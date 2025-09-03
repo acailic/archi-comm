@@ -1,0 +1,127 @@
+{
+  "$schema": "..\\node_modules/@tauri-apps/cli\\schema\\tauri-apps-cli.schema.json",
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "ArchiComm",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "path": {
+        "all": true
+      },
+      "fs": {
+        "all": true,
+        "scope": ["$APPDATA", "$APPDATA/*", "$RESOURCE", "$RESOURCE/*", "$TEMP", "$TEMP/*"]
+      },
+      "dialog": {
+        "all": true
+      },
+      "notification": {
+        "all": true
+      },
+      "clipboard": {
+        "all": true
+      },
+      "globalShortcut": {
+        "all": true
+      },
+      "os": {
+        "all": true
+      },
+      "window": {
+        "all": false,
+        "close": true,
+        "hide": true,
+        "show": true,
+        "maximize": true,
+        "minimize": true,
+        "unmaximize": true,
+        "unminimize": true,
+        "startDragging": true,
+        "print": true,
+        "setResizable": true,
+        "setTitle": true,
+        "setMaximizable": true,
+        "setMinimizable": true,
+        "setClosable": true,
+        "setDecorations": true,
+        "setAlwaysOnTop": true,
+        "setSize": true,
+        "setMinSize": true,
+        "setMaxSize": true,
+        "setPosition": true,
+        "setFullscreen": true,
+        "setFocus": true,
+        "setIcon": true,
+        "setSkipTaskbar": true,
+        "setCursorGrab": true,
+        "setCursorVisible": true,
+        "setCursorIcon": true,
+        "setCursorPosition": true,
+        "setIgnoreCursorEvents": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.archicomm.app",
+      "icon": [],
+      "resources": [],
+      "externalBin": [],
+      "copyright": "",
+      "category": "DeveloperTool",
+      "shortDescription": "Architecture Communication Platform",
+      "longDescription": "A comprehensive platform for architectural design and team communication, enabling seamless collaboration on software architecture projects.",
+      "deb": {
+        "depends": []
+      },
+      "macOS": {
+        "frameworks": [],
+        "minimumSystemVersion": "10.13",
+        "exceptionDomain": "",
+        "signingIdentity": null,
+        "providerShortName": null,
+        "entitlements": null
+      },
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "ArchiComm",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "fileDropEnabled": false,
+        "url": "../dist/index.html"
+      }
+    ],
+    "updater": {
+      "active": false
+    }
+  }
+}

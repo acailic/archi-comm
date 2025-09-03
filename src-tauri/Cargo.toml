@@ -1,0 +1,72 @@
+[package]
+name = "archicomm"
+version = "0.1.0"
+description = "ArchiComm MVP Application - Desktop Architecture Communication Platform"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/your-username/archicomm"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.8", features = [
+    "clipboard-all",
+    "dialog-all",
+    "fs-all",
+    "global-shortcut-all", 
+    "notification-all",
+    "os-all",
+    "path-all",
+    "shell-open",
+    "window-close",
+    "window-hide",
+    "window-maximize", 
+    "window-minimize",
+    "window-print",
+    "window-set-always-on-top",
+    "window-set-closable",
+    "window-set-cursor-grab",
+    "window-set-cursor-icon",
+    "window-set-cursor-position",
+    "window-set-cursor-visible",
+    "window-set-decorations",
+    "window-set-focus",
+    "window-set-fullscreen",
+    "window-set-icon",
+    "window-set-ignore-cursor-events",
+    "window-set-max-size",
+    "window-set-maximizable",
+    "window-set-min-size",
+    "window-set-minimizable",
+    "window-set-position",
+    "window-set-resizable",
+    "window-set-size",
+    "window-set-skip-taskbar",
+    "window-set-title",
+    "window-show",
+    "window-start-dragging",
+    "window-unmaximize",
+    "window-unminimize"
+] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
+dirs = "5.0"
+log = "0.4"
+env_logger = "0.11"
+
+[features]
+# This feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
+
+[[bin]]
+name = "archicomm"
+path = "src/main.rs"
