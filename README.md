@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/acailic/archi-comm/main/src-tauri/icons/app-icon.png" alt="ArchiComm Logo" width="110" height="110">
+<img src="https://raw.githubusercontent.com/acailic/archicomm/main/src-tauri/icons/icon.png" alt="ArchiComm Logo" width="110" height="110">
 
 # ArchiComm
 ### A desktop companion for studying system design
@@ -34,8 +34,8 @@ See also: src/docs/SystemDesignPractice.md
 
 ```bash
 # Clone and launch the desktop app
-git clone https://github.com/acailic/archi-comm.git
-cd archi-comm
+git clone https://github.com/acailic/archicomm.git
+cd archicomm
 npm install
 npm run dev   # or: npm start
 ```
@@ -140,8 +140,8 @@ Press `?` in the app for the full list.
 We welcome improvements to modules, patterns, checklists, and study flows.
 
 ```bash
-git clone https://github.com/acailic/archi-comm.git
-cd archi-comm
+git clone https://github.com/acailic/archicomm.git
+cd archicomm
 npm install
 npm run dev
 ```
