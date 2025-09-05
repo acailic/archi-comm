@@ -15,6 +15,20 @@ mod dev_utils;
 // Audio transcription module
 mod transcription;
 
+// Data structures for transcription
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptionSegment {
+    pub text: String,
+    pub start: i64,
+    pub end: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptionResponse {
+    pub text: String,
+    pub segments: Vec<TranscriptionSegment>,
+}
+
 // Data structures for the application
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -296,6 +310,33 @@ async fn load_connections(
     Ok(store.get(&project_id).cloned().unwrap_or_default())
 }
 
+// Tauri command for audio transcription
+#[tauri::command]
+async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, String> {
+    let config = transcription::TranscriptionConfig {
+        model: transcription::Model::Base,
+        language: None,
+    };
+
+    let mut transcriber = transcription::AudioTranscriber::new(config);
+    if let Err(e) = transcriber.initialize() {
+        return Err(format!("Failed to initialize transcriber: {}", e));
+    }
+
+    match transcriber.transcribe_audio(&file_path) {
+        Ok(result) => {
+            // simple_transcribe_rs does not provide segments, so we return an empty vec
+            let response = TranscriptionResponse {
+                text: result.text,
+                segments: vec![],
+            };
+            Ok(response)
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+
 // Utility commands
 #[tauri::command]
 async fn get_app_version() -> Result<String, String> {
@@ -406,6 +447,8 @@ fn main() {
                     get_app_version,
                     show_in_folder,
                     export_project_data,
+                    // Transcription command
+                    transcribe_audio,
                     // Debug commands
                     populate_sample_data,
                 ]
@@ -432,6 +475,8 @@ fn main() {
                     get_app_version,
                     show_in_folder,
                     export_project_data,
+                    // Transcription command
+                    transcribe_audio,
                 ]
             }
         })

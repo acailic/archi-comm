@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { useDrag } from 'react-dnd';
+import { useDrag, useDrop } from 'react-dnd';
 import { DesignComponent } from '../App';
 import { 
   Server, Database, Zap, Globe, Monitor, HardDrive, Cloud, Container, 
@@ -16,6 +16,8 @@ interface CanvasComponentProps {
   isConnectionStart: boolean;
   onMove: (id: string, x: number, y: number) => void;
   onSelect: (id: string) => void;
+  onStartConnection: (id: string, position: 'top' | 'bottom' | 'left' | 'right') => void;
+  onCompleteConnection: (fromId: string, toId: string) => void;
 }
 
 const componentIcons: Record<DesignComponent['type'], React.ComponentType<any>> = {
@@ -176,16 +178,43 @@ const componentColors: Record<DesignComponent['type'], string> = {
   'ai-ml': 'bg-pink-600'
 };
 
+const ConnectionPoint = ({ position, onStartConnection, componentId }) => {
+  const [, drag] = useDrag(() => ({
+    type: 'connection-point',
+    item: { fromId: componentId, fromPosition: position },
+  }));
+
+  const positionClasses = {
+    top: '-top-1 left-1/2 -translate-x-1/2',
+    bottom: '-bottom-1 left-1/2 -translate-x-1/2',
+    left: '-left-1 top-1/2 -translate-y-1/2',
+    right: '-right-1 top-1/2 -translate-y-1/2',
+  };
+
+  return (
+    <div
+      ref={drag}
+      className={`absolute w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${positionClasses[position]}`}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        onStartConnection(componentId, position);
+      }}
+    />
+  );
+};
+
 export function CanvasComponent({
   component,
   isSelected,
   isConnectionStart,
   onMove,
-  onSelect
+  onSelect,
+  onStartConnection,
+  onCompleteConnection,
 }: CanvasComponentProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const Icon = componentIcons[component.type] || Server; // Fallback to Server icon
-  const bgColor = componentColors[component.type] || 'bg-gray-500'; // Fallback color
+  const Icon = componentIcons[component.type] || Server;
+  const bgColor = componentColors[component.type] || 'bg-gray-500';
 
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'canvas-component',
@@ -203,7 +232,19 @@ export function CanvasComponent({
     },
   }));
 
-  drag(ref);
+  const [{ isOver }, drop] = useDrop(() => ({
+    accept: 'connection-point',
+    drop: (item: { fromId: string }) => {
+      if (item.fromId !== component.id) {
+        onCompleteConnection(item.fromId, component.id);
+      }
+    },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+    }),
+  }));
+
+  drag(drop(ref));
 
   return (
     <div
@@ -219,6 +260,7 @@ export function CanvasComponent({
         ${isDragging ? 'opacity-75 z-50 scale-105' : 'z-10'}
         ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}
         ${isConnectionStart ? 'ring-2 ring-yellow-500 ring-offset-2 animate-pulse' : ''}
+        ${isOver ? 'ring-2 ring-green-500' : ''}
       `}
       onClick={() => onSelect(component.id)}
     >
@@ -226,14 +268,12 @@ export function CanvasComponent({
         w-full h-full rounded-lg shadow-lg border-2
         ${isSelected ? 'border-primary' : 'border-border'}
         ${isConnectionStart ? 'border-yellow-500' : ''}
+        ${isOver ? 'border-green-500' : ''}
         bg-background hover:shadow-xl transition-shadow
       `}>
-        {/* Icon section */}
         <div className={`w-full h-8 ${bgColor} rounded-t-md flex items-center justify-center`}>
           <Icon className="w-4 h-4 text-white" />
         </div>
-        
-        {/* Label section */}
         <div className="px-2 py-1 text-center">
           <div className="text-xs font-medium truncate" title={component.label}>
             {component.label}
@@ -241,11 +281,10 @@ export function CanvasComponent({
         </div>
       </div>
 
-      {/* Connection points */}
-      <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="absolute -left-1 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <ConnectionPoint position="top" onStartConnection={onStartConnection} componentId={component.id} />
+      <ConnectionPoint position="bottom" onStartConnection={onStartConnection} componentId={component.id} />
+      <ConnectionPoint position="left" onStartConnection={onStartConnection} componentId={component.id} />
+      <ConnectionPoint position="right" onStartConnection={onStartConnection} componentId={component.id} />
     </div>
   );
 }

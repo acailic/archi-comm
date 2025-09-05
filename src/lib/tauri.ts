@@ -217,10 +217,51 @@ export const diagramUtils = {
   },
 };
 
+// Type guard to validate TranscriptionResponse structure
+function isValidTranscriptionResponse(response: any): response is TranscriptionResponse {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    typeof response.text === 'string' &&
+    Array.isArray(response.segments) &&
+    response.segments.every((segment: any) => 
+      typeof segment === 'object' &&
+      segment !== null &&
+      typeof segment.text === 'string' &&
+      typeof segment.start === 'number' &&
+      typeof segment.end === 'number'
+    )
+  );
+}
+
 // Transcription utilities
 export const transcriptionUtils = {
   async transcribeAudio(filePath: string): Promise<TranscriptionResponse> {
-    return ipcUtils.invoke('transcribe_audio', { filePath });
+    // Check if running in Tauri environment
+    if (!isTauri()) {
+      // Return typed fallback object for non-Tauri environments
+      return {
+        text: '',
+        segments: []
+      };
+    }
+
+    try {
+      // IPC payload key matches backend's expected parameter name (file_path)
+      const response = await ipcUtils.invoke('transcribe_audio', { file_path: filePath });
+      
+      // Validate response structure before returning
+      if (!isValidTranscriptionResponse(response)) {
+        throw new Error(
+          `Invalid transcription response structure: expected TranscriptionResponse with 'text' (string) and 'segments' (array), but received: ${JSON.stringify(response)}`
+        );
+      }
+      
+      return response;
+    } catch (error) {
+      // Handle any errors from the backend or validation
+      throw new Error(`Transcription failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   },
 };
 

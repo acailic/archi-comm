@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Button } from './ui/button';
@@ -22,17 +22,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [components, setComponents] = useState<DesignComponent[]>(initialData.components);
   const [connections, setConnections] = useState<Connection[]>(initialData.connections);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
-  const [connectionMode, setConnectionMode] = useState(false);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
-  const [sessionStartTime] = useState<Date>(new Date());
-  const [designProgress, setDesignProgress] = useState({
-    componentsCount: 0,
-    connectionsCount: 0,
-    timeElapsed: 0
-  });
 
-  // Get extended challenge data
   const extendedChallenge = challengeManager.getChallengeById(challenge.id) as ExtendedChallenge || challenge;
 
   const handleComponentDrop = useCallback((componentType: DesignComponent['type'], x: number, y: number) => {
@@ -53,25 +45,25 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, []);
 
   const handleComponentSelect = useCallback((id: string) => {
-    if (connectionMode) {
-      if (!connectionStart) {
-        setConnectionStart(id);
-      } else if (connectionStart !== id) {
-        const newConnection: Connection = {
-          id: `connection-${Date.now()}`,
-          from: connectionStart,
-          to: id,
-          label: 'Connection',
-          type: 'data'
-        };
-        setConnections(prev => [...prev, newConnection]);
-        setConnectionStart(null);
-        setConnectionMode(false);
-      }
-    } else {
-      setSelectedComponent(id);
-    }
-  }, [connectionMode, connectionStart]);
+    setSelectedComponent(id);
+  }, []);
+
+  const handleStartConnection = useCallback((id: string) => {
+    setConnectionStart(id);
+  }, []);
+
+  const handleCompleteConnection = useCallback((fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    const newConnection: Connection = {
+      id: `connection-${Date.now()}`,
+      from: fromId,
+      to: toId,
+      label: 'Connection',
+      type: 'data'
+    };
+    setConnections(prev => [...prev, newConnection]);
+    setConnectionStart(null);
+  }, []);
 
   const handleComponentLabelChange = useCallback((id: string, label: string) => {
     setComponents(prev => prev.map(comp => 
@@ -134,7 +126,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen flex flex-col">
-        {/* Header */}
         <div className="border-b bg-card p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -173,44 +164,12 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         </div>
 
         <div className="flex-1 flex">
-          {/* Component Palette & Tools Sidebar */}
           <div className="w-80 border-r bg-card/30 backdrop-blur-sm flex flex-col">
-            {/* Component Library */}
             <div className="flex-1 p-4">
               <ComponentPalette />
             </div>
             
-            {/* Tools Section */}
             <div className="border-t border-border/30 p-4 space-y-4">
-              {/* Connection Controls */}
-              <Card className="bg-card/50 backdrop-blur-sm border-border/30">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    Connections
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button
-                    variant={connectionMode ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setConnectionMode(!connectionMode);
-                      setConnectionStart(null);
-                    }}
-                    className="w-full"
-                  >
-                    {connectionMode ? 'Cancel Connection' : 'Add Connection'}
-                  </Button>
-                  {connectionMode && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Click two components to connect them
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Selected Component Properties */}
               {selectedComponent && (
                 <Card className="bg-card/50 backdrop-blur-sm border-border/30">
                   <CardHeader className="pb-2">
@@ -252,7 +211,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             </div>
           </div>
 
-          {/* Canvas Area */}
           <div className="flex-1 flex">
             <div className="flex-1">
               <CanvasArea
@@ -266,10 +224,11 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                 onConnectionLabelChange={handleConnectionLabelChange}
                 onConnectionDelete={handleConnectionDelete}
                 onConnectionTypeChange={handleConnectionTypeChange}
+                onStartConnection={handleStartConnection}
+                onCompleteConnection={handleCompleteConnection}
               />
             </div>
             
-            {/* Solution Hints Panel */}
             {showHints && (
               <div className="w-80 border-l bg-card/30 backdrop-blur-sm">
                 <SolutionHints 
