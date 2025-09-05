@@ -13,7 +13,7 @@ edition = "2021"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.8", features = [
+tauri = { version = "1.8", features = [ "system-tray",
     "clipboard-all",
     "dialog-all",
     "fs-all",

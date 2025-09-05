@@ -116,6 +116,17 @@ export interface Connection {
   properties: Record<string, string>;
 }
 
+export interface TranscriptionSegment {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export interface TranscriptionResponse {
+  text: string;
+  segments: TranscriptionSegment[];
+}
+
 // Project management utilities (matching actual Rust backend commands)
 export const projectUtils = {
   async createProject(name: string, description: string): Promise<Project> {
@@ -206,6 +217,13 @@ export const diagramUtils = {
   },
 };
 
+// Transcription utilities
+export const transcriptionUtils = {
+  async transcribeAudio(filePath: string): Promise<TranscriptionResponse> {
+    return ipcUtils.invoke('transcribe_audio', { filePath });
+  },
+};
+
 // Utility functions
 export const utilUtils = {
   async getAppVersion(): Promise<string> {
@@ -236,6 +254,7 @@ export const tauriAPI = {
   projectUtils,
   componentUtils,
   diagramUtils,
+  transcriptionUtils,
   utilUtils,
   // Convenience methods expected by UI components
   async getAppVersion() {

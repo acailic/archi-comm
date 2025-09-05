@@ -124,9 +124,7 @@
         "minWidth": 800,
         "minHeight": 600,
         "center": true,
-        "decorations": false,
-        "transparent": true,
-        "titleBarStyle": "overlay",
+        "decorations": true,
         "alwaysOnTop": false,
         "fileDropEnabled": false,
         "url": "index.html"
