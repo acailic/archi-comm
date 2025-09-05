@@ -12,6 +12,9 @@ use uuid::Uuid;
 #[cfg(debug_assertions)]
 mod dev_utils;
 
+// Audio transcription module
+mod transcription;
+
 // Data structures for the application
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {

@@ -9,7 +9,7 @@ const CommandPalette = React.lazy(() => import('@modules/command').then(m => ({ 
 const WelcomeOverlay = React.lazy(() => import('@modules/onboarding').then(m => ({ default: m.WelcomeOverlay })));
 const StatusBar = React.lazy(() => import('@modules/status').then(m => ({ default: m.StatusBar })));
 const ChallengeManager = React.lazy(() => import('@modules/challenges').then(m => ({ default: m.ChallengeManager })));
-import { TitleBar } from './components/TitleBar';
+
 import { tauriAPI, isTauriApp } from './lib/tauri';
 import { challengeManager, ExtendedChallenge } from './lib/challenge-config';
 import { reloadTracker, preventUnnecessaryReload } from './lib/reload-tracker';
@@ -447,7 +447,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden">
       {/* Tauri Title Bar */}
-      <TitleBar title={screenTitles[currentScreen]} />
+      
       
       {/* Window Controls */}
       <WindowControls 
