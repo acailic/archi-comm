@@ -119,7 +119,207 @@ Thumbs.db
 .claude-flow/
 .hive-mind/
 
+# Development tools and caches
+.turbo/
+.next/
+.nuxt/
+.out/
+.vercel/
+.wrangler/
+.netlify/
+.firebase/
+
+# TypeScript
+*.tsbuildinfo
+.tscache/
+
+# ESLint
+.eslintcache
+
+# Prettier
+.prettierignore
+
+# Stylelint
+.stylelintcache
+
+# Bundle analyzers
+.bundle-analyzer/
+bundle-report.html
+stats.html
+
+# Package managers
+yarn.lock
+pnpm-lock.yaml
+.pnpm-debug.log*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# IDE and editors
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+*~
+tags
+[._]*.un~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# macOS specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows specific
+[Tt]humbs.db
+[Tt]humbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux specific
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Security
+.env.*.local
+.envrc
+.secrets
+secrets.json
+config.json
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+auth.json
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# Kubernetes
+*.kubeconfig
+kustomization.yaml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+*.tfplan
+
+# Deployment and CI/CD
+.github/workflows/secrets/
+deploy.sh
+deployment/
+k8s/secrets/
+
+# Performance and profiling
+*.prof
+*.heap
+*.cpuprofile
+.clinic/
+profile.json
+isolate-*
+v8.log
+
 # Backup files
 *.backup
 *.bak
 *.orig
+*.tmp
+*.swp
+*.swo
+*~.nib
+*.old
+
+# Auto-generated files
+auto-imports.d.ts
+components.d.ts
+typed-router.d.ts
+*.generated.*
+
+# Local development overrides
+.local/
+local.config.*
+dev.config.*
+*.local.*
