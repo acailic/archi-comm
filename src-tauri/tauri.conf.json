@@ -1,9 +1,9 @@
 {
   "$schema": "..\\node_modules/@tauri-apps/cli\\schema\\tauri-apps-cli.schema.json",
   "build": {
-    "beforeBuildCommand": "npm run build",
-    "beforeDevCommand": "npm run dev",
-    "devPath": "http://localhost:1420",
+    "beforeBuildCommand": "npm run web:build",
+    "beforeDevCommand": "npm run web:dev",
+    "devPath": "http://localhost:5173",
     "distDir": "../dist",
     "withGlobalTauri": true
   },
@@ -117,7 +117,7 @@
         "decorations": true,
         "alwaysOnTop": false,
         "fileDropEnabled": false,
-        "url": "../dist/index.html"
+        "url": "index.html"
       }
     ],
     "updater": {

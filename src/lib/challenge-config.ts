@@ -233,7 +233,182 @@ export const defaultChallengeConfig: ChallengeConfig = {
         }
       ]
     }
-    // Additional challenges would be loaded from external sources
+    ,
+    {
+      id: 'news-feed',
+      title: 'Social Media News Feed',
+      description: 'Design a personalized, real-time news feed like Twitter or Instagram supporting ranking, fan-out, and timelines.',
+      requirements: [
+        '100M DAU with 10k posts/sec peak',
+        'Latency: p95 < 200ms to render initial feed',
+        'Personalized ranking with recency and engagement signals',
+        'Support write amplification (fan-out/fan-in trade-offs)',
+        'Backfill, pagination, and timeline invalidation'
+      ],
+      difficulty: 'advanced',
+      estimatedTime: 60,
+      category: 'system-design',
+      tags: ['ranking', 'caching', 'fanout', 'search', 'feed'],
+      learningObjectives: [
+        'Compare fan-out on write vs fan-in on read',
+        'Design cache hierarchies for hot feeds',
+        'Model timelines and invalidation strategies',
+        'Balance consistency and freshness'
+      ],
+      solutionHints: [
+        {
+          id: 'news-feed-cache',
+          title: 'Multi-tier Caching',
+          content: 'Cache user timelines (Redis) and consider per-shard hot timelines. Use write-through for hot users and compute-on-read for tail users.',
+          type: 'optimization',
+          difficulty: 'intermediate'
+        },
+        {
+          id: 'news-feed-fanout',
+          title: 'Fan-out Strategy',
+          content: 'High-follower producers use fan-in-on-read to avoid write storms. Long-tail posts can use fan-out-on-write via a queue.',
+          type: 'tradeoff',
+          difficulty: 'advanced'
+        }
+      ],
+      architectureTemplate: {
+        name: 'Ranked Feed (Hybrid Fan-out)',
+        description: 'Hybrid fan-out with cached timelines and background ranking jobs',
+        components: [
+          { type: 'api-gateway', label: 'API Gateway', description: 'Auth, rate limit', position: { x: 120, y: 90 } },
+          { type: 'server', label: 'Feed Service', description: 'Assemble timelines', position: { x: 320, y: 90 } },
+          { type: 'redis', label: 'Timeline Cache', description: 'Per-user timelines', position: { x: 520, y: 90 } },
+          { type: 'message-queue', label: 'Queue', description: 'Ingest posts/events', position: { x: 320, y: 240 } },
+          { type: 'elasticsearch', label: 'Search/Ranking', description: 'Feature store / rank', position: { x: 520, y: 240 } },
+          { type: 'postgresql', label: 'Feed DB', description: 'Timeline and edges', position: { x: 720, y: 180 } }
+        ],
+        connections: [
+          { from: 'API Gateway', to: 'Feed Service', label: 'REST', type: 'sync', protocol: 'REST' },
+          { from: 'Feed Service', to: 'Timeline Cache', label: 'Read/Write', type: 'sync' },
+          { from: 'Feed Service', to: 'Queue', label: 'Events', type: 'async' },
+          { from: 'Queue', to: 'Search/Ranking', label: 'Consumers', type: 'async' },
+          { from: 'Feed Service', to: 'Feed DB', label: 'Persist', type: 'sync' }
+        ]
+      },
+      resources: [
+        { title: 'Designing a News Feed', url: 'https://example.com/news-feed', type: 'case-study' }
+      ]
+    },
+    {
+      id: 'chat-system',
+      title: 'Real-time Chat and Presence',
+      description: 'Design a WhatsApp/Slack-like chat service with real-time messaging, presence, and typing indicators.',
+      requirements: [
+        'WebSocket connections at 1M concurrent users',
+        'Message delivery p99 < 150ms within a region',
+        'Message persistence with read receipts',
+        'Online/offline presence and typing indicators',
+        'Backpressure and retries for mobile clients'
+      ],
+      difficulty: 'intermediate',
+      estimatedTime: 45,
+      category: 'system-design',
+      tags: ['realtime', 'websocket', 'presence', 'messaging', 'queues'],
+      learningObjectives: [
+        'Architect low-latency real-time messaging',
+        'Plan session affinity and scale WebSockets',
+        'Handle backpressure and retries',
+        'Persist messages and receipts efficiently'
+      ],
+      solutionHints: [
+        {
+          id: 'chat-presence',
+          title: 'Presence Storage',
+          content: 'Keep presence in Redis with short TTL heartbeats; shard by userId. Broadcast changes via pub/sub.',
+          type: 'architecture',
+          difficulty: 'beginner'
+        },
+        {
+          id: 'chat-ws-scale',
+          title: 'WebSocket Scaling',
+          content: 'Use a WS gateway tier with sticky LB to a connection manager. Fan-out via MQ to server groups subscribed to rooms.',
+          type: 'scaling',
+          difficulty: 'intermediate'
+        }
+      ],
+      architectureTemplate: {
+        name: 'Chat with WS Gateway',
+        description: 'Gateway + chat service + Redis pub/sub + durable store',
+        components: [
+          { type: 'api-gateway', label: 'WS Gateway', description: 'Sticky sessions', position: { x: 120, y: 90 } },
+          { type: 'websocket', label: 'WS Endpoint', description: 'Upgrade connections', position: { x: 260, y: 90 } },
+          { type: 'server', label: 'Chat Service', description: 'Rooms, routing', position: { x: 420, y: 90 } },
+          { type: 'redis', label: 'Redis Pub/Sub', description: 'Presence + fan-out', position: { x: 600, y: 90 } },
+          { type: 'postgresql', label: 'Messages DB', description: 'Durable storage', position: { x: 420, y: 240 } },
+          { type: 'message-queue', label: 'Async Queue', description: 'Retries/Buffer', position: { x: 600, y: 240 } }
+        ],
+        connections: [
+          { from: 'WS Gateway', to: 'WS Endpoint', label: 'Upgrade', type: 'sync', protocol: 'WebSocket' },
+          { from: 'WS Endpoint', to: 'Chat Service', label: 'Session', type: 'sync' },
+          { from: 'Chat Service', to: 'Redis Pub/Sub', label: 'Publish', type: 'async' },
+          { from: 'Chat Service', to: 'Messages DB', label: 'Persist', type: 'sync' },
+          { from: 'Chat Service', to: 'Async Queue', label: 'Retry', type: 'async' }
+        ]
+      }
+    },
+    {
+      id: 'ride-hailing',
+      title: 'Ride-hailing Dispatch System',
+      description: 'Design Uber/Lyft-style dispatch: matching drivers to riders, live location updates, surge pricing.',
+      requirements: [
+        'Real-time location updates at >50k events/sec',
+        'Match latency under 500ms at p95',
+        'Geo-partitioning and nearest-neighbor search',
+        'Resilient to mobile disconnects and retries',
+        'Support surge pricing calculations'
+      ],
+      difficulty: 'advanced',
+      estimatedTime: 60,
+      category: 'scaling',
+      tags: ['geospatial', 'stream-processing', 'matching', 'caching'],
+      learningObjectives: [
+        'Partition by geography for scale',
+        'Maintain driver location indexes',
+        'Design matching and pricing pipelines',
+        'Handle mobile networking challenges'
+      ],
+      solutionHints: [
+        {
+          id: 'ride-geo',
+          title: 'Geo Indexing',
+          content: 'Use geohash or H3 to shard location updates and query nearby drivers efficiently.',
+          type: 'architecture',
+          difficulty: 'intermediate'
+        },
+        {
+          id: 'ride-stream',
+          title: 'Streaming Updates',
+          content: 'Buffer updates on a message queue; aggregate per cell and push deltas to clients to control bandwidth.',
+          type: 'optimization',
+          difficulty: 'advanced'
+        }
+      ],
+      architectureTemplate: {
+        name: 'Geo-partitioned Dispatch',
+        description: 'Geo-sharded services with streaming updates and caching',
+        components: [
+          { type: 'api-gateway', label: 'API Gateway', description: 'Auth/Rate limit', position: { x: 120, y: 90 } },
+          { type: 'server', label: 'Dispatch Service', description: 'Matching logic', position: { x: 320, y: 90 } },
+          { type: 'server', label: 'Location Service', description: 'Geo index', position: { x: 520, y: 90 } },
+          { type: 'message-queue', label: 'Updates Queue', description: 'Ingest telemetry', position: { x: 320, y: 240 } },
+          { type: 'redis', label: 'Hot Cache', description: 'Nearby drivers', position: { x: 520, y: 240 } },
+          { type: 'postgresql', label: 'Rides DB', description: 'Trips/History', position: { x: 720, y: 180 } }
+        ],
+        connections: [
+          { from: 'API Gateway', to: 'Dispatch Service', label: 'REST', type: 'sync', protocol: 'REST' },
+          { from: 'Dispatch Service', to: 'Location Service', label: 'Query', type: 'sync' },
+          { from: 'Location Service', to: 'Updates Queue', label: 'Ingest', type: 'async' },
+          { from: 'Dispatch Service', to: 'Hot Cache', label: 'Read/Write', type: 'sync' },
+          { from: 'Dispatch Service', to: 'Rides DB', label: 'Persist', type: 'sync' }
+        ]
+      }
+    }
+    // Additional challenges may be loaded from external sources
   ],
   settings: {
     enableHints: true,

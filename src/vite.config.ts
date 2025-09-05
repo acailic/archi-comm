@@ -7,6 +7,20 @@ const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './test/setup.ts',
+    css: true,
+    coverage: {
+      reporter: ['text', 'html'],
+      exclude: ['src-tauri/**', 'dist/**'],
+      lines: 70,
+      functions: 65,
+      branches: 55,
+      statements: 70
+    }
+  },
   
   // Root directory and index.html location
   root: '.',
@@ -40,9 +54,49 @@ export default defineConfig({
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     // Produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
+    cssCodeSplit: true,
+    treeshake: true,
     rollupOptions: {
       input: 'index.html',
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          motion: ['motion'],
+          radix: [
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-aspect-ratio',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-collapsible',
+            '@radix-ui/react-context-menu',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-hover-card',
+            '@radix-ui/react-label',
+            '@radix-ui/react-menubar',
+            '@radix-ui/react-navigation-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-radio-group',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-separator',
+            '@radix-ui/react-slider',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toggle',
+            '@radix-ui/react-toggle-group',
+            '@radix-ui/react-tooltip',
+          ],
+          charts: ['recharts'],
+          dnd: ['react-dnd', 'react-dnd-html5-backend'],
+          tauri: ['@tauri-apps/api'],
+        },
+      },
     },
+  },
+  esbuild: {
+    drop: process.env.TAURI_DEBUG ? [] : ['console', 'debugger'],
   },
   
   resolve: {
@@ -84,6 +138,9 @@ export default defineConfig({
       '@radix-ui/react-alert-dialog@1.1.6': '@radix-ui/react-alert-dialog',
       '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
       '@': path.resolve(__dirname, './src'),
+      '@modules': path.resolve(__dirname, './src/modules'),
+      '@services': path.resolve(__dirname, './src/services'),
+      '@shared': path.resolve(__dirname, './src/shared'),
     },
   },
 });

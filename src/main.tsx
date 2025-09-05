@@ -1,6 +1,7 @@
 
   import { createRoot } from "react-dom/client";
   import App from "./App.tsx";
+  import { ErrorBoundary } from './shared/ui/ErrorBoundary';
   import "./index.css";
 
   // Disable right-click context menu in production Tauri build
@@ -16,5 +17,9 @@
     });
   }
 
-  createRoot(document.getElementById("root")!).render(<App />);
+  createRoot(document.getElementById("root")!).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
   

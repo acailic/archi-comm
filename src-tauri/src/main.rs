@@ -443,3 +443,27 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn project_serialization_contract() {
+        let p = Project {
+            id: "id1".into(),
+            name: "Name".into(),
+            description: "Desc".into(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            status: ProjectStatus::Planning,
+            components: vec![],
+        };
+        let s = serde_json::to_string(&p).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(v["name"], json!("Name"));
+        assert!(v["created_at"].as_str().unwrap().contains('T'));
+        assert_eq!(v["status"], json!("Planning"));
+    }
+}

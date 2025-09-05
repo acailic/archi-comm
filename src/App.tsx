@@ -1,17 +1,18 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { ChallengeSelection } from './components/ChallengeSelection';
-import { DesignCanvas } from './components/DesignCanvas';
-import { AudioRecording } from './components/AudioRecording';
-import { ReviewScreen } from './components/ReviewScreen';
-import { WindowControls } from './components/WindowControls';
-import { CommandPalette } from './components/CommandPalette';
-import { WelcomeOverlay } from './components/WelcomeOverlay';
-import { StatusBar } from './components/StatusBar';
-import { ChallengeManager } from './components/ChallengeManager';
+import React, { useState, useCallback, useEffect, Suspense, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+const ChallengeSelection = React.lazy(() => import('@modules/challenges').then(m => ({ default: m.ChallengeSelection })));
+const DesignCanvas = React.lazy(() => import('@modules/canvas').then(m => ({ default: m.DesignCanvas })));
+const AudioRecording = React.lazy(() => import('@modules/session').then(m => ({ default: m.AudioRecording })));
+const ReviewScreen = React.lazy(() => import('@modules/review').then(m => ({ default: m.ReviewScreen })));
+const WindowControls = React.lazy(() => import('@modules/status').then(m => ({ default: m.WindowControls })));
+const CommandPalette = React.lazy(() => import('@modules/command').then(m => ({ default: m.CommandPalette })));
+const WelcomeOverlay = React.lazy(() => import('@modules/onboarding').then(m => ({ default: m.WelcomeOverlay })));
+const StatusBar = React.lazy(() => import('@modules/status').then(m => ({ default: m.StatusBar })));
+const ChallengeManager = React.lazy(() => import('@modules/challenges').then(m => ({ default: m.ChallengeManager })));
 import { TitleBar } from './components/TitleBar';
 import { tauriAPI, isTauriApp } from './lib/tauri';
 import { challengeManager, ExtendedChallenge } from './lib/challenge-config';
+import { reloadTracker, preventUnnecessaryReload } from './lib/reload-tracker';
 import { Button } from './components/ui/button';
 import { Progress } from './components/ui/progress';
 import { 
@@ -44,7 +45,7 @@ export interface DesignComponent {
         'data-warehouse' | 'data-lake' | 'etl' | 'stream-processing' | 'event-sourcing' |
         'cqrs' | 'graphql' | 'rest-api' | 'websocket' | 'grpc' | 'mobile-app' | 'web-app' |
         'desktop-app' | 'iot-device' | 'edge-computing' | 'serverless' | 'lambda' |
-        'cloud-function' | 'storage' | 's3' | 'blob-storage' | 'file-system';
+        'cloud-function' | 'storage' | 's3' | 'blob-storage' | 'file-system' | 'note';
   x: number;
   y: number;
   label: string;
@@ -103,6 +104,17 @@ const screenIcons = {
 };
 
 export default function App() {
+  // Development reload tracking
+  const preventReload = preventUnnecessaryReload('App');
+  preventReload();
+  
+  // Log app initialization in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      reloadTracker.logEvent('app-init', 'App component initialized');
+    }
+  }, []);
+  
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [designData, setDesignData] = useState<DesignData>({
@@ -158,87 +170,137 @@ export default function App() {
     return currentIndex >= 0 ? ((currentIndex + 1) / screens.length) * 100 : 0;
   };
 
-  // Auto-save functionality
-  useEffect(() => {
-    if (selectedChallenge && (designData.components.length > 0 || audioData.transcript)) {
-      const autoSave = async () => {
-        try {
-          const sessionData = {
-            challenge: selectedChallenge,
-            design: designData,
-            audio: {
-              transcript: audioData.transcript,
-              duration: audioData.duration,
-              wordCount: audioData.wordCount,
-              businessValueTags: audioData.businessValueTags
-            },
-            progress: currentScreen,
-            timestamp: new Date().toISOString()
-          };
-          
-          await tauriAPI.saveDesign(sessionData, `autosave-${selectedChallenge.id}`);
-        } catch (error) {
-          console.error('Auto-save failed:', error);
-        }
-      };
-
-      const timeout = setTimeout(autoSave, 5000); // Auto-save every 5 seconds
-      return () => clearTimeout(timeout);
+  // Debounced auto-save functionality
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSaveDataRef = useRef<string>('');
+  
+  const autoSave = useCallback(async (sessionData: any) => {
+    try {
+      await tauriAPI.saveDesign(sessionData, `autosave-${sessionData.challenge.id}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Auto-save completed');
+      }
+    } catch (error) {
+      console.error('Auto-save failed:', error);
     }
-  }, [selectedChallenge, designData, audioData, currentScreen]);
-
-  // Keyboard shortcuts
+  }, []);
+  
+  const sessionDataToSave = useMemo(() => {
+    if (!selectedChallenge) return null;
+    
+    return {
+      challenge: selectedChallenge,
+      design: designData,
+      audio: {
+        transcript: audioData.transcript,
+        duration: audioData.duration,
+        wordCount: audioData.wordCount,
+        businessValueTags: audioData.businessValueTags
+      },
+      progress: currentScreen,
+      timestamp: new Date().toISOString()
+    };
+  }, [selectedChallenge, designData.components, designData.connections, audioData.transcript, audioData.duration, audioData.wordCount, audioData.businessValueTags, currentScreen]);
+  
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Command palette (Cmd/Ctrl + K)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCommandPalette(true);
-      }
+    if (sessionDataToSave && (designData.components.length > 0 || audioData.transcript)) {
+      // Create a serialized version to check if data actually changed
+      const currentDataString = JSON.stringify({
+        components: sessionDataToSave.design.components,
+        connections: sessionDataToSave.design.connections,
+        transcript: sessionDataToSave.audio.transcript,
+        progress: sessionDataToSave.progress
+      });
       
-      // Challenge manager (Cmd/Ctrl + Shift + C)
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'C') {
-        e.preventDefault();
-        setShowChallengeManager(true);
-      }
-      
-      // Navigation shortcuts
-      if (e.altKey) {
-        switch (e.key) {
-          case '1':
-            e.preventDefault();
-            if (currentScreen !== 'challenge-selection') setCurrentScreen('challenge-selection');
-            break;
-          case '2':
-            e.preventDefault();
-            if (selectedChallenge && currentScreen !== 'design-canvas') setCurrentScreen('design-canvas');
-            break;
-          case '3':
-            e.preventDefault();
-            if (selectedChallenge && currentScreen !== 'audio-recording') setCurrentScreen('audio-recording');
-            break;
-          case '4':
-            e.preventDefault();
-            if (selectedChallenge && currentScreen !== 'review') setCurrentScreen('review');
-            break;
+      // Only save if data actually changed
+      if (currentDataString !== lastSaveDataRef.current) {
+        // Clear existing timeout
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current);
         }
+        
+        // Set new timeout for debounced save
+        autoSaveTimeoutRef.current = setTimeout(() => {
+          autoSave(sessionDataToSave);
+          lastSaveDataRef.current = currentDataString;
+        }, 3000); // Debounced to 3 seconds
+      }
+    }
+    
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
       }
     };
+  }, [sessionDataToSave, autoSave, designData.components.length, audioData.transcript]);
 
+  // Memoized keyboard shortcuts handler
+  const handleKeyPress = useCallback((e: KeyboardEvent) => {
+    // Command palette (Cmd/Ctrl + K)
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      setShowCommandPalette(true);
+    }
+    
+    // Challenge manager (Cmd/Ctrl + Shift + C)
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'C') {
+      e.preventDefault();
+      setShowChallengeManager(true);
+    }
+    
+    // Navigation shortcuts
+    if (e.altKey) {
+      switch (e.key) {
+        case '1':
+          e.preventDefault();
+          setCurrentScreen(prev => prev !== 'challenge-selection' ? 'challenge-selection' : prev);
+          break;
+        case '2':
+          e.preventDefault();
+          if (selectedChallenge) {
+            setCurrentScreen(prev => prev !== 'design-canvas' ? 'design-canvas' : prev);
+          }
+          break;
+        case '3':
+          e.preventDefault();
+          if (selectedChallenge) {
+            setCurrentScreen(prev => prev !== 'audio-recording' ? 'audio-recording' : prev);
+          }
+          break;
+        case '4':
+          e.preventDefault();
+          if (selectedChallenge) {
+            setCurrentScreen(prev => prev !== 'review' ? 'review' : prev);
+          }
+          break;
+      }
+    }
+  }, [selectedChallenge]);
+  
+  // Keyboard shortcuts
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentScreen, selectedChallenge]);
+  }, [handleKeyPress]);
 
-  // Set window title based on current screen
-  useEffect(() => {
-    const title = selectedChallenge 
+  // Memoized window title
+  const windowTitle = useMemo(() => {
+    return selectedChallenge 
       ? `${screenTitles[currentScreen]} - ${selectedChallenge.title} - ArchiComm`
       : `${screenTitles[currentScreen]} - ArchiComm`;
-    
-    tauriAPI.setWindowTitle(title);
-  }, [currentScreen, selectedChallenge]);
+  }, [currentScreen, selectedChallenge?.title]);
+  
+  // Set window title based on current screen
+  useEffect(() => {
+    tauriAPI.setWindowTitle(windowTitle);
+  }, [windowTitle]);
 
   const handleChallengeSelect = useCallback(async (challenge: Challenge) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Challenge selected:', challenge.id);
+      reloadTracker.logEvent('challenge-select', `Selected challenge: ${challenge.title}`);
+    }
+    
     setIsLoading(true);
     setProgress(0);
     
@@ -252,7 +314,7 @@ export default function App() {
       setSessionStartTime(new Date());
       
       // Initialize design data with metadata
-      setDesignData({
+      const initialDesignData = {
         components: [],
         connections: [],
         metadata: {
@@ -260,7 +322,8 @@ export default function App() {
           lastModified: new Date().toISOString(),
           version: '1.0'
         }
-      });
+      };
+      setDesignData(initialDesignData);
 
       await new Promise(resolve => setTimeout(resolve, 500)); // Smooth transition
       clearInterval(progressInterval);
@@ -281,6 +344,9 @@ export default function App() {
   }, []);
 
   const handleDesignComplete = useCallback(async (data: DesignData) => {
+    if (process.env.NODE_ENV === 'development') {
+      reloadTracker.logEvent('design-complete', `Design completed with ${data.components.length} components`);
+    }
     setIsLoading(true);
     
     const updatedData = {
@@ -299,11 +365,14 @@ export default function App() {
   }, []);
 
   const handleAudioComplete = useCallback(async (data: AudioData) => {
+    if (process.env.NODE_ENV === 'development') {
+      reloadTracker.logEvent('audio-complete', `Audio recorded: ${data.duration}s, ${data.wordCount} words`);
+    }
     setIsLoading(true);
     
     // Calculate analysis metrics
     const analysisMetrics = {
-      clarityScore: Math.min(100, (data.wordCount / data.duration) * 2), // Words per second * 2
+      clarityScore: Math.min(100, data.duration > 0 ? (data.wordCount / data.duration) * 2 : 0), // Words per second * 2
       technicalDepth: Math.min(100, designData.components.length * 12.5), // Components * 12.5%
       businessFocus: Math.min(100, data.businessValueTags.length * 25) // Tags * 25%
     };
@@ -321,6 +390,9 @@ export default function App() {
   }, [designData.components.length]);
 
   const handleStartOver = useCallback(async () => {
+    if (process.env.NODE_ENV === 'development') {
+      reloadTracker.logEvent('session-reset', 'User started over');
+    }
     setIsLoading(true);
     
     // Reset all state
@@ -370,7 +442,7 @@ export default function App() {
     setAvailableChallenges(updatedChallenges);
   }, []);
 
-  const currentProgress = getSessionProgress();
+  const currentProgress = useMemo(() => getSessionProgress(), [currentScreen]);
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden">
@@ -446,10 +518,12 @@ export default function App() {
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait">
           {showWelcome && currentScreen === 'welcome' && (
-            <WelcomeOverlay 
-              key="welcome"
-              onComplete={handleWelcomeComplete} 
-            />
+            <Suspense fallback={<div className="p-6 text-sm opacity-70">Loading…</div>}>
+              <WelcomeOverlay 
+                key="welcome"
+                onComplete={handleWelcomeComplete} 
+              />
+            </Suspense>
           )}
 
           {currentScreen === 'challenge-selection' && !showWelcome && (
@@ -461,10 +535,12 @@ export default function App() {
               transition={{ duration: 0.4, ease: "easeInOut" }}
               className="h-full"
             >
-              <ChallengeSelection 
-                onChallengeSelect={handleChallengeSelect}
-                availableChallenges={availableChallenges}
-              />
+              <Suspense fallback={<div className="p-6 text-sm opacity-70">Loading challenges…</div>}>
+                <ChallengeSelection 
+                  onChallengeSelect={handleChallengeSelect}
+                  availableChallenges={availableChallenges}
+                />
+              </Suspense>
             </motion.div>
           )}
           
@@ -477,12 +553,14 @@ export default function App() {
               transition={{ duration: 0.4, ease: "easeInOut" }}
               className="h-full"
             >
-              <DesignCanvas
-                challenge={selectedChallenge}
-                initialData={designData}
-                onComplete={handleDesignComplete}
-                onBack={() => setCurrentScreen('challenge-selection')}
-              />
+              <Suspense fallback={<div className="p-6 text-sm opacity-70">Preparing canvas…</div>}>
+                <DesignCanvas
+                  challenge={selectedChallenge}
+                  initialData={designData}
+                  onComplete={handleDesignComplete}
+                  onBack={() => setCurrentScreen('challenge-selection')}
+                />
+              </Suspense>
             </motion.div>
           )}
           
@@ -495,12 +573,14 @@ export default function App() {
               transition={{ duration: 0.4, ease: "easeInOut" }}
               className="h-full"
             >
-              <AudioRecording
-                challenge={selectedChallenge}
-                designData={designData}
-                onComplete={handleAudioComplete}
-                onBack={goBackToDesign}
-              />
+              <Suspense fallback={<div className="p-6 text-sm opacity-70">Loading recorder…</div>}>
+                <AudioRecording
+                  challenge={selectedChallenge}
+                  designData={designData}
+                  onComplete={handleAudioComplete}
+                  onBack={goBackToDesign}
+                />
+              </Suspense>
             </motion.div>
           )}
           
@@ -513,44 +593,52 @@ export default function App() {
               transition={{ duration: 0.4, ease: "easeInOut" }}
               className="h-full"
             >
-              <ReviewScreen
-                challenge={selectedChallenge}
-                designData={designData}
-                audioData={audioData}
-                onStartOver={handleStartOver}
-                onBackToDesign={goBackToDesign}
-                onBackToAudio={goBackToAudio}
-              />
+              <Suspense fallback={<div className="p-6 text-sm opacity-70">Loading review…</div>}>
+                <ReviewScreen
+                  challenge={selectedChallenge}
+                  designData={designData}
+                  audioData={audioData}
+                  onStartOver={handleStartOver}
+                  onBackToDesign={goBackToDesign}
+                  onBackToAudio={goBackToAudio}
+                />
+              </Suspense>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {/* Status Bar */}
-      <StatusBar 
-        currentScreen={currentScreen}
-        sessionStartTime={sessionStartTime}
-        selectedChallenge={selectedChallenge}
-      />
+      <Suspense fallback={null}>
+        <StatusBar 
+          currentScreen={currentScreen}
+          sessionStartTime={sessionStartTime}
+          selectedChallenge={selectedChallenge}
+        />
+      </Suspense>
 
       {/* Command Palette */}
-      <CommandPalette
-        isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
-        currentScreen={currentScreen}
-        onNavigate={(screen) => {
-          setCurrentScreen(screen);
-          setShowCommandPalette(false);
-        }}
-        selectedChallenge={selectedChallenge}
-      />
+      <Suspense fallback={null}>
+        <CommandPalette
+          isOpen={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+          currentScreen={currentScreen}
+          onNavigate={(screen) => {
+            setCurrentScreen(screen);
+            setShowCommandPalette(false);
+          }}
+          selectedChallenge={selectedChallenge}
+        />
+      </Suspense>
 
       {/* Challenge Manager */}
-      <ChallengeManager
-        isOpen={showChallengeManager}
-        onClose={() => setShowChallengeManager(false)}
-        onChallengeUpdate={handleChallengeUpdate}
-      />
+      <Suspense fallback={null}>
+        <ChallengeManager
+          isOpen={showChallengeManager}
+          onClose={() => setShowChallengeManager(false)}
+          onChallengeUpdate={handleChallengeUpdate}
+        />
+      </Suspense>
 
       {/* Floating Action Button for Command Palette */}
       {currentScreen !== 'welcome' && (

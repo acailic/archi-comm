@@ -75,7 +75,7 @@ export class ProjectAPI {
   }
 
   static async getProject(projectId: string): Promise<Project | null> {
-    return await invoke('get_project', { projectId });
+    return await invoke('get_project', { project_id: projectId });
   }
 
   static async updateProject(
@@ -87,7 +87,7 @@ export class ProjectAPI {
     }
   ): Promise<Project | null> {
     return await invoke('update_project', {
-      projectId,
+      project_id: projectId,
       name: updates.name,
       description: updates.description,
       status: updates.status,
@@ -95,7 +95,7 @@ export class ProjectAPI {
   }
 
   static async deleteProject(projectId: string): Promise<boolean> {
-    return await invoke('delete_project', { projectId });
+    return await invoke('delete_project', { project_id: projectId });
   }
 }
 
@@ -108,9 +108,9 @@ export class ComponentAPI {
     description: string
   ): Promise<Component | null> {
     return await invoke('add_component', {
-      projectId,
+      project_id: projectId,
       name,
-      componentType,
+      component_type: componentType,
       description,
     });
   }
@@ -126,8 +126,8 @@ export class ComponentAPI {
     }
   ): Promise<Component | null> {
     return await invoke('update_component', {
-      projectId,
-      componentId,
+      project_id: projectId,
+      component_id: componentId,
       name: updates.name,
       description: updates.description,
       status: updates.status,
@@ -139,7 +139,7 @@ export class ComponentAPI {
     projectId: string,
     componentId: string
   ): Promise<boolean> {
-    return await invoke('remove_component', { projectId, componentId });
+    return await invoke('remove_component', { project_id: projectId, component_id: componentId });
   }
 }
 
@@ -149,22 +149,22 @@ export class DiagramAPI {
     projectId: string,
     elements: DiagramElement[]
   ): Promise<void> {
-    return await invoke('save_diagram', { projectId, elements });
+    return await invoke('save_diagram', { project_id: projectId, elements });
   }
 
   static async loadDiagram(projectId: string): Promise<DiagramElement[]> {
-    return await invoke('load_diagram', { projectId });
+    return await invoke('load_diagram', { project_id: projectId });
   }
 
   static async saveConnections(
     projectId: string,
     connections: Connection[]
   ): Promise<void> {
-    return await invoke('save_connections', { projectId, connections });
+    return await invoke('save_connections', { project_id: projectId, connections });
   }
 
   static async loadConnections(projectId: string): Promise<Connection[]> {
-    return await invoke('load_connections', { projectId });
+    return await invoke('load_connections', { project_id: projectId });
   }
 }
 
@@ -179,7 +179,7 @@ export class UtilityAPI {
   }
 
   static async exportProjectData(projectId: string): Promise<string> {
-    return await invoke('export_project_data', { projectId });
+    return await invoke('export_project_data', { project_id: projectId });
   }
 }
 

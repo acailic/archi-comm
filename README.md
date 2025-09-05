@@ -1,403 +1,135 @@
-# 
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/acailic/archi-comm/main/src-tauri/icons/app-icon.png" alt="ArchiComm Logo" width="120" height="120">
+<img src="https://raw.githubusercontent.com/acailic/archi-comm/main/src-tauri/icons/app-icon.png" alt="ArchiComm Logo" width="110" height="110">
 
-# **ArchiComm** ⚡
-### *The Future of Architecture Communication*
+# ArchiComm
+### A desktop companion for studying system design
 
-[![Made with Tauri](https://img.shields.io/badge/Made%20with-Tauri-FFC131?logo=tauri&logoColor=white&style=for-the-badge)](https://tauri.app)
-[![Built with React](https://img.shields.io/badge/Built%20with-React-61DAFB?logo=react&logoColor=white&style=for-the-badge)](https://reactjs.org)
-[![Powered by Rust](https://img.shields.io/badge/Powered%20by-Rust-000000?logo=rust&logoColor=white&style=for-the-badge)](https://rust-lang.org)
+[![Tauri](https://img.shields.io/badge/Desktop-Tauri-FFC131?logo=tauri&logoColor=white)](https://tauri.app)
+[![React](https://img.shields.io/badge/UI-React-61DAFB?logo=react&logoColor=white)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/Lang-TypeScript-2f74c0?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-[![Performance: Top 0.01%](https://img.shields.io/badge/Performance-Top%200.01%25-00ff88?style=for-the-badge&logo=lightning)](https://github.com/acailic/archi-comm)
-[![Desktop Native](https://img.shields.io/badge/Platform-Desktop%20Native-blue?style=for-the-badge&logo=desktop)](https://github.com/acailic/archi-comm)
-[![Cross Platform](https://img.shields.io/badge/Cross%20Platform-Windows%20%7C%20macOS%20%7C%20Linux-brightgreen?style=for-the-badge)](https://github.com/acailic/archi-comm)
+Learn, practice, and teach system design through guided scenarios, interactive diagrams, and repeatable exercises.
 
-*Revolutionizing how architecture teams design, communicate, and collaborate*
-
-[🚀 **Get Started**](#-quick-start) • [📱 **Features**](#-what-makes-archicomm-special) • [⌨️ **Shortcuts**](#️-keyboard-mastery) • [🎯 **Examples**](#-live-examples)
+[Get Started](#quick-start) • [Why ArchiComm](#why-archicomm) • [Study Flow](#study-flow) • [Modules](#study-modules) • [AI Review](#optional-ai-review)
 
 </div>
 
 ---
 
-## ✨ **What Makes ArchiComm Special?**
+## Why ArchiComm
 
-<table>
-<tr>
-<td width="33%" align="center">
+ArchiComm reframes the app as a learning tool focused on system design fundamentals and interview practice.
 
-### 🎨 **Modern Design**
-Beautiful, intuitive interface with
-glassmorphism effects and smooth
-animations that inspire creativity
+- Study by doing: work through realistic scenarios end-to-end.
+- Reason about trade-offs: latency vs. throughput, consistency vs. availability, cost vs. performance.
+- Build a reusable toolkit: patterns, checklists, estimations, and ADRs you can export.
+- Teach and coach: run time‑boxed interview sessions with rubrics and hints.
 
-</td>
-<td width="33%" align="center">
-
-### ⚡ **Lightning Fast**
-Top 0.01% performance optimization
-with <50ms response times and
-buttery smooth 120fps animations
-
-</td>
-<td width="33%" align="center">
-
-### 🧠 **AI-Powered**
-Smart suggestions, auto-completion,
-and intelligent pattern recognition
-for architectural decisions
-
-</td>
-</tr>
-<tr>
-<td align="center">
-
-### 🔧 **Ultra Extensible**
-Plugin system with hot-reloading,
-custom templates, and modular
-task configurations
-
-</td>
-<td align="center">
-
-### 🎯 **Precision Tools**
-Advanced canvas with sub-pixel
-precision, magnetic guides, and
-professional drawing tools
-
-</td>
-<td align="center">
-
-### 🚀 **Desktop Native**
-True native performance with
-system integration, offline support,
-and native notifications
-
-</td>
-</tr>
-</table>
+See also: src/docs/SystemDesignPractice.md
 
 ---
 
-## 🎬 **See It In Action**
-
-<div align="center">
-
-| **Canvas Magic** | **Real-time Collaboration** | **AI Insights** |
-|:---:|:---:|:---:|
-| ![Canvas Demo](https://via.placeholder.com/300x200/6366f1/ffffff?text=Interactive+Canvas) | ![Collaboration Demo](https://via.placeholder.com/300x200/8b5cf6/ffffff?text=Live+Collaboration) | ![AI Demo](https://via.placeholder.com/300x200/f59e0b/ffffff?text=AI+Suggestions) |
-| *Drag, connect, and design with precision* | *Real-time team collaboration* | *Smart architectural insights* |
-
-</div>
-
----
-
-## 🚀 **Quick Start**
-
-### **One-Command Installation**
-```bash
-# Clone and launch in seconds
-git clone https://github.com/acailic/archi-comm.git
-cd archi-comm
-npm install && npm start
-```
-
-### **Or Download Ready-to-Use Binaries**
-<div align="center">
-
-| Platform | Download | Size | Performance |
-|:---:|:---:|:---:|:---:|
-| **🍎 macOS** | [Download](https://github.com/acailic/archi-comm/releases/latest/download/ArchiComm.dmg) | ~15MB | Native M1/Intel |
-| **🪟 Windows** | [Download](https://github.com/acailic/archi-comm/releases/latest/download/ArchiComm.msi) | ~18MB | Native x64 |
-| **🐧 Linux** | [Download](https://github.com/acailic/archi-comm/releases/latest/download/ArchiComm.AppImage) | ~20MB | Universal Binary |
-
-</div>
-
----
-
-## ⌨️ **Keyboard Mastery**
-
-<div align="center">
-
-### **Master These Shortcuts & Become a Pro**
-
-| Action | Shortcut | Action | Shortcut |
-|:---|:---:|:---|:---:|
-| **Quick Add Component** | `Space` | **Save Project** | `Ctrl+S` |
-| **Command Palette** | `Ctrl+K` | **Undo/Redo** | `Ctrl+Z/Y` |
-| **Focus Mode** | `F11` | **Zoom Fit** | `Ctrl+0` |
-| **Connect Mode** | `C` | **Delete Selected** | `Del` |
-| **Comment Mode** | `Ctrl+/` | **Duplicate** | `Ctrl+D` |
-| **Multi-Select** | `Shift+Click` | **Group Items** | `Ctrl+G` |
-
-[📖 **See All 50+ Shortcuts**](#complete-shortcuts-reference) • Press `?` in app for interactive help
-
-</div>
-
----
-
-## 🎯 **Live Examples**
-
-<details>
-<summary><b>🏗️ Microservices E-commerce Platform</b></summary>
-
-```typescript
-// Example: Auto-generated from visual design
-const architecture = {
-  services: [
-    { name: 'UserService', type: 'authentication', database: 'PostgreSQL' },
-    { name: 'ProductCatalog', type: 'api', database: 'MongoDB' },
-    { name: 'OrderService', type: 'business-logic', database: 'PostgreSQL' },
-    { name: 'PaymentService', type: 'integration', provider: 'Stripe' }
-  ],
-  connections: [
-    { from: 'UserService', to: 'OrderService', type: 'REST API' },
-    { from: 'OrderService', to: 'PaymentService', type: 'Event-driven' }
-  ]
-}
-```
-
-</details>
-
-<details>
-<summary><b>☁️ Serverless Image Processing Pipeline</b></summary>
-
-```yaml
-# Auto-exported YAML configuration
-triggers:
-  - type: S3Upload
-    bucket: images-input
-    events: ['s3:ObjectCreated:*']
-    
-functions:
-  - name: ImageProcessor
-    runtime: python3.9
-    memory: 1024MB
-    timeout: 300s
-    
-outputs:
-  - type: S3Bucket
-    bucket: images-processed
-    cdn: CloudFront
-```
-
-</details>
-
-<details>
-<summary><b>🌊 Event-Driven Analytics Platform</b></summary>
-
-```json
-{
-  "eventSources": ["UserActions", "SystemMetrics", "APILogs"],
-  "streamProcessing": {
-    "engine": "Apache Kafka",
-    "processors": ["RealtimeAnalytics", "AlertManager", "DataEnrichment"]
-  },
-  "storage": {
-    "eventStore": "EventStoreDB",
-    "analytics": "ClickHouse",
-    "cache": "Redis"
-  }
-}
-```
-
-</details>
-
----
-
-## 📊 **Performance Metrics** 
-
-<div align="center">
-
-| Metric | ArchiComm | Industry Average | **Improvement** |
-|:---|:---:|:---:|:---:|
-| **Startup Time** | 0.8s | 3.2s | 🚀 **4x Faster** |
-| **Memory Usage** | 45MB | 180MB | 💚 **75% Less** |
-| **Canvas Response** | <16ms | 100ms+ | ⚡ **6x More Responsive** |
-| **File Operations** | <50ms | 500ms | 💨 **10x Faster** |
-
-*Benchmarked against leading architecture tools*
-
-</div>
-
----
-
-## 🛠️ **Tech Stack Excellence**
-
-<div align="center">
-
-```mermaid
-graph TD
-    A[⚡ Tauri Desktop] --> B[🎨 React 18 Frontend]
-    A --> C[🦀 Rust Backend]
-    B --> D[🎭 Framer Motion]
-    B --> E[🎨 Radix UI + Tailwind]
-    B --> F[📐 Canvas Engine]
-    C --> G[💾 SQLx Database]
-    C --> H[🔌 Plugin System]
-    C --> I[⚡ Native APIs]
-    
-    style A fill:#ffc131,stroke:#000,stroke-width:3px
-    style C fill:#ce422b,stroke:#000,stroke-width:2px
-    style B fill:#61dafb,stroke:#000,stroke-width:2px
-```
-
-**Frontend Powerhouse:**
-- React 18.3 with Concurrent Features
-- TypeScript for bulletproof code
-- Vite 6.3 for instant hot reloading
-- Motion/Framer for 120fps animations
-
-**Backend Excellence:**
-- Rust for memory safety & speed
-- Tauri 1.8 for native desktop integration
-- SQLx for type-safe database operations
-- Custom plugin architecture
-
-</div>
-
----
-
-## 🎨 **Design Philosophy**
-
-> *"Great architecture tools should be invisible – they should amplify your thinking, not get in the way."*
-
-### **Our Core Principles:**
-
-1. **🎯 Precision First** - Every pixel, every animation, every interaction is crafted for accuracy
-2. **⚡ Speed Obsessed** - Sub-50ms response times because your thoughts move at light speed  
-3. **🧠 Intelligence Augmented** - AI that understands architecture patterns and suggests improvements
-4. **🎨 Beauty in Simplicity** - Complex capabilities wrapped in elegant, intuitive interfaces
-
----
-
-## 🔧 **Advanced Features**
-
-<details>
-<summary><b>🎨 Canvas Engine</b> - Professional drawing tools with sub-pixel precision</summary>
-
-- **Infinite Canvas** with smooth pan/zoom (10x-0.1x range)
-- **Magnetic Guidelines** that snap to architectural patterns
-- **Advanced Selection** with lasso, rectangular, and smart selection
-- **Layer Management** with grouping, locking, and visibility controls
-- **Export Engine** supporting SVG, PNG, PDF with vector accuracy
-
-</details>
-
-<details>
-<summary><b>🧩 Plugin Ecosystem</b> - Extend functionality with custom plugins</summary>
-
-```typescript
-// Create your own plugins in TypeScript
-export const MyArchPlugin: TaskPlugin = {
-  id: 'my-custom-patterns',
-  name: 'Custom Architecture Patterns',
-  components: [
-    // Your custom components
-  ],
-  templates: [
-    // Your custom templates  
-  ],
-  validators: [
-    // Custom validation logic
-  ]
-}
-```
-
-</details>
-
-<details>
-<summary><b>🤖 AI Integration</b> - Smart suggestions and pattern recognition</summary>
-
-- **Pattern Detection** - Automatically identifies architectural patterns
-- **Smart Suggestions** - Context-aware component and connection recommendations  
-- **Optimization Hints** - Performance and scalability improvement suggestions
-- **Compliance Checking** - Validates against industry standards and best practices
-
-</details>
-
----
-
-## 🏆 **Awards & Recognition**
-
-<div align="center">
-
-| **🥇 Performance Champion** | **🎨 Design Excellence** | **🔧 Developer Choice** |
-|:---:|:---:|:---:|
-| Top 0.01% fastest desktop apps | Most beautiful architecture tool | Highest GitHub stars in category |
-
-</div>
-
----
-
-## 🤝 **Join Our Community**
-
-<div align="center">
-
-[![GitHub Stars](https://img.shields.io/github/stars/acailic/archi-comm?style=social)](https://github.com/acailic/archi-comm)
-[![Discord](https://img.shields.io/discord/1234567890?color=5865F2&label=Discord&logo=discord&logoColor=white)](https://discord.gg/archicomm)
-[![Twitter Follow](https://img.shields.io/twitter/follow/archicomm?style=social)](https://twitter.com/archicomm)
-
-**[💬 Discord](https://discord.gg/archicomm) • [🐦 Twitter](https://twitter.com/archicomm) • [📺 YouTube](https://youtube.com/archicomm)**
-
-</div>
-
-### **Contributing**
-
-We welcome contributions! Here's how to get involved:
+## Quick Start
 
 ```bash
-# Development setup
+# Clone and launch the desktop app
 git clone https://github.com/acailic/archi-comm.git
 cd archi-comm
 npm install
-npm run dev  # Start development mode
-
-# Build for production  
-npm run build
+npm run dev   # or: npm start
 ```
 
-**Ways to Contribute:**
-- 🐛 **Bug Reports** - Help us squash bugs
-- ✨ **Feature Requests** - Shape the roadmap  
-- 📝 **Documentation** - Improve our guides
-- 🧩 **Plugins** - Create custom extensions
-- 🎨 **Themes** - Design beautiful themes
+Build binaries: `npm run build` (Tauri bundles for your OS).
 
 ---
 
-## 📈 **Roadmap 2024**
+## Study Flow
 
-<div align="center">
+- Define requirements: functional scope, SLAs/SLOs, constraints, traffic assumptions.
+- Estimate: back‑of‑the‑envelope throughput, storage, QPS, fan‑out, costs.
+- Design: place components on the canvas; connect data flows and failure domains.
+- Explore trade‑offs: toggle replication, sharding, consistency, cache policies, queues.
+- Validate: run checklists and rubrics; capture risks and mitigation strategies.
+- Document: export diagram (SVG/PNG), notes/ADR (Markdown), and assumptions.
 
-```mermaid
-timeline
-    title ArchiComm Development Roadmap
-    
-    section Q4 2024
-        Real-time Collaboration : Multi-user editing
-                                : Voice/video integration
-                                : Conflict resolution
-        
-    section Q1 2025  
-        AI Revolution : GPT-4 integration
-                     : Auto-architecture generation
-                     : Smart code generation
-                     
-    section Q2 2025
-        Enterprise Features : SSO integration  
-                           : Advanced permissions
-                           : Audit logging
-                           
-    section Q3 2025
-        Mobile Companion : iOS/Android apps
-                        : Cross-device sync
-                        : Touch-optimized UI
+---
+
+## Key Features for Studying
+
+- Scenario templates: classic problems (URL shortener, news feed, chat, ride‑hailing, file storage).
+- Patterns library: load balancing, caching, sharding, CQRS, pub/sub, rate limiting.
+- Trade‑off explorer: consistency levels, replication factors, partitioning schemes, backpressure.
+- Estimation helpers: latency budgets, p50/p95, queue depth, storage growth, cost rough‑order.
+- Interview mode: time‑boxed session, hints, rubric, and exportable scorecard.
+- Exports: diagrams (SVG/PNG), notes (Markdown), and ADR templates.
+
+---
+
+## Study Modules
+
+ArchiComm loads “Tasks” (study modules) that define prompts, acceptance criteria, hints, and assets. You can add your own tasks or use built‑ins.
+
+- Structure and examples: src/docs/SystemDesignPractice.md
+- Create a task: add a `task.json` under `src/lib/tasks/plugins/<your-task>/` and export it from `src/lib/tasks/index.ts`.
+- Optional assets: diagrams, seed data, or reference links.
+
+Example scenarios to include:
+- URL shortener at scale
+- Twitter/Instagram news feed
+- Real‑time chat and presence
+- Distributed cache and invalidation
+- Background jobs and retries
+- Ride‑hailing dispatch
+
+---
+
+## Optional AI Review
+
+You can request rubric‑based feedback using a local Tauri command that proxies to your model provider (keeps keys out of the UI). Setup steps and sample code are documented in src/docs/SystemDesignPractice.md.
+
+- Configure `OPENAI_API_KEY` (or swap in another provider).
+- Invoke `ai_review` from the UI; receive summary, strengths, risks, and a score.
+
+---
+
+## Shortcuts
+
+- Command palette: `Ctrl/Cmd + K`
+- Add/Connect mode: `A` / `C`
+- Zoom to fit: `Ctrl/Cmd + 0`
+- Duplicate: `Ctrl/Cmd + D`
+- Undo/Redo: `Ctrl/Cmd + Z` / `Ctrl/Cmd + Shift + Z`
+
+Press `?` in the app for the full list.
+
+---
+
+## Tech Stack
+
+- Desktop shell: Tauri (Rust)
+- UI: React + TypeScript, Radix UI, Tailwind
+- Canvas and interactions: custom canvas engine, Motion/Framer animations
+
+---
+
+## Contributing
+
+We welcome improvements to modules, patterns, checklists, and study flows.
+
+```bash
+git clone https://github.com/acailic/archi-comm.git
+cd archi-comm
+npm install
+npm run dev
 ```
 
-</div>
+Ideas that help learners most:
+- New study modules with clear acceptance criteria and hints
+- Trade‑off explorers (e.g., sharding vs. hashing strategies)
+- Estimation worksheets and rubric improvements
+- Better exports (ADR templates, interview scorecards)
+
 
 ---
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent } from './ui/dialog';

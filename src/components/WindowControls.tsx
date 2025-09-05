@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Minimize2, Maximize2, X, Menu } from 'lucide-react';
 import { tauriAPI, isTauriApp } from '../lib/tauri';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 
 interface WindowControlsProps {
   title?: string;

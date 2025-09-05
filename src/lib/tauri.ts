@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
+import { writeTextFile, createDir } from '@tauri-apps/api/fs';
+import { appDataDir, join } from '@tauri-apps/api/path';
 
 // Helper function to check if we're running in Tauri
 export const isTauri = () => {
@@ -235,4 +237,34 @@ export const tauriAPI = {
   componentUtils,
   diagramUtils,
   utilUtils,
+  // Convenience methods expected by UI components
+  async getAppVersion() {
+    return utilUtils.getAppVersion();
+  },
+  async minimizeWindow() {
+    return windowUtils.minimize();
+  },
+  async maximizeWindow() {
+    return windowUtils.maximize();
+  },
+  async closeWindow() {
+    return windowUtils.close();
+  },
+  async setWindowTitle(title: string) {
+    return windowUtils.setTitle(title);
+  },
+  // Lightweight autosave used by App.tsx; stores JSON under AppData/autosaves
+  async saveDesign(data: unknown, key: string) {
+    if (!isTauri()) return; // no-op on web
+    try {
+      const base = await appDataDir();
+      const dirPath = await join(base, 'archicomm', 'autosaves');
+      await createDir(dirPath, { recursive: true });
+      const filePath = await join(dirPath, `${key}.json`);
+      await writeTextFile(filePath, JSON.stringify(data, null, 2));
+      return filePath;
+    } catch (e) {
+      console.error('saveDesign failed:', e);
+    }
+  },
 };
