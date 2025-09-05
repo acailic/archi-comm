@@ -74,7 +74,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           react: ['react', 'react-dom'],
-          motion: ['motion'],
+          motion: ['framer-motion'],
           radix: [
             '@radix-ui/react-accordion',
             '@radix-ui/react-alert-dialog',
