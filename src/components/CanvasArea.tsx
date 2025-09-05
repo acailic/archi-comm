@@ -1,12 +1,10 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { useDrop } from 'react-dnd';
+import { useDrop, useDragLayer } from 'react-dnd';
 import { CanvasComponent } from './CanvasComponent';
 import { DesignComponent, Connection } from '../App';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Trash2, Edit3, Zap, ArrowRight, MoreHorizontal } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 interface CanvasAreaProps {
   components: DesignComponent[];
@@ -19,7 +17,47 @@ interface CanvasAreaProps {
   onConnectionLabelChange: (id: string, label: string) => void;
   onConnectionDelete?: (id: string) => void;
   onConnectionTypeChange?: (id: string, type: Connection['type']) => void;
+  onStartConnection: (id: string, position: 'top' | 'bottom' | 'left' | 'right') => void;
+  onCompleteConnection: (fromId: string, toId: string) => void;
 }
+
+function DraggingConnectionPreview() {
+  const { item, currentOffset } = useDragLayer((monitor) => ({
+    item: monitor.getItem(),
+    itemType: monitor.getItemType(),
+    currentOffset: monitor.getSourceClientOffset(),
+  }));
+
+  if (!currentOffset || item.type !== 'connection-point') {
+    return null;
+  }
+
+  const { fromComponent, fromPosition } = item;
+  const fromPoint = getComponentConnectionPoint(fromComponent, fromPosition);
+
+  return (
+    <svg style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      <path
+        d={`M ${fromPoint.x} ${fromPoint.y} L ${currentOffset.x} ${currentOffset.y}`}
+        stroke="hsl(var(--primary))"
+        strokeWidth="2"
+        strokeDasharray="5,5"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+const getComponentConnectionPoint = (component: DesignComponent, position: 'top' | 'bottom' | 'left' | 'right') => {
+  const width = 128;
+  const height = 80;
+  switch (position) {
+    case 'top': return { x: component.x + width / 2, y: component.y };
+    case 'bottom': return { x: component.x + width / 2, y: component.y + height };
+    case 'left': return { x: component.x, y: component.y + height / 2 };
+    case 'right': return { x: component.x + width, y: component.y + height / 2 };
+  }
+};
 
 export function CanvasArea({
   components,
@@ -31,24 +69,26 @@ export function CanvasArea({
   onComponentSelect,
   onConnectionLabelChange,
   onConnectionDelete,
-  onConnectionTypeChange
+  onConnectionTypeChange,
+  onStartConnection,
+  onCompleteConnection,
 }: CanvasAreaProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [connectionStyle, setConnectionStyle] = useState<'straight' | 'curved' | 'stepped'>('curved');
 
   const [{ isOver }, drop] = useDrop(() => ({
-    accept: 'component',
-    drop: (item: { type: DesignComponent['type'] }, monitor) => {
-      if (!canvasRef.current) return;
-      
-      const offset = monitor.getClientOffset();
-      const canvasRect = canvasRef.current.getBoundingClientRect();
-      
-      if (offset) {
-        const x = offset.x - canvasRect.left;
-        const y = offset.y - canvasRect.top;
-        onComponentDrop(item.type, x, y);
+    accept: ['component', 'connection-point'],
+    drop: (item: any, monitor) => {
+      if (monitor.getItemType() === 'component') {
+        if (!canvasRef.current) return;
+        const offset = monitor.getClientOffset();
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        if (offset) {
+          const x = offset.x - canvasRect.left;
+          const y = offset.y - canvasRect.top;
+          onComponentDrop(item.type, x, y);
+        }
       }
     },
     collect: (monitor) => ({
@@ -56,21 +96,17 @@ export function CanvasArea({
     }),
   }));
 
-  // Helper function to get connection point on component edge
   const getConnectionPoint = useCallback((fromComp: DesignComponent, toComp: DesignComponent) => {
-    const fromCenterX = fromComp.x + 64; // Component width/2 (128/2)
-    const fromCenterY = fromComp.y + 40; // Component height/2 (80/2)
+    const fromCenterX = fromComp.x + 64;
+    const fromCenterY = fromComp.y + 40;
     const toCenterX = toComp.x + 64;
     const toCenterY = toComp.y + 40;
 
-    // Calculate angle between components
     const angle = Math.atan2(toCenterY - fromCenterY, toCenterX - fromCenterX);
     
-    // Component dimensions (should match the w-32 h-20 classes)
-    const compWidth = 128; // w-32 = 8rem = 128px
-    const compHeight = 80;  // h-20 = 5rem = 80px
+    const compWidth = 128;
+    const compHeight = 80;
 
-    // Calculate edge points
     const fromX = fromCenterX + Math.cos(angle) * (compWidth / 2);
     const fromY = fromCenterY + Math.sin(angle) * (compHeight / 2);
     const toX = toCenterX - Math.cos(angle) * (compWidth / 2);
@@ -79,7 +115,6 @@ export function CanvasArea({
     return { fromX, fromY, toX, toY };
   }, []);
 
-  // Generate path based on connection style
   const generatePath = useCallback((x1: number, y1: number, x2: number, y2: number, style: string) => {
     switch (style) {
       case 'curved':
@@ -97,7 +132,7 @@ export function CanvasArea({
         const midX = (x1 + x2) / 2;
         return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
       
-      default: // straight
+      default:
         return `M ${x1} ${y1} L ${x2} ${y2}`;
     }
   }, []);
@@ -126,7 +161,6 @@ export function CanvasArea({
       const { fromX, fromY, toX, toY } = getConnectionPoint(fromComponent, toComponent);
       const path = generatePath(fromX, fromY, toX, toY, connectionStyle);
       
-      // Calculate midpoint for label
       const midX = (fromX + toX) / 2;
       const midY = (fromY + toY) / 2;
 
@@ -136,7 +170,6 @@ export function CanvasArea({
 
       return (
         <g key={connection.id} className="cursor-pointer">
-          {/* Invisible thick line for easier clicking */}
           <path
             d={path}
             stroke="transparent"
@@ -145,7 +178,6 @@ export function CanvasArea({
             onClick={() => setSelectedConnection(connection.id)}
           />
           
-          {/* Visible connection line */}
           <path
             d={path}
             stroke={strokeColor}
@@ -157,7 +189,6 @@ export function CanvasArea({
             onClick={() => setSelectedConnection(connection.id)}
           />
 
-          {/* Connection type indicator */}
           {connection.type && connection.type !== 'data' && (
             <circle
               cx={fromX + (toX - fromX) * 0.2}
@@ -168,7 +199,6 @@ export function CanvasArea({
             />
           )}
 
-          {/* Connection label and controls */}
           <foreignObject 
             x={midX - 60} 
             y={midY - 25} 
@@ -239,7 +269,7 @@ export function CanvasArea({
         backgroundSize: '20px 20px'
       }}
     >
-      {/* Grid pattern overlay */}
+      <DraggingConnectionPreview />
       <div className="absolute inset-0 opacity-50 pointer-events-none">
         <svg width="100%" height="100%">
           <defs>
@@ -247,89 +277,21 @@ export function CanvasArea({
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" opacity="0.5"/>
             </pattern>
             
-            {/* Different arrow heads for different connection types */}
-            <marker
-              id="arrowhead-default"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 10 3.5, 0 7"
-                fill="hsl(var(--primary))"
-              />
-            </marker>
-            
-            <marker
-              id="arrowhead-data"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 10 3.5, 0 7"
-                fill="hsl(var(--blue-500))"
-              />
-            </marker>
-            
-            <marker
-              id="arrowhead-control"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 10 3.5, 0 7"
-                fill="hsl(var(--purple-500))"
-              />
-            </marker>
-            
-            <marker
-              id="arrowhead-sync"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 10 3.5, 0 7"
-                fill="hsl(var(--green-500))"
-              />
-            </marker>
-            
-            <marker
-              id="arrowhead-async"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon
-                points="0 0, 10 3.5, 0 7"
-                fill="hsl(var(--orange-500))"
-              />
-            </marker>
+            <marker id="arrowhead-default" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--primary))" /></marker>
+            <marker id="arrowhead-data" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--blue-500))" /></marker>
+            <marker id="arrowhead-control" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--purple-500))" /></marker>
+            <marker id="arrowhead-sync" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--green-500))" /></marker>
+            <marker id="arrowhead-async" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--orange-500))" /></marker>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>
       </div>
 
-      {/* Connection style controls */}
       <div className="absolute top-4 right-4 z-10">
         <div className="flex items-center space-x-2 bg-card/80 backdrop-blur-xl border border-border/30 rounded-lg p-3 shadow-lg">
           <span className="text-xs text-muted-foreground font-medium">Connection Style:</span>
           <Select value={connectionStyle} onValueChange={(value: any) => setConnectionStyle(value)}>
-            <SelectTrigger className="h-8 text-xs bg-background/50 backdrop-blur-sm border-border/20">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="h-8 text-xs bg-background/50 backdrop-blur-sm border-border/20"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="straight">Straight</SelectItem>
               <SelectItem value="curved">Curved</SelectItem>
@@ -339,48 +301,29 @@ export function CanvasArea({
         </div>
       </div>
 
-      {/* Connection legend */}
       {connections.length > 0 && (
         <div className="absolute bottom-4 right-4 z-10">
           <div className="bg-card/80 backdrop-blur-xl border border-border/30 rounded-lg p-4 shadow-lg">
             <h4 className="text-xs font-medium mb-3 text-foreground/90">Connection Types</h4>
             <div className="space-y-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-0.5 bg-blue-500 rounded-full"></div>
-                <span className="text-xs text-muted-foreground">Data Flow</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-0.5 bg-purple-500 rounded-full"></div>
-                <span className="text-xs text-muted-foreground">Control</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-0.5 bg-green-500 rounded-full"></div>
-                <span className="text-xs text-muted-foreground">Synchronous</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-0.5 bg-orange-500 border-dashed border-t rounded-full"></div>
-                <span className="text-xs text-muted-foreground">Asynchronous</span>
-              </div>
+              <div className="flex items-center space-x-3"><div className="w-6 h-0.5 bg-blue-500 rounded-full"></div><span className="text-xs text-muted-foreground">Data Flow</span></div>
+              <div className="flex items-center space-x-3"><div className="w-6 h-0.5 bg-purple-500 rounded-full"></div><span className="text-xs text-muted-foreground">Control</span></div>
+              <div className="flex items-center space-x-3"><div className="w-6 h-0.5 bg-green-500 rounded-full"></div><span className="text-xs text-muted-foreground">Synchronous</span></div>
+              <div className="flex items-center space-x-3"><div className="w-6 h-0.5 bg-orange-500 border-dashed border-t rounded-full"></div><span className="text-xs text-muted-foreground">Asynchronous</span></div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Connection lines */}
       <svg 
         className="absolute inset-0 pointer-events-auto" 
         width="100%" 
         height="100%"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setSelectedConnection(null);
-          }
-        }}
+        onClick={(e) => { if (e.target === e.currentTarget) { setSelectedConnection(null); } }}
       >
         {renderConnections()}
       </svg>
 
-      {/* Components */}
       {components.map((component) => (
         <CanvasComponent
           key={component.id}
@@ -389,10 +332,11 @@ export function CanvasArea({
           isConnectionStart={connectionStart === component.id}
           onMove={onComponentMove}
           onSelect={onComponentSelect}
+          onStartConnection={onStartConnection}
+          onCompleteConnection={onCompleteConnection}
         />
       ))}
 
-      {/* Drop zone indicator */}
       {isOver && (
         <div className="absolute inset-0 border-2 border-dashed border-primary bg-primary/5 flex items-center justify-center pointer-events-none">
           <div className="bg-card/90 backdrop-blur-xl rounded-xl px-8 py-4 border border-primary/30 shadow-2xl">
@@ -404,7 +348,6 @@ export function CanvasArea({
         </div>
       )}
 
-      {/* Instructions when empty */}
       {components.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center text-muted-foreground">

@@ -178,10 +178,10 @@ const componentColors: Record<DesignComponent['type'], string> = {
   'ai-ml': 'bg-pink-600'
 };
 
-const ConnectionPoint = ({ position, onStartConnection, componentId }) => {
+const ConnectionPoint = ({ position, onStartConnection, component }) => {
   const [, drag] = useDrag(() => ({
     type: 'connection-point',
-    item: { fromId: componentId, fromPosition: position },
+    item: { fromId: component.id, fromComponent: component, fromPosition: position },
   }));
 
   const positionClasses = {
@@ -197,7 +197,7 @@ const ConnectionPoint = ({ position, onStartConnection, componentId }) => {
       className={`absolute w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${positionClasses[position]}`}
       onMouseDown={(e) => {
         e.stopPropagation();
-        onStartConnection(componentId, position);
+        onStartConnection(component.id, position);
       }}
     />
   );

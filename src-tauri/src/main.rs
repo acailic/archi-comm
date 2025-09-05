@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -314,16 +315,19 @@ async fn load_connections(
 #[tauri::command]
 async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, String> {
     let config = transcription::TranscriptionConfig {
-        model: transcription::Model::Base,
-        language: None,
+        model_type: "base".to_string(),
+        language: Some("en".to_string()),
+        audio_file_path: PathBuf::new(),
+        output_format: "text".to_string(),
     };
 
     let mut transcriber = transcription::AudioTranscriber::new(config);
-    if let Err(e) = transcriber.initialize() {
+    if let Err(e) = transcriber.initialize().await {
         return Err(format!("Failed to initialize transcriber: {}", e));
     }
 
-    match transcriber.transcribe_audio(&file_path) {
+    let audio_path = PathBuf::from(file_path);
+    match transcriber.transcribe_audio(&audio_path).await {
         Ok(result) => {
             // simple_transcribe_rs does not provide segments, so we return an empty vec
             let response = TranscriptionResponse {
