@@ -57,12 +57,34 @@ Build binaries: `npm run build` (Tauri bundles for your OS).
 
 ## Key Features for Studying
 
+- **Voice Recording & Transcription**: Record audio explanations of your system designs with manual transcript entry and planned automatic speech-to-text conversion.
 - Scenario templates: classic problems (URL shortener, news feed, chat, ride‑hailing, file storage).
 - Patterns library: load balancing, caching, sharding, CQRS, pub/sub, rate limiting.
 - Trade‑off explorer: consistency levels, replication factors, partitioning schemes, backpressure.
 - Estimation helpers: latency budgets, p50/p95, queue depth, storage growth, cost rough‑order.
 - Interview mode: time‑boxed session, hints, rubric, and exportable scorecard.
 - Exports: diagrams (SVG/PNG), notes (Markdown), and ADR templates.
+
+---
+
+## Audio Features
+
+ArchiComm includes powerful audio recording capabilities to help you practice explaining your system designs verbally - a crucial skill for technical interviews and design reviews.
+
+### Current Features
+- **Audio Recording**: Record your design explanations with built-in microphone support
+- **Manual Transcription**: Enter text transcripts alongside your audio recordings
+- **Playback Controls**: Review your recorded explanations with integrated audio playback
+- **Duration Tracking**: Monitor recording time with real-time duration display
+- **Word Count Analysis**: Track transcript length and speaking pace metrics
+
+### Planned Enhancements
+- **Automatic Speech-to-Text**: Convert audio recordings to text automatically using cloud speech services
+- **Voice Command Recognition**: Navigate and control the app using voice commands
+- **Audio Analysis**: Get feedback on speaking pace, clarity, and technical depth
+- **Offline Transcription**: Process audio locally without requiring internet connectivity
+
+See [TODO.md](TODO.md) for the complete roadmap of planned audio and speech features.
 
 ---
 
@@ -129,6 +151,7 @@ Ideas that help learners most:
 - Trade‑off explorers (e.g., sharding vs. hashing strategies)
 - Estimation worksheets and rubric improvements
 - Better exports (ADR templates, interview scorecards)
+- Audio and speech-to-text enhancements (see [TODO.md](TODO.md))
 
 
 ---
