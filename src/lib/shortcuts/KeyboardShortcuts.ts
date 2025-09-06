@@ -30,12 +30,22 @@ export class KeyboardShortcutManager {
   private changeListeners: Set<() => void> = new Set();
   private shortcutsVersion = 0;
   private autoSetup: boolean;
+  private finalizer?: FinalizationRegistry<() => void>;
 
   constructor(options: { autoSetup?: boolean } = { autoSetup: true }) {
     this.autoSetup = options.autoSetup !== false;
+    this.handleKeyDown = this.handleKeyDown.bind(this);
+
     if (this.autoSetup && typeof window !== 'undefined' && typeof document !== 'undefined') {
       this.initializeDefaultShortcuts();
       this.attachEventListeners();
+
+      if (typeof FinalizationRegistry === 'function') {
+        this.finalizer = new FinalizationRegistry(() => {
+          this.destroy();
+        });
+        this.finalizer.register(this, () => {});
+      }
     }
   }
 
@@ -134,7 +144,7 @@ export class KeyboardShortcutManager {
   /**
    * Handle keyboard events with high performance
    */
-  private handleKeyDown = (event: KeyboardEvent): void => {
+  private handleKeyDown(event: KeyboardEvent): void {
     if (!this.isEnabled || this.temporarilyDisabled) return;
 
     // Skip if user is typing in input fields
@@ -161,7 +171,7 @@ export class KeyboardShortcutManager {
         console.error('Shortcut execution error:', error);
       }
     }
-  };
+  }
 
   private attachEventListeners(): void {
     document.addEventListener('keydown', this.handleKeyDown, true);

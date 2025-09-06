@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+// Comment 1: Move relevantKeys to a module-level Set for performance
+const RELEVANT_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter', 'Escape']);
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAllShortcuts, formatShortcutKey, globalShortcutManager, getShortcutsVersion } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
@@ -41,6 +43,78 @@ interface Command {
   shortcut?: string;
   available?: boolean;
 }
+
+// Comment 4: Extract CommandItem outside main component and memoize
+interface CommandItemProps {
+  command: Command;
+  index: number;
+  isSelected: boolean;
+  onClick: () => void;
+  onMouseEnter: () => void;
+  onFocus: () => void;
+}
+
+const CommandItem = React.memo(({ command, index, isSelected, onClick, onMouseEnter, onFocus }: CommandItemProps) => {
+  const Icon = command.icon;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, delay: index * 0.02 }}
+      className={`
+        p-3 rounded-lg cursor-pointer transition-all duration-200 group
+        ${isSelected 
+          ? 'bg-primary/10 border-l-2 border-primary' 
+          : 'hover:bg-muted/50'
+        }
+      `}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onFocus={onFocus}
+      tabIndex={0}
+      role="option"
+      aria-selected={isSelected}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className={`
+            p-2 rounded-md transition-all duration-200
+            ${isSelected 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground'
+            }
+          `}>
+            <Icon className="w-4 h-4" />
+          </div>
+          <div>
+            <div className={`font-medium transition-colors ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+              {command.title}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {command.description}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          {command.shortcut && (
+            <Badge variant="outline" className="text-xs font-mono">
+              {command.shortcut}
+            </Badge>
+          )}
+          {isSelected && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <ArrowRight className="w-4 h-4 text-primary" />
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+});
 
 export function CommandPalette({ 
   isOpen, 
@@ -169,16 +243,16 @@ export function CommandPalette({
     ];
   }, [selectedChallenge, onNavigate, getShortcutsVersion()]);
 
+  // Comment 5: Precompute lower-case trimmed query for filtering
   const filteredCommands = useMemo(() => {
     const availableCommands = commands.filter(cmd => cmd.available !== false);
-    
-    if (!query.trim()) {
+    const q = query.trim().toLowerCase();
+    if (!q) {
       return availableCommands;
     }
-    
     return availableCommands.filter(cmd => 
-      cmd.title.toLowerCase().includes(query.toLowerCase()) ||
-      cmd.description.toLowerCase().includes(query.toLowerCase())
+      cmd.title.toLowerCase().includes(q) ||
+      cmd.description.toLowerCase().includes(q)
     );
   }, [commands, query]);
 
@@ -201,9 +275,8 @@ export function CommandPalette({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle keys relevant to the palette
-      const relevantKeys = ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'];
-      if (!relevantKeys.includes(e.key)) return;
+      // Comment 1: Use RELEVANT_KEYS Set for key lookup
+      if (!RELEVANT_KEYS.has(e.key)) return;
 
       // Guard: do nothing if no commands
       if (filteredCommands.length === 0) return;
@@ -238,12 +311,16 @@ export function CommandPalette({
       }
     };
 
-    // Use bubble phase unless capture is necessary
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, filteredCommands, selectedIndex, onClose]);
 
-  // Clamp selectedIndex to valid range when filteredCommands changes
+  // Comment 2: Consolidate selectedIndex reset logic
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query, isOpen, filteredCommands.length]);
+
+  // Comment 3: Clamp selectedIndex to valid range when filteredCommands changes
   useEffect(() => {
     if (filteredCommands.length === 0) {
       setSelectedIndex(0);
@@ -252,12 +329,7 @@ export function CommandPalette({
     } else if (selectedIndex < 0) {
       setSelectedIndex(0);
     }
-  }, [filteredCommands.length]);
-
-  // Reset selection when query changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
+  }, [filteredCommands.length, selectedIndex]);
 
   // Reset query when closing
   useEffect(() => {
@@ -267,67 +339,7 @@ export function CommandPalette({
     }
   }, [isOpen]);
 
-  const CommandItem = ({ command, index }: { command: Command; index: number }) => {
-    const isSelected = index === selectedIndex;
-    const Icon = command.icon;
-    
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, delay: index * 0.02 }}
-        className={`
-          p-3 rounded-lg cursor-pointer transition-all duration-200 group
-          ${isSelected 
-            ? 'bg-primary/10 border-l-2 border-primary' 
-            : 'hover:bg-muted/50'
-          }
-        `}
-        onClick={() => {
-          command.action();
-          onClose();
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className={`
-              p-2 rounded-md transition-all duration-200
-              ${isSelected 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground'
-              }
-            `}>
-              <Icon className="w-4 h-4" />
-            </div>
-            <div>
-              <div className={`font-medium transition-colors ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-                {command.title}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {command.description}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {command.shortcut && (
-              <Badge variant="outline" className="text-xs font-mono">
-                {command.shortcut}
-              </Badge>
-            )}
-            {isSelected && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
-                <ArrowRight className="w-4 h-4 text-primary" />
-              </motion.div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-    );
-  };
+  // ...existing code...
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -385,6 +397,13 @@ export function CommandPalette({
                               key={command.id}
                               command={command}
                               index={globalIndex}
+                              isSelected={globalIndex === selectedIndex}
+                              onClick={() => {
+                                command.action();
+                                onClose();
+                              }}
+                              onMouseEnter={() => setSelectedIndex(globalIndex)}
+                              onFocus={() => setSelectedIndex(globalIndex)}
                             />
                           );
                         })}

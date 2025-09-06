@@ -93,6 +93,8 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   onCompleteConnection,
 }, ref) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  // Comment 1 & 2: Track the actual DOM node in state for reliable event listener attachment
+  const [canvasNode, setCanvasNode] = useState<HTMLDivElement | null>(null);
   const annotationOverlayRef = useRef<CanvasAnnotationOverlayRef>(null);
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [connectionStyle, setConnectionStyle] = useState<'straight' | 'curved' | 'stepped'>('curved');
@@ -447,47 +449,6 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
       }
     };
 
-    // Annotation event handlers
-    const handleAnnotationCreate = useCallback((annotation: Annotation) => {
-      setAnnotations(prev => [...prev, annotation]);
-    }, []);
-
-    const handleAnnotationUpdate = useCallback((updatedAnnotation: Annotation) => {
-      setAnnotations(prev => 
-        prev.map(ann => ann.id === updatedAnnotation.id ? updatedAnnotation : ann)
-      );
-      setSelectedAnnotation(null);
-      setIsEditDialogOpen(false);
-    }, []);
-
-    const handleAnnotationDelete = useCallback((annotationId: string) => {
-      setAnnotations(prev => prev.filter(ann => ann.id !== annotationId));
-      setSelectedAnnotation(null);
-      setIsEditDialogOpen(false);
-    }, []);
-
-    const handleAnnotationSelect = useCallback((annotation: Annotation | null) => {
-      setSelectedAnnotation(annotation);
-    }, []);
-
-    // Handle edit annotation events from overlay
-    useEffect(() => {
-      const handleEditAnnotation = (event: CustomEvent) => {
-        const annotation = event.detail as Annotation;
-        setSelectedAnnotation(annotation);
-        setIsEditDialogOpen(true);
-      };
-
-      const canvasElement = canvasRef.current;
-      if (canvasElement) {
-        canvasElement.addEventListener('editAnnotation', handleEditAnnotation as EventListener);
-        
-        return () => {
-          canvasElement.removeEventListener('editAnnotation', handleEditAnnotation as EventListener);
-        };
-      }
-    }, []);
-
     // Add event listeners for canvas-specific shortcuts
     window.addEventListener('shortcut:select-all', handleSelectAll);
     window.addEventListener('shortcut:clear-selection', handleClearSelection);
@@ -515,11 +476,49 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
     };
   }, [components, selectedComponent, selectedConnection, onComponentMove, onConnectionDelete, onComponentSelect]);
 
+  // Annotation event handlers
+  const handleAnnotationCreate = useCallback((annotation: Annotation) => {
+    setAnnotations(prev => [...prev, annotation]);
+  }, []);
+
+  const handleAnnotationUpdate = useCallback((updatedAnnotation: Annotation) => {
+    setAnnotations(prev => 
+      prev.map(ann => ann.id === updatedAnnotation.id ? updatedAnnotation : ann)
+    );
+    setSelectedAnnotation(null);
+    setIsEditDialogOpen(false);
+  }, []);
+
+  const handleAnnotationDelete = useCallback((annotationId: string) => {
+    setAnnotations(prev => prev.filter(ann => ann.id !== annotationId));
+    setSelectedAnnotation(null);
+    setIsEditDialogOpen(false);
+  }, []);
+
+  const handleAnnotationSelect = useCallback((annotation: Annotation | null) => {
+    setSelectedAnnotation(annotation);
+  }, []);
+
+  // Handle edit annotation events from overlay
+  useEffect(() => {
+    if (!canvasNode) return;
+    const handleEditAnnotation = (event: CustomEvent) => {
+      const annotation = event.detail as Annotation;
+      setSelectedAnnotation(annotation);
+      setIsEditDialogOpen(true);
+    };
+    canvasNode.addEventListener('editAnnotation', handleEditAnnotation as EventListener);
+    return () => {
+      canvasNode.removeEventListener('editAnnotation', handleEditAnnotation as EventListener);
+    };
+  }, [canvasNode]);
+
   return (
     <div 
       data-testid="canvas"
       ref={(node) => {
         canvasRef.current = node;
+        setCanvasNode(node); // Comment 2: update state with DOM node
         drop(node);
         if (ref) {
           if (typeof ref === 'function') {
