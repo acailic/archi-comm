@@ -1,6 +1,12 @@
 /**
  * ArchiComm Ultra-Optimized Keyboard Shortcuts System
  * Designed for maximum productivity and efficiency
+ *
+ * Shortcut key assignments (no duplicates):
+ * Alt+C: Add component
+ * Ctrl+Shift+C: Add comment
+ * Alt+N: Add note
+ * (see initializeDefaultShortcuts for more)
  */
 
 // Only canonical modifiers; 'cmd' is normalized to 'meta'
@@ -11,18 +17,19 @@ export interface ShortcutConfig {
   key: string;
   description: string;
   category: ShortcutCategory;
+  action: (event?: KeyboardEvent) => void | Promise<void>;
   modifiers?: KeyModifier[];
   preventDefault?: boolean;
   global?: boolean;
-  action: () => void;
 }
 
-  // Map from normalized shortcut key to a Set of ShortcutConfig handlers
-  private shortcuts: Map<string, Set<ShortcutConfig>> = new Map();
+export class KeyboardShortcutManager {
+  // Map from normalized shortcut key to a single ShortcutConfig handler (no duplicates)
+  private shortcuts: Map<string, ShortcutConfig> = new Map();
   private isEnabled = true;
   private changeListeners: Set<() => void> = new Set();
   private shortcutsVersion = 0;
-  private autoSetup: boolean = true;
+  private autoSetup: boolean;
 
   constructor(options: { autoSetup?: boolean } = { autoSetup: true }) {
     this.autoSetup = options.autoSetup !== false;
@@ -33,47 +40,26 @@ export interface ShortcutConfig {
   }
 
   /**
-   * Register a new keyboard shortcut
-   */
-  /**
    * Register a new keyboard shortcut. Returns an unregister function.
    * Warns if overwriting an existing shortcut in debug mode.
    */
   register(config: ShortcutConfig): () => boolean {
     const shortcutKey = this.generateShortcutKey(config.key, config.modifiers);
-    let set = this.shortcuts.get(shortcutKey);
-    if (!set) {
-      set = new Set<ShortcutConfig>();
-      this.shortcuts.set(shortcutKey, set);
-    }
-    if (this.debugMode && set.size > 0) {
+    if (this.debugMode && this.shortcuts.has(shortcutKey)) {
       console.warn(`Overwriting existing shortcut for ${shortcutKey}`);
     }
-    set.add(config);
+    this.shortcuts.set(shortcutKey, config);
     this.notifyChange();
     // Return unregister function
-    return () => this.unregister(config.key, config.modifiers, config);
+    return () => this.unregister(config.key, config.modifiers);
   }
 
   /**
-   * Unregister a keyboard shortcut
-   */
-  private autoSetup: boolean;
-  /**
    * Unregister a keyboard shortcut. Returns true if removed, false if not found.
    */
-  unregister(key: string, modifiers?: KeyModifier[], configToRemove?: ShortcutConfig): boolean {
+  unregister(key: string, modifiers?: KeyModifier[]): boolean {
     const shortcutKey = this.generateShortcutKey(key, modifiers);
-    const set = this.shortcuts.get(shortcutKey);
-    if (!set) return false;
-    let removed = false;
-    if (configToRemove) {
-      removed = set.delete(configToRemove);
-      if (set.size === 0) this.shortcuts.delete(shortcutKey);
-    } else {
-      // Remove all handlers for this key
-      removed = this.shortcuts.delete(shortcutKey);
-    }
+    const removed = this.shortcuts.delete(shortcutKey);
     if (removed) this.notifyChange();
     return removed;
   }
@@ -248,12 +234,21 @@ export interface ShortcutConfig {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
     });
 
+    // 'Add component': Alt+C, 'Add comment': Ctrl+Shift+C (no conflicts)
     this.register({
-      key: ',',
-      modifiers: ['meta'],
-      description: 'AI Settings',
-      category: 'general',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
+      key: 'c',
+      modifiers: ['alt'],
+      description: 'Add component',
+      category: 'canvas',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:add-component'))
+    });
+
+    this.register({
+      key: 'c',
+      modifiers: ['ctrl', 'shift'],
+      description: 'Add comment',
+      category: 'canvas',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:add-comment'))
     });
 
     this.register({
@@ -267,6 +262,14 @@ export interface ShortcutConfig {
     this.register({
       key: 'y',
       modifiers: ['ctrl'],
+      description: 'Redo',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:redo'))
+    });
+
+    this.register({
+      key: 'z',
+      modifiers: ['ctrl', 'shift'],
       description: 'Redo',
       category: 'general',
       action: () => window.dispatchEvent(new CustomEvent('shortcut:redo'))

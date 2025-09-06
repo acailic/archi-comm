@@ -39,6 +39,13 @@ export const notificationUtils = {
 
 // IPC communication helpers
 export const ipcUtils = {
+  /**
+   * Invoke a Tauri command. Returns a Promise resolving to the result.
+   * @template T The expected return type.
+   * @param command The Tauri command to invoke.
+   * @param args Optional arguments for the command.
+   * @returns Promise resolving to the result of the command.
+   */
   async invoke<T>(command: string, args?: any): Promise<T> {
     if (!isTauri()) {
       console.warn(`Tauri command "${command}" called outside of Tauri environment`);
@@ -46,18 +53,25 @@ export const ipcUtils = {
     }
     return invoke(command, args);
   },
-  
+
+  /**
+   * Listen for a Tauri event. Returns a Promise resolving to an unlisten function.
+   * The unlisten function returns a Promise<void> when called.
+   * @template T The payload type for the event.
+   * @param event The event name to listen for.
+   * @param callback The callback to invoke with the event payload.
+   * @returns Promise resolving to an unlisten function.
+   */
   async listen<T>(event: string, callback: (payload: T) => void): Promise<() => Promise<void>> {
     if (!isTauri()) {
       console.warn(`Tauri event listener "${event}" registered outside of Tauri environment`);
       return () => Promise.resolve();
     }
-    
     const unlisten = await listen(event, (event) => {
       callback(event.payload as T);
     });
-    
-    return unlisten;
+    // Wrap the unlisten function to return a Promise<void> for type safety
+    return () => Promise.resolve(unlisten());
   },
 };
 
@@ -276,32 +290,32 @@ function isValidTranscriptionResponse(response: any, maxSegments: number = 10000
   // Enhanced segment validation with detailed checks
   for (let i = 0; i < response.segments.length; i++) {
     const segment = response.segments[i];
-    
-    // Verify segment object integrity - ensure each segment is a valid object
+
+    // 1. Verify segment object integrity - ensure each segment is a valid object
     if (typeof segment !== 'object' || segment === null) {
       console.error(`Validation Error: Segment ${i} is not an object.`, segment);
       return false;
     }
-    
-    // Ensure text is a string - validate the transcribed content exists and is properly typed
+
+    // 2. Ensure text is a string - validate the transcribed content exists and is properly typed
     if (typeof segment.text !== 'string') {
       console.error(`Validation Error: Segment ${i} 'text' field is not a string.`, segment);
       return false;
     }
-    
-    // Validate start time - must be a finite, non-negative number representing seconds
+
+    // 3. Validate start time - must be a finite, non-negative number representing seconds
     if (!Number.isFinite(segment.start) || segment.start < 0) {
       console.error(`Validation Error: Segment ${i} 'start' is not a non-negative finite number.`, segment);
       return false;
     }
-    
-    // Validate end time - must be a finite number and greater than or equal to start time
+
+    // 4. Validate end time - must be a finite number and greater than or equal to start time
     if (!Number.isFinite(segment.end) || segment.end < segment.start) {
       console.error(`Validation Error: Segment ${i} 'end' is not a finite number >= start.`, segment);
       return false;
     }
-    
-    // Confirm segments do not overlap - check temporal ordering to ensure data integrity
+
+    // 5. Confirm segments do not overlap - check temporal ordering to ensure data integrity
     if (i > 0) {
       const prevSegment = response.segments[i - 1];
       if (segment.start < prevSegment.end) {

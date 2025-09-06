@@ -201,20 +201,27 @@ export function CommandPalette({
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent global shortcuts from interfering when palette is open
+      // Only handle keys relevant to the palette
+      const relevantKeys = ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'];
+      if (!relevantKeys.includes(e.key)) return;
+
+      // Guard: do nothing if no commands
+      if (filteredCommands.length === 0) return;
+
+      // Only stop propagation for relevant keys
       e.stopPropagation();
-      
+
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex(prev => 
-            prev < filteredCommands.length - 1 ? prev + 1 : 0
+          setSelectedIndex(prev =>
+            filteredCommands.length === 0 ? 0 : Math.min(prev + 1, filteredCommands.length - 1)
           );
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedIndex(prev => 
-            prev > 0 ? prev - 1 : filteredCommands.length - 1
+          setSelectedIndex(prev =>
+            filteredCommands.length === 0 ? 0 : Math.max(prev - 1, 0)
           );
           break;
         case 'Enter':
@@ -231,10 +238,21 @@ export function CommandPalette({
       }
     };
 
-    // Use capture phase to ensure higher precedence than global shortcuts
-    document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
+    // Use bubble phase unless capture is necessary
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, filteredCommands, selectedIndex, onClose]);
+
+  // Clamp selectedIndex to valid range when filteredCommands changes
+  useEffect(() => {
+    if (filteredCommands.length === 0) {
+      setSelectedIndex(0);
+    } else if (selectedIndex >= filteredCommands.length) {
+      setSelectedIndex(filteredCommands.length - 1);
+    } else if (selectedIndex < 0) {
+      setSelectedIndex(0);
+    }
+  }, [filteredCommands.length]);
 
   // Reset selection when query changes
   useEffect(() => {
