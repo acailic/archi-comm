@@ -176,18 +176,42 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
             setIsTranscribing(false);
           }
           return;
-        } catch (tauriError) {
+        } catch (tauriError: any) {
           console.warn('Tauri transcription failed, falling back to Web Speech API:', tauriError);
+
+          // Mock telemetry/metrics call
+          const trackTelemetry = (eventName: string, properties: object) => {
+            console.log(`[TELEMETRY] Event: ${eventName}`, properties);
+            // In a real app, this would send data to a telemetry service.
+          };
+          trackTelemetry('TauriTranscriptionFallback', {
+            reason: tauriError,
+          });
+
           if (!mountedRef.current) return;
           
-          const errorMessage = getErrorMessage(tauriError);
-          let fallbackMessage = `Tauri transcription failed: ${errorMessage}. Falling back...`;
-          if (errorMessage.startsWith('MODEL_ERROR')) {
-            fallbackMessage = `Model Error: ${errorMessage}. Falling back...`;
-          } else if (errorMessage.startsWith('FFMPEG_ERROR')) {
-            fallbackMessage = `Audio Conversion Error: ${errorMessage}. Falling back...`;
-          } else if (errorMessage.startsWith('FORMAT_ERROR')) {
-            fallbackMessage = `Format Error: ${errorMessage}. Falling back...`;
+          let fallbackMessage: string;
+          // Check if it's a structured error from our backend
+          if (tauriError && typeof tauriError === 'object' && tauriError.code && tauriError.message) {
+            const { code, message } = tauriError;
+            switch (code) {
+              case 'ModelLoadError':
+                fallbackMessage = `Model Error: ${message}. Falling back...`;
+                break;
+              case 'ConversionFailed':
+                fallbackMessage = `Audio Conversion Error: ${message}. Falling back...`;
+                break;
+              case 'InvalidAudioFormat':
+                fallbackMessage = `Format Error: ${message}. Falling back...`;
+                break;
+              default:
+                fallbackMessage = `Tauri transcription failed: ${message}. Falling back...`;
+                break;
+            }
+          } else {
+            // Fallback for unexpected error shapes
+            const errorMessage = getErrorMessage(tauriError);
+            fallbackMessage = `Tauri transcription failed: ${errorMessage}. Falling back...`;
           }
           
           if (mountedRef.current) setTranscriptionError(fallbackMessage);

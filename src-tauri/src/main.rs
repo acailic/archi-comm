@@ -29,7 +29,7 @@ pub enum ApiError {
     InvalidComponentData { details: String },
     
     #[error("File system error: {operation} failed - {source}")]
-    FileSystemError { operation: String, source: std::io::Error },
+    FileSystemError { operation: String, source: String },
     
     #[error("Audio file not found at path: {path}")]
     AudioFileNotFound { path: String },
@@ -41,7 +41,7 @@ pub enum ApiError {
     TranscriptionInitError { details: String },
     
     #[error("Serialization error: {operation} - {source}")]
-    SerializationError { operation: String, source: serde_json::Error },
+    SerializationError { operation: String, source: String },
     
     #[error("State lock error: Failed to acquire lock for {resource}")]
     StateLockError { resource: String },
@@ -57,7 +57,7 @@ impl From<std::io::Error> for ApiError {
     fn from(err: std::io::Error) -> Self {
         ApiError::FileSystemError {
             operation: "unknown".to_string(),
-            source: err,
+            source: err.to_string(),
         }
     }
 }
@@ -66,7 +66,7 @@ impl From<serde_json::Error> for ApiError {
     fn from(err: serde_json::Error) -> Self {
         ApiError::SerializationError {
             operation: "unknown".to_string(),
-            source: err,
+            source: err.to_string(),
         }
     }
 }
@@ -559,7 +559,7 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Api
     fs::create_dir_all(&audio_dir)
         .map_err(|e| ApiError::FileSystemError {
             operation: "create audio directory".to_string(),
-            source: e,
+            source: e.to_string(),
         })?;
     
     // Construct the final file path using only the sanitized filename
@@ -569,35 +569,35 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Api
     let mut temp_file = NamedTempFile::new_in(&audio_dir)
         .map_err(|e| ApiError::FileSystemError {
             operation: "create temporary file".to_string(),
-            source: e,
+            source: e.to_string(),
         })?;
     
     // Write the audio data to the temporary file
     temp_file.write_all(&data)
         .map_err(|e| ApiError::FileSystemError {
             operation: "write audio data".to_string(),
-            source: e,
+            source: e.to_string(),
         })?;
     
     // Ensure all data is written to disk
     temp_file.flush()
         .map_err(|e| ApiError::FileSystemError {
             operation: "flush temporary file".to_string(),
-            source: e,
+            source: e.to_string(),
         })?;
     
     // Atomically move the temporary file to the final location
     temp_file.persist(&final_file_path)
         .map_err(|e| ApiError::FileSystemError {
             operation: format!("persist file '{}'", file_name),
-            source: e.error,
+            source: e.error.to_string(),
         })?;
     
     // Canonicalize the path to get the absolute, resolved path
     let canonical_path = fs::canonicalize(&final_file_path)
         .map_err(|e| ApiError::FileSystemError {
             operation: format!("canonicalize path for '{}'", file_name),
-            source: e,
+            source: e.to_string(),
         })?;
     
     // Convert to string, ensuring it's valid UTF-8
@@ -739,7 +739,7 @@ async fn export_project_data(
     let json_string = serde_json::to_string_pretty(&export_data)
         .map_err(|e| ApiError::SerializationError {
             operation: "export project data".to_string(),
-            source: e,
+            source: e.to_string(),
         })?;
 
     log::info!("Project data exported successfully: {}", project_id);
@@ -1050,7 +1050,7 @@ mod tests {
         match api_error {
             ApiError::FileSystemError { operation, source } => {
                 assert_eq!(operation, "unknown");
-                assert_eq!(source.kind(), ErrorKind::PermissionDenied);
+                assert_eq!(source, "access denied");
             }
             _ => panic!("Expected FileSystemError variant"),
         }
