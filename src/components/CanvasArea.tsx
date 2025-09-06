@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useDrop, useDragLayer } from 'react-dnd';
 import { CanvasComponent } from './CanvasComponent';
 import { DesignComponent, Connection } from '../App';
