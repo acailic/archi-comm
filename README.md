@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/acailic/archicomm/main/src-tauri/icons/icon.png" alt="ArchiComm Logo" width="110" height="110">
+<img src="src-tauri/icons/128x128@2x.png" width="110" height="110">
 
 # ArchiComm
 ### A desktop companion for studying system design
