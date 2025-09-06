@@ -97,16 +97,19 @@ export class KeyboardShortcutManager {
   /**
    * Get all shortcuts by category
    */
+  // Comment 3: Flatten any Sets in the collection to arrays
   getShortcutsByCategory(category: ShortcutCategory): ShortcutConfig[] {
     return Array.from(this.shortcuts.values())
-      .filter(shortcut => shortcut.category === category);
+      .filter(shortcut => shortcut.category === category)
+      .flatMap(s => (s instanceof Set ? Array.from(s) : s));
   }
 
   /**
    * Get all shortcuts
    */
   getAllShortcuts(): ShortcutConfig[] {
-    return Array.from(this.shortcuts.values());
+    return Array.from(this.shortcuts.values())
+      .flatMap(s => (s instanceof Set ? Array.from(s) : s));
   }
 
   /**
@@ -543,9 +546,9 @@ export const useKeyboardShortcuts = (shortcuts: ShortcutConfig[]) => {
 export const globalShortcutManager = new KeyboardShortcutManager();
 
 // Utility functions for formatted shortcut display
+// Comment 7: Use canonical modifier order for display
 export const formatShortcutKey = (key: string, modifiers?: KeyModifier[]): string => {
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  
+  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   const modifierSymbols = {
     ctrl: isMac ? '⌃' : 'Ctrl',
     cmd: '⌘',
@@ -553,10 +556,12 @@ export const formatShortcutKey = (key: string, modifiers?: KeyModifier[]): strin
     alt: isMac ? '⌥' : 'Alt',
     shift: isMac ? '⇧' : 'Shift'
   };
-
-  const formattedModifiers = modifiers?.map(mod => modifierSymbols[mod]) || [];
+  const canonicalOrder: KeyModifier[] = ['ctrl', 'meta', 'alt', 'shift'];
+  const ordered = modifiers
+    ? [...modifiers].sort((a, b) => canonicalOrder.indexOf(a) - canonicalOrder.indexOf(b))
+    : [];
+  const formattedModifiers = ordered.map(mod => modifierSymbols[mod]) || [];
   const formattedKey = key === ' ' ? 'Space' : key;
-  
   return [...formattedModifiers, formattedKey].join(isMac ? '' : '+');
 };
 

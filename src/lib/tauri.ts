@@ -1,5 +1,5 @@
-import { invoke } from '@tauri-apps/api/tauri';
-import { listen } from '@tauri-apps/api/event';
+import { invoke as tauriInvoke } from '@tauri-apps/api/tauri';
+import { listen as tauriListen, Event } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
 import { writeTextFile, createDir } from '@tauri-apps/api/fs';
@@ -7,7 +7,7 @@ import { appDataDir, join } from '@tauri-apps/api/path';
 
 // Helper function to check if we're running in Tauri
 export const isTauri = () => {
-  return typeof window !== 'undefined' && window.__TAURI__;
+  return typeof window !== 'undefined' && !!window.__TAURI__;
 };
 
 
@@ -45,13 +45,15 @@ export const ipcUtils = {
    * @param command The Tauri command to invoke.
    * @param args Optional arguments for the command.
    * @returns Promise resolving to the result of the command.
+   * @rejects If called outside of a Tauri environment.
    */
   async invoke<T>(command: string, args?: any): Promise<T> {
     if (!isTauri()) {
-      console.warn(`Tauri command "${command}" called outside of Tauri environment`);
-      return Promise.resolve({} as T);
+      const errorMsg = `Tauri command "${command}" called outside of Tauri environment with args: ${JSON.stringify(args)}`;
+      console.error(errorMsg);
+      return Promise.reject(new Error(errorMsg));
     }
-    return invoke(command, args);
+    return tauriInvoke(command, args);
   },
 
   /**
@@ -65,13 +67,27 @@ export const ipcUtils = {
   async listen<T>(event: string, callback: (payload: T) => void): Promise<() => Promise<void>> {
     if (!isTauri()) {
       console.warn(`Tauri event listener "${event}" registered outside of Tauri environment`);
-      return () => Promise.resolve();
+      return async () => {};
     }
-    const unlisten = await listen(event, (event) => {
-      callback(event.payload as T);
-    });
-    // Wrap the unlisten function to return a Promise<void> for type safety
-    return () => Promise.resolve(unlisten());
+    
+    try {
+      const unlistenFn = await tauriListen<T>(event, (evt: Event<T>) => {
+        callback(evt.payload);
+      });
+
+      return async () => {
+        try {
+          unlistenFn();
+        } catch (error) {
+          console.error(`Failed to unlisten for event "${event}":`, error);
+          // Optionally re-throw or handle as needed
+          throw error;
+        }
+      };
+    } catch (error) {
+      console.error(`Failed to set up listener for event "${event}":`, error);
+      throw error;
+    }
   },
 };
 
@@ -197,7 +213,11 @@ export const projectUtils = {
     description?: string, 
     status?: Project['status']
   ): Promise<Project | null> {
-    return ipcUtils.invoke('update_project', { project_id: projectId, name, description, status });
+    const payload: { project_id: string; name?: string; description?: string; status?: Project['status'] } = { project_id: projectId };
+    if (name !== undefined) payload.name = name;
+    if (description !== undefined) payload.description = description;
+    if (status !== undefined) payload.status = status;
+    return ipcUtils.invoke('update_project', payload);
   },
   
   async deleteProject(projectId: string): Promise<boolean> {
@@ -233,14 +253,21 @@ export const componentUtils = {
     status?: Component['status'],
     dependencies?: string[]
   ): Promise<Component | null> {
-    return ipcUtils.invoke('update_component', { 
-      project_id: projectId, 
-      component_id: componentId, 
-      name, 
-      description, 
-      status, 
-      dependencies 
-    });
+    const payload: {
+      project_id: string;
+      component_id: string;
+      name?: string;
+      description?: string;
+      status?: Component['status'];
+      dependencies?: string[];
+    } = { project_id: projectId, component_id: componentId };
+
+    if (name !== undefined) payload.name = name;
+    if (description !== undefined) payload.description = description;
+    if (status !== undefined) payload.status = status;
+    if (dependencies !== undefined) payload.dependencies = dependencies;
+
+    return ipcUtils.invoke('update_component', payload);
   },
   
   async removeComponent(projectId: string, componentId: string): Promise<boolean> {
@@ -268,7 +295,7 @@ export const diagramUtils = {
 };
 
 // Type guard to validate TranscriptionResponse structure
-function isValidTranscriptionResponse(response: any, maxSegments: number = 10000): response is TranscriptionResponse {
+function isValidTranscriptionResponse(response: any): response is TranscriptionResponse {
   if (typeof response !== 'object' || response === null) {
     console.error("Validation Error: Response is not an object.", response);
     return false;
@@ -281,51 +308,73 @@ function isValidTranscriptionResponse(response: any, maxSegments: number = 10000
     console.error("Validation Error: 'segments' field is not an array.", response);
     return false;
   }
-  // If segments exceed maximum, truncate instead of rejecting
-  if (response.segments.length > maxSegments) {
-    console.warn(`Validation Warning: Number of segments (${response.segments.length}) exceeds the limit of ${maxSegments}. Truncating to allowed maximum.`);
-    response.segments = response.segments.slice(0, maxSegments);
-  }
   
-  // Enhanced segment validation with detailed checks
-  for (let i = 0; i < response.segments.length; i++) {
-    const segment = response.segments[i];
+  // Create a sorted copy for validation to avoid mutation and ensure correct order
+  const sortedSegments = [...response.segments].sort((a, b) => a.start - b.start);
 
-    // 1. Verify segment object integrity - ensure each segment is a valid object
+  // Enhanced segment validation with detailed checks
+  for (let i = 0; i < sortedSegments.length; i++) {
+    const segment = sortedSegments[i];
+
     if (typeof segment !== 'object' || segment === null) {
       console.error(`Validation Error: Segment ${i} is not an object.`, segment);
       return false;
     }
-
-    // 2. Ensure text is a string - validate the transcribed content exists and is properly typed
     if (typeof segment.text !== 'string') {
       console.error(`Validation Error: Segment ${i} 'text' field is not a string.`, segment);
       return false;
     }
 
-    // 3. Validate start time - must be a finite, non-negative number representing seconds
-    if (!Number.isFinite(segment.start) || segment.start < 0) {
+    const start = typeof segment.start === 'string' ? parseFloat(segment.start) : segment.start;
+    const end = typeof segment.end === 'string' ? parseFloat(segment.end) : segment.end;
+
+    if (!Number.isFinite(start) || start < 0) {
       console.error(`Validation Error: Segment ${i} 'start' is not a non-negative finite number.`, segment);
       return false;
     }
-
-    // 4. Validate end time - must be a finite number and greater than or equal to start time
-    if (!Number.isFinite(segment.end) || segment.end < segment.start) {
+    if (!Number.isFinite(end) || end < start) {
       console.error(`Validation Error: Segment ${i} 'end' is not a finite number >= start.`, segment);
       return false;
     }
 
-    // 5. Confirm segments do not overlap - check temporal ordering to ensure data integrity
+    if (segment.confidence !== undefined && (typeof segment.confidence !== 'number' || segment.confidence < 0 || segment.confidence > 1)) {
+      console.error(`Validation Error: Segment ${i} 'confidence' is not a number between 0 and 1.`, segment);
+      return false;
+    }
+    if (segment.words !== undefined && !Array.isArray(segment.words)) {
+      console.error(`Validation Error: Segment ${i} 'words' is not an array.`, segment);
+      return false;
+    }
+
     if (i > 0) {
-      const prevSegment = response.segments[i - 1];
-      if (segment.start < prevSegment.end) {
-        console.error(`Validation Error: Segment ${i} overlaps with previous segment.`, { prev: prevSegment, current: segment });
-        return false;
+      const prevSegment = sortedSegments[i - 1];
+      if (start < prevSegment.end) {
+        console.warn(`Validation Warning: Segment ${i} overlaps with previous segment.`, { prev: prevSegment, current: segment });
       }
     }
   }
   
   return true;
+}
+
+/**
+ * Sanitizes a transcription response, ensuring it conforms to expected constraints.
+ * This function does not mutate the original response object.
+ * @param response The original transcription response.
+ * @param maxSegments The maximum number of segments to allow.
+ * @returns A new, sanitized transcription response object.
+ */
+function sanitizeTranscriptionResponse(response: TranscriptionResponse, maxSegments: number): TranscriptionResponse {
+  const sanitizedResponse = { ...response, segments: [...response.segments] };
+
+  if (sanitizedResponse.segments.length > maxSegments) {
+    console.warn(`Sanitization: Number of segments (${sanitizedResponse.segments.length}) exceeds the limit of ${maxSegments}. Truncating.`);
+    sanitizedResponse.segments = sanitizedResponse.segments.slice(0, maxSegments);
+    // Optionally, you could also regenerate the full text from the truncated segments
+    // sanitizedResponse.text = sanitizedResponse.segments.map(s => s.text).join(' ').trim();
+  }
+
+  return sanitizedResponse;
 }
 
 // Helper function to categorize errors from the backend
@@ -359,32 +408,25 @@ export const transcriptionUtils = {
       maxSegments?: number; // Maximum allowed segments (default: 10000)
     }
   ): Promise<TranscriptionResponse> {
-    // Check if running in Tauri environment
     if (!isTauri()) {
-      // Return typed fallback object for non-Tauri environments
-      return {
-        text: 'This is a mock transcription for non-Tauri environments.',
-        segments: []
-      };
+      return Promise.reject(new Error('transcribeAudio can only be called in a Tauri environment.'));
     }
 
     const { onProgress, jobId, timeout, maxSegments = 10000 } = options || {};
     
-    // Parameter validation
     if (timeout !== undefined && (!Number.isFinite(timeout) || timeout <= 0)) {
-      throw new Error('timeout must be a positive number');
+      return Promise.reject(new Error('timeout must be a positive number'));
     }
     if (jobId !== undefined && (typeof jobId !== 'string' || jobId.trim() === '')) {
-      throw new Error('jobId must be a non-empty string');
+      return Promise.reject(new Error('jobId must be a non-empty string'));
     }
     if (!Number.isFinite(maxSegments) || maxSegments <= 0) {
-      throw new Error('maxSegments must be a positive number');
+      return Promise.reject(new Error('maxSegments must be a positive number'));
     }
     
-    let progressUnlisten: (() => void) | null = null;
+    let progressUnlisten: (() => Promise<void>) | null = null;
 
     try {
-      // Set up progress listener if callback is provided
       if (onProgress) {
         progressUnlisten = await ipcUtils.listen<TranscriptionProgressEvent>(
           'transcription-progress',
@@ -400,22 +442,20 @@ export const transcriptionUtils = {
 
       const response = await ipcUtils.invoke('transcribe_audio', invokeParams);
       
-      if (!isValidTranscriptionResponse(response, maxSegments)) {
+      if (!isValidTranscriptionResponse(response)) {
         throw new Error(
           `Invalid transcription response structure received from backend: ${JSON.stringify(response)}`
         );
       }
       
-      return response;
+      return sanitizeTranscriptionResponse(response, maxSegments);
     } catch (error) {
-      // Preserve original error's stack trace and cause
       const categorizedError = new Error(categorizeTranscriptionError(error));
       Object.assign(categorizedError, { cause: error });
       throw categorizedError;
     } finally {
-      // Ensure progress listener is always cleaned up
       if (progressUnlisten) {
-        progressUnlisten();
+        await progressUnlisten();
         progressUnlisten = null;
       }
     }
