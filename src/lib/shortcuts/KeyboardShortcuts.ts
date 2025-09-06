@@ -3,48 +3,79 @@
  * Designed for maximum productivity and efficiency
  */
 
+// Only canonical modifiers; 'cmd' is normalized to 'meta'
+export type KeyModifier = 'ctrl' | 'meta' | 'alt' | 'shift';
+export type ShortcutCategory = 'general' | 'canvas' | 'components' | 'navigation' | 'project' | 'system';
+
 export interface ShortcutConfig {
   key: string;
   description: string;
-  action: () => void;
   category: ShortcutCategory;
   modifiers?: KeyModifier[];
   preventDefault?: boolean;
   global?: boolean;
+  action: () => void;
 }
 
-export type KeyModifier = 'ctrl' | 'cmd' | 'alt' | 'shift' | 'meta';
-export type ShortcutCategory = 'general' | 'canvas' | 'components' | 'navigation' | 'project' | 'system';
-
-export class KeyboardShortcutManager {
-  private shortcuts: Map<string, ShortcutConfig> = new Map();
-  private activeElement: HTMLElement | null = null;
+  // Map from normalized shortcut key to a Set of ShortcutConfig handlers
+  private shortcuts: Map<string, Set<ShortcutConfig>> = new Map();
   private isEnabled = true;
-  private listeners: Map<string, EventListener> = new Map();
   private changeListeners: Set<() => void> = new Set();
   private shortcutsVersion = 0;
+  private autoSetup: boolean = true;
 
-  constructor() {
-    this.initializeDefaultShortcuts();
-    this.attachEventListeners();
+  constructor(options: { autoSetup?: boolean } = { autoSetup: true }) {
+    this.autoSetup = options.autoSetup !== false;
+    if (this.autoSetup && typeof window !== 'undefined' && typeof document !== 'undefined') {
+      this.initializeDefaultShortcuts();
+      this.attachEventListeners();
+    }
   }
 
   /**
    * Register a new keyboard shortcut
    */
-  register(config: ShortcutConfig): void {
+  /**
+   * Register a new keyboard shortcut. Returns an unregister function.
+   * Warns if overwriting an existing shortcut in debug mode.
+   */
+  register(config: ShortcutConfig): () => boolean {
     const shortcutKey = this.generateShortcutKey(config.key, config.modifiers);
-    this.shortcuts.set(shortcutKey, config);
+    let set = this.shortcuts.get(shortcutKey);
+    if (!set) {
+      set = new Set<ShortcutConfig>();
+      this.shortcuts.set(shortcutKey, set);
+    }
+    if (this.debugMode && set.size > 0) {
+      console.warn(`Overwriting existing shortcut for ${shortcutKey}`);
+    }
+    set.add(config);
     this.notifyChange();
+    // Return unregister function
+    return () => this.unregister(config.key, config.modifiers, config);
   }
 
   /**
    * Unregister a keyboard shortcut
    */
-  unregister(key: string, modifiers?: KeyModifier[]): void {
+  private autoSetup: boolean;
+  /**
+   * Unregister a keyboard shortcut. Returns true if removed, false if not found.
+   */
+  unregister(key: string, modifiers?: KeyModifier[], configToRemove?: ShortcutConfig): boolean {
     const shortcutKey = this.generateShortcutKey(key, modifiers);
-    this.shortcuts.delete(shortcutKey);
-    this.notifyChange();
+    const set = this.shortcuts.get(shortcutKey);
+    if (!set) return false;
+    let removed = false;
+    if (configToRemove) {
+      removed = set.delete(configToRemove);
+      if (set.size === 0) this.shortcuts.delete(shortcutKey);
+    } else {
+      // Remove all handlers for this key
+      removed = this.shortcuts.delete(shortcutKey);
+    }
+    if (removed) this.notifyChange();
+    return removed;
   }
 
   /**
@@ -117,7 +148,7 @@ export class KeyboardShortcutManager {
   /**
    * Handle keyboard events with high performance
    */
-  private handleKeyDown = (event: KeyboardEvent): void {
+  private handleKeyDown = (event: KeyboardEvent): void => {
     if (!this.isEnabled || this.temporarilyDisabled) return;
 
     // Skip if user is typing in input fields
