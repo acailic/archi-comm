@@ -229,48 +229,113 @@ export const diagramUtils = {
 
 // Type guard to validate TranscriptionResponse structure
 function isValidTranscriptionResponse(response: any): response is TranscriptionResponse {
-  return (
-    typeof response === 'object' &&
-    response !== null &&
-    typeof response.text === 'string' &&
-    Array.isArray(response.segments) &&
-    response.segments.every((segment: any) => 
+  if (typeof response !== 'object' || response === null) {
+    console.error("Validation Error: Response is not an object.", response);
+    return false;
+  }
+  if (typeof response.text !== 'string') {
+    console.error("Validation Error: 'text' field is not a string.", response);
+    return false;
+  }
+  if (!Array.isArray(response.segments)) {
+    console.error("Validation Error: 'segments' field is not an array.", response);
+    return false;
+  }
+  if (!response.segments.every((segment: any) => 
       typeof segment === 'object' &&
       segment !== null &&
       typeof segment.text === 'string' &&
       typeof segment.start === 'number' &&
       typeof segment.end === 'number'
-    )
-  );
+    )) {
+    console.error("Validation Error: One or more segments have an invalid structure.", response);
+    return false;
+  }
+  return true;
+}
+
+// Helper function to categorize errors from the backend
+function categorizeTranscriptionError(error: any): string {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
+  if (errorMessage.startsWith('MODEL_ERROR')) {
+    return `Model Error: The AI model failed to load. Please check your internet connection and try again. Details: ${errorMessage}`;
+  }
+  if (errorMessage.startsWith('FFMPEG_ERROR')) {
+    return `Audio Conversion Error: Failed to process the audio file. Please ensure your audio format is supported. Details: ${errorMessage}`;
+  }
+  if (errorMessage.startsWith('FORMAT_ERROR')) {
+    return `Invalid Format Error: The audio format is not supported. Please use a standard format like WAV or MP3. Details: ${errorMessage}`;
+  }
+  if (errorMessage.startsWith('FILE_NOT_FOUND')) {
+    return `File Not Found: The audio file could not be found at the specified path. Details: ${errorMessage}`;
+  }
+  
+  return `An unexpected error occurred during transcription: ${errorMessage}`;
 }
 
 // Transcription utilities
 export const transcriptionUtils = {
-  async transcribeAudio(filePath: string): Promise<TranscriptionResponse> {
+  async transcribeAudio(
+    filePath: string, 
+    options?: { 
+      onProgress?: TranscriptionProgressCallback;
+    }
+  ): Promise<TranscriptionResponse> {
     // Check if running in Tauri environment
     if (!isTauri()) {
       // Return typed fallback object for non-Tauri environments
       return {
-        text: '',
+        text: 'This is a mock transcription for non-Tauri environments.',
         segments: []
       };
     }
 
+    const { onProgress } = options || {};
+    let progressUnlisten: (() => void) | null = null;
+
     try {
-      // IPC payload key matches backend's expected parameter name (file_path)
+      // Set up progress listener if callback is provided
+      if (onProgress) {
+        progressUnlisten = await ipcUtils.listen<TranscriptionProgressEvent>(
+          'transcription-progress',
+          (event) => {
+            onProgress({ ...event, timestamp: Date.now() });
+          }
+        );
+      }
+
       const response = await ipcUtils.invoke('transcribe_audio', { file_path: filePath });
       
-      // Validate response structure before returning
+      if (progressUnlisten) {
+        progressUnlisten();
+      }
+      
       if (!isValidTranscriptionResponse(response)) {
         throw new Error(
-          `Invalid transcription response structure: expected TranscriptionResponse with 'text' (string) and 'segments' (array), but received: ${JSON.stringify(response)}`
+          `Invalid transcription response structure received from backend: ${JSON.stringify(response)}`
         );
       }
       
       return response;
     } catch (error) {
-      // Handle any errors from the backend or validation
-      throw new Error(`Transcription failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (progressUnlisten) {
+        progressUnlisten();
+      }
+      throw new Error(categorizeTranscriptionError(error));
+    }
+  },
+
+  // IPC testing utility
+  async testTranscriptionPipeline(testAudioPath: string): Promise<{ success: boolean; data?: TranscriptionResponse; error?: string }> {
+    if (!isTauri()) {
+      return { success: false, error: 'Not in a Tauri environment.' };
+    }
+    try {
+      const response = await this.transcribeAudio(testAudioPath);
+      return { success: true, data: response };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   },
 };

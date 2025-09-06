@@ -61,9 +61,11 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono"
 dirs = "5.0"
 log = "0.4"
 env_logger = "0.11"
-simple_transcribe_rs = "1.0.3"
 thiserror = "1.0"
-whisper-rs = "0.10"
+whisper-rs = { version = "0.10", features = ["ffmpeg"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
 tempfile = "3.8"
 
 [features]

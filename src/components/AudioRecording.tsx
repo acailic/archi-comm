@@ -123,6 +123,12 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       return;
     }
 
+    // Validate audio file size
+    if (audioBlob.size > 50 * 1024 * 1024) { // 50MB limit
+      setTranscriptionError('Audio file is too large (max 50MB). Please record a shorter explanation.');
+      return;
+    }
+
     setIsTranscribing(true);
     setTranscriptionError('');
     setTranscriptionMethod('auto');
@@ -160,19 +166,21 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
           
           // Provide specific error messages for different failure types
           if (tauriError instanceof Error) {
-            if (tauriError.message.includes('File system') || tauriError.message.includes('save audio file')) {
-              setTranscriptionError(`File saving failed: ${tauriError.message}. Falling back to Web Speech API...`);
-            } else if (tauriError.message.includes('transcription') || tauriError.message.includes('Invalid transcription')) {
-              setTranscriptionError(`Transcription service failed: ${tauriError.message}. Falling back to Web Speech API...`);
+            if (tauriError.message.startsWith('MODEL_ERROR')) {
+              setTranscriptionError(`Model Error: ${tauriError.message}. Falling back...`);
+            } else if (tauriError.message.startsWith('FFMPEG_ERROR')) {
+              setTranscriptionError(`Audio Conversion Error: ${tauriError.message}. Falling back...`);
+            } else if (tauriError.message.startsWith('FORMAT_ERROR')) {
+              setTranscriptionError(`Format Error: ${tauriError.message}. Falling back...`);
             } else {
-              setTranscriptionError(`Tauri transcription failed: ${tauriError.message}. Falling back to Web Speech API...`);
+              setTranscriptionError(`Tauri transcription failed: ${tauriError.message}. Falling back...`);
             }
           } else {
             setTranscriptionError('Tauri transcription failed. Falling back to Web Speech API...');
           }
           
           // Brief delay to show the error message before fallback
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 2500));
         }
       }
 
