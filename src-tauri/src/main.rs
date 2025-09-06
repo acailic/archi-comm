@@ -370,7 +370,7 @@ async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, St
 // Utility commands
 #[tauri::command]
 async fn get_app_version() -> Result<String, String> {
-    Ok("0.1.0".to_string())
+    Ok("0.2.0".to_string())
 }
 
 #[tauri::command]
