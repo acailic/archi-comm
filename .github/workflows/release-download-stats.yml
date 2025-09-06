@@ -1,0 +1,26 @@
+# .github/workflows/release-download-stats.yml
+name: Release download snapshots
+on:
+  schedule: [{ cron: "0 2 */7 * *" }]  # weekly
+  workflow_dispatch:
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch releases JSON
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p stats
+          curl -H "Authorization: Bearer $GH_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               https://api.github.com/repos/$GITHUB_REPOSITORY/releases \
+               > "stats/releases_$(date -u +%F).json"
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add stats/
+          git commit -m "Snapshot release download counts"
+          git push
