@@ -178,10 +178,10 @@ const componentColors: Record<DesignComponent['type'], string> = {
   'ai-ml': 'bg-pink-600'
 };
 
-const ConnectionPoint = ({ position, onStartConnection, component }) => {
+const ConnectionPoint = ({ position, onStartConnection, componentId }) => {
   const [, drag] = useDrag(() => ({
     type: 'connection-point',
-    item: { fromId: component.id, fromComponent: component, fromPosition: position },
+    item: { fromId: componentId, fromPosition: position },
   }));
 
   const positionClasses = {
@@ -197,7 +197,7 @@ const ConnectionPoint = ({ position, onStartConnection, component }) => {
       className={`absolute w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${positionClasses[position]}`}
       onMouseDown={(e) => {
         e.stopPropagation();
-        onStartConnection(component.id, position);
+        onStartConnection(componentId, position);
       }}
     />
   );
@@ -281,10 +281,10 @@ export function CanvasComponent({
         </div>
       </div>
 
-      <ConnectionPoint position="top" onStartConnection={onStartConnection} component={component} />
-      <ConnectionPoint position="bottom" onStartConnection={onStartConnection} component={component} />
-      <ConnectionPoint position="left" onStartConnection={onStartConnection} component={component} />
-      <ConnectionPoint position="right" onStartConnection={onStartConnection} component={component} />
+      <ConnectionPoint position="top" onStartConnection={onStartConnection} componentId={component.id} />
+      <ConnectionPoint position="bottom" onStartConnection={onStartConnection} componentId={component.id} />
+      <ConnectionPoint position="left" onStartConnection={onStartConnection} componentId={component.id} />
+      <ConnectionPoint position="right" onStartConnection={onStartConnection} componentId={component.id} />
     </div>
   );
 }

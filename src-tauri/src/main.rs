@@ -334,27 +334,31 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Str
         .map_err(|e| format!("Failed to write audio file '{}': {}", file_name, e))?;
     
     // Return the full file path as a string
-    file_path.to_string_lossy().to_string().into()
+    Ok(file_path.to_string_lossy().to_string())
 }
 
 // Tauri command for audio transcription
 #[tauri::command]
 async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, String> {
+    if !PathBuf::from(&file_path).exists() {
+        log::error!("Audio file not found at path: {}", file_path);
+        return Err(format!("FILE_NOT_FOUND: Audio file not found at the specified path."));
+    }
+
     let config = transcription::TranscriptionConfig {
-        model_type: "base".to_string(),
-        language: Some("en".to_string()),
-        audio_file_path: PathBuf::new(),
-        output_format: "text".to_string(),
+        model: transcription::Model::Base,
+        // language field is removed as per plan
     };
 
     let mut transcriber = transcription::AudioTranscriber::new(config);
-    if let Err(e) = transcriber.initialize().await {
-        return Err(format!("Failed to initialize transcriber: {}", e));
+    if let Err(e) = transcriber.initialize() {
+        log::error!("Failed to initialize transcriber: {}", e);
+        return Err(format!("INITIALIZATION_ERROR: {}", e));
     }
 
-    let audio_path = PathBuf::from(file_path);
-    match transcriber.transcribe_audio(&audio_path).await {
+    match transcriber.transcribe_audio(&file_path) {
         Ok(result) => {
+            log::info!("Transcription successful for file: {}", file_path);
             // simple_transcribe_rs does not provide segments, so we return an empty vec
             let response = TranscriptionResponse {
                 text: result.text,
@@ -362,7 +366,10 @@ async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, St
             };
             Ok(response)
         }
-        Err(e) => Err(e.to_string()),
+        Err(e) => {
+            log::error!("Transcription failed for file: {}: {}", file_path, e);
+            Err(e.to_string())
+        }
     }
 }
 

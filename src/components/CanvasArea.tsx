@@ -6,6 +6,13 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Trash2 } from 'lucide-react';
 
+interface DragLayerItem {
+  fromId?: string;
+  fromComponent?: DesignComponent;
+  fromPosition?: 'top' | 'bottom' | 'left' | 'right';
+  type?: DesignComponent['type'];
+}
+
 interface CanvasAreaProps {
   components: DesignComponent[];
   connections: Connection[];
@@ -21,32 +28,6 @@ interface CanvasAreaProps {
   onCompleteConnection: (fromId: string, toId: string) => void;
 }
 
-function DraggingConnectionPreview() {
-  const { item, itemType, currentOffset } = useDragLayer((monitor) => ({
-    item: monitor.getItem(),
-    itemType: monitor.getItemType(),
-    currentOffset: monitor.getSourceClientOffset(),
-  }));
-
-  if (!currentOffset || itemType !== 'connection-point') {
-    return null;
-  }
-
-  const { fromComponent, fromPosition } = item;
-  const fromPoint = getComponentConnectionPoint(fromComponent, fromPosition);
-
-  return (
-    <svg style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-      <path
-        d={`M ${fromPoint.x} ${fromPoint.y} L ${currentOffset.x} ${currentOffset.y}`}
-        stroke="hsl(var(--primary))"
-        strokeWidth="2"
-        strokeDasharray="5,5"
-        fill="none"
-      />
-    </svg>
-  );
-}
 
 const getComponentConnectionPoint = (component: DesignComponent, position: 'top' | 'bottom' | 'left' | 'right') => {
   const width = 128;
@@ -76,6 +57,48 @@ export function CanvasArea({
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [connectionStyle, setConnectionStyle] = useState<'straight' | 'curved' | 'stepped'>('curved');
+
+  function DraggingConnectionPreview() {
+    const { item, itemType, currentOffset } = useDragLayer<DragLayerItem>((monitor) => ({
+      item: monitor.getItem() as DragLayerItem,
+      itemType: monitor.getItemType(),
+      currentOffset: monitor.getClientOffset(),
+    }));
+
+    // Guard clause to check if item is defined
+    if (!item || !currentOffset || itemType !== 'connection-point') {
+      return null;
+    }
+
+    const { fromComponent, fromPosition } = item;
+    if (!fromComponent || !fromPosition) {
+      return null;
+    }
+
+    const fromPoint = getComponentConnectionPoint(fromComponent, fromPosition);
+    
+    // Convert canvas-local coordinates to viewport coordinates
+    let adjustedFromPoint = fromPoint;
+    if (canvasRef.current) {
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      adjustedFromPoint = {
+        x: fromPoint.x + canvasRect.left,
+        y: fromPoint.y + canvasRect.top,
+      };
+    }
+
+    return (
+      <svg style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+        <path
+          d={`M ${adjustedFromPoint.x} ${adjustedFromPoint.y} L ${currentOffset.x} ${currentOffset.y}`}
+          stroke="hsl(var(--primary))"
+          strokeWidth="2"
+          strokeDasharray="5,5"
+          fill="none"
+        />
+      </svg>
+    );
+  }
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ['component', 'connection-point'],
