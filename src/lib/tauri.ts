@@ -247,16 +247,41 @@ function isValidTranscriptionResponse(response: any): response is TranscriptionR
     console.error(`Validation Error: Number of segments exceeds the limit of ${MAX_SEGMENTS}.`, response);
     return false;
   }
-  if (!response.segments.every((segment: any) => 
-      typeof segment === 'object' &&
-      segment !== null &&
-      typeof segment.text === 'string' &&
-      typeof segment.start === 'number' &&
-      typeof segment.end === 'number'
-    )) {
-    console.error("Validation Error: One or more segments have an invalid structure.", response);
-    return false;
+  
+  // Enhanced segment validation with Number.isFinite and ordering checks
+  for (let i = 0; i < response.segments.length; i++) {
+    const segment = response.segments[i];
+    
+    if (typeof segment !== 'object' || segment === null) {
+      console.error(`Validation Error: Segment ${i} is not an object.`, segment);
+      return false;
+    }
+    
+    if (typeof segment.text !== 'string') {
+      console.error(`Validation Error: Segment ${i} 'text' field is not a string.`, segment);
+      return false;
+    }
+    
+    if (!Number.isFinite(segment.start) || segment.start < 0) {
+      console.error(`Validation Error: Segment ${i} 'start' is not a non-negative finite number.`, segment);
+      return false;
+    }
+    
+    if (!Number.isFinite(segment.end) || segment.end < segment.start) {
+      console.error(`Validation Error: Segment ${i} 'end' is not a finite number >= start.`, segment);
+      return false;
+    }
+    
+    // Check ordering: current segment should start after previous segment ends
+    if (i > 0) {
+      const prevSegment = response.segments[i - 1];
+      if (segment.start < prevSegment.end) {
+        console.error(`Validation Error: Segment ${i} overlaps with previous segment.`, { prev: prevSegment, current: segment });
+        return false;
+      }
+    }
   }
+  
   return true;
 }
 
@@ -300,6 +325,15 @@ export const transcriptionUtils = {
     }
 
     const { onProgress, jobId, timeout } = options || {};
+    
+    // Parameter validation
+    if (timeout !== undefined && (!Number.isFinite(timeout) || timeout <= 0)) {
+      throw new Error('timeout must be a positive number');
+    }
+    if (jobId !== undefined && (typeof jobId !== 'string' || jobId.trim() === '')) {
+      throw new Error('jobId must be a non-empty string');
+    }
+    
     let progressUnlisten: (() => void) | null = null;
 
     try {
@@ -313,15 +347,11 @@ export const transcriptionUtils = {
         );
       }
 
-      const response = await ipcUtils.invoke('transcribe_audio', {
-        file_path: filePath,
-        job_id: jobId,
-        timeout,
-      });
-      
-      if (progressUnlisten) {
-        progressUnlisten();
-      }
+      const invokeParams: any = { file_path: filePath };
+      if (jobId) invokeParams.job_id = jobId;
+      if (timeout) invokeParams.timeout = timeout;
+
+      const response = await ipcUtils.invoke('transcribe_audio', invokeParams);
       
       if (!isValidTranscriptionResponse(response)) {
         throw new Error(
@@ -331,19 +361,36 @@ export const transcriptionUtils = {
       
       return response;
     } catch (error) {
+      // Preserve original error's stack trace and cause
+      const categorizedError = new Error(categorizeTranscriptionError(error));
+      Object.assign(categorizedError, { cause: error });
+      throw categorizedError;
+    } finally {
+      // Ensure progress listener is always cleaned up
       if (progressUnlisten) {
         progressUnlisten();
+        progressUnlisten = null;
       }
-      throw new Error(categorizeTranscriptionError(error));
     }
   },
 
-  async cancelTranscription(jobId: string): Promise<void> {
+  async cancelTranscription(jobId: string): Promise<boolean> {
     if (!isTauri()) {
       console.warn(`cancel_transcription called outside of Tauri environment`);
-      return;
+      return false;
     }
-    return ipcUtils.invoke('cancel_transcription', { job_id: jobId });
+    
+    if (!jobId || jobId.trim() === '') {
+      throw new Error('jobId is required and cannot be empty');
+    }
+    
+    try {
+      await ipcUtils.invoke('cancel_transcription', { job_id: jobId });
+      return true;
+    } catch (error) {
+      console.error('Failed to cancel transcription:', error);
+      return false;
+    }
   },
 
   // IPC testing utility

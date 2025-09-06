@@ -500,7 +500,7 @@ async fn load_connections(
 // Helper function to validate and sanitize file names
 fn validate_filename(file_name: &str) -> Result<(), ApiError> {
     // Check for empty filename
-    if file_name.is_empty() {
+    if file_name.trim().is_empty() {
         return Err(ApiError::InvalidProjectData { 
             details: "File name cannot be empty".to_string() 
         });
@@ -590,7 +590,7 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Api
     temp_file.persist(&final_file_path)
         .map_err(|e| ApiError::FileSystemError {
             operation: format!("persist file '{}'", file_name),
-            details: e.error.to_string(),
+            details: e.to_string(),
         })?;
     
     // Canonicalize the path to get the absolute, resolved path

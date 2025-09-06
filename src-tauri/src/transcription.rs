@@ -19,7 +19,7 @@ pub struct TranscriptionConfig {
 pub struct TranscriptionResult {
     pub text: String,
     pub confidence: Option<f32>,
-    pub processing_time: Duration,
+    pub processing_time_ms: u128,
     pub language_detected: Option<String>,
 }
 
@@ -105,7 +105,7 @@ impl AudioTranscriber {
         Ok(TranscriptionResult {
             text: "This is a mock transcription result. The audio was successfully processed.".to_string(),
             confidence: Some(0.95),
-            processing_time,
+            processing_time_ms: processing_time.as_millis(),
             language_detected: Some("en".to_string()),
         })
     }
@@ -191,7 +191,7 @@ pub struct TranscriptionConfig {
 pub struct TranscriptionResult {
     pub text: String,
     pub confidence: Option<f32>,
-    pub processing_time: Duration,
+    pub processing_time_ms: u128,
     pub language_detected: Option<String>,
 }
 
@@ -328,7 +328,7 @@ impl AudioTranscriber {
         Ok(TranscriptionResult {
             text: "This is a mock transcription result. The audio was successfully processed.".to_string(),
             confidence: Some(0.95),
-            processing_time,
+            processing_time_ms: processing_time.as_millis(),
             language_detected: Some("en".to_string()),
         })
     }
