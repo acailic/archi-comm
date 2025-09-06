@@ -10,6 +10,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use uuid::Uuid;
+use tempfile::NamedTempFile;
+use std::io::Write;
 
 // Development utilities
 #[cfg(debug_assertions)]
@@ -326,15 +328,27 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Str
     fs::create_dir_all(&audio_dir)
         .map_err(|e| format!("Failed to create audio directory: {}", e))?;
     
-    // Construct the full file path
-    let file_path = audio_dir.join(&file_name);
+    // Construct the final file path
+    let final_file_path = audio_dir.join(&file_name);
     
-    // Write the audio data to the file
-    fs::write(&file_path, data)
-        .map_err(|e| format!("Failed to write audio file '{}': {}", file_name, e))?;
+    // Create a temporary file in the same directory as the target
+    let mut temp_file = NamedTempFile::new_in(&audio_dir)
+        .map_err(|e| format!("Failed to create temporary file: {}", e))?;
+    
+    // Write the audio data to the temporary file
+    temp_file.write_all(&data)
+        .map_err(|e| format!("Failed to write audio data to temporary file: {}", e))?;
+    
+    // Ensure all data is written to disk
+    temp_file.flush()
+        .map_err(|e| format!("Failed to flush temporary file: {}", e))?;
+    
+    // Atomically move the temporary file to the final location
+    temp_file.persist(&final_file_path)
+        .map_err(|e| format!("Failed to atomically move temporary file to '{}': {}", file_name, e))?;
     
     // Return the full file path as a string
-    Ok(file_path.to_string_lossy().to_string())
+    Ok(final_file_path.to_string_lossy().to_string())
 }
 
 // Tauri command for audio transcription

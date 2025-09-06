@@ -64,6 +64,7 @@ env_logger = "0.11"
 simple_transcribe_rs = "1.0.3"
 thiserror = "1.0"
 whisper-rs = "0.10"
+tempfile = "3.8"
 
 [features]
 # This feature is used for production builds or when `devPath` points to the filesystem
