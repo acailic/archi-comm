@@ -4,6 +4,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::fs;
+use std::env;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -311,6 +313,30 @@ async fn load_connections(
     Ok(store.get(&project_id).cloned().unwrap_or_default())
 }
 
+// Tauri command for saving audio files
+#[tauri::command]
+async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, String> {
+    // Get the system temporary directory
+    let temp_dir = env::temp_dir();
+    
+    // Create a subdirectory for archicomm audio files
+    let audio_dir = temp_dir.join("archicomm_audio");
+    
+    // Create the directory if it doesn't exist
+    fs::create_dir_all(&audio_dir)
+        .map_err(|e| format!("Failed to create audio directory: {}", e))?;
+    
+    // Construct the full file path
+    let file_path = audio_dir.join(&file_name);
+    
+    // Write the audio data to the file
+    fs::write(&file_path, data)
+        .map_err(|e| format!("Failed to write audio file '{}': {}", file_name, e))?;
+    
+    // Return the full file path as a string
+    file_path.to_string_lossy().to_string().into()
+}
+
 // Tauri command for audio transcription
 #[tauri::command]
 async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, String> {
@@ -451,7 +477,8 @@ fn main() {
                     get_app_version,
                     show_in_folder,
                     export_project_data,
-                    // Transcription command
+                    // Transcription commands
+                    save_audio_file,
                     transcribe_audio,
                     // Debug commands
                     populate_sample_data,
@@ -479,7 +506,8 @@ fn main() {
                     get_app_version,
                     show_in_folder,
                     export_project_data,
-                    // Transcription command
+                    // Transcription commands
+                    save_audio_file,
                     transcribe_audio,
                 ]
             }
