@@ -187,3 +187,28 @@
 html {
   font-size: var(--font-size);
 }
+
+/* Export mode styles - hide UI overlays during image capture */
+.export-mode .pointer-events-auto {
+  display: none !important;
+}
+
+.export-mode [class*="selected"] {
+  display: none !important;
+}
+
+.export-mode .absolute.top-4.right-4 {
+  display: none !important;
+}
+
+.export-mode .absolute.bottom-4.right-4 {
+  display: none !important;
+}
+
+.export-mode .bg-card\/80 {
+  display: none !important;
+}
+
+.export-mode .bg-card\\/80 {
+  display: none !important;
+}

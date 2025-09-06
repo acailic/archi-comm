@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { toPng } from 'html-to-image';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -24,6 +25,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   const extendedChallenge = challengeManager.getChallengeById(challenge.id) as ExtendedChallenge || challenge;
 
@@ -59,7 +61,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       from: fromId,
       to: toId,
       label: 'Connection',
-      type: 'data'
+      type: 'data',
+      direction: 'end'
     };
     setConnections(prev => [...prev, newConnection]);
     setConnectionStart(null);
@@ -87,6 +90,12 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     ));
   }, []);
 
+  const handleConnectionDirectionChange = useCallback((id: string, direction: Connection['direction']) => {
+    setConnections(prev => prev.map(conn => 
+      conn.id === id ? { ...conn, direction } : conn
+    ));
+  }, []);
+
   const handleDeleteComponent = useCallback((id: string) => {
     setComponents(prev => prev.filter(comp => comp.id !== id));
     setConnections(prev => prev.filter(conn => conn.from !== id && conn.to !== id));
@@ -109,6 +118,35 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     link.click();
     URL.revokeObjectURL(url);
   }, [components, connections, challenge.id]);
+
+  const handleExportImage = useCallback(async () => {
+    if (!canvasRef.current) return;
+    
+    try {
+      // Temporarily hide UI overlays for clean export
+      canvasRef.current.classList.add('export-mode');
+      
+      // Capture the canvas as PNG
+      const dataUrl = await toPng(canvasRef.current, {
+        quality: 1.0,
+        pixelRatio: 2
+      });
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${challenge.id}-design.png`;
+      link.click();
+      
+    } catch (error) {
+      console.error('Failed to export image:', error);
+    } finally {
+      // Restore UI overlays
+      if (canvasRef.current) {
+        canvasRef.current.classList.remove('export-mode');
+      }
+    }
+  }, [challenge.id]);
 
   const handleContinue = useCallback(() => {
     const designData: DesignData = {
@@ -155,6 +193,10 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               <Button variant="outline" size="sm" onClick={handleExport}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportImage}>
+                <Download className="w-4 h-4 mr-2" />
+                Export PNG
               </Button>
               <Button onClick={handleContinue} disabled={components.length === 0}>
                 Continue to Recording
@@ -214,6 +256,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           <div className="flex-1 flex">
             <div className="flex-1">
               <CanvasArea
+                ref={canvasRef}
                 components={components}
                 connections={connections}
                 selectedComponent={selectedComponent}
@@ -224,6 +267,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                 onConnectionLabelChange={handleConnectionLabelChange}
                 onConnectionDelete={handleConnectionDelete}
                 onConnectionTypeChange={handleConnectionTypeChange}
+                onConnectionDirectionChange={handleConnectionDirectionChange}
                 onStartConnection={handleStartConnection}
                 onCompleteConnection={handleCompleteConnection}
               />

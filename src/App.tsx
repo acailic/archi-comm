@@ -60,6 +60,7 @@ export interface Connection {
   label: string;
   type: 'data' | 'control' | 'sync' | 'async';
   protocol?: string;
+  direction?: 'none' | 'end' | 'both';
 }
 
 export interface DesignData {

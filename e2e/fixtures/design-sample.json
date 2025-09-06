@@ -4,7 +4,7 @@
     { "id": "api-1", "type": "api-gateway", "x": 280, "y": 120, "label": "API Gateway" }
   ],
   "connections": [
-    { "id": "c1", "from": "server-1", "to": "api-1", "label": "Ingress", "type": "data" }
+    { "id": "c1", "from": "server-1", "to": "api-1", "label": "Ingress", "type": "data", "direction": "end" }
   ]
 }
 

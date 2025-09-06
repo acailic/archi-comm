@@ -1,10 +1,14 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useCallback, useMemo, forwardRef } from 'react';
 import { useDrop, useDragLayer } from 'react-dnd';
 import { CanvasComponent } from './CanvasComponent';
 import { DesignComponent, Connection } from '../App';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Trash2 } from 'lucide-react';
+
+// Component dimension constants
+const COMPONENT_WIDTH = 128;
+const COMPONENT_HEIGHT = 80;
 
 interface DragLayerItem {
   fromId?: string;
@@ -24,23 +28,49 @@ interface CanvasAreaProps {
   onConnectionLabelChange: (id: string, label: string) => void;
   onConnectionDelete?: (id: string) => void;
   onConnectionTypeChange?: (id: string, type: Connection['type']) => void;
+  onConnectionDirectionChange?: (id: string, direction: Connection['direction']) => void;
   onStartConnection: (id: string, position: 'top' | 'bottom' | 'left' | 'right') => void;
   onCompleteConnection: (fromId: string, toId: string) => void;
 }
 
 
 const getComponentConnectionPoint = (component: DesignComponent, position: 'top' | 'bottom' | 'left' | 'right') => {
-  const width = 128;
-  const height = 80;
   switch (position) {
-    case 'top': return { x: component.x + width / 2, y: component.y };
-    case 'bottom': return { x: component.x + width / 2, y: component.y + height };
-    case 'left': return { x: component.x, y: component.y + height / 2 };
-    case 'right': return { x: component.x + width, y: component.y + height / 2 };
+    case 'top': return { x: component.x + COMPONENT_WIDTH / 2, y: component.y };
+    case 'bottom': return { x: component.x + COMPONENT_WIDTH / 2, y: component.y + COMPONENT_HEIGHT };
+    case 'left': return { x: component.x, y: component.y + COMPONENT_HEIGHT / 2 };
+    case 'right': return { x: component.x + COMPONENT_WIDTH, y: component.y + COMPONENT_HEIGHT / 2 };
   }
 };
 
-export function CanvasArea({
+// Edge intersection utility function
+const calculateEdgeIntersection = (fromComp: DesignComponent, toComp: DesignComponent) => {
+  const fromCenterX = fromComp.x + COMPONENT_WIDTH / 2;
+  const fromCenterY = fromComp.y + COMPONENT_HEIGHT / 2;
+  const toCenterX = toComp.x + COMPONENT_WIDTH / 2;
+  const toCenterY = toComp.y + COMPONENT_HEIGHT / 2;
+
+  const dx = toCenterX - fromCenterX;
+  const dy = toCenterY - fromCenterY;
+  
+  // Calculate intersection with 'from' component edge
+  const fromSx = COMPONENT_WIDTH / 2;
+  const fromSy = COMPONENT_HEIGHT / 2;
+  const fromK = 1 / Math.max(Math.abs(dx) / fromSx, Math.abs(dy) / fromSy);
+  const fromX = fromCenterX + dx * fromK;
+  const fromY = fromCenterY + dy * fromK;
+  
+  // Calculate intersection with 'to' component edge
+  const toSx = COMPONENT_WIDTH / 2;
+  const toSy = COMPONENT_HEIGHT / 2;
+  const toK = 1 / Math.max(Math.abs(-dx) / toSx, Math.abs(-dy) / toSy);
+  const toX = toCenterX - dx * toK;
+  const toY = toCenterY - dy * toK;
+  
+  return { fromX, fromY, toX, toY };
+};
+
+export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function CanvasArea({
   components,
   connections,
   selectedComponent,
@@ -51,9 +81,10 @@ export function CanvasArea({
   onConnectionLabelChange,
   onConnectionDelete,
   onConnectionTypeChange,
+  onConnectionDirectionChange,
   onStartConnection,
   onCompleteConnection,
-}: CanvasAreaProps) {
+}, ref) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [connectionStyle, setConnectionStyle] = useState<'straight' | 'curved' | 'stepped'>('curved');
@@ -94,27 +125,17 @@ export function CanvasArea({
         return null;
       }
 
-      // Calculate connection point based on component position and connection position
-      const width = 128;
-      const height = 80;
-      let fromPoint: { x: number; y: number };
+      // Create a temporary component object for the edge intersection calculation
+      const fromComponent: DesignComponent = {
+        id: 'temp-from',
+        type: 'server',
+        x: fromComponentX,
+        y: fromComponentY,
+        label: 'temp'
+      };
       
-      switch (fromPosition) {
-        case 'top': 
-          fromPoint = { x: fromComponentX + width / 2, y: fromComponentY };
-          break;
-        case 'bottom': 
-          fromPoint = { x: fromComponentX + width / 2, y: fromComponentY + height };
-          break;
-        case 'left': 
-          fromPoint = { x: fromComponentX, y: fromComponentY + height / 2 };
-          break;
-        case 'right': 
-          fromPoint = { x: fromComponentX + width, y: fromComponentY + height / 2 };
-          break;
-        default:
-          return null;
-      }
+      // Calculate connection point using the same utility as main rendering
+      const fromPoint = getComponentConnectionPoint(fromComponent, fromPosition);
 
       // Convert canvas-local coordinates to viewport coordinates
       if (canvasRef.current) {
@@ -169,22 +190,7 @@ export function CanvasArea({
   }));
 
   const getConnectionPoint = useCallback((fromComp: DesignComponent, toComp: DesignComponent) => {
-    const fromCenterX = fromComp.x + 64;
-    const fromCenterY = fromComp.y + 40;
-    const toCenterX = toComp.x + 64;
-    const toCenterY = toComp.y + 40;
-
-    const angle = Math.atan2(toCenterY - fromCenterY, toCenterX - fromCenterX);
-    
-    const compWidth = 128;
-    const compHeight = 80;
-
-    const fromX = fromCenterX + Math.cos(angle) * (compWidth / 2);
-    const fromY = fromCenterY + Math.sin(angle) * (compHeight / 2);
-    const toX = toCenterX - Math.cos(angle) * (compWidth / 2);
-    const toY = toCenterY - Math.sin(angle) * (compHeight / 2);
-
-    return { fromX, fromY, toX, toY };
+    return calculateEdgeIntersection(fromComp, toComp);
   }, []);
 
   const generatePath = useCallback((x1: number, y1: number, x2: number, y2: number, style: string) => {
@@ -223,6 +229,24 @@ export function CanvasArea({
     return connection.type === 'async' ? '5,5' : undefined;
   }, []);
 
+  const getConnectionMarkers = useCallback((connection: Connection) => {
+    const direction = connection.direction || 'end';
+    const type = connection.type || 'default';
+    
+    switch (direction) {
+      case 'none':
+        return { markerStart: undefined, markerEnd: undefined };
+      case 'both':
+        return { 
+          markerStart: `url(#arrowhead-start-${type})`, 
+          markerEnd: `url(#arrowhead-${type})` 
+        };
+      case 'end':
+      default:
+        return { markerStart: undefined, markerEnd: `url(#arrowhead-${type})` };
+    }
+  }, []);
+
   const renderConnections = () => {
     return connections.map((connection) => {
       const fromComponent = components.find(c => c.id === connection.from);
@@ -239,6 +263,7 @@ export function CanvasArea({
       const isSelected = selectedConnection === connection.id;
       const strokeColor = getConnectionColor(connection);
       const strokeDasharray = getConnectionStrokePattern(connection);
+      const { markerStart, markerEnd } = getConnectionMarkers(connection);
 
       return (
         <g key={connection.id} className="cursor-pointer">
@@ -256,7 +281,7 @@ export function CanvasArea({
             strokeWidth={isSelected ? "3" : "2"}
             strokeDasharray={strokeDasharray}
             fill="none"
-            markerEnd={`url(#arrowhead-${connection.type || 'default'})`}
+            {...getConnectionMarkers(connection)}
             className={`transition-all duration-200 ${isSelected ? 'drop-shadow-lg' : ''}`}
             onClick={() => setSelectedConnection(connection.id)}
           />
@@ -288,34 +313,50 @@ export function CanvasArea({
               />
               
               {isSelected && (
-                <div className="flex items-center space-x-1">
+                <div className="flex flex-col items-center space-y-1">
+                  <div className="flex items-center space-x-1">
+                    <Select
+                      value={connection.type || 'data'}
+                      onValueChange={(value) => onConnectionTypeChange?.(connection.id, value as Connection['type'])}
+                    >
+                      <SelectTrigger className="h-6 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="data">Data</SelectItem>
+                        <SelectItem value="control">Control</SelectItem>
+                        <SelectItem value="sync">Sync</SelectItem>
+                        <SelectItem value="async">Async</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConnectionDelete?.(connection.id);
+                        setSelectedConnection(null);
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  
                   <Select
-                    value={connection.type || 'data'}
-                    onValueChange={(value) => onConnectionTypeChange?.(connection.id, value as Connection['type'])}
+                    value={connection.direction || 'end'}
+                    onValueChange={(value) => onConnectionDirectionChange?.(connection.id, value as Connection['direction'])}
                   >
                     <SelectTrigger className="h-6 text-xs">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="data">Data</SelectItem>
-                      <SelectItem value="control">Control</SelectItem>
-                      <SelectItem value="sync">Sync</SelectItem>
-                      <SelectItem value="async">Async</SelectItem>
+                      <SelectItem value="none">No arrows</SelectItem>
+                      <SelectItem value="end">End arrow</SelectItem>
+                      <SelectItem value="both">Both arrows</SelectItem>
                     </SelectContent>
                   </Select>
-                  
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onConnectionDelete?.(connection.id);
-                      setSelectedConnection(null);
-                    }}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
                 </div>
               )}
             </div>
@@ -330,6 +371,13 @@ export function CanvasArea({
       ref={(node) => {
         canvasRef.current = node;
         drop(node);
+        if (ref) {
+          if (typeof ref === 'function') {
+            ref(node);
+          } else {
+            ref.current = node;
+          }
+        }
       }}
       className={`
         relative w-full h-full bg-muted/10 
@@ -354,6 +402,12 @@ export function CanvasArea({
             <marker id="arrowhead-control" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--purple-500))" /></marker>
             <marker id="arrowhead-sync" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--green-500))" /></marker>
             <marker id="arrowhead-async" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--orange-500))" /></marker>
+            
+            <marker id="arrowhead-start-default" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--primary))" /></marker>
+            <marker id="arrowhead-start-data" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--blue-500))" /></marker>
+            <marker id="arrowhead-start-control" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--purple-500))" /></marker>
+            <marker id="arrowhead-start-sync" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--green-500))" /></marker>
+            <marker id="arrowhead-start-async" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--orange-500))" /></marker>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>
@@ -436,4 +490,4 @@ export function CanvasArea({
       )}
     </div>
   );
-}
+});
