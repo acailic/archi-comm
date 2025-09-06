@@ -9,6 +9,7 @@ const CommandPalette = React.lazy(() => import('@modules/command').then(m => ({ 
 const WelcomeOverlay = React.lazy(() => import('@modules/onboarding').then(m => ({ default: m.WelcomeOverlay })));
 const StatusBar = React.lazy(() => import('@modules/status').then(m => ({ default: m.StatusBar })));
 const ChallengeManager = React.lazy(() => import('@modules/challenges').then(m => ({ default: m.ChallengeManager })));
+const AIConfigPage = React.lazy(() => import('@modules/settings').then(m => ({ default: m.AIConfigPage })));
 
 import { tauriAPI, isTauriApp } from './lib/tauri';
 import { challengeManager, ExtendedChallenge } from './lib/challenge-config';
@@ -24,7 +25,8 @@ import {
   Eye, 
   CheckCircle, 
   Command as CommandIcon,
-  Settings
+  Settings,
+  Brain
 } from 'lucide-react';
 
 export interface Challenge {
@@ -145,6 +147,7 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showChallengeManager, setShowChallengeManager] = useState(false);
+  const [showAIConfig, setShowAIConfig] = useState(false);
   const shortcutsOverlay = useShortcutsOverlay();
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -305,9 +308,26 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'review' } }))
     });
 
+    globalShortcutManager.register({
+      key: ',',
+      modifiers: ['ctrl'],
+      description: 'AI Settings',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
+    });
+
+    globalShortcutManager.register({
+      key: ',',
+      modifiers: ['meta'],
+      description: 'AI Settings',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
+    });
+
     // Event listeners for shortcut actions
     const handleCommandPalette = () => setShowCommandPalette(true);
     const handleChallengeManager = () => setShowChallengeManager(true);
+    const handleAISettings = () => setShowAIConfig(true);
     const handleNavigateToScreen = (event: CustomEvent) => {
       const { screen } = event.detail;
       switch (screen) {
@@ -335,6 +355,7 @@ export default function App() {
     window.addEventListener('shortcut:command-palette', handleCommandPalette);
     window.addEventListener('shortcut:challenge-manager', handleChallengeManager);
     window.addEventListener('shortcut:navigate-to-screen', handleNavigateToScreen);
+    window.addEventListener('shortcut:ai-settings', handleAISettings);
 
     return () => {
       // Cleanup shortcuts
@@ -346,11 +367,14 @@ export default function App() {
       globalShortcutManager.unregister('2', ['alt']);
       globalShortcutManager.unregister('3', ['alt']);
       globalShortcutManager.unregister('4', ['alt']);
+      globalShortcutManager.unregister(',', ['ctrl']);
+      globalShortcutManager.unregister(',', ['meta']);
 
       // Cleanup event listeners
       window.removeEventListener('shortcut:command-palette', handleCommandPalette);
       window.removeEventListener('shortcut:challenge-manager', handleChallengeManager);
       window.removeEventListener('shortcut:navigate-to-screen', handleNavigateToScreen);
+      window.removeEventListener('shortcut:ai-settings', handleAISettings);
     };
   }, [selectedChallenge]);
 
@@ -529,11 +553,11 @@ export default function App() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setShowChallengeManager(true)}
+            onClick={() => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))}
             className="px-2"
-            title="Challenge Manager (Ctrl+Shift+C)"
+            title="AI Settings (Ctrl+,)"
           >
-            <Settings className="w-4 h-4" />
+            <Brain className="w-4 h-4" />
           </Button>
         }
       />

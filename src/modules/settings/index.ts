@@ -1,0 +1,1 @@
+export { default as AIConfigPage } from '../../components/AIConfigPage';

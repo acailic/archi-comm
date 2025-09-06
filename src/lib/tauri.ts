@@ -47,10 +47,10 @@ export const ipcUtils = {
     return invoke(command, args);
   },
   
-  async listen<T>(event: string, callback: (payload: T) => void) {
+  async listen<T>(event: string, callback: (payload: T) => void): Promise<() => Promise<void>> {
     if (!isTauri()) {
       console.warn(`Tauri event listener "${event}" registered outside of Tauri environment`);
-      return () => {};
+      return () => Promise.resolve();
     }
     
     const unlisten = await listen(event, (event) => {
@@ -116,14 +116,40 @@ export interface Connection {
   properties: Record<string, string>;
 }
 
+/**
+ * Represents a transcription segment with time boundaries
+ */
 export interface TranscriptionSegment {
+  /** The transcribed text content for this segment */
   text: string;
+  /** Start time of the segment in seconds */
   start: number;
+  /** End time of the segment in seconds */
   end: number;
+  /** Optional confidence score (0-1) for this segment (not currently provided by backend) */
+  confidence?: number;
+  /** Optional speaker identification (not currently provided by backend) */
+  speaker?: string;
+  /** Optional individual words within the segment (not currently provided by backend) */
+  words?: Array<{
+    /** The individual word */
+    word: string;
+    /** Start time of the word in seconds */
+    start: number;
+    /** End time of the word in seconds */
+    end: number;
+    /** Optional confidence score for the word */
+    confidence?: number;
+  }>;
 }
 
+/**
+ * Complete transcription response containing full text and segmented data
+ */
 export interface TranscriptionResponse {
+  /** Full transcribed text combining all segments */
   text: string;
+  /** Array of time-bounded transcription segments */
   segments: TranscriptionSegment[];
 }
 
@@ -227,10 +253,8 @@ export const diagramUtils = {
   },
 };
 
-const MAX_SEGMENTS = 10000;
-
 // Type guard to validate TranscriptionResponse structure
-function isValidTranscriptionResponse(response: any): response is TranscriptionResponse {
+function isValidTranscriptionResponse(response: any, maxSegments: number = 10000): response is TranscriptionResponse {
   if (typeof response !== 'object' || response === null) {
     console.error("Validation Error: Response is not an object.", response);
     return false;
@@ -243,36 +267,41 @@ function isValidTranscriptionResponse(response: any): response is TranscriptionR
     console.error("Validation Error: 'segments' field is not an array.", response);
     return false;
   }
-  if (response.segments.length > MAX_SEGMENTS) {
-    console.error(`Validation Error: Number of segments exceeds the limit of ${MAX_SEGMENTS}.`, response);
-    return false;
+  // If segments exceed maximum, truncate instead of rejecting
+  if (response.segments.length > maxSegments) {
+    console.warn(`Validation Warning: Number of segments (${response.segments.length}) exceeds the limit of ${maxSegments}. Truncating to allowed maximum.`);
+    response.segments = response.segments.slice(0, maxSegments);
   }
   
-  // Enhanced segment validation with Number.isFinite and ordering checks
+  // Enhanced segment validation with detailed checks
   for (let i = 0; i < response.segments.length; i++) {
     const segment = response.segments[i];
     
+    // Verify segment object integrity - ensure each segment is a valid object
     if (typeof segment !== 'object' || segment === null) {
       console.error(`Validation Error: Segment ${i} is not an object.`, segment);
       return false;
     }
     
+    // Ensure text is a string - validate the transcribed content exists and is properly typed
     if (typeof segment.text !== 'string') {
       console.error(`Validation Error: Segment ${i} 'text' field is not a string.`, segment);
       return false;
     }
     
+    // Validate start time - must be a finite, non-negative number representing seconds
     if (!Number.isFinite(segment.start) || segment.start < 0) {
       console.error(`Validation Error: Segment ${i} 'start' is not a non-negative finite number.`, segment);
       return false;
     }
     
+    // Validate end time - must be a finite number and greater than or equal to start time
     if (!Number.isFinite(segment.end) || segment.end < segment.start) {
       console.error(`Validation Error: Segment ${i} 'end' is not a finite number >= start.`, segment);
       return false;
     }
     
-    // Check ordering: current segment should start after previous segment ends
+    // Confirm segments do not overlap - check temporal ordering to ensure data integrity
     if (i > 0) {
       const prevSegment = response.segments[i - 1];
       if (segment.start < prevSegment.end) {
@@ -313,6 +342,7 @@ export const transcriptionUtils = {
       onProgress?: TranscriptionProgressCallback;
       timeout?: number; // Timeout in milliseconds
       jobId?: string;   // Optional ID for cancellation
+      maxSegments?: number; // Maximum allowed segments (default: 10000)
     }
   ): Promise<TranscriptionResponse> {
     // Check if running in Tauri environment
@@ -324,7 +354,7 @@ export const transcriptionUtils = {
       };
     }
 
-    const { onProgress, jobId, timeout } = options || {};
+    const { onProgress, jobId, timeout, maxSegments = 10000 } = options || {};
     
     // Parameter validation
     if (timeout !== undefined && (!Number.isFinite(timeout) || timeout <= 0)) {
@@ -332,6 +362,9 @@ export const transcriptionUtils = {
     }
     if (jobId !== undefined && (typeof jobId !== 'string' || jobId.trim() === '')) {
       throw new Error('jobId must be a non-empty string');
+    }
+    if (!Number.isFinite(maxSegments) || maxSegments <= 0) {
+      throw new Error('maxSegments must be a positive number');
     }
     
     let progressUnlisten: (() => void) | null = null;
@@ -353,7 +386,7 @@ export const transcriptionUtils = {
 
       const response = await ipcUtils.invoke('transcribe_audio', invokeParams);
       
-      if (!isValidTranscriptionResponse(response)) {
+      if (!isValidTranscriptionResponse(response, maxSegments)) {
         throw new Error(
           `Invalid transcription response structure received from backend: ${JSON.stringify(response)}`
         );
