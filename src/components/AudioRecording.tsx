@@ -84,15 +84,35 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       const timestamp = Date.now();
       const fileName = `recording_${timestamp}.webm`;
       
-      // For now, we'll use a simple approach - in a real app, you'd want to
-      // add a proper file writing method to the Tauri API
-      return await tauriAPI.ipcUtils.invoke('save_audio_file', {
-        fileName,
+      // Call save_audio_file with correct parameter structure matching Rust backend
+      const filePath = await tauriAPI.ipcUtils.invoke('save_audio_file', {
+        file_name: fileName, // Changed from fileName to file_name to match Rust backend
         data: Array.from(uint8Array)
       });
+
+      // Validate the returned file path
+      if (!filePath || typeof filePath !== 'string' || filePath.trim() === '') {
+        throw new Error('Invalid file path returned from save_audio_file');
+      }
+
+      return filePath;
     } catch (error) {
       console.error('Error converting blob to file:', error);
-      return null;
+      
+      // Provide more specific error messages based on error type
+      if (error instanceof Error) {
+        if (error.message.includes('permission')) {
+          throw new Error('File system permission denied. Please check app permissions.');
+        } else if (error.message.includes('space') || error.message.includes('disk')) {
+          throw new Error('Insufficient disk space to save audio file.');
+        } else if (error.message.includes('Invalid file path')) {
+          throw new Error('Failed to create audio file. Invalid file path returned.');
+        } else {
+          throw new Error(`File system error: ${error.message}`);
+        }
+      } else {
+        throw new Error('Unknown error occurred while saving audio file.');
+      }
     }
   }, []);
 
@@ -111,19 +131,54 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       // Method 1: Try Tauri-based transcription first (if available)
       if (tauriAPI.isTauri()) {
         try {
+          // Show file saving progress
+          setTranscriptionError('Saving audio file...');
+          
           const filePath = await convertBlobToFile(audioBlob);
-          if (filePath) {
-            const response = await tauriAPI.transcriptionUtils.transcribeAudio(filePath);
-            setTranscript(response.text);
-            setIsTranscribing(false);
-            return;
+          
+          // Validate file path before proceeding
+          if (!filePath || typeof filePath !== 'string' || filePath.trim() === '') {
+            throw new Error('Failed to save audio file - invalid file path returned');
           }
+
+          // Show transcription progress
+          setTranscriptionError('Transcribing audio...');
+          
+          const response = await tauriAPI.transcriptionUtils.transcribeAudio(filePath);
+          
+          // Validate transcription response
+          if (!response || !response.text || typeof response.text !== 'string') {
+            throw new Error('Invalid transcription response received');
+          }
+          
+          setTranscript(response.text);
+          setTranscriptionError(''); // Clear error on success
+          setIsTranscribing(false);
+          return;
         } catch (tauriError) {
           console.warn('Tauri transcription failed, falling back to Web Speech API:', tauriError);
+          
+          // Provide specific error messages for different failure types
+          if (tauriError instanceof Error) {
+            if (tauriError.message.includes('File system') || tauriError.message.includes('save audio file')) {
+              setTranscriptionError(`File saving failed: ${tauriError.message}. Falling back to Web Speech API...`);
+            } else if (tauriError.message.includes('transcription') || tauriError.message.includes('Invalid transcription')) {
+              setTranscriptionError(`Transcription service failed: ${tauriError.message}. Falling back to Web Speech API...`);
+            } else {
+              setTranscriptionError(`Tauri transcription failed: ${tauriError.message}. Falling back to Web Speech API...`);
+            }
+          } else {
+            setTranscriptionError('Tauri transcription failed. Falling back to Web Speech API...');
+          }
+          
+          // Brief delay to show the error message before fallback
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
 
       // Method 2: Fall back to Web Speech API
+      setTranscriptionError('Using Web Speech API for transcription...');
+      
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         throw new Error('Speech recognition is not supported in this browser. Please type your transcript manually.');
       }
@@ -154,12 +209,13 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       };
 
       recognition.onerror = (event: any) => {
-        setTranscriptionError(`Transcription error: ${event.error}. Please try typing your transcript manually.`);
+        setTranscriptionError(`Web Speech API error: ${event.error}. Please try typing your transcript manually.`);
         setIsTranscribing(false);
       };
 
       recognition.onend = () => {
         setIsTranscribing(false);
+        setTranscriptionError(''); // Clear error on successful completion
         if (finalTranscript.trim()) {
           setTranscript(finalTranscript.trim());
         }
@@ -190,8 +246,23 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       audio.play();
 
     } catch (error) {
-      setTranscriptionError(error instanceof Error ? error.message : 'Transcription failed. Please type your transcript manually.');
+      // Ensure UI state is properly reset on any error
       setIsTranscribing(false);
+      
+      // Provide specific error messages based on error type
+      if (error instanceof Error) {
+        if (error.message.includes('Speech recognition is not supported')) {
+          setTranscriptionError('Speech recognition is not supported in this browser. Please type your transcript manually.');
+        } else if (error.message.includes('File system') || error.message.includes('save audio file')) {
+          setTranscriptionError(`File system error: ${error.message}. Please try typing your transcript manually.`);
+        } else if (error.message.includes('transcription') || error.message.includes('Transcription service')) {
+          setTranscriptionError(`Transcription service error: ${error.message}. Please try typing your transcript manually.`);
+        } else {
+          setTranscriptionError(`Transcription failed: ${error.message}. Please try typing your transcript manually.`);
+        }
+      } else {
+        setTranscriptionError('Unknown transcription error occurred. Please try typing your transcript manually.');
+      }
     }
   }, [audioBlob, convertBlobToFile]);
 
