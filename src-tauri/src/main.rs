@@ -182,37 +182,68 @@ async fn create_project(
     name: String,
     description: String,
     projects: State<'_, ProjectStore>,
-) -> Result<Project, String> {
+) -> Result<Project, ApiError> {
+    // Validate project data
+    if name.trim().is_empty() {
+        return Err(ApiError::InvalidProjectData {
+            details: "Project name cannot be empty".to_string(),
+        });
+    }
+
+    if name.len() > 255 {
+        return Err(ApiError::InvalidProjectData {
+            details: format!("Project name too long: {} characters (max 255)", name.len()),
+        });
+    }
+
     let project = Project {
         id: Uuid::new_v4().to_string(),
-        name,
-        description,
+        name: name.trim().to_string(),
+        description: description.trim().to_string(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
         status: ProjectStatus::Planning,
         components: Vec::new(),
     };
 
-    let mut store = projects.lock().unwrap();
+    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
+    
     let project_id = project.id.clone();
     store.insert(project_id, project.clone());
 
+    log::info!("Project created successfully: {} ({})", project.name, project.id);
     Ok(project)
 }
 
 #[tauri::command]
-async fn get_projects(projects: State<'_, ProjectStore>) -> Result<Vec<Project>, String> {
-    let store = projects.lock().unwrap();
-    Ok(store.values().cloned().collect())
+async fn get_projects(projects: State<'_, ProjectStore>) -> Result<Vec<Project>, ApiError> {
+    let store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
+    
+    let all_projects: Vec<Project> = store.values().cloned().collect();
+    log::debug!("Retrieved {} projects", all_projects.len());
+    Ok(all_projects)
 }
 
 #[tauri::command]
 async fn get_project(
     project_id: String,
     projects: State<'_, ProjectStore>,
-) -> Result<Option<Project>, String> {
-    let store = projects.lock().unwrap();
-    Ok(store.get(&project_id).cloned())
+) -> Result<Option<Project>, ApiError> {
+    let store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
+    
+    let project = store.get(&project_id).cloned();
+    if project.is_some() {
+        log::debug!("Retrieved project: {}", project_id);
+    } else {
+        log::debug!("Project not found: {}", project_id);
+    }
+    Ok(project)
 }
 
 #[tauri::command]
@@ -222,23 +253,37 @@ async fn update_project(
     description: Option<String>,
     status: Option<ProjectStatus>,
     projects: State<'_, ProjectStore>,
-) -> Result<Option<Project>, String> {
-    let mut store = projects.lock().unwrap();
+) -> Result<Option<Project>, ApiError> {
+    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
     
     if let Some(project) = store.get_mut(&project_id) {
         if let Some(new_name) = name {
-            project.name = new_name;
+            if new_name.trim().is_empty() {
+                return Err(ApiError::InvalidProjectData {
+                    details: "Project name cannot be empty".to_string(),
+                });
+            }
+            if new_name.len() > 255 {
+                return Err(ApiError::InvalidProjectData {
+                    details: format!("Project name too long: {} characters (max 255)", new_name.len()),
+                });
+            }
+            project.name = new_name.trim().to_string();
         }
         if let Some(new_description) = description {
-            project.description = new_description;
+            project.description = new_description.trim().to_string();
         }
         if let Some(new_status) = status {
             project.status = new_status;
         }
         project.updated_at = Utc::now();
         
+        log::info!("Project updated successfully: {} ({})", project.name, project.id);
         Ok(Some(project.clone()))
     } else {
+        log::debug!("Project not found for update: {}", project_id);
         Ok(None)
     }
 }
@@ -247,9 +292,21 @@ async fn update_project(
 async fn delete_project(
     project_id: String,
     projects: State<'_, ProjectStore>,
-) -> Result<bool, String> {
-    let mut store = projects.lock().unwrap();
-    Ok(store.remove(&project_id).is_some())
+) -> Result<bool, ApiError> {
+    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
+    
+    let removed = store.remove(&project_id);
+    let success = removed.is_some();
+    
+    if success {
+        log::info!("Project deleted successfully: {}", project_id);
+    } else {
+        log::debug!("Project not found for deletion: {}", project_id);
+    }
+    
+    Ok(success)
 }
 
 // Tauri commands for component management
@@ -260,15 +317,30 @@ async fn add_component(
     component_type: ComponentType,
     description: String,
     projects: State<'_, ProjectStore>,
-) -> Result<Option<Component>, String> {
-    let mut store = projects.lock().unwrap();
+) -> Result<Option<Component>, ApiError> {
+    // Validate component data
+    if name.trim().is_empty() {
+        return Err(ApiError::InvalidComponentData {
+            details: "Component name cannot be empty".to_string(),
+        });
+    }
+    
+    if name.len() > 255 {
+        return Err(ApiError::InvalidComponentData {
+            details: format!("Component name too long: {} characters (max 255)", name.len()),
+        });
+    }
+
+    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
     
     if let Some(project) = store.get_mut(&project_id) {
         let component = Component {
             id: Uuid::new_v4().to_string(),
-            name,
+            name: name.trim().to_string(),
             component_type,
-            description,
+            description: description.trim().to_string(),
             dependencies: Vec::new(),
             status: ComponentStatus::NotStarted,
             metadata: HashMap::new(),
@@ -277,8 +349,10 @@ async fn add_component(
         project.components.push(component.clone());
         project.updated_at = Utc::now();
         
+        log::info!("Component added successfully: {} to project {}", component.name, project_id);
         Ok(Some(component))
     } else {
+        log::debug!("Project not found for component addition: {}", project_id);
         Ok(None)
     }
 }
@@ -292,16 +366,28 @@ async fn update_component(
     status: Option<ComponentStatus>,
     dependencies: Option<Vec<String>>,
     projects: State<'_, ProjectStore>,
-) -> Result<Option<Component>, String> {
-    let mut store = projects.lock().unwrap();
+) -> Result<Option<Component>, ApiError> {
+    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
     
     if let Some(project) = store.get_mut(&project_id) {
         if let Some(component) = project.components.iter_mut().find(|c| c.id == component_id) {
             if let Some(new_name) = name {
-                component.name = new_name;
+                if new_name.trim().is_empty() {
+                    return Err(ApiError::InvalidComponentData {
+                        details: "Component name cannot be empty".to_string(),
+                    });
+                }
+                if new_name.len() > 255 {
+                    return Err(ApiError::InvalidComponentData {
+                        details: format!("Component name too long: {} characters (max 255)", new_name.len()),
+                    });
+                }
+                component.name = new_name.trim().to_string();
             }
             if let Some(new_description) = description {
-                component.description = new_description;
+                component.description = new_description.trim().to_string();
             }
             if let Some(new_status) = status {
                 component.status = new_status;
@@ -311,12 +397,15 @@ async fn update_component(
             }
             
             project.updated_at = Utc::now();
+            log::info!("Component updated successfully: {} in project {}", component.name, project_id);
             Ok(Some(component.clone()))
         } else {
-            Ok(None)
+            log::debug!("Component not found for update: {} in project {}", component_id, project_id);
+            Err(ApiError::ComponentNotFound { component_id, project_id })
         }
     } else {
-        Ok(None)
+        log::debug!("Project not found for component update: {}", project_id);
+        Err(ApiError::ProjectNotFound { project_id })
     }
 }
 
@@ -325,17 +414,27 @@ async fn remove_component(
     project_id: String,
     component_id: String,
     projects: State<'_, ProjectStore>,
-) -> Result<bool, String> {
-    let mut store = projects.lock().unwrap();
+) -> Result<bool, ApiError> {
+    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
     
     if let Some(project) = store.get_mut(&project_id) {
         let initial_len = project.components.len();
         project.components.retain(|c| c.id != component_id);
         project.updated_at = Utc::now();
         
-        Ok(project.components.len() < initial_len)
+        let success = project.components.len() < initial_len;
+        if success {
+            log::info!("Component removed successfully: {} from project {}", component_id, project_id);
+        } else {
+            log::debug!("Component not found for removal: {} in project {}", component_id, project_id);
+        }
+        
+        Ok(success)
     } else {
-        Ok(false)
+        log::debug!("Project not found for component removal: {}", project_id);
+        Err(ApiError::ProjectNotFound { project_id })
     }
 }
 
@@ -345,9 +444,13 @@ async fn save_diagram(
     project_id: String,
     elements: Vec<DiagramElement>,
     diagrams: State<'_, DiagramStore>,
-) -> Result<(), String> {
-    let mut store = diagrams.lock().unwrap();
-    store.insert(project_id, elements);
+) -> Result<(), ApiError> {
+    let mut store = diagrams.lock().map_err(|_| ApiError::StateLockError {
+        resource: "DiagramStore".to_string(),
+    })?;
+    
+    store.insert(project_id.clone(), elements);
+    log::debug!("Diagram saved successfully for project: {}", project_id);
     Ok(())
 }
 
@@ -355,9 +458,14 @@ async fn save_diagram(
 async fn load_diagram(
     project_id: String,
     diagrams: State<'_, DiagramStore>,
-) -> Result<Vec<DiagramElement>, String> {
-    let store = diagrams.lock().unwrap();
-    Ok(store.get(&project_id).cloned().unwrap_or_default())
+) -> Result<Vec<DiagramElement>, ApiError> {
+    let store = diagrams.lock().map_err(|_| ApiError::StateLockError {
+        resource: "DiagramStore".to_string(),
+    })?;
+    
+    let elements = store.get(&project_id).cloned().unwrap_or_default();
+    log::debug!("Diagram loaded for project: {} ({} elements)", project_id, elements.len());
+    Ok(elements)
 }
 
 #[tauri::command]
@@ -365,9 +473,13 @@ async fn save_connections(
     project_id: String,
     connections: Vec<Connection>,
     connection_store: State<'_, ConnectionStore>,
-) -> Result<(), String> {
-    let mut store = connection_store.lock().unwrap();
-    store.insert(project_id, connections);
+) -> Result<(), ApiError> {
+    let mut store = connection_store.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ConnectionStore".to_string(),
+    })?;
+    
+    store.insert(project_id.clone(), connections);
+    log::debug!("Connections saved successfully for project: {}", project_id);
     Ok(())
 }
 
@@ -375,9 +487,14 @@ async fn save_connections(
 async fn load_connections(
     project_id: String,
     connection_store: State<'_, ConnectionStore>,
-) -> Result<Vec<Connection>, String> {
-    let store = connection_store.lock().unwrap();
-    Ok(store.get(&project_id).cloned().unwrap_or_default())
+) -> Result<Vec<Connection>, ApiError> {
+    let store = connection_store.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ConnectionStore".to_string(),
+    })?;
+    
+    let connections = store.get(&project_id).cloned().unwrap_or_default();
+    log::debug!("Connections loaded for project: {} ({} connections)", project_id, connections.len());
+    Ok(connections)
 }
 
 // Helper function to validate and sanitize file names
@@ -496,10 +613,12 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Api
 
 // Tauri command for audio transcription
 #[tauri::command]
-async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, String> {
-    if !PathBuf::from(&file_path).exists() {
+async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, ApiError> {
+    let audio_path = PathBuf::from(&file_path);
+    
+    if !audio_path.exists() {
         log::error!("Audio file not found at path: {}", file_path);
-        return Err(format!("FILE_NOT_FOUND: Audio file not found at the specified path."));
+        return Err(ApiError::AudioFileNotFound { path: file_path });
     }
 
     let config = transcription::TranscriptionConfig {
@@ -510,7 +629,9 @@ async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, St
     let mut transcriber = transcription::AudioTranscriber::new(config);
     if let Err(e) = transcriber.initialize() {
         log::error!("Failed to initialize transcriber: {}", e);
-        return Err(format!("INITIALIZATION_ERROR: {}", e));
+        return Err(ApiError::TranscriptionInitError {
+            details: format!("Transcriber initialization failed: {}", e),
+        });
     }
 
     match transcriber.transcribe_audio(&file_path) {
@@ -525,7 +646,11 @@ async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, St
         }
         Err(e) => {
             log::error!("Transcription failed for file: {}: {}", file_path, e);
-            Err(e.to_string())
+            Err(ApiError::TranscriptionError {
+                details: format!("Transcription processing failed for '{}': {}", 
+                               audio_path.file_name().unwrap_or_default().to_string_lossy(), 
+                               e),
+            })
         }
     }
 }
@@ -533,18 +658,27 @@ async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, St
 
 // Utility commands
 #[tauri::command]
-async fn get_app_version() -> Result<String, String> {
+async fn get_app_version() -> Result<String, ApiError> {
     Ok("0.2.0".to_string())
 }
 
 #[tauri::command]
-async fn show_in_folder(path: String) -> Result<(), String> {
+async fn show_in_folder(path: String) -> Result<(), ApiError> {
+    // Validate the path exists
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        return Err(ApiError::AudioFileNotFound { path });
+    }
+
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")
             .args(["/select,", &path])
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| ApiError::ProcessError {
+                command: "explorer".to_string(),
+                details: format!("Failed to open file explorer: {}", e),
+            })?;
     }
 
     #[cfg(target_os = "macos")]
@@ -552,17 +686,24 @@ async fn show_in_folder(path: String) -> Result<(), String> {
         std::process::Command::new("open")
             .args(["-R", &path])
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| ApiError::ProcessError {
+                command: "open".to_string(),
+                details: format!("Failed to open Finder: {}", e),
+            })?;
     }
 
     #[cfg(target_os = "linux")]
     {
         std::process::Command::new("xdg-open")
-            .arg(std::path::Path::new(&path).parent().unwrap_or_else(|| std::path::Path::new("/")))
+            .arg(path_buf.parent().unwrap_or_else(|| std::path::Path::new("/")))
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| ApiError::ProcessError {
+                command: "xdg-open".to_string(),
+                details: format!("Failed to open file manager: {}", e),
+            })?;
     }
 
+    log::info!("Successfully opened folder for path: {}", path);
     Ok(())
 }
 
@@ -572,12 +713,19 @@ async fn export_project_data(
     projects: State<'_, ProjectStore>,
     diagrams: State<'_, DiagramStore>,
     connections: State<'_, ConnectionStore>,
-) -> Result<String, String> {
-    let project_store = projects.lock().unwrap();
-    let diagram_store = diagrams.lock().unwrap();
-    let connection_store = connections.lock().unwrap();
+) -> Result<String, ApiError> {
+    let project_store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
+    let diagram_store = diagrams.lock().map_err(|_| ApiError::StateLockError {
+        resource: "DiagramStore".to_string(),
+    })?;
+    let connection_store = connections.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ConnectionStore".to_string(),
+    })?;
 
-    let project = project_store.get(&project_id);
+    let project = project_store.get(&project_id)
+        .ok_or_else(|| ApiError::ProjectNotFound { project_id: project_id.clone() })?;
     let diagram_elements = diagram_store.get(&project_id).cloned().unwrap_or_default();
     let diagram_connections = connection_store.get(&project_id).cloned().unwrap_or_default();
 
@@ -588,16 +736,25 @@ async fn export_project_data(
         "exported_at": Utc::now()
     });
 
-    serde_json::to_string_pretty(&export_data).map_err(|e| e.to_string())
+    let json_string = serde_json::to_string_pretty(&export_data)
+        .map_err(|e| ApiError::SerializationError {
+            operation: "export project data".to_string(),
+            source: e,
+        })?;
+
+    log::info!("Project data exported successfully: {}", project_id);
+    Ok(json_string)
 }
 
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn populate_sample_data(
     projects: State<'_, ProjectStore>,
-) -> Result<Vec<Project>, String> {
+) -> Result<Vec<Project>, ApiError> {
     let sample_projects = dev_utils::create_sample_projects();
-    let mut store = projects.lock().unwrap();
+    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+        resource: "ProjectStore".to_string(),
+    })?;
     
     let mut result = Vec::new();
     for project in sample_projects {
@@ -606,6 +763,7 @@ async fn populate_sample_data(
         result.push(project);
     }
     
+    log::info!("Sample data populated successfully: {} projects", result.len());
     Ok(result)
 }
 
@@ -709,5 +867,209 @@ mod tests {
         assert_eq!(v["name"], json!("Name"));
         assert!(v["created_at"].as_str().unwrap().contains('T'));
         assert_eq!(v["status"], json!("Planning"));
+    }
+
+    #[test]
+    fn test_validate_filename_security() {
+        // Test path traversal attempts
+        assert!(validate_filename("../evil").is_err());
+        assert!(validate_filename("..\\evil").is_err());
+        assert!(validate_filename("evil/../file").is_err());
+        assert!(validate_filename("/etc/passwd").is_err());
+        assert!(validate_filename("C:\\Windows\\System32\\config").is_err());
+        
+        // Test reserved Windows names
+        assert!(validate_filename("CON").is_err());
+        assert!(validate_filename("con.txt").is_err());
+        assert!(validate_filename("PRN").is_err());
+        assert!(validate_filename("AUX").is_err());
+        assert!(validate_filename("NUL").is_err());
+        assert!(validate_filename("COM1").is_err());
+        assert!(validate_filename("LPT1").is_err());
+        
+        // Test invalid characters
+        assert!(validate_filename("file<name").is_err());
+        assert!(validate_filename("file>name").is_err());
+        assert!(validate_filename("file:name").is_err());
+        assert!(validate_filename("file\"name").is_err());
+        assert!(validate_filename("file|name").is_err());
+        assert!(validate_filename("file?name").is_err());
+        assert!(validate_filename("file*name").is_err());
+        
+        // Test control characters
+        assert!(validate_filename("file\x00name").is_err());
+        assert!(validate_filename("file\x1fname").is_err());
+        
+        // Test empty filename
+        assert!(validate_filename("").is_err());
+        assert!(validate_filename("   ").is_err());
+        
+        // Test filename too long
+        let long_name = "a".repeat(256);
+        assert!(validate_filename(&long_name).is_err());
+        
+        // Test valid filenames
+        assert!(validate_filename("valid_file.txt").is_ok());
+        assert!(validate_filename("audio_recording_123.wav").is_ok());
+        assert!(validate_filename("file-with-dashes.mp3").is_ok());
+        assert!(validate_filename("file with spaces.webm").is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_save_audio_file_security() {
+        use tempfile::tempdir;
+        
+        // Test with valid filename
+        let valid_data = b"fake audio data";
+        let result = save_audio_file("test_audio.wav".to_string(), valid_data.to_vec()).await;
+        assert!(result.is_ok());
+        
+        // Clean up - the file should exist and be valid
+        let file_path = result.unwrap();
+        assert!(std::path::Path::new(&file_path).exists());
+        let content = std::fs::read(&file_path).unwrap();
+        assert_eq!(content, valid_data);
+        
+        // Clean up
+        std::fs::remove_file(&file_path).ok();
+        
+        // Test with malicious filename - should fail
+        let malicious_names = vec![
+            "../etc/passwd",
+            "..\\Windows\\System32\\config",
+            "CON",
+            "file<>name",
+            "",
+            "a".repeat(300), // too long
+        ];
+        
+        for malicious_name in malicious_names {
+            let result = save_audio_file(malicious_name.to_string(), valid_data.to_vec()).await;
+            assert!(result.is_err(), "Expected error for malicious filename: {}", malicious_name);
+        }
+    }
+
+    #[tokio::test] 
+    async fn test_save_audio_file_canonicalization() {
+        use std::path::PathBuf;
+        
+        // Test that canonicalization works correctly
+        let test_data = b"test audio content";
+        let result = save_audio_file("test_canonical.wav".to_string(), test_data.to_vec()).await;
+        
+        assert!(result.is_ok());
+        let canonical_path = result.unwrap();
+        
+        // Verify path is absolute
+        let path_buf = PathBuf::from(&canonical_path);
+        assert!(path_buf.is_absolute());
+        
+        // Verify file exists and has correct content
+        assert!(path_buf.exists());
+        let content = std::fs::read(&path_buf).unwrap();
+        assert_eq!(content, test_data);
+        
+        // Verify path is properly UTF-8 encoded
+        assert!(canonical_path.is_ascii() || canonical_path.chars().all(|c| !c.is_control()));
+        
+        // Clean up
+        std::fs::remove_file(&path_buf).ok();
+    }
+
+    #[tokio::test]
+    async fn test_file_cleanup_and_no_artifacts() {
+        use std::fs;
+        use std::path::PathBuf;
+        
+        let test_data = b"cleanup test data";
+        let filename = "cleanup_test.wav";
+        
+        // Save file
+        let result = save_audio_file(filename.to_string(), test_data.to_vec()).await;
+        assert!(result.is_ok());
+        
+        let file_path = result.unwrap();
+        let path_buf = PathBuf::from(&file_path);
+        
+        // Verify file exists
+        assert!(path_buf.exists());
+        
+        // Get directory and check for temporary artifacts
+        let dir = path_buf.parent().unwrap();
+        let entries_before_cleanup: Vec<_> = fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        
+        // Remove the file
+        fs::remove_file(&path_buf).unwrap();
+        
+        // Verify no temp files left behind
+        let entries_after_cleanup: Vec<_> = fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        
+        // Should be one fewer file (the one we removed)
+        assert_eq!(entries_after_cleanup.len(), entries_before_cleanup.len() - 1);
+        
+        // No temporary files should remain (no files starting with .tmp)
+        let temp_files: Vec<_> = entries_after_cleanup
+            .iter()
+            .filter(|name| name.to_string_lossy().starts_with(".tmp"))
+            .collect();
+        assert!(temp_files.is_empty(), "Found temporary files: {:?}", temp_files);
+    }
+
+    #[test]
+    fn test_api_error_display() {
+        let error = ApiError::ProjectNotFound { 
+            project_id: "test_id".to_string() 
+        };
+        assert_eq!(error.to_string(), "Project not found: test_id");
+        
+        let error = ApiError::ComponentNotFound { 
+            component_id: "comp_id".to_string(),
+            project_id: "proj_id".to_string()
+        };
+        assert_eq!(error.to_string(), "Component not found: comp_id in project proj_id");
+        
+        let error = ApiError::InvalidProjectData { 
+            details: "Name too long".to_string() 
+        };
+        assert_eq!(error.to_string(), "Invalid project data: Name too long");
+    }
+
+    #[test]
+    fn test_api_error_from_conversions() {
+        use std::io::ErrorKind;
+        
+        // Test From<std::io::Error>
+        let io_error = std::io::Error::new(ErrorKind::PermissionDenied, "access denied");
+        let api_error: ApiError = io_error.into();
+        match api_error {
+            ApiError::FileSystemError { operation, source } => {
+                assert_eq!(operation, "unknown");
+                assert_eq!(source.kind(), ErrorKind::PermissionDenied);
+            }
+            _ => panic!("Expected FileSystemError variant"),
+        }
+        
+        // Test From<serde_json::Error>
+        let json_error = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
+        let api_error: ApiError = json_error.into();
+        match api_error {
+            ApiError::SerializationError { operation, source: _ } => {
+                assert_eq!(operation, "unknown");
+            }
+            _ => panic!("Expected SerializationError variant"),
+        }
+        
+        // Test From<ApiError> for String
+        let api_error = ApiError::Internal { 
+            details: "test error".to_string() 
+        };
+        let error_string: String = api_error.into();
+        assert_eq!(error_string, "Internal error: test error");
     }
 }

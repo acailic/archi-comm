@@ -6,6 +6,16 @@ import { Challenge, DesignData, AudioData } from '../App';
 import { ArrowLeft, Mic, Square, Play, Pause, Type, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { tauriAPI } from '../lib/tauri';
 
+const getErrorMessage = (error: unknown): string => {
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return String(error);
+};
+
 interface AudioRecordingProps {
   challenge: Challenge;
   designData: DesignData;
@@ -14,6 +24,7 @@ interface AudioRecordingProps {
 }
 
 export function AudioRecording({ challenge, designData, onComplete, onBack }: AudioRecordingProps) {
+  const mountedRef = useRef(true);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [transcript, setTranscript] = useState('');
@@ -38,22 +49,24 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         chunks.push(event.data);
       };
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        setAudioBlob(blob);
-      };
-
       mediaRecorder.start();
-      setIsRecording(true);
+      if (mountedRef.current) {
+        setIsRecording(true);
+      }
 
       // Start duration timer
       const startTime = Date.now();
       const timer = setInterval(() => {
-        setDuration(Math.floor((Date.now() - startTime) / 1000));
+        if (mountedRef.current) {
+          setDuration(Math.floor((Date.now() - startTime) / 1000));
+        } else {
+          clearInterval(timer);
+        }
       }, 1000);
 
       mediaRecorder.onstop = () => {
         clearInterval(timer);
+        if (!mountedRef.current) return;
         const blob = new Blob(chunks, { type: 'audio/webm' });
         setAudioBlob(blob);
       };
@@ -66,7 +79,9 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
+      if (mountedRef.current) {
+        setIsRecording(false);
+      }
     }
   }, [isRecording]);
 
@@ -98,20 +113,16 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       return filePath;
     } catch (error) {
       console.error('Error converting blob to file:', error);
+      const errorMessage = getErrorMessage(error);
       
-      // Provide more specific error messages based on error type
-      if (error instanceof Error) {
-        if (error.message.includes('permission')) {
-          throw new Error('File system permission denied. Please check app permissions.');
-        } else if (error.message.includes('space') || error.message.includes('disk')) {
-          throw new Error('Insufficient disk space to save audio file.');
-        } else if (error.message.includes('Invalid file path')) {
-          throw new Error('Failed to create audio file. Invalid file path returned.');
-        } else {
-          throw new Error(`File system error: ${error.message}`);
-        }
+      if (errorMessage.includes('permission')) {
+        throw new Error('File system permission denied. Please check app permissions.');
+      } else if (errorMessage.includes('space') || errorMessage.includes('disk')) {
+        throw new Error('Insufficient disk space to save audio file.');
+      } else if (errorMessage.includes('Invalid file path')) {
+        throw new Error('Failed to create audio file. Invalid file path returned.');
       } else {
-        throw new Error('Unknown error occurred while saving audio file.');
+        throw new Error(`File system error: ${errorMessage}`);
       }
     }
   }, []);
@@ -119,73 +130,76 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   // Automatic transcription with multiple fallback methods
   const startAutoTranscription = useCallback(async () => {
     if (!audioBlob) {
-      setTranscriptionError('No audio recording available');
+      if (mountedRef.current) setTranscriptionError('No audio recording available');
       return;
     }
 
     // Validate audio file size
     if (audioBlob.size > 50 * 1024 * 1024) { // 50MB limit
-      setTranscriptionError('Audio file is too large (max 50MB). Please record a shorter explanation.');
+      if (mountedRef.current) setTranscriptionError('Audio file is too large (max 50MB). Please record a shorter explanation.');
       return;
     }
 
-    setIsTranscribing(true);
-    setTranscriptionError('');
-    setTranscriptionMethod('auto');
+    if (mountedRef.current) {
+      setIsTranscribing(true);
+      setTranscriptionError('');
+      setTranscriptionMethod('auto');
+    }
 
     try {
       // Method 1: Try Tauri-based transcription first (if available)
       if (tauriAPI.isTauri()) {
         try {
-          // Show file saving progress
-          setTranscriptionError('Saving audio file...');
+          if (mountedRef.current) setTranscriptionError('Saving audio file...');
           
           const filePath = await convertBlobToFile(audioBlob);
+          if (!mountedRef.current) return;
           
           // Validate file path before proceeding
           if (!filePath || typeof filePath !== 'string' || filePath.trim() === '') {
             throw new Error('Failed to save audio file - invalid file path returned');
           }
 
-          // Show transcription progress
-          setTranscriptionError('Transcribing audio...');
+          if (mountedRef.current) setTranscriptionError('Transcribing audio...');
           
           const response = await tauriAPI.transcriptionUtils.transcribeAudio(filePath);
+          if (!mountedRef.current) return;
           
           // Validate transcription response
           if (!response || !response.text || typeof response.text !== 'string') {
             throw new Error('Invalid transcription response received');
           }
           
-          setTranscript(response.text);
-          setTranscriptionError(''); // Clear error on success
-          setIsTranscribing(false);
+          if (mountedRef.current) {
+            setTranscript(response.text);
+            setTranscriptionError(''); // Clear error on success
+            setIsTranscribing(false);
+          }
           return;
         } catch (tauriError) {
           console.warn('Tauri transcription failed, falling back to Web Speech API:', tauriError);
+          if (!mountedRef.current) return;
           
-          // Provide specific error messages for different failure types
-          if (tauriError instanceof Error) {
-            if (tauriError.message.startsWith('MODEL_ERROR')) {
-              setTranscriptionError(`Model Error: ${tauriError.message}. Falling back...`);
-            } else if (tauriError.message.startsWith('FFMPEG_ERROR')) {
-              setTranscriptionError(`Audio Conversion Error: ${tauriError.message}. Falling back...`);
-            } else if (tauriError.message.startsWith('FORMAT_ERROR')) {
-              setTranscriptionError(`Format Error: ${tauriError.message}. Falling back...`);
-            } else {
-              setTranscriptionError(`Tauri transcription failed: ${tauriError.message}. Falling back...`);
-            }
-          } else {
-            setTranscriptionError('Tauri transcription failed. Falling back to Web Speech API...');
+          const errorMessage = getErrorMessage(tauriError);
+          let fallbackMessage = `Tauri transcription failed: ${errorMessage}. Falling back...`;
+          if (errorMessage.startsWith('MODEL_ERROR')) {
+            fallbackMessage = `Model Error: ${errorMessage}. Falling back...`;
+          } else if (errorMessage.startsWith('FFMPEG_ERROR')) {
+            fallbackMessage = `Audio Conversion Error: ${errorMessage}. Falling back...`;
+          } else if (errorMessage.startsWith('FORMAT_ERROR')) {
+            fallbackMessage = `Format Error: ${errorMessage}. Falling back...`;
           }
+          
+          if (mountedRef.current) setTranscriptionError(fallbackMessage);
           
           // Brief delay to show the error message before fallback
           await new Promise(resolve => setTimeout(resolve, 2500));
+          if (!mountedRef.current) return;
         }
       }
 
       // Method 2: Fall back to Web Speech API
-      setTranscriptionError('Using Web Speech API for transcription...');
+      if (mountedRef.current) setTranscriptionError('Using Web Speech API for transcription...');
       
       if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         throw new Error('Speech recognition is not supported in this browser. Please type your transcript manually.');
@@ -202,6 +216,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       let finalTranscript = '';
 
       recognition.onresult = (event: any) => {
+        if (!mountedRef.current) return;
         let interimTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -213,15 +228,17 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
           }
         }
         
-        setTranscript(finalTranscript + interimTranscript);
+        if (mountedRef.current) setTranscript(finalTranscript + interimTranscript);
       };
 
       recognition.onerror = (event: any) => {
+        if (!mountedRef.current) return;
         setTranscriptionError(`Web Speech API error: ${event.error}. Please try typing your transcript manually.`);
         setIsTranscribing(false);
       };
 
       recognition.onend = () => {
+        if (!mountedRef.current) return;
         setIsTranscribing(false);
         setTranscriptionError(''); // Clear error on successful completion
         if (finalTranscript.trim()) {
@@ -247,6 +264,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
 
       audio.onerror = () => {
         recognition.stop();
+        if (!mountedRef.current) return;
         setTranscriptionError('Audio playback failed. Please try typing your transcript manually.');
         setIsTranscribing(false);
       };
@@ -254,23 +272,21 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       audio.play();
 
     } catch (error) {
+      if (!mountedRef.current) return;
       // Ensure UI state is properly reset on any error
       setIsTranscribing(false);
       
-      // Provide specific error messages based on error type
-      if (error instanceof Error) {
-        if (error.message.includes('Speech recognition is not supported')) {
-          setTranscriptionError('Speech recognition is not supported in this browser. Please type your transcript manually.');
-        } else if (error.message.includes('File system') || error.message.includes('save audio file')) {
-          setTranscriptionError(`File system error: ${error.message}. Please try typing your transcript manually.`);
-        } else if (error.message.includes('transcription') || error.message.includes('Transcription service')) {
-          setTranscriptionError(`Transcription service error: ${error.message}. Please try typing your transcript manually.`);
-        } else {
-          setTranscriptionError(`Transcription failed: ${error.message}. Please try typing your transcript manually.`);
-        }
-      } else {
-        setTranscriptionError('Unknown transcription error occurred. Please try typing your transcript manually.');
+      const errorMessage = getErrorMessage(error);
+      let displayError = `Transcription failed: ${errorMessage}. Please try typing your transcript manually.`;
+      if (errorMessage.includes('Speech recognition is not supported')) {
+        displayError = 'Speech recognition is not supported in this browser. Please type your transcript manually.';
+      } else if (errorMessage.includes('File system') || errorMessage.includes('save audio file')) {
+        displayError = `File system error: ${errorMessage}. Please try typing your transcript manually.`;
+      } else if (errorMessage.includes('transcription') || errorMessage.includes('Transcription service')) {
+        displayError = `Transcription service error: ${errorMessage}. Please try typing your transcript manually.`;
       }
+      
+      if (mountedRef.current) setTranscriptionError(displayError);
     }
   }, [audioBlob, convertBlobToFile]);
 
@@ -282,9 +298,9 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       const audio = new Audio(URL.createObjectURL(audioBlob));
       audioElementRef.current = audio;
       
-      audio.onended = () => setIsPlaying(false);
-      audio.onpause = () => setIsPlaying(false);
-      audio.onplay = () => setIsPlaying(true);
+      audio.onended = () => { if (mountedRef.current) setIsPlaying(false); };
+      audio.onpause = () => { if (mountedRef.current) setIsPlaying(false); };
+      audio.onplay = () => { if (mountedRef.current) setIsPlaying(true); };
     }
 
     if (isPlaying) {
@@ -297,6 +313,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
