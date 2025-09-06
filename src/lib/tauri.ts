@@ -41,17 +41,17 @@ export const notificationUtils = {
 export const ipcUtils = {
   /**
    * Invoke a Tauri command. Returns a Promise resolving to the result.
+   * Throws an error if called outside of a Tauri environment.
    * @template T The expected return type.
    * @param command The Tauri command to invoke.
    * @param args Optional arguments for the command.
    * @returns Promise resolving to the result of the command.
-   * @rejects If called outside of a Tauri environment.
+   * @throws Error if called outside of a Tauri environment.
    */
   async invoke<T>(command: string, args?: any): Promise<T> {
     if (!isTauri()) {
       const errorMsg = `Tauri command "${command}" called outside of Tauri environment with args: ${JSON.stringify(args)}`;
-      console.error(errorMsg);
-      return Promise.reject(new Error(errorMsg));
+      throw new Error(errorMsg);
     }
     return tauriInvoke(command, args);
   },
@@ -295,6 +295,11 @@ export const diagramUtils = {
 };
 
 // Type guard to validate TranscriptionResponse structure
+/**
+ * Validates a TranscriptionResponse structure.
+ * Note: This function sorts a copy of the segments array by start time before checking for overlaps,
+ * so the overlap check is always reliable regardless of backend order.
+ */
 function isValidTranscriptionResponse(response: any): response is TranscriptionResponse {
   if (typeof response !== 'object' || response === null) {
     console.error("Validation Error: Response is not an object.", response);
@@ -308,8 +313,8 @@ function isValidTranscriptionResponse(response: any): response is TranscriptionR
     console.error("Validation Error: 'segments' field is not an array.", response);
     return false;
   }
-  
-  // Create a sorted copy for validation to avoid mutation and ensure correct order
+
+  // Sort a copy of segments by start time for reliable overlap validation
   const sortedSegments = [...response.segments].sort((a, b) => a.start - b.start);
 
   // Enhanced segment validation with detailed checks
@@ -353,7 +358,7 @@ function isValidTranscriptionResponse(response: any): response is TranscriptionR
       }
     }
   }
-  
+
   return true;
 }
 
