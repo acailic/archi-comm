@@ -323,3 +323,5 @@ typed-router.d.ts
 local.config.*
 dev.config.*
 *.local.*
+
+ideas/
