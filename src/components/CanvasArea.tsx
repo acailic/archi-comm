@@ -22,13 +22,13 @@ interface CanvasAreaProps {
 }
 
 function DraggingConnectionPreview() {
-  const { item, currentOffset } = useDragLayer((monitor) => ({
+  const { item, itemType, currentOffset } = useDragLayer((monitor) => ({
     item: monitor.getItem(),
     itemType: monitor.getItemType(),
     currentOffset: monitor.getSourceClientOffset(),
   }));
 
-  if (!currentOffset || item.type !== 'connection-point') {
+  if (!currentOffset || itemType !== 'connection-point') {
     return null;
   }
 

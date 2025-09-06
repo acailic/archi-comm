@@ -281,10 +281,10 @@ export function CanvasComponent({
         </div>
       </div>
 
-      <ConnectionPoint position="top" onStartConnection={onStartConnection} componentId={component.id} />
-      <ConnectionPoint position="bottom" onStartConnection={onStartConnection} componentId={component.id} />
-      <ConnectionPoint position="left" onStartConnection={onStartConnection} componentId={component.id} />
-      <ConnectionPoint position="right" onStartConnection={onStartConnection} componentId={component.id} />
+      <ConnectionPoint position="top" onStartConnection={onStartConnection} component={component} />
+      <ConnectionPoint position="bottom" onStartConnection={onStartConnection} component={component} />
+      <ConnectionPoint position="left" onStartConnection={onStartConnection} component={component} />
+      <ConnectionPoint position="right" onStartConnection={onStartConnection} component={component} />
     </div>
   );
 }
