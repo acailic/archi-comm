@@ -21,6 +21,8 @@ export class KeyboardShortcutManager {
   private activeElement: HTMLElement | null = null;
   private isEnabled = true;
   private listeners: Map<string, EventListener> = new Map();
+  private changeListeners: Set<() => void> = new Set();
+  private shortcutsVersion = 0;
 
   constructor() {
     this.initializeDefaultShortcuts();
@@ -33,6 +35,7 @@ export class KeyboardShortcutManager {
   register(config: ShortcutConfig): void {
     const shortcutKey = this.generateShortcutKey(config.key, config.modifiers);
     this.shortcuts.set(shortcutKey, config);
+    this.notifyChange();
   }
 
   /**
@@ -41,6 +44,7 @@ export class KeyboardShortcutManager {
   unregister(key: string, modifiers?: KeyModifier[]): void {
     const shortcutKey = this.generateShortcutKey(key, modifiers);
     this.shortcuts.delete(shortcutKey);
+    this.notifyChange();
   }
 
   /**
@@ -76,6 +80,29 @@ export class KeyboardShortcutManager {
    */
   getAllShortcuts(): ShortcutConfig[] {
     return Array.from(this.shortcuts.values());
+  }
+
+  /**
+   * Get current shortcuts version for change tracking
+   */
+  getShortcutsVersion(): number {
+    return this.shortcutsVersion;
+  }
+
+  /**
+   * Subscribe to shortcut changes
+   */
+  onShortcutsChange(callback: () => void): () => void {
+    this.changeListeners.add(callback);
+    return () => this.changeListeners.delete(callback);
+  }
+
+  /**
+   * Notify listeners of shortcut changes
+   */
+  private notifyChange(): void {
+    this.shortcutsVersion++;
+    this.changeListeners.forEach(callback => callback());
   }
 
   /**
@@ -495,4 +522,12 @@ export const getShortcutsByCategory = (category: ShortcutCategory): ShortcutConf
 
 export const getAllShortcuts = (): ShortcutConfig[] => {
   return globalShortcutManager.getAllShortcuts();
+};
+
+export const getShortcutsVersion = (): number => {
+  return globalShortcutManager.getShortcutsVersion();
+};
+
+export const onShortcutsChange = (callback: () => void): () => void => {
+  return globalShortcutManager.onShortcutsChange(callback);
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getAllShortcuts, formatShortcutKey, globalShortcutManager } from '../lib/shortcuts/KeyboardShortcuts';
+import { getAllShortcuts, formatShortcutKey, globalShortcutManager, getShortcutsVersion } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent } from './ui/dialog';
@@ -167,7 +167,7 @@ export function CommandPalette({
         available: true
       }
     ];
-  }, [selectedChallenge, onNavigate]);
+  }, [selectedChallenge, onNavigate, getShortcutsVersion()]);
 
   const filteredCommands = useMemo(() => {
     const availableCommands = commands.filter(cmd => cmd.available !== false);
