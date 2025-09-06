@@ -13,6 +13,71 @@ use uuid::Uuid;
 use tempfile::NamedTempFile;
 use std::io::Write;
 
+// Custom error types for structured error handling
+#[derive(Debug, thiserror::Error)]
+pub enum ApiError {
+    #[error("Project not found: {project_id}")]
+    ProjectNotFound { project_id: String },
+    
+    #[error("Component not found: {component_id} in project {project_id}")]
+    ComponentNotFound { component_id: String, project_id: String },
+    
+    #[error("Invalid project data: {details}")]
+    InvalidProjectData { details: String },
+    
+    #[error("Invalid component data: {details}")]
+    InvalidComponentData { details: String },
+    
+    #[error("File system error: {operation} failed - {source}")]
+    FileSystemError { operation: String, source: std::io::Error },
+    
+    #[error("Audio file not found at path: {path}")]
+    AudioFileNotFound { path: String },
+    
+    #[error("Audio transcription failed: {details}")]
+    TranscriptionError { details: String },
+    
+    #[error("Transcription initialization failed: {details}")]
+    TranscriptionInitError { details: String },
+    
+    #[error("Serialization error: {operation} - {source}")]
+    SerializationError { operation: String, source: serde_json::Error },
+    
+    #[error("State lock error: Failed to acquire lock for {resource}")]
+    StateLockError { resource: String },
+    
+    #[error("External process error: {command} failed - {details}")]
+    ProcessError { command: String, details: String },
+    
+    #[error("Internal error: {details}")]
+    Internal { details: String },
+}
+
+impl From<std::io::Error> for ApiError {
+    fn from(err: std::io::Error) -> Self {
+        ApiError::FileSystemError {
+            operation: "unknown".to_string(),
+            source: err,
+        }
+    }
+}
+
+impl From<serde_json::Error> for ApiError {
+    fn from(err: serde_json::Error) -> Self {
+        ApiError::SerializationError {
+            operation: "unknown".to_string(),
+            source: err,
+        }
+    }
+}
+
+// Convert ApiError to String for Tauri compatibility
+impl From<ApiError> for String {
+    fn from(err: ApiError) -> Self {
+        err.to_string()
+    }
+}
+
 // Development utilities
 #[cfg(debug_assertions)]
 mod dev_utils;
@@ -315,9 +380,58 @@ async fn load_connections(
     Ok(store.get(&project_id).cloned().unwrap_or_default())
 }
 
+// Helper function to validate and sanitize file names
+fn validate_filename(file_name: &str) -> Result<(), ApiError> {
+    // Check for empty filename
+    if file_name.is_empty() {
+        return Err(ApiError::InvalidProjectData { 
+            details: "File name cannot be empty".to_string() 
+        });
+    }
+
+    // Check for path traversal attempts
+    if file_name.contains("..") || file_name.contains('/') || file_name.contains('\\') {
+        return Err(ApiError::InvalidProjectData { 
+            details: format!("Invalid filename '{}': contains path traversal characters", file_name) 
+        });
+    }
+
+    // Check for reserved names on Windows
+    let reserved_names = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", 
+                         "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", 
+                         "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
+    
+    let name_without_ext = file_name.split('.').next().unwrap_or("").to_uppercase();
+    if reserved_names.contains(&name_without_ext.as_str()) {
+        return Err(ApiError::InvalidProjectData { 
+            details: format!("Invalid filename '{}': uses reserved system name", file_name) 
+        });
+    }
+
+    // Check for invalid characters
+    let invalid_chars = ['<', '>', ':', '"', '|', '?', '*'];
+    if file_name.chars().any(|c| invalid_chars.contains(&c) || c.is_control()) {
+        return Err(ApiError::InvalidProjectData { 
+            details: format!("Invalid filename '{}': contains invalid characters", file_name) 
+        });
+    }
+
+    // Check reasonable length limits
+    if file_name.len() > 255 {
+        return Err(ApiError::InvalidProjectData { 
+            details: format!("Filename too long: {} characters (max 255)", file_name.len()) 
+        });
+    }
+
+    Ok(())
+}
+
 // Tauri command for saving audio files
 #[tauri::command]
-async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, String> {
+async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, ApiError> {
+    // Validate and sanitize the filename
+    validate_filename(&file_name)?;
+
     // Get the system temporary directory
     let temp_dir = env::temp_dir();
     
@@ -326,29 +440,58 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Str
     
     // Create the directory if it doesn't exist
     fs::create_dir_all(&audio_dir)
-        .map_err(|e| format!("Failed to create audio directory: {}", e))?;
+        .map_err(|e| ApiError::FileSystemError {
+            operation: "create audio directory".to_string(),
+            source: e,
+        })?;
     
-    // Construct the final file path
+    // Construct the final file path using only the sanitized filename
     let final_file_path = audio_dir.join(&file_name);
     
     // Create a temporary file in the same directory as the target
     let mut temp_file = NamedTempFile::new_in(&audio_dir)
-        .map_err(|e| format!("Failed to create temporary file: {}", e))?;
+        .map_err(|e| ApiError::FileSystemError {
+            operation: "create temporary file".to_string(),
+            source: e,
+        })?;
     
     // Write the audio data to the temporary file
     temp_file.write_all(&data)
-        .map_err(|e| format!("Failed to write audio data to temporary file: {}", e))?;
+        .map_err(|e| ApiError::FileSystemError {
+            operation: "write audio data".to_string(),
+            source: e,
+        })?;
     
     // Ensure all data is written to disk
     temp_file.flush()
-        .map_err(|e| format!("Failed to flush temporary file: {}", e))?;
+        .map_err(|e| ApiError::FileSystemError {
+            operation: "flush temporary file".to_string(),
+            source: e,
+        })?;
     
     // Atomically move the temporary file to the final location
     temp_file.persist(&final_file_path)
-        .map_err(|e| format!("Failed to atomically move temporary file to '{}': {}", file_name, e))?;
+        .map_err(|e| ApiError::FileSystemError {
+            operation: format!("persist file '{}'", file_name),
+            source: e.error,
+        })?;
     
-    // Return the full file path as a string
-    Ok(final_file_path.to_string_lossy().to_string())
+    // Canonicalize the path to get the absolute, resolved path
+    let canonical_path = fs::canonicalize(&final_file_path)
+        .map_err(|e| ApiError::FileSystemError {
+            operation: format!("canonicalize path for '{}'", file_name),
+            source: e,
+        })?;
+    
+    // Convert to string, ensuring it's valid UTF-8
+    let path_str = canonical_path.to_str()
+        .ok_or_else(|| ApiError::Internal {
+            details: format!("Path contains invalid UTF-8 sequences: '{}'", 
+                           canonical_path.to_string_lossy())
+        })?;
+    
+    log::info!("Audio file saved successfully: {}", path_str);
+    Ok(path_str.to_string())
 }
 
 // Tauri command for audio transcription

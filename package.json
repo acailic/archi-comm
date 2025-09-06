@@ -10,6 +10,10 @@
     "url": "https://github.com/acailic/archi-comm.git"
   },
   "keywords": ["architecture", "communication", "desktop", "tauri", "react", "design"],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
       "dependencies": {
           "@tauri-apps/api": "^1.5.3",
           "@radix-ui/react-accordion": "^1.2.3",
@@ -63,7 +67,7 @@
           "@tauri-apps/cli": "^1.5.11",
           "@types/node": "^20.10.0",
           "@vitejs/plugin-react-swc": "^3.10.2",
-          "vite": "6.3.5",
+          "vite": "^6.3.5",
           "vitest": "^2.0.5",
           "@vitest/coverage-v8": "^2.0.5",
           "@testing-library/react": "^16.0.0",
@@ -73,6 +77,7 @@
           "@playwright/test": "^1.47.2"
       },
   "scripts": {
+    "prepare": "playwright install --with-deps",
     "clean": "rm -rf dist node_modules/.vite src-tauri/target/.tauri-cli-cache .vite",
     "clean:all": "rm -rf dist node_modules src-tauri/target .vite && npm install",
     "start": "tauri dev",
@@ -90,6 +95,7 @@
     "release": "tauri build --bundles all",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "lint": "echo \"Linting will be implemented\" && exit 0",
     "preview": "tauri build --debug && echo \"Debug build created in src-tauri/target/debug/\"",
