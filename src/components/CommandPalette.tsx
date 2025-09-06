@@ -129,17 +129,16 @@ export function CommandPalette({
         available: !!selectedChallenge
       },
       {
-        id: 'action-export',
-        title: 'Export Session',
-        description: 'Export your work as JSON',
-        icon: Download,
+        id: 'action-ai-settings',
+        title: 'AI Settings',
+        description: 'Configure AI provider settings and API keys',
+        icon: Settings,
         action: () => {
-          // Add export logic
-          console.log('Exporting session...');
+          window.dispatchEvent(new CustomEvent('shortcut:ai-settings'));
         },
         section: 'actions',
-        shortcut: getShortcutDisplay('export'),
-        available: !!selectedChallenge
+        shortcut: getShortcutDisplay('AI Settings'),
+        available: true
       },
       
       // Help Commands

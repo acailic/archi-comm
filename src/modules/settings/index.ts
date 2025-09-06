@@ -1,1 +1,1 @@
-export { default as AIConfigPage } from '../../components/AIConfigPage';
+export { AIConfigPage } from '../../components/AIConfigPage';

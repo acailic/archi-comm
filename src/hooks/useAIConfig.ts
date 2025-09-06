@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { aiConfigService } from '../lib/services/AIConfigService';
 import { 
   AIConfig, 
@@ -25,6 +25,7 @@ interface UseAIConfigActions {
   validateProvider: (provider: AIProvider, config: Partial<AIConfig[AIProvider]>) => string[];
   updateProvider: (provider: AIProvider, updates: Partial<AIConfig[AIProvider]>) => void;
   clearError: () => void;
+  clearTestResult: (provider: AIProvider) => void;
   getEnabledProviders: () => AIProvider[];
   isProviderConfigured: (provider: AIProvider) => boolean;
 }
@@ -50,6 +51,7 @@ const initialState: UseAIConfigState = {
 
 export function useAIConfig(): UseAIConfigReturn {
   const [state, setState] = useState<UseAIConfigState>(initialState);
+  const lastSavedConfigRef = useRef<string>('');
 
   // Memoized selectors
   const enabledProviders = useMemo(() => {
@@ -75,6 +77,7 @@ export function useAIConfig(): UseAIConfigReturn {
       setState(prev => ({ ...prev, loading: true, error: null }));
       const config = await aiConfigService.loadConfig();
       setState(prev => ({ ...prev, config, loading: false }));
+      lastSavedConfigRef.current = JSON.stringify(config);
     } catch (error) {
       setState(prev => ({ 
         ...prev, 
@@ -232,6 +235,14 @@ export function useAIConfig(): UseAIConfigReturn {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  // Clear test result for a provider
+  const clearTestResult = useCallback((provider: AIProvider) => {
+    setState(prev => ({
+      ...prev,
+      connectionTests: { ...prev.connectionTests, [provider]: null }
+    }));
+  }, []);
+
   // Get enabled providers list
   const getEnabledProviders = useCallback(() => enabledProviders, [enabledProviders]);
 
@@ -240,16 +251,19 @@ export function useAIConfig(): UseAIConfigReturn {
     loadConfig();
   }, [loadConfig]);
 
-  // Auto-save debounced configuration changes
+  // Auto-save debounced configuration changes with deep comparison
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (state.config !== initialState.config) {
-        saveConfig(state.config);
+      const current = JSON.stringify(state.config);
+      if (current !== lastSavedConfigRef.current && !state.saving) {
+        saveConfig(state.config).then(() => {
+          lastSavedConfigRef.current = current;
+        });
       }
-    }, 1000); // 1 second debounce
+    }, 2500); // 2.5 second debounce
 
     return () => clearTimeout(timeoutId);
-  }, [state.config, saveConfig]);
+  }, [state.config, state.saving, saveConfig]);
 
   return {
     // State
@@ -268,6 +282,7 @@ export function useAIConfig(): UseAIConfigReturn {
     validateProvider,
     updateProvider,
     clearError,
+    clearTestResult,
     getEnabledProviders,
     isProviderConfigured
   };

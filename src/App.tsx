@@ -308,22 +308,6 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'review' } }))
     });
 
-    globalShortcutManager.register({
-      key: ',',
-      modifiers: ['ctrl'],
-      description: 'AI Settings',
-      category: 'general',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
-    });
-
-    globalShortcutManager.register({
-      key: ',',
-      modifiers: ['meta'],
-      description: 'AI Settings',
-      category: 'general',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
-    });
-
     // Event listeners for shortcut actions
     const handleCommandPalette = () => setShowCommandPalette(true);
     const handleChallengeManager = () => setShowChallengeManager(true);
@@ -367,8 +351,6 @@ export default function App() {
       globalShortcutManager.unregister('2', ['alt']);
       globalShortcutManager.unregister('3', ['alt']);
       globalShortcutManager.unregister('4', ['alt']);
-      globalShortcutManager.unregister(',', ['ctrl']);
-      globalShortcutManager.unregister(',', ['meta']);
 
       // Cleanup event listeners
       window.removeEventListener('shortcut:command-palette', handleCommandPalette);
@@ -734,6 +716,13 @@ export default function App() {
           onChallengeUpdate={handleChallengeUpdate}
         />
       </Suspense>
+
+      {/* AI Config Page */}
+      {showAIConfig && (
+        <Suspense fallback={null}>
+          <AIConfigPage />
+        </Suspense>
+      )}
 
       {/* Shortcuts Overlay */}
       <ShortcutsOverlay 

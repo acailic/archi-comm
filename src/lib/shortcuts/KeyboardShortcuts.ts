@@ -183,6 +183,22 @@ export class KeyboardShortcutManager {
     });
 
     this.register({
+      key: ',',
+      modifiers: ['ctrl'],
+      description: 'AI Settings',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
+    });
+
+    this.register({
+      key: ',',
+      modifiers: ['meta'],
+      description: 'AI Settings',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:ai-settings'))
+    });
+
+    this.register({
       key: 'z',
       modifiers: ['ctrl'],
       description: 'Undo',

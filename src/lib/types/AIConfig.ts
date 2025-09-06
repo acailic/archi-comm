@@ -157,6 +157,13 @@ export const AIProviderConfigSchema = z.object({
   selectedModel: z.string().min(1, 'Model selection is required'),
   settings: AISettingsSchema,
   enabled: z.boolean()
+}).refine((data) => {
+  // If provider is disabled, API key and selected model are not required
+  if (!data.enabled) return true;
+  return data.apiKey.length > 0 && data.selectedModel.length > 0;
+}, {
+  message: 'API key and model selection are required when provider is enabled',
+  path: ['enabled']
 });
 
 export const AIConfigSchema = z.object({

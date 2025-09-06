@@ -59,6 +59,7 @@ export function AIConfigPage() {
     testConnection,
     resetToDefaults,
     clearError,
+    clearTestResult,
     isProviderConfigured
   } = useAIConfig();
 
@@ -263,9 +264,7 @@ export function AIConfigPage() {
                                         onChange={(e) => {
                                           field.onChange(e);
                                           // Clear test results when API key changes
-                                          if (connectionTests[provider]) {
-                                            // This would ideally clear the test result
-                                          }
+                                          clearTestResult(provider);
                                         }}
                                       />
                                     </FormControl>
@@ -406,6 +405,227 @@ export function AIConfigPage() {
                                   </FormItem>
                                 )}
                               />
+
+                              {/* Provider-specific advanced settings */}
+                              {provider === AIProvider.OPENAI && (
+                                <>
+                                  <FormField
+                                    control={form.control}
+                                    name={`${provider}.settings.topP`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                          Top P
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Info className="h-4 w-4" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              Controls diversity via nucleus sampling. Lower values = more focused
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <div className="space-y-2">
+                                            <Slider
+                                              value={[field.value || 1]}
+                                              onValueChange={([value]) => field.onChange(value)}
+                                              max={1}
+                                              min={0}
+                                              step={0.1}
+                                              className="w-full"
+                                            />
+                                            <div className="text-center text-sm text-muted-foreground">
+                                              {field.value?.toFixed(1) || '1.0'}
+                                            </div>
+                                          </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name={`${provider}.settings.frequencyPenalty`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                          Frequency Penalty
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Info className="h-4 w-4" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              Reduces repetition of frequent tokens. Higher values = less repetition
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <div className="space-y-2">
+                                            <Slider
+                                              value={[field.value || 0]}
+                                              onValueChange={([value]) => field.onChange(value)}
+                                              max={2}
+                                              min={-2}
+                                              step={0.1}
+                                              className="w-full"
+                                            />
+                                            <div className="text-center text-sm text-muted-foreground">
+                                              {field.value?.toFixed(1) || '0.0'}
+                                            </div>
+                                          </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name={`${provider}.settings.presencePenalty`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                          Presence Penalty
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Info className="h-4 w-4" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              Reduces repetition of any tokens. Higher values = more diverse topics
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <div className="space-y-2">
+                                            <Slider
+                                              value={[field.value || 0]}
+                                              onValueChange={([value]) => field.onChange(value)}
+                                              max={2}
+                                              min={-2}
+                                              step={0.1}
+                                              className="w-full"
+                                            />
+                                            <div className="text-center text-sm text-muted-foreground">
+                                              {field.value?.toFixed(1) || '0.0'}
+                                            </div>
+                                          </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </>
+                              )}
+
+                              {provider === AIProvider.GEMINI && (
+                                <>
+                                  <FormField
+                                    control={form.control}
+                                    name={`${provider}.settings.topP`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                          Top P
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Info className="h-4 w-4" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              Controls diversity via nucleus sampling. Lower values = more focused
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <div className="space-y-2">
+                                            <Slider
+                                              value={[field.value || 1]}
+                                              onValueChange={([value]) => field.onChange(value)}
+                                              max={1}
+                                              min={0}
+                                              step={0.1}
+                                              className="w-full"
+                                            />
+                                            <div className="text-center text-sm text-muted-foreground">
+                                              {field.value?.toFixed(1) || '1.0'}
+                                            </div>
+                                          </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+
+                                  <FormField
+                                    control={form.control}
+                                    name={`${provider}.settings.topK`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                          Top K
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Info className="h-4 w-4" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              Limits token selection to top K most likely tokens
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input
+                                            type="number"
+                                            min="1"
+                                            max="100"
+                                            {...field}
+                                            onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </>
+                              )}
+
+                              {provider === AIProvider.CLAUDE && (
+                                <FormField
+                                  control={form.control}
+                                  name={`${provider}.settings.topP`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="flex items-center gap-2">
+                                        Top P
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <Info className="h-4 w-4" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Controls diversity via nucleus sampling. Lower values = more focused
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </FormLabel>
+                                      <FormControl>
+                                        <div className="space-y-2">
+                                          <Slider
+                                            value={[field.value || 1]}
+                                            onValueChange={([value]) => field.onChange(value)}
+                                            max={1}
+                                            min={0}
+                                            step={0.1}
+                                            className="w-full"
+                                          />
+                                          <div className="text-center text-sm text-muted-foreground">
+                                            {field.value?.toFixed(1) || '1.0'}
+                                          </div>
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              )}
                             </CardContent>
                           </Card>
                         </CardContent>

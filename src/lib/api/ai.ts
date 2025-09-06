@@ -2,6 +2,7 @@ import { ReviewResp as ReviewRespSchema, type ReviewResp } from '../contracts/sc
 import { invoke } from '@tauri-apps/api/tauri';
 import { aiConfigService } from '../services/AIConfigService';
 import { AIProvider, AIConfig } from '../types/AIConfig';
+import { isTauri } from '../tauri';
 
 // AI API Response interface for different providers
 interface AIResponse {
@@ -16,6 +17,9 @@ export async function reviewSolution(taskId: string, solutionText: string): Prom
     const config = await aiConfigService.loadConfig();
     
     if (provider && config[provider].enabled && config[provider].apiKey) {
+      if (!isTauri()) {
+        throw new Error('AI provider calls are only available in the desktop application to protect API keys.');
+      }
       const response = await callAIProvider(provider, config, solutionText);
       return parseAIResponse(response.content);
     }
@@ -43,6 +47,10 @@ export async function callAIProvider(
   config: AIConfig, 
   prompt: string
 ): Promise<AIResponse> {
+  if (!isTauri()) {
+    throw new Error('AI provider calls are only available in the desktop application to protect API keys.');
+  }
+  
   const providerConfig = config[provider];
   
   if (!providerConfig.enabled || !providerConfig.apiKey) {

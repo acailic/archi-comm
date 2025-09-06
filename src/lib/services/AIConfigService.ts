@@ -212,6 +212,13 @@ export class AIConfigService {
     }
 
     try {
+      if (!isTauri()) {
+        return {
+          success: false,
+          error: 'AI connection tests are only available in desktop app.',
+          responseTime: Date.now() - startTime
+        };
+      }
       const result = await this.makeTestRequest(provider, keyToTest, config[provider].selectedModel);
       return {
         ...result,
@@ -369,7 +376,12 @@ export class AIConfigService {
   async getEnabledProviders(): Promise<AIProvider[]> {
     const config = await this.loadConfig();
     return Object.entries(config)
-      .filter(([key, value]) => key !== 'defaultProvider' && value.enabled && value.apiKey)
+      .filter(([key, value]) => 
+        key !== 'defaultProvider' && 
+        value.enabled && 
+        value.apiKey && 
+        value.selectedModel?.trim()
+      )
       .map(([key]) => key as AIProvider);
   }
 
