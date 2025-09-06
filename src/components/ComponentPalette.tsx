@@ -505,6 +505,7 @@ function DraggableComponent({ type, label, icon: Icon, color, description }: Dra
   return (
     <div
       ref={drag}
+      data-testid={`palette-item-${type}`}
       className={`
         group p-2.5 rounded-lg border border-border/50 cursor-move transition-all duration-200
         hover:border-primary/50 hover:bg-accent/30 hover:shadow-sm hover:scale-[1.02]

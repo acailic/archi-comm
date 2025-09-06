@@ -141,6 +141,8 @@ export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({ isOpen, onCl
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    data-keyboard-ignore="true"
+                    autoFocus
                   />
                 </div>
 

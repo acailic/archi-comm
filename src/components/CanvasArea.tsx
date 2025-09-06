@@ -1,10 +1,13 @@
-import React, { useRef, useState, useCallback, useMemo, forwardRef } from 'react';
+import React, { useRef, useState, useCallback, useMemo, forwardRef, useEffect } from 'react';
 import { useDrop, useDragLayer } from 'react-dnd';
 import { CanvasComponent } from './CanvasComponent';
+import { CanvasAnnotationOverlay, CanvasAnnotationOverlayRef } from './CanvasAnnotationOverlay';
+import { AnnotationEditDialog } from './AnnotationEditDialog';
 import { DesignComponent, Connection } from '../App';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Trash2 } from 'lucide-react';
+import { Annotation } from '../lib/canvas/CanvasAnnotations';
 
 // Component dimension constants
 const COMPONENT_WIDTH = 128;
@@ -22,6 +25,8 @@ interface CanvasAreaProps {
   connections: Connection[];
   selectedComponent: string | null;
   connectionStart: string | null;
+  commentMode?: string | null;
+  isCommentModeActive?: boolean;
   onComponentDrop: (type: DesignComponent['type'], x: number, y: number) => void;
   onComponentMove: (id: string, x: number, y: number) => void;
   onComponentSelect: (id: string) => void;
@@ -75,6 +80,8 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   connections,
   selectedComponent,
   connectionStart,
+  commentMode,
+  isCommentModeActive,
   onComponentDrop,
   onComponentMove,
   onComponentSelect,
@@ -86,8 +93,14 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   onCompleteConnection,
 }, ref) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const annotationOverlayRef = useRef<CanvasAnnotationOverlayRef>(null);
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [connectionStyle, setConnectionStyle] = useState<'straight' | 'curved' | 'stepped'>('curved');
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Optimized and memoized DraggingConnectionPreview component
   const DraggingConnectionPreview = React.memo(() => {
@@ -366,8 +379,145 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
     });
   };
 
+  // Canvas-specific keyboard shortcuts integration
+  useEffect(() => {
+    const handleSelectAll = () => {
+      const allComponentIds = components.map(comp => comp.id);
+      setSelectedItems(allComponentIds);
+    };
+
+    const handleClearSelection = () => {
+      setSelectedItems([]);
+      setSelectedConnection(null);
+      onComponentSelect('');
+    };
+
+    const handleDeleteSelected = () => {
+      if (selectedConnection && onConnectionDelete) {
+        onConnectionDelete(selectedConnection);
+        setSelectedConnection(null);
+      }
+    };
+
+    const handleZoomIn = () => {
+      setZoomLevel(prev => Math.min(prev * 1.2, 3));
+    };
+
+    const handleZoomOut = () => {
+      setZoomLevel(prev => Math.max(prev / 1.2, 0.3));
+    };
+
+    const handleZoomReset = () => {
+      setZoomLevel(1);
+    };
+
+    const handleMoveUp = () => {
+      if (selectedComponent) {
+        const component = components.find(c => c.id === selectedComponent);
+        if (component) {
+          onComponentMove(selectedComponent, component.x, component.y - 10);
+        }
+      }
+    };
+
+    const handleMoveDown = () => {
+      if (selectedComponent) {
+        const component = components.find(c => c.id === selectedComponent);
+        if (component) {
+          onComponentMove(selectedComponent, component.x, component.y + 10);
+        }
+      }
+    };
+
+    const handleMoveLeft = () => {
+      if (selectedComponent) {
+        const component = components.find(c => c.id === selectedComponent);
+        if (component) {
+          onComponentMove(selectedComponent, component.x - 10, component.y);
+        }
+      }
+    };
+
+    const handleMoveRight = () => {
+      if (selectedComponent) {
+        const component = components.find(c => c.id === selectedComponent);
+        if (component) {
+          onComponentMove(selectedComponent, component.x + 10, component.y);
+        }
+      }
+    };
+
+    // Annotation event handlers
+    const handleAnnotationCreate = useCallback((annotation: Annotation) => {
+      setAnnotations(prev => [...prev, annotation]);
+    }, []);
+
+    const handleAnnotationUpdate = useCallback((updatedAnnotation: Annotation) => {
+      setAnnotations(prev => 
+        prev.map(ann => ann.id === updatedAnnotation.id ? updatedAnnotation : ann)
+      );
+      setSelectedAnnotation(null);
+      setIsEditDialogOpen(false);
+    }, []);
+
+    const handleAnnotationDelete = useCallback((annotationId: string) => {
+      setAnnotations(prev => prev.filter(ann => ann.id !== annotationId));
+      setSelectedAnnotation(null);
+      setIsEditDialogOpen(false);
+    }, []);
+
+    const handleAnnotationSelect = useCallback((annotation: Annotation | null) => {
+      setSelectedAnnotation(annotation);
+    }, []);
+
+    // Handle edit annotation events from overlay
+    useEffect(() => {
+      const handleEditAnnotation = (event: CustomEvent) => {
+        const annotation = event.detail as Annotation;
+        setSelectedAnnotation(annotation);
+        setIsEditDialogOpen(true);
+      };
+
+      const canvasElement = canvasRef.current;
+      if (canvasElement) {
+        canvasElement.addEventListener('editAnnotation', handleEditAnnotation as EventListener);
+        
+        return () => {
+          canvasElement.removeEventListener('editAnnotation', handleEditAnnotation as EventListener);
+        };
+      }
+    }, []);
+
+    // Add event listeners for canvas-specific shortcuts
+    window.addEventListener('shortcut:select-all', handleSelectAll);
+    window.addEventListener('shortcut:clear-selection', handleClearSelection);
+    window.addEventListener('shortcut:delete-selected', handleDeleteSelected);
+    window.addEventListener('shortcut:zoom-in', handleZoomIn);
+    window.addEventListener('shortcut:zoom-out', handleZoomOut);
+    window.addEventListener('shortcut:zoom-reset', handleZoomReset);
+    window.addEventListener('shortcut:move-up', handleMoveUp);
+    window.addEventListener('shortcut:move-down', handleMoveDown);
+    window.addEventListener('shortcut:move-left', handleMoveLeft);
+    window.addEventListener('shortcut:move-right', handleMoveRight);
+
+    return () => {
+      // Cleanup event listeners
+      window.removeEventListener('shortcut:select-all', handleSelectAll);
+      window.removeEventListener('shortcut:clear-selection', handleClearSelection);
+      window.removeEventListener('shortcut:delete-selected', handleDeleteSelected);
+      window.removeEventListener('shortcut:zoom-in', handleZoomIn);
+      window.removeEventListener('shortcut:zoom-out', handleZoomOut);
+      window.removeEventListener('shortcut:zoom-reset', handleZoomReset);
+      window.removeEventListener('shortcut:move-up', handleMoveUp);
+      window.removeEventListener('shortcut:move-down', handleMoveDown);
+      window.removeEventListener('shortcut:move-left', handleMoveLeft);
+      window.removeEventListener('shortcut:move-right', handleMoveRight);
+    };
+  }, [components, selectedComponent, selectedConnection, onComponentMove, onConnectionDelete, onComponentSelect]);
+
   return (
     <div 
+      data-testid="canvas"
       ref={(node) => {
         canvasRef.current = node;
         drop(node);
@@ -386,7 +536,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
       `}
       style={{ 
         backgroundImage: 'radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)',
-        backgroundSize: '20px 20px'
+        backgroundSize: '20px 20px',
+        transform: `scale(${zoomLevel})`,
+        transformOrigin: '50% 50%'
       }}
     >
       <DraggingConnectionPreview />
@@ -488,6 +640,31 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
           </div>
         </div>
       )}
+
+      {/* Annotation Overlay */}
+      <CanvasAnnotationOverlay
+        ref={annotationOverlayRef}
+        width={canvasRef.current?.clientWidth || 0}
+        height={canvasRef.current?.clientHeight || 0}
+        selectedTool={commentMode || undefined}
+        isActive={isCommentModeActive || false}
+        onAnnotationCreate={handleAnnotationCreate}
+        onAnnotationUpdate={handleAnnotationUpdate}
+        onAnnotationDelete={handleAnnotationDelete}
+        onAnnotationSelect={handleAnnotationSelect}
+      />
+
+      {/* Annotation Edit Dialog */}
+      <AnnotationEditDialog
+        annotation={selectedAnnotation}
+        isOpen={isEditDialogOpen}
+        onClose={() => {
+          setIsEditDialogOpen(false);
+          setSelectedAnnotation(null);
+        }}
+        onSave={handleAnnotationUpdate}
+        onDelete={handleAnnotationDelete}
+      />
     </div>
   );
 });

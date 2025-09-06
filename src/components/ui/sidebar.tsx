@@ -93,20 +93,31 @@ function SidebarProvider({
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen, setOpenMobile]);
 
-  // Adds a keyboard shortcut to toggle the sidebar.
+  // Sidebar keyboard shortcut integration
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if the event target is an input element to avoid conflicts
+      const target = event.target as HTMLElement;
+      const isInputElement = target.tagName.toLowerCase() === 'input' ||
+                           target.tagName.toLowerCase() === 'textarea' ||
+                           target.tagName.toLowerCase() === 'select' ||
+                           target.contentEditable === 'true' ||
+                           target.hasAttribute('data-keyboard-ignore');
+      
       if (
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
+        (event.metaKey || event.ctrlKey) &&
+        !isInputElement
       ) {
         event.preventDefault();
+        event.stopPropagation();
         toggleSidebar();
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    // Use capture phase to ensure proper event handling order
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [toggleSidebar]);
 
   // We add a state so that we can do data-state="expanded" or "collapsed".

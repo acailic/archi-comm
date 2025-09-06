@@ -1,16 +1,18 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toPng } from 'html-to-image';
+import { useKeyboardShortcuts } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ComponentPalette } from './ComponentPalette';
 import { CanvasArea } from './CanvasArea';
 import { SolutionHints } from './SolutionHints';
+import { CommentToolbar } from './CommentToolbar';
 import { Challenge, DesignComponent, Connection, DesignData } from '../App';
 import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
-import { ArrowLeft, Save, Download, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Save, Download, Lightbulb, MessageSquare } from 'lucide-react';
 
 interface DesignCanvasProps {
   challenge: Challenge;
@@ -25,6 +27,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
+  const [commentMode, setCommentMode] = useState<string | null>(null);
+  const [showCommentToolbar, setShowCommentToolbar] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const extendedChallenge = challengeManager.getChallengeById(challenge.id) as ExtendedChallenge || challenge;
@@ -161,6 +165,98 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     onComplete(designData);
   }, [components, connections, initialData.metadata.created, onComplete]);
 
+  // Keyboard shortcuts integration
+  useEffect(() => {
+    const handleSaveProject = () => {
+      handleSave();
+    };
+
+    const handleDeleteSelected = () => {
+      if (selectedComponent) {
+        handleDeleteComponent(selectedComponent);
+      }
+    };
+
+    const handleAddComponent = () => {
+      // Focus on component palette or show component picker
+      console.log('Add component shortcut triggered');
+    };
+
+    const handleUndo = () => {
+      // Placeholder for undo functionality
+      console.log('Undo shortcut triggered - not yet implemented');
+    };
+
+    const handleRedo = () => {
+      // Placeholder for redo functionality  
+      console.log('Redo shortcut triggered - not yet implemented');
+    };
+
+    const handleNewProject = () => {
+      // Reset canvas state
+      setComponents([]);
+      setConnections([]);
+      setSelectedComponent(null);
+      setConnectionStart(null);
+    };
+
+    // Comment-related event handlers
+    const handleAddComment = () => {
+      setCommentMode('comment');
+    };
+
+    const handleAddNote = () => {
+      setCommentMode('note');
+    };
+
+    const handleAddLabel = () => {
+      setCommentMode('label');
+    };
+
+    const handleAddArrow = () => {
+      setCommentMode('arrow');
+    };
+
+    const handleAddHighlight = () => {
+      setCommentMode('highlight');
+    };
+
+    // Add event listeners for canvas-specific shortcuts
+    window.addEventListener('shortcut:save-project', handleSaveProject);
+    window.addEventListener('shortcut:delete-selected', handleDeleteSelected);
+    window.addEventListener('shortcut:add-component', handleAddComponent);
+    window.addEventListener('shortcut:undo', handleUndo);
+    window.addEventListener('shortcut:redo', handleRedo);
+    window.addEventListener('shortcut:new-project', handleNewProject);
+    
+    // Add event listeners for comment-related shortcuts
+    window.addEventListener('shortcut:add-comment', handleAddComment);
+    window.addEventListener('shortcut:add-note', handleAddNote);
+    window.addEventListener('shortcut:add-label', handleAddLabel);
+    window.addEventListener('shortcut:add-arrow', handleAddArrow);
+    window.addEventListener('shortcut:add-highlight', handleAddHighlight);
+
+    return () => {
+      // Cleanup event listeners
+      window.removeEventListener('shortcut:save-project', handleSaveProject);
+      window.removeEventListener('shortcut:delete-selected', handleDeleteSelected);
+      window.removeEventListener('shortcut:add-component', handleAddComponent);
+      window.removeEventListener('shortcut:undo', handleUndo);
+      window.removeEventListener('shortcut:redo', handleRedo);
+      window.removeEventListener('shortcut:new-project', handleNewProject);
+      
+      // Cleanup comment-related event listeners
+      window.removeEventListener('shortcut:add-comment', handleAddComment);
+      window.removeEventListener('shortcut:add-note', handleAddNote);
+      window.removeEventListener('shortcut:add-label', handleAddLabel);
+      window.removeEventListener('shortcut:add-arrow', handleAddArrow);
+      window.removeEventListener('shortcut:add-highlight', handleAddHighlight);
+    };
+  }, [selectedComponent, handleSave, handleDeleteComponent, setComponents, setConnections, setSelectedComponent, setConnectionStart]);
+
+  // Initialize keyboard shortcuts hook
+  useKeyboardShortcuts([]);
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen flex flex-col">
@@ -177,6 +273,15 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowCommentToolbar(!showCommentToolbar)}
+                className={showCommentToolbar ? "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700" : ""}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Comments
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -261,6 +366,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                 connections={connections}
                 selectedComponent={selectedComponent}
                 connectionStart={connectionStart}
+                commentMode={commentMode}
+                isCommentModeActive={!!commentMode}
                 onComponentDrop={handleComponentDrop}
                 onComponentMove={handleComponentMove}
                 onComponentSelect={handleComponentSelect}
@@ -284,6 +391,14 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             )}
           </div>
         </div>
+
+        {/* Comment Toolbar */}
+        <CommentToolbar
+          visible={showCommentToolbar}
+          onToggle={() => setShowCommentToolbar(!showCommentToolbar)}
+          selectedTool={commentMode || undefined}
+          onToolSelect={(tool) => setCommentMode(tool)}
+        />
       </div>
     </DndProvider>
   );

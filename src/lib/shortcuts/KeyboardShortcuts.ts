@@ -51,6 +51,19 @@ export class KeyboardShortcutManager {
   }
 
   /**
+   * Temporarily disable shortcuts (useful when modals/overlays are open)
+   */
+  private temporarilyDisabled = false;
+  
+  temporarilyDisableShortcuts(): void {
+    this.temporarilyDisabled = true;
+  }
+
+  enableShortcuts(): void {
+    this.temporarilyDisabled = false;
+  }
+
+  /**
    * Get all shortcuts by category
    */
   getShortcutsByCategory(category: ShortcutCategory): ShortcutConfig[] {
@@ -66,10 +79,19 @@ export class KeyboardShortcutManager {
   }
 
   /**
+   * Debug mode for development
+   */
+  private debugMode = process.env.NODE_ENV === 'development';
+
+  setDebugMode(enabled: boolean): void {
+    this.debugMode = enabled;
+  }
+
+  /**
    * Handle keyboard events with high performance
    */
-  private handleKeyDown = (event: KeyboardEvent): void => {
-    if (!this.isEnabled) return;
+  private handleKeyDown = (event: KeyboardEvent): void {
+    if (!this.isEnabled || this.temporarilyDisabled) return;
 
     // Skip if user is typing in input fields
     const target = event.target as HTMLElement;
@@ -79,6 +101,10 @@ export class KeyboardShortcutManager {
     const shortcut = this.shortcuts.get(shortcutKey);
 
     if (shortcut) {
+      if (this.debugMode) {
+        console.log(`Executing shortcut: ${shortcut.description} (${shortcutKey})`);
+      }
+      
       if (shortcut.preventDefault !== false) {
         event.preventDefault();
         event.stopPropagation();
@@ -108,7 +134,9 @@ export class KeyboardShortcutManager {
       tagName === 'textarea' ||
       tagName === 'select' ||
       element.contentEditable === 'true' ||
-      element.isContentEditable
+      element.isContentEditable ||
+      element.hasAttribute('data-keyboard-ignore') ||
+      element.closest('[data-keyboard-ignore]') !== null
     );
   }
 
@@ -207,6 +235,46 @@ export class KeyboardShortcutManager {
       description: 'Clear selection',
       category: 'canvas',
       action: () => window.dispatchEvent(new CustomEvent('shortcut:clear-selection'))
+    });
+
+    // Comment shortcuts
+    this.register({
+      key: 'c',
+      description: 'Add comment',
+      category: 'canvas',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:add-comment'))
+    });
+
+    this.register({
+      key: 'n',
+      modifiers: ['alt'],
+      description: 'Add note',
+      category: 'canvas',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:add-note'))
+    });
+
+    this.register({
+      key: 'l',
+      modifiers: ['shift'],
+      description: 'Add label',
+      category: 'canvas',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:add-label'))
+    });
+
+    this.register({
+      key: 'a',
+      modifiers: ['shift'],
+      description: 'Add arrow',
+      category: 'canvas',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:add-arrow'))
+    });
+
+    this.register({
+      key: 'h',
+      modifiers: ['shift'],
+      description: 'Add highlight',
+      category: 'canvas',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:add-highlight'))
     });
 
     // Component shortcuts

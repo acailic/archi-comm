@@ -13,6 +13,8 @@ const ChallengeManager = React.lazy(() => import('@modules/challenges').then(m =
 import { tauriAPI, isTauriApp } from './lib/tauri';
 import { challengeManager, ExtendedChallenge } from './lib/challenge-config';
 import { reloadTracker, preventUnnecessaryReload } from './lib/reload-tracker';
+import { globalShortcutManager } from './lib/shortcuts/KeyboardShortcuts';
+import { ShortcutsOverlay, useShortcutsOverlay } from './components/shortcuts/ShortcutsOverlay';
 import { Button } from './components/ui/button';
 import { Progress } from './components/ui/progress';
 import { 
@@ -143,6 +145,7 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showChallengeManager, setShowChallengeManager] = useState(false);
+  const shortcutsOverlay = useShortcutsOverlay();
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -235,54 +238,121 @@ export default function App() {
     };
   }, [sessionDataToSave, autoSave, designData.components.length, audioData.transcript]);
 
-  // Memoized keyboard shortcuts handler
-  const handleKeyPress = useCallback((e: KeyboardEvent) => {
-    // Command palette (Cmd/Ctrl + K)
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-      e.preventDefault();
-      setShowCommandPalette(true);
-    }
-    
-    // Challenge manager (Cmd/Ctrl + Shift + C)
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'C') {
-      e.preventDefault();
-      setShowChallengeManager(true);
-    }
-    
-    // Navigation shortcuts
-    if (e.altKey) {
-      switch (e.key) {
-        case '1':
-          e.preventDefault();
+  // Global keyboard shortcuts integration
+  useEffect(() => {
+    // Register App-specific shortcuts
+    globalShortcutManager.register({
+      key: 'k',
+      modifiers: ['ctrl'],
+      description: 'Open command palette',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:command-palette'))
+    });
+
+    globalShortcutManager.register({
+      key: 'k',
+      modifiers: ['meta'],
+      description: 'Open command palette',
+      category: 'general', 
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:command-palette'))
+    });
+
+    globalShortcutManager.register({
+      key: 'c',
+      modifiers: ['ctrl', 'shift'],
+      description: 'Open challenge manager',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'))
+    });
+
+    globalShortcutManager.register({
+      key: 'c',
+      modifiers: ['meta', 'shift'],
+      description: 'Open challenge manager',
+      category: 'general',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'))
+    });
+
+    globalShortcutManager.register({
+      key: '1',
+      modifiers: ['alt'],
+      description: 'Navigate to challenge selection',
+      category: 'navigation',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'challenge-selection' } }))
+    });
+
+    globalShortcutManager.register({
+      key: '2',
+      modifiers: ['alt'],
+      description: 'Navigate to design canvas',
+      category: 'navigation',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'design-canvas' } }))
+    });
+
+    globalShortcutManager.register({
+      key: '3',
+      modifiers: ['alt'],
+      description: 'Navigate to audio recording',
+      category: 'navigation',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'audio-recording' } }))
+    });
+
+    globalShortcutManager.register({
+      key: '4',
+      modifiers: ['alt'],
+      description: 'Navigate to review',
+      category: 'navigation',
+      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'review' } }))
+    });
+
+    // Event listeners for shortcut actions
+    const handleCommandPalette = () => setShowCommandPalette(true);
+    const handleChallengeManager = () => setShowChallengeManager(true);
+    const handleNavigateToScreen = (event: CustomEvent) => {
+      const { screen } = event.detail;
+      switch (screen) {
+        case 'challenge-selection':
           setCurrentScreen(prev => prev !== 'challenge-selection' ? 'challenge-selection' : prev);
           break;
-        case '2':
-          e.preventDefault();
+        case 'design-canvas':
           if (selectedChallenge) {
             setCurrentScreen(prev => prev !== 'design-canvas' ? 'design-canvas' : prev);
           }
           break;
-        case '3':
-          e.preventDefault();
+        case 'audio-recording':
           if (selectedChallenge) {
             setCurrentScreen(prev => prev !== 'audio-recording' ? 'audio-recording' : prev);
           }
           break;
-        case '4':
-          e.preventDefault();
+        case 'review':
           if (selectedChallenge) {
             setCurrentScreen(prev => prev !== 'review' ? 'review' : prev);
           }
           break;
       }
-    }
+    };
+
+    window.addEventListener('shortcut:command-palette', handleCommandPalette);
+    window.addEventListener('shortcut:challenge-manager', handleChallengeManager);
+    window.addEventListener('shortcut:navigate-to-screen', handleNavigateToScreen);
+
+    return () => {
+      // Cleanup shortcuts
+      globalShortcutManager.unregister('k', ['ctrl']);
+      globalShortcutManager.unregister('k', ['meta']);
+      globalShortcutManager.unregister('c', ['ctrl', 'shift']);
+      globalShortcutManager.unregister('c', ['meta', 'shift']);
+      globalShortcutManager.unregister('1', ['alt']);
+      globalShortcutManager.unregister('2', ['alt']);
+      globalShortcutManager.unregister('3', ['alt']);
+      globalShortcutManager.unregister('4', ['alt']);
+
+      // Cleanup event listeners
+      window.removeEventListener('shortcut:command-palette', handleCommandPalette);
+      window.removeEventListener('shortcut:challenge-manager', handleChallengeManager);
+      window.removeEventListener('shortcut:navigate-to-screen', handleNavigateToScreen);
+    };
   }, [selectedChallenge]);
-  
-  // Keyboard shortcuts
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleKeyPress]);
 
   // Memoized window title
   const windowTitle = useMemo(() => {
@@ -640,6 +710,12 @@ export default function App() {
           onChallengeUpdate={handleChallengeUpdate}
         />
       </Suspense>
+
+      {/* Shortcuts Overlay */}
+      <ShortcutsOverlay 
+        isOpen={shortcutsOverlay.isOpen}
+        onClose={shortcutsOverlay.close}
+      />
 
       {/* Floating Action Button for Command Palette */}
       {currentScreen !== 'welcome' && (

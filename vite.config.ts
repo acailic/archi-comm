@@ -12,9 +12,10 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.ts',
     css: true,
+    exclude: ['**/e2e/**', '**/node_modules/**', '**/dist/**'],
     coverage: {
       reporter: ['text', 'html'],
-      exclude: ['src-tauri/**', 'dist/**'],
+      exclude: ['src-tauri/**', 'dist/**', 'e2e/**'],
       lines: 70,
       functions: 65,
       branches: 55,

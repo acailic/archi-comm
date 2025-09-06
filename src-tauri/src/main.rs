@@ -2,9 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Mutex;
-use std::fs;
+use std::path::{PathBuf, Path};
+use std::sync::RwLock;
 use std::env;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -12,6 +11,26 @@ use tauri::State;
 use uuid::Uuid;
 use tempfile::NamedTempFile;
 use std::io::Write;
+use std::fs;
+use std::process;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
+// Operation name constants for consistent error handling
+pub struct OperationNames;
+
+impl OperationNames {
+    pub const FILE_SYSTEM: &'static str = "file system operation";
+    pub const SERIALIZATION: &'static str = "serialization operation";
+    pub const VALIDATION: &'static str = "input validation";
+    pub const AUDIO_SAVE: &'static str = "audio file save";
+    pub const DIRECTORY_CREATE: &'static str = "directory creation";
+    pub const FILE_WRITE: &'static str = "file write";
+    pub const FILE_PERSIST: &'static str = "file persistence";
+    pub const PATH_CANONICALIZE: &'static str = "path canonicalization";
+    pub const PROJECT_MANAGEMENT: &'static str = "project management";
+    pub const COMPONENT_MANAGEMENT: &'static str = "component management";
+}
 
 // Custom error types for structured error handling
 #[derive(Debug, thiserror::Error, Serialize)]
@@ -29,7 +48,10 @@ pub enum ApiError {
     InvalidComponentData { details: String },
     
     #[error("File system error: {operation} failed - {details}")]
-    FileSystemError { operation: String, details: String },
+    FileSystemError { 
+        operation: String, 
+        details: String 
+    },
     
     #[error("Audio file not found at path: {path}")]
     AudioFileNotFound { path: String },
@@ -53,20 +75,28 @@ pub enum ApiError {
     Internal { details: String },
 }
 
+// Convert std::io::Error to FileSystemError with context
 impl From<std::io::Error> for ApiError {
     fn from(err: std::io::Error) -> Self {
+        let full_error = err.to_string();
+        log::error!("I/O error occurred: {}", full_error);
+        
         ApiError::FileSystemError {
-            operation: "unknown".to_string(),
-            details: err.to_string(),
+            operation: OperationNames::FILE_SYSTEM.to_string(),
+            details: format!("A file system operation failed. Please check file permissions and disk space. Error: {}", full_error),
         }
     }
 }
 
+// Convert serde_json::Error to SerializationError with context
 impl From<serde_json::Error> for ApiError {
     fn from(err: serde_json::Error) -> Self {
+        let full_error = err.to_string();
+        log::error!("Serialization error occurred: {}", full_error);
+        
         ApiError::SerializationError {
-            operation: "unknown".to_string(),
-            details: err.to_string(),
+            operation: OperationNames::SERIALIZATION.to_string(),
+            details: "Data serialization or deserialization failed. The data format may be invalid.".to_string(),
         }
     }
 }
@@ -171,10 +201,10 @@ pub struct Connection {
     pub properties: HashMap<String, String>,
 }
 
-// Application state
-type ProjectStore = Mutex<HashMap<String, Project>>;
-type DiagramStore = Mutex<HashMap<String, Vec<DiagramElement>>>;
-type ConnectionStore = Mutex<HashMap<String, Vec<Connection>>>;
+// Application state with RwLock for better concurrency
+type ProjectStore = RwLock<HashMap<String, Project>>;
+type DiagramStore = RwLock<HashMap<String, Vec<DiagramElement>>>;
+type ConnectionStore = RwLock<HashMap<String, Vec<Connection>>>;
 
 // Tauri commands for project management
 #[tauri::command]
@@ -206,7 +236,7 @@ async fn create_project(
         components: Vec::new(),
     };
 
-    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -219,7 +249,7 @@ async fn create_project(
 
 #[tauri::command]
 async fn get_projects(projects: State<'_, ProjectStore>) -> Result<Vec<Project>, ApiError> {
-    let store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let store = projects.read().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -233,7 +263,7 @@ async fn get_project(
     project_id: String,
     projects: State<'_, ProjectStore>,
 ) -> Result<Option<Project>, ApiError> {
-    let store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let store = projects.read().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -254,7 +284,7 @@ async fn update_project(
     status: Option<ProjectStatus>,
     projects: State<'_, ProjectStore>,
 ) -> Result<Option<Project>, ApiError> {
-    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -293,7 +323,7 @@ async fn delete_project(
     project_id: String,
     projects: State<'_, ProjectStore>,
 ) -> Result<bool, ApiError> {
-    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -331,7 +361,7 @@ async fn add_component(
         });
     }
 
-    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -367,7 +397,7 @@ async fn update_component(
     dependencies: Option<Vec<String>>,
     projects: State<'_, ProjectStore>,
 ) -> Result<Option<Component>, ApiError> {
-    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -415,7 +445,7 @@ async fn remove_component(
     component_id: String,
     projects: State<'_, ProjectStore>,
 ) -> Result<bool, ApiError> {
-    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -445,7 +475,7 @@ async fn save_diagram(
     elements: Vec<DiagramElement>,
     diagrams: State<'_, DiagramStore>,
 ) -> Result<(), ApiError> {
-    let mut store = diagrams.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = diagrams.write().map_err(|_| ApiError::StateLockError {
         resource: "DiagramStore".to_string(),
     })?;
     
@@ -459,7 +489,7 @@ async fn load_diagram(
     project_id: String,
     diagrams: State<'_, DiagramStore>,
 ) -> Result<Vec<DiagramElement>, ApiError> {
-    let store = diagrams.lock().map_err(|_| ApiError::StateLockError {
+    let store = diagrams.read().map_err(|_| ApiError::StateLockError {
         resource: "DiagramStore".to_string(),
     })?;
     
@@ -474,7 +504,7 @@ async fn save_connections(
     connections: Vec<Connection>,
     connection_store: State<'_, ConnectionStore>,
 ) -> Result<(), ApiError> {
-    let mut store = connection_store.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = connection_store.write().map_err(|_| ApiError::StateLockError {
         resource: "ConnectionStore".to_string(),
     })?;
     
@@ -488,7 +518,7 @@ async fn load_connections(
     project_id: String,
     connection_store: State<'_, ConnectionStore>,
 ) -> Result<Vec<Connection>, ApiError> {
-    let store = connection_store.lock().map_err(|_| ApiError::StateLockError {
+    let store = connection_store.read().map_err(|_| ApiError::StateLockError {
         resource: "ConnectionStore".to_string(),
     })?;
     
@@ -506,10 +536,29 @@ fn validate_filename(file_name: &str) -> Result<(), ApiError> {
         });
     }
 
-    // Check for path traversal attempts
-    if file_name.contains("..") || file_name.contains('/') || file_name.contains('\\') {
+    // Check for path traversal attempts using proper std::path methods
+    let path = Path::new(file_name);
+    
+    // Check if the path has multiple components (indicates directory traversal)
+    if path.components().count() > 1 {
         return Err(ApiError::InvalidProjectData { 
-            details: format!("Invalid filename '{}': contains path traversal characters", file_name) 
+            details: format!("Invalid filename '{}': contains path separators", file_name) 
+        });
+    }
+    
+    // Check for parent directory references
+    if path.components().any(|component| {
+        matches!(component, std::path::Component::ParentDir | std::path::Component::CurDir)
+    }) {
+        return Err(ApiError::InvalidProjectData { 
+            details: format!("Invalid filename '{}': contains directory traversal patterns", file_name) 
+        });
+    }
+    
+    // Additional check for explicit path separator characters to be extra safe
+    if file_name.contains('/') || file_name.contains('\\') {
+        return Err(ApiError::InvalidProjectData { 
+            details: format!("Invalid filename '{}': contains path separator characters", file_name) 
         });
     }
 
@@ -545,22 +594,38 @@ fn validate_filename(file_name: &str) -> Result<(), ApiError> {
 
 // Tauri command for saving audio files
 #[tauri::command]
-async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, ApiError> {
+async fn save_audio_file(file_name: String, data: Vec<u8>, base_dir: Option<String>) -> Result<String, ApiError> {
     // Validate and sanitize the filename
     validate_filename(&file_name)?;
 
-    // Get the system temporary directory
-    let temp_dir = env::temp_dir();
+    // Determine base directory - use provided base_dir or default to system temp
+    let base_temp_dir = if let Some(dir) = base_dir {
+        PathBuf::from(dir)
+    } else {
+        env::temp_dir()
+    };
     
-    // Create a subdirectory for archicomm audio files
-    let audio_dir = temp_dir.join("archicomm_audio");
+    // Create a per-process subdirectory with unique identifier
+    let process_id = process::id();
+    let session_id = Uuid::new_v4();
+    let audio_dir = base_temp_dir.join(format!("archicomm_audio_{}_{}", process_id, session_id));
     
-    // Create the directory if it doesn't exist
+    // Create the directory with secure permissions (0o700 on Unix)
     fs::create_dir_all(&audio_dir)
         .map_err(|e| ApiError::FileSystemError {
-            operation: "create audio directory".to_string(),
-            details: e.to_string(),
+            operation: OperationNames::DIRECTORY_CREATE.to_string(),
+            details: format!("Failed to create audio directory: {}", e),
         })?;
+    
+    #[cfg(unix)]
+    {
+        use std::fs::Permissions;
+        fs::set_permissions(&audio_dir, Permissions::from_mode(0o700))
+            .map_err(|e| ApiError::FileSystemError {
+                operation: OperationNames::DIRECTORY_CREATE.to_string(),
+                details: format!("Failed to set secure directory permissions: {}", e),
+            })?;
+    }
     
     // Construct the final file path using only the sanitized filename
     let final_file_path = audio_dir.join(&file_name);
@@ -568,37 +633,48 @@ async fn save_audio_file(file_name: String, data: Vec<u8>) -> Result<String, Api
     // Create a temporary file in the same directory as the target
     let mut temp_file = NamedTempFile::new_in(&audio_dir)
         .map_err(|e| ApiError::FileSystemError {
-            operation: "create temporary file".to_string(),
-            details: e.to_string(),
+            operation: OperationNames::FILE_WRITE.to_string(),
+            details: format!("Failed to create temporary file: {}", e),
         })?;
     
     // Write the audio data to the temporary file
     temp_file.write_all(&data)
         .map_err(|e| ApiError::FileSystemError {
-            operation: "write audio data".to_string(),
-            details: e.to_string(),
+            operation: OperationNames::FILE_WRITE.to_string(),
+            details: format!("Failed to write audio data to file: {}", e),
         })?;
     
     // Ensure all data is written to disk
     temp_file.flush()
         .map_err(|e| ApiError::FileSystemError {
-            operation: "flush temporary file".to_string(),
-            details: e.to_string(),
+            operation: OperationNames::FILE_WRITE.to_string(),
+            details: format!("Failed to flush file data to disk: {}", e),
         })?;
     
     // Atomically move the temporary file to the final location
     temp_file.persist(&final_file_path)
         .map_err(|e| ApiError::FileSystemError {
-            operation: format!("persist file '{}'", file_name),
-            details: e.to_string(),
+            operation: OperationNames::FILE_PERSIST.to_string(),
+            details: format!("Failed to persist temporary file to final location: {}", e),
         })?;
     
-    // Canonicalize the path to get the absolute, resolved path
+    // Canonicalize the path to get the absolute, resolved path with fallback
     let canonical_path = fs::canonicalize(&final_file_path)
-        .map_err(|e| ApiError::FileSystemError {
-            operation: format!("canonicalize path for '{}'", file_name),
-            details: e.to_string(),
-        })?;
+        .or_else(|_| {
+            // Fallback: manually construct absolute path if canonicalize fails
+            let abs_path = if final_file_path.is_absolute() {
+                final_file_path.clone()
+            } else {
+                env::current_dir()
+                    .map_err(|e| ApiError::FileSystemError {
+                        operation: OperationNames::PATH_CANONICALIZE.to_string(),
+                        details: format!("Cannot determine current directory: {}", e),
+                    })?
+                    .join(&final_file_path)
+            };
+            Ok(abs_path)
+        })
+        .map_err(|e: ApiError| e)?;
     
     // Convert to string, ensuring it's valid UTF-8
     let path_str = canonical_path.to_str()
@@ -630,7 +706,7 @@ async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, Ap
     if let Err(e) = transcriber.initialize() {
         log::error!("Failed to initialize transcriber: {}", e);
         return Err(ApiError::TranscriptionInitError {
-            details: format!("Transcriber initialization failed: {}", e),
+            details: "Audio transcription service initialization failed. Please try again later.".to_string(),
         });
     }
 
@@ -647,9 +723,7 @@ async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, Ap
         Err(e) => {
             log::error!("Transcription failed for file: {}: {}", file_path, e);
             Err(ApiError::TranscriptionError {
-                details: format!("Transcription processing failed for '{}': {}", 
-                               audio_path.file_name().unwrap_or_default().to_string_lossy(), 
-                               e),
+                details: "Audio transcription failed. Please ensure the file is a valid audio format and try again.".to_string(),
             })
         }
     }
@@ -714,13 +788,13 @@ async fn export_project_data(
     diagrams: State<'_, DiagramStore>,
     connections: State<'_, ConnectionStore>,
 ) -> Result<String, ApiError> {
-    let project_store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let project_store = projects.read().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
-    let diagram_store = diagrams.lock().map_err(|_| ApiError::StateLockError {
+    let diagram_store = diagrams.read().map_err(|_| ApiError::StateLockError {
         resource: "DiagramStore".to_string(),
     })?;
-    let connection_store = connections.lock().map_err(|_| ApiError::StateLockError {
+    let connection_store = connections.read().map_err(|_| ApiError::StateLockError {
         resource: "ConnectionStore".to_string(),
     })?;
 
@@ -752,7 +826,7 @@ async fn populate_sample_data(
     projects: State<'_, ProjectStore>,
 ) -> Result<Vec<Project>, ApiError> {
     let sample_projects = dev_utils::create_sample_projects();
-    let mut store = projects.lock().map_err(|_| ApiError::StateLockError {
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
     })?;
     
@@ -917,11 +991,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_audio_file_security() {
-        use tempfile::tempdir;
+        // use tempfile::tempdir; // Not needed for this test
         
         // Test with valid filename
         let valid_data = b"fake audio data";
-        let result = save_audio_file("test_audio.wav".to_string(), valid_data.to_vec()).await;
+        let result = save_audio_file("test_audio.wav".to_string(), valid_data.to_vec(), None).await;
         assert!(result.is_ok());
         
         // Clean up - the file should exist and be valid
@@ -934,17 +1008,18 @@ mod tests {
         std::fs::remove_file(&file_path).ok();
         
         // Test with malicious filename - should fail
+        let long_name = "a".repeat(300);
         let malicious_names = vec![
             "../etc/passwd",
             "..\\Windows\\System32\\config",
             "CON",
             "file<>name",
             "",
-            "a".repeat(300), // too long
+            &long_name, // too long
         ];
         
         for malicious_name in malicious_names {
-            let result = save_audio_file(malicious_name.to_string(), valid_data.to_vec()).await;
+            let result = save_audio_file(malicious_name.to_string(), valid_data.to_vec(), None).await;
             assert!(result.is_err(), "Expected error for malicious filename: {}", malicious_name);
         }
     }
@@ -955,7 +1030,7 @@ mod tests {
         
         // Test that canonicalization works correctly
         let test_data = b"test audio content";
-        let result = save_audio_file("test_canonical.wav".to_string(), test_data.to_vec()).await;
+        let result = save_audio_file("test_canonical.wav".to_string(), test_data.to_vec(), None).await;
         
         assert!(result.is_ok());
         let canonical_path = result.unwrap();
@@ -985,7 +1060,7 @@ mod tests {
         let filename = "cleanup_test.wav";
         
         // Save file
-        let result = save_audio_file(filename.to_string(), test_data.to_vec()).await;
+        let result = save_audio_file(filename.to_string(), test_data.to_vec(), None).await;
         assert!(result.is_ok());
         
         let file_path = result.unwrap();
@@ -1049,8 +1124,9 @@ mod tests {
         let api_error: ApiError = io_error.into();
         match api_error {
             ApiError::FileSystemError { operation, details } => {
-                assert_eq!(operation, "unknown");
-                assert_eq!(details, "access denied");
+                assert_eq!(operation, OperationNames::FILE_SYSTEM);
+                assert!(details.contains("A file system operation failed"));
+                assert!(details.contains("access denied"));
             }
             _ => panic!("Expected FileSystemError variant"),
         }
@@ -1059,8 +1135,9 @@ mod tests {
         let json_error = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
         let api_error: ApiError = json_error.into();
         match api_error {
-            ApiError::SerializationError { operation, details: _ } => {
-                assert_eq!(operation, "unknown");
+            ApiError::SerializationError { operation, details } => {
+                assert_eq!(operation, OperationNames::SERIALIZATION);
+                assert_eq!(details, "Data serialization or deserialization failed. The data format may be invalid.");
             }
             _ => panic!("Expected SerializationError variant"),
         }

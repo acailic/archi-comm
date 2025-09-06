@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getAllShortcuts, formatShortcutKey, globalShortcutManager } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent } from './ui/dialog';
@@ -51,117 +52,123 @@ export function CommandPalette({
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const commands: Command[] = useMemo(() => [
-    // Navigation Commands
-    {
-      id: 'nav-challenges',
-      title: 'Select Challenge',
-      description: 'Choose a system design challenge to practice',
-      icon: Target,
-      action: () => onNavigate('challenge-selection'),
-      section: 'navigation',
-      shortcut: '⌥1',
-      available: true
-    },
-    {
-      id: 'nav-design',
-      title: 'Design Canvas',
-      description: 'Create your system architecture',
-      icon: Palette,
-      action: () => onNavigate('design-canvas'),
-      section: 'navigation',
-      shortcut: '⌥2',
-      available: !!selectedChallenge
-    },
-    {
-      id: 'nav-recording',
-      title: 'Record Explanation',
-      description: 'Practice your technical communication',
-      icon: Mic,
-      action: () => onNavigate('audio-recording'),
-      section: 'navigation',
-      shortcut: '⌥3',
-      available: !!selectedChallenge
-    },
-    {
-      id: 'nav-review',
-      title: 'Session Review',
-      description: 'Analyze your performance and get feedback',
-      icon: Eye,
-      action: () => onNavigate('review'),
-      section: 'navigation',
-      shortcut: '⌥4',
-      available: !!selectedChallenge
-    },
-    
-    // Action Commands
-    {
-      id: 'action-new-session',
-      title: 'New Session',
-      description: 'Start a fresh practice session',
-      icon: RotateCcw,
-      action: () => {
-        onNavigate('challenge-selection');
-        // Add logic to reset session
+  const commands: Command[] = useMemo(() => {
+    const allShortcuts = getAllShortcuts();
+    const getShortcutDisplay = (description: string) => {
+      const shortcut = allShortcuts.find(s => s.description.toLowerCase().includes(description.toLowerCase()));
+      return shortcut ? formatShortcutKey(shortcut.key, shortcut.modifiers) : undefined;
+    };
+
+    return [
+      // Navigation Commands
+      {
+        id: 'nav-challenges',
+        title: 'Select Challenge',
+        description: 'Choose a system design challenge to practice',
+        icon: Target,
+        action: () => onNavigate('challenge-selection'),
+        section: 'navigation',
+        shortcut: getShortcutDisplay('challenge selection'),
+        available: true
       },
-      section: 'actions',
-      shortcut: '⌘N',
-      available: true
-    },
-    {
-      id: 'action-save',
-      title: 'Save Session',
-      description: 'Save your current progress',
-      icon: Save,
-      action: () => {
-        // Add save logic
-        console.log('Saving session...');
+      {
+        id: 'nav-design',
+        title: 'Design Canvas',
+        description: 'Create your system architecture',
+        icon: Palette,
+        action: () => onNavigate('design-canvas'),
+        section: 'navigation',
+        shortcut: getShortcutDisplay('design canvas'),
+        available: !!selectedChallenge
       },
-      section: 'actions',
-      shortcut: '⌘S',
-      available: !!selectedChallenge
-    },
-    {
-      id: 'action-export',
-      title: 'Export Session',
-      description: 'Export your work as JSON',
-      icon: Download,
-      action: () => {
-        // Add export logic
-        console.log('Exporting session...');
+      {
+        id: 'nav-recording',
+        title: 'Record Explanation',
+        description: 'Practice your technical communication',
+        icon: Mic,
+        action: () => onNavigate('audio-recording'),
+        section: 'navigation',
+        shortcut: getShortcutDisplay('audio recording'),
+        available: !!selectedChallenge
       },
-      section: 'actions',
-      shortcut: '⌘E',
-      available: !!selectedChallenge
-    },
-    
-    // Help Commands
-    {
-      id: 'help-shortcuts',
-      title: 'Keyboard Shortcuts',
-      description: 'View all available keyboard shortcuts',
-      icon: Keyboard,
-      action: () => {
-        // Add shortcuts help logic
-        console.log('Showing shortcuts...');
+      {
+        id: 'nav-review',
+        title: 'Session Review',
+        description: 'Analyze your performance and get feedback',
+        icon: Eye,
+        action: () => onNavigate('review'),
+        section: 'navigation',
+        shortcut: getShortcutDisplay('review'),
+        available: !!selectedChallenge
       },
-      section: 'help',
-      shortcut: '⌘?',
-      available: true
-    },
-    {
-      id: 'help-guide',
-      title: 'User Guide',
-      description: 'Learn how to use ArchiComm effectively',
-      icon: HelpCircle,
-      action: () => {
-        // Add user guide logic
-        console.log('Opening user guide...');
+      
+      // Action Commands
+      {
+        id: 'action-new-session',
+        title: 'New Session',
+        description: 'Start a fresh practice session',
+        icon: RotateCcw,
+        action: () => {
+          onNavigate('challenge-selection');
+          // Add logic to reset session
+        },
+        section: 'actions',
+        shortcut: getShortcutDisplay('new project'),
+        available: true
       },
-      section: 'help',
-      available: true
-    }
-  ], [selectedChallenge, onNavigate]);
+      {
+        id: 'action-save',
+        title: 'Save Session',
+        description: 'Save your current progress',
+        icon: Save,
+        action: () => {
+          window.dispatchEvent(new CustomEvent('shortcut:save-project'));
+        },
+        section: 'actions',
+        shortcut: getShortcutDisplay('save project'),
+        available: !!selectedChallenge
+      },
+      {
+        id: 'action-export',
+        title: 'Export Session',
+        description: 'Export your work as JSON',
+        icon: Download,
+        action: () => {
+          // Add export logic
+          console.log('Exporting session...');
+        },
+        section: 'actions',
+        shortcut: getShortcutDisplay('export'),
+        available: !!selectedChallenge
+      },
+      
+      // Help Commands
+      {
+        id: 'help-shortcuts',
+        title: 'Keyboard Shortcuts',
+        description: 'View all available keyboard shortcuts',
+        icon: Keyboard,
+        action: () => {
+          window.dispatchEvent(new CustomEvent('shortcut:show-help'));
+        },
+        section: 'help',
+        shortcut: getShortcutDisplay('show shortcuts help'),
+        available: true
+      },
+      {
+        id: 'help-guide',
+        title: 'User Guide',
+        description: 'Learn how to use ArchiComm effectively',
+        icon: HelpCircle,
+        action: () => {
+          // Add user guide logic
+          console.log('Opening user guide...');
+        },
+        section: 'help',
+        available: true
+      }
+    ];
+  }, [selectedChallenge, onNavigate]);
 
   const filteredCommands = useMemo(() => {
     const availableCommands = commands.filter(cmd => cmd.available !== false);
@@ -190,11 +197,14 @@ export function CommandPalette({
     return groups;
   }, [filteredCommands]);
 
-  // Keyboard navigation
+  // Keyboard navigation with global shortcuts coordination
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent global shortcuts from interfering when palette is open
+      e.stopPropagation();
+      
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
@@ -222,8 +232,9 @@ export function CommandPalette({
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase to ensure higher precedence than global shortcuts
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, filteredCommands, selectedIndex, onClose]);
 
   // Reset selection when query changes
@@ -326,7 +337,7 @@ export function CommandPalette({
               />
             </div>
             <Badge variant="outline" className="text-xs font-mono">
-              ⌘K
+              {formatShortcutKey('k', ['ctrl'])}
             </Badge>
           </div>
 
