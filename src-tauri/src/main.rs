@@ -14,7 +14,7 @@ use tempfile::NamedTempFile;
 use std::io::Write;
 
 // Custom error types for structured error handling
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Serialize)]
 pub enum ApiError {
     #[error("Project not found: {project_id}")]
     ProjectNotFound { project_id: String },

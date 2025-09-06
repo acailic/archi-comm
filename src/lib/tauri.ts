@@ -227,6 +227,8 @@ export const diagramUtils = {
   },
 };
 
+const MAX_SEGMENTS = 10000;
+
 // Type guard to validate TranscriptionResponse structure
 function isValidTranscriptionResponse(response: any): response is TranscriptionResponse {
   if (typeof response !== 'object' || response === null) {
@@ -239,6 +241,10 @@ function isValidTranscriptionResponse(response: any): response is TranscriptionR
   }
   if (!Array.isArray(response.segments)) {
     console.error("Validation Error: 'segments' field is not an array.", response);
+    return false;
+  }
+  if (response.segments.length > MAX_SEGMENTS) {
+    console.error(`Validation Error: Number of segments exceeds the limit of ${MAX_SEGMENTS}.`, response);
     return false;
   }
   if (!response.segments.every((segment: any) => 
@@ -277,9 +283,11 @@ function categorizeTranscriptionError(error: any): string {
 // Transcription utilities
 export const transcriptionUtils = {
   async transcribeAudio(
-    filePath: string, 
-    options?: { 
+    filePath: string,
+    options?: {
       onProgress?: TranscriptionProgressCallback;
+      timeout?: number; // Timeout in milliseconds
+      jobId?: string;   // Optional ID for cancellation
     }
   ): Promise<TranscriptionResponse> {
     // Check if running in Tauri environment
@@ -291,7 +299,7 @@ export const transcriptionUtils = {
       };
     }
 
-    const { onProgress } = options || {};
+    const { onProgress, jobId, timeout } = options || {};
     let progressUnlisten: (() => void) | null = null;
 
     try {
@@ -305,7 +313,11 @@ export const transcriptionUtils = {
         );
       }
 
-      const response = await ipcUtils.invoke('transcribe_audio', { file_path: filePath });
+      const response = await ipcUtils.invoke('transcribe_audio', {
+        file_path: filePath,
+        job_id: jobId,
+        timeout,
+      });
       
       if (progressUnlisten) {
         progressUnlisten();
@@ -324,6 +336,14 @@ export const transcriptionUtils = {
       }
       throw new Error(categorizeTranscriptionError(error));
     }
+  },
+
+  async cancelTranscription(jobId: string): Promise<void> {
+    if (!isTauri()) {
+      console.warn(`cancel_transcription called outside of Tauri environment`);
+      return;
+    }
+    return ipcUtils.invoke('cancel_transcription', { job_id: jobId });
   },
 
   // IPC testing utility
