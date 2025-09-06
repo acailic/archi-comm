@@ -189,15 +189,20 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ['component', 'connection-point'],
     drop: (item: any, monitor) => {
-      if (monitor.getItemType() === 'component') {
-        if (!canvasRef.current) return;
-        const offset = monitor.getClientOffset();
-        const canvasRect = canvasRef.current.getBoundingClientRect();
-        if (offset) {
-          const x = offset.x - canvasRect.left;
-          const y = offset.y - canvasRect.top;
-          onComponentDrop(item.type, x, y);
+      try {
+        if (monitor.getItemType() === 'component') {
+          if (!canvasRef.current) return;
+          const offset = monitor.getClientOffset();
+          const canvasRect = canvasRef.current.getBoundingClientRect();
+          if (offset) {
+            const x = offset.x - canvasRect.left;
+            const y = offset.y - canvasRect.top;
+            onComponentDrop(item.type, x, y);
+          }
         }
+      } catch (error) {
+        console.error('Error during drag-and-drop operation:', error);
+        // Optionally, provide user feedback here (e.g., toast notification)
       }
     },
     collect: (monitor) => ({
