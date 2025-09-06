@@ -127,6 +127,16 @@ export interface TranscriptionResponse {
   segments: TranscriptionSegment[];
 }
 
+export interface TranscriptionProgressEvent {
+  type: 'progress' | 'partial_result' | 'status';
+  progress?: number; // 0-100 percentage
+  partialText?: string;
+  status?: string;
+  timestamp: number;
+}
+
+export type TranscriptionProgressCallback = (event: TranscriptionProgressEvent) => void;
+
 // Project management utilities (matching actual Rust backend commands)
 export const projectUtils = {
   async createProject(name: string, description: string): Promise<Project> {

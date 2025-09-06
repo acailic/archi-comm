@@ -58,39 +58,88 @@ export function CanvasArea({
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [connectionStyle, setConnectionStyle] = useState<'straight' | 'curved' | 'stepped'>('curved');
 
-  function DraggingConnectionPreview() {
-    const { item, itemType, currentOffset } = useDragLayer<DragLayerItem>((monitor) => ({
-      item: monitor.getItem() as DragLayerItem,
-      itemType: monitor.getItemType(),
-      currentOffset: monitor.getClientOffset(),
-    }));
-
-    // Guard clause to check if item is defined
-    if (!item || !currentOffset || itemType !== 'connection-point') {
-      return null;
-    }
-
-    const { fromComponent, fromPosition } = item;
-    if (!fromComponent || !fromPosition) {
-      return null;
-    }
-
-    const fromPoint = getComponentConnectionPoint(fromComponent, fromPosition);
-    
-    // Convert canvas-local coordinates to viewport coordinates
-    let adjustedFromPoint = fromPoint;
-    if (canvasRef.current) {
-      const canvasRect = canvasRef.current.getBoundingClientRect();
-      adjustedFromPoint = {
-        x: fromPoint.x + canvasRect.left,
-        y: fromPoint.y + canvasRect.top,
+  // Optimized and memoized DraggingConnectionPreview component
+  const DraggingConnectionPreview = React.memo(() => {
+    const dragLayerData = useDragLayer<DragLayerItem>((monitor) => {
+      const currentOffset = monitor.getClientOffset();
+      const item = monitor.getItem() as DragLayerItem;
+      const itemType = monitor.getItemType();
+      
+      // Only return primitive values to minimize re-renders
+      return {
+        isDragging: monitor.isDragging(),
+        itemType,
+        currentOffset,
+        fromComponentId: item?.fromComponent?.id,
+        fromComponentX: item?.fromComponent?.x,
+        fromComponentY: item?.fromComponent?.y,
+        fromPosition: item?.fromPosition,
       };
+    });
+
+    const { 
+      isDragging, 
+      itemType, 
+      currentOffset, 
+      fromComponentId, 
+      fromComponentX, 
+      fromComponentY, 
+      fromPosition 
+    } = dragLayerData;
+
+    // Memoized coordinate calculation to prevent expensive recalculations
+    const adjustedFromPoint = useMemo(() => {
+      if (!isDragging || itemType !== 'connection-point' || 
+          fromComponentX === undefined || fromComponentY === undefined || !fromPosition) {
+        return null;
+      }
+
+      // Calculate connection point based on component position and connection position
+      const width = 128;
+      const height = 80;
+      let fromPoint: { x: number; y: number };
+      
+      switch (fromPosition) {
+        case 'top': 
+          fromPoint = { x: fromComponentX + width / 2, y: fromComponentY };
+          break;
+        case 'bottom': 
+          fromPoint = { x: fromComponentX + width / 2, y: fromComponentY + height };
+          break;
+        case 'left': 
+          fromPoint = { x: fromComponentX, y: fromComponentY + height / 2 };
+          break;
+        case 'right': 
+          fromPoint = { x: fromComponentX + width, y: fromComponentY + height / 2 };
+          break;
+        default:
+          return null;
+      }
+
+      // Convert canvas-local coordinates to viewport coordinates
+      if (canvasRef.current) {
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        return {
+          x: fromPoint.x + canvasRect.left,
+          y: fromPoint.y + canvasRect.top,
+        };
+      }
+      
+      return fromPoint;
+    }, [isDragging, itemType, fromComponentX, fromComponentY, fromPosition]);
+
+    // Early return with guard clauses
+    if (!isDragging || !currentOffset || itemType !== 'connection-point' || !adjustedFromPoint) {
+      return null;
     }
+
+    // Memoized path calculation
+    const pathData = `M ${adjustedFromPoint.x} ${adjustedFromPoint.y} L ${currentOffset.x} ${currentOffset.y}`;
 
     return (
       <svg style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         <path
-          d={`M ${adjustedFromPoint.x} ${adjustedFromPoint.y} L ${currentOffset.x} ${currentOffset.y}`}
+          d={pathData}
           stroke="hsl(var(--primary))"
           strokeWidth="2"
           strokeDasharray="5,5"
@@ -98,7 +147,7 @@ export function CanvasArea({
         />
       </svg>
     );
-  }
+  });
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ['component', 'connection-point'],
