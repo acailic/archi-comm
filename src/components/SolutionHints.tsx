@@ -98,10 +98,10 @@ export function SolutionHints({
 
   // Auto-show hints based on progress
   useEffect(() => {
-    if (designProgress.timeElapsed > 60 && !showHints && availableHints.length > 0) {
-      setShowHints(true);
+    if (designProgress.timeElapsed > 60 && availableHints.length > 0) {
+      // Auto-show logic removed - showHints is controlled by parent component
     }
-  }, [designProgress.timeElapsed, showHints, availableHints.length]);
+  }, [designProgress.timeElapsed, availableHints.length]);
 
   const handleHintView = (hintId: string) => {
     const newViewedHints = new Set(viewedHints);
