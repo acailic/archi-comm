@@ -1,15 +1,15 @@
 import React, { useState, useCallback, useEffect, Suspense, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-const ChallengeSelection = React.lazy(() => import('@modules/challenges').then(m => ({ default: m.ChallengeSelection })));
-const DesignCanvas = React.lazy(() => import('@modules/canvas').then(m => ({ default: m.DesignCanvas })));
-const AudioRecording = React.lazy(() => import('@modules/session').then(m => ({ default: m.AudioRecording })));
-const ReviewScreen = React.lazy(() => import('@modules/review').then(m => ({ default: m.ReviewScreen })));
-const WindowControls = React.lazy(() => import('@modules/status').then(m => ({ default: m.WindowControls })));
-const CommandPalette = React.lazy(() => import('@modules/command').then(m => ({ default: m.CommandPalette })));
-const WelcomeOverlay = React.lazy(() => import('@modules/onboarding').then(m => ({ default: m.WelcomeOverlay })));
-const StatusBar = React.lazy(() => import('@modules/status').then(m => ({ default: m.StatusBar })));
-const ChallengeManager = React.lazy(() => import('@modules/challenges').then(m => ({ default: m.ChallengeManager })));
-const AIConfigPage = React.lazy(() => import('@modules/settings').then(m => ({ default: m.AIConfigPage })));
+const ChallengeSelection = React.lazy(() => import('./components/ChallengeSelection').then(m => ({ default: m.ChallengeSelection })));
+const DesignCanvas = React.lazy(() => import('./components/DesignCanvas').then(m => ({ default: m.DesignCanvas })));
+const AudioRecording = React.lazy(() => import('./components/AudioRecording').then(m => ({ default: m.AudioRecording })));
+const ReviewScreen = React.lazy(() => import('./components/ReviewScreen').then(m => ({ default: m.ReviewScreen })));
+const WindowControls = React.lazy(() => import('./components/WindowControls').then(m => ({ default: m.WindowControls })));
+const CommandPalette = React.lazy(() => import('./components/CommandPalette').then(m => ({ default: m.CommandPalette })));
+const WelcomeOverlay = React.lazy(() => import('./components/WelcomeOverlay').then(m => ({ default: m.WelcomeOverlay })));
+const StatusBar = React.lazy(() => import('./components/StatusBar').then(m => ({ default: m.StatusBar })));
+const ChallengeManager = React.lazy(() => import('./components/ChallengeManager').then(m => ({ default: m.ChallengeManager })));
+const AIConfigPage = React.lazy(() => import('./components/AIConfigPage').then(m => ({ default: m.AIConfigPage })));
 
 import { tauriAPI, isTauriApp } from './lib/tauri';
 import { challengeManager, ExtendedChallenge } from './lib/challenge-config';
@@ -915,7 +915,7 @@ export default function App() {
       {/* AI Config Page */}
       {showAIConfig && (
         <Suspense fallback={null}>
-          <AIConfigPage />
+          <AIConfigPage onClose={() => setShowAIConfig(false)} />
         </Suspense>
       )}
 

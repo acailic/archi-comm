@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,7 +13,9 @@ import {
   Settings,
   Save,
   RotateCcw,
-  Loader2
+  Loader2,
+  ArrowLeft,
+  X
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -39,7 +41,11 @@ import {
 
 const FormSchema = AIConfigSchema;
 
-export function AIConfigPage() {
+interface AIConfigPageProps {
+  onClose?: () => void;
+}
+
+export function AIConfigPage({ onClose }: AIConfigPageProps) {
   const [showApiKeys, setShowApiKeys] = useState<Record<AIProvider, boolean>>({
     [AIProvider.OPENAI]: false,
     [AIProvider.GEMINI]: false,
@@ -94,6 +100,35 @@ export function AIConfigPage() {
     await resetToDefaults();
     form.reset(config);
   };
+
+  const handleClose = () => {
+    if (!onClose) return;
+    
+    const isDirty = form.formState.isDirty;
+    if (isDirty) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to leave without saving?'
+      );
+      if (!confirmed) return;
+    }
+    
+    onClose();
+  };
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && onClose) {
+        event.preventDefault();
+        handleClose();
+      }
+    };
+
+    if (onClose) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [onClose, handleClose]);
 
   const getConnectionStatus = (provider: AIProvider) => {
     const test = connectionTests[provider];
@@ -151,11 +186,24 @@ export function AIConfigPage() {
     <TooltipProvider>
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">AI Configuration</h1>
-            <p className="text-muted-foreground mt-2">
-              Configure your AI provider settings and API keys
-            </p>
+          <div className="flex items-center gap-4">
+            {onClose && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleClose}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            )}
+            <div>
+              <h1 className="text-3xl font-bold">AI Configuration</h1>
+              <p className="text-muted-foreground mt-2">
+                Configure your AI provider settings and API keys
+              </p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button 
@@ -166,6 +214,16 @@ export function AIConfigPage() {
               <RotateCcw className="h-4 w-4 mr-2" />
               Reset to Defaults
             </Button>
+            {onClose && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleClose}
+                className="h-9 w-9 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -670,7 +728,17 @@ export function AIConfigPage() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              {onClose && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={handleClose}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+              )}
               <Button type="submit" disabled={saving}>
                 {saving ? (
                   <>
