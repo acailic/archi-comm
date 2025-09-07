@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
+import { useOnboarding } from '../lib/onboarding/OnboardingManager';
+import { UXOptimizer } from '../lib/user-experience/UXOptimizer';
 import { 
   Zap, 
   Target, 
@@ -13,12 +15,30 @@ import {
   Brain,
   Users,
   TrendingUp,
-  CheckCircle
+  CheckCircle,
+  Settings,
+  Accessibility,
+  Lightbulb
 } from 'lucide-react';
 
 interface WelcomeOverlayProps {
   onComplete: () => void;
 }
+
+interface OnboardingFlow {
+  id: string;
+  name: string;
+  description: string;
+  duration: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+}
+
+type SkillLevel = 'beginner' | 'intermediate' | 'advanced';
+type AccessibilityPreferences = {
+  reducedMotion: boolean;
+  highContrast: boolean;
+  screenReader: boolean;
+};
 
 const features = [
   {
@@ -57,17 +77,121 @@ const benefits = [
 export function WelcomeOverlay({ onComplete }: WelcomeOverlayProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [showFeatures, setShowFeatures] = useState(false);
+  const [skillLevel, setSkillLevel] = useState<SkillLevel>('intermediate');
+  const [selectedFlow, setSelectedFlow] = useState<string | null>(null);
+  const [accessibilityPrefs, setAccessibilityPrefs] = useState<AccessibilityPreferences>({
+    reducedMotion: false,
+    highContrast: false,
+    screenReader: false
+  });
+  const [showOnboardingOptions, setShowOnboardingOptions] = useState(false);
+  
+  const { startOnboarding, getAllFlows, getFlowsByCategory } = useOnboarding();
+  const uxOptimizer = UXOptimizer.getInstance();
 
   useEffect(() => {
+    const shouldReduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldUseHighContrast = window.matchMedia('(prefers-contrast: high)').matches;
+    
+    setAccessibilityPrefs(prev => ({
+      ...prev,
+      reducedMotion: shouldReduceMotion,
+      highContrast: shouldUseHighContrast
+    }));
+
     const timer = setTimeout(() => {
       setShowFeatures(true);
-    }, 1000);
+    }, shouldReduceMotion ? 100 : 1000);
 
     return () => clearTimeout(timer);
   }, []);
 
   const handleGetStarted = () => {
+    setShowOnboardingOptions(true);
+  };
+
+  const handleSkipOnboarding = () => {
+    // Track user preferences
+    uxOptimizer.trackAction({
+      type: 'welcome_completed',
+      data: { 
+        skillLevel, 
+        onboardingSkipped: true,
+        accessibilityPrefs
+      },
+      success: true,
+      context: {
+        page: '/welcome',
+        component: 'welcome-overlay',
+        userIntent: 'skip-onboarding'
+      }
+    });
+    
     onComplete();
+  };
+
+  const handleOnboardingFlowSelect = async (flowId: string) => {
+    // Track user preferences
+    uxOptimizer.trackAction({
+      type: 'welcome_completed',
+      data: { 
+        skillLevel, 
+        selectedOnboardingFlow: flowId,
+        accessibilityPrefs
+      },
+      success: true,
+      context: {
+        page: '/welcome',
+        component: 'welcome-overlay',
+        userIntent: 'start-onboarding'
+      }
+    });
+    
+    // Apply accessibility preferences
+    if (accessibilityPrefs.reducedMotion) {
+      document.documentElement.style.setProperty('--motion-reduce', 'reduce');
+    }
+    if (accessibilityPrefs.highContrast) {
+      document.documentElement.classList.add('high-contrast');
+    }
+    
+    // Start onboarding flow
+    const success = await startOnboarding(flowId);
+    if (success) {
+      onComplete();
+    }
+  };
+
+  const onboardingFlows: OnboardingFlow[] = [
+    {
+      id: 'quick-start',
+      name: 'Quick Start',
+      description: 'Learn the essentials in 5 minutes',
+      duration: '5 min',
+      difficulty: 'beginner'
+    },
+    {
+      id: 'comprehensive-tour',
+      name: 'Complete Tour',
+      description: 'Comprehensive walkthrough of all features',
+      duration: '15 min',
+      difficulty: 'intermediate'
+    },
+    {
+      id: 'advanced-features',
+      name: 'Advanced Features',
+      description: 'Focus on power-user features and shortcuts',
+      duration: '10 min',
+      difficulty: 'advanced'
+    }
+  ];
+
+  const getFlowsForSkillLevel = () => {
+    return onboardingFlows.filter(flow => {
+      if (skillLevel === 'beginner') return flow.difficulty === 'beginner';
+      if (skillLevel === 'advanced') return flow.difficulty === 'advanced' || flow.difficulty === 'intermediate';
+      return true; // intermediate shows all
+    });
   };
 
   return (
@@ -75,7 +199,14 @@ export function WelcomeOverlay({ onComplete }: WelcomeOverlayProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-primary/5 backdrop-blur-xl z-50 overflow-auto"
+      transition={{ duration: accessibilityPrefs.reducedMotion ? 0.1 : 0.3 }}
+      className={`absolute inset-0 bg-gradient-to-br from-background via-background/95 to-primary/5 backdrop-blur-xl z-50 overflow-auto ${
+        accessibilityPrefs.highContrast ? 'contrast-125' : ''
+      }`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="welcome-title"
+      aria-describedby="welcome-description"
     >
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-20">
@@ -126,7 +257,10 @@ export function WelcomeOverlay({ onComplete }: WelcomeOverlayProps) {
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.6 }}
+              transition={{ 
+                duration: accessibilityPrefs.reducedMotion ? 0.1 : 0.8, 
+                delay: accessibilityPrefs.reducedMotion ? 0 : 0.6 
+              }}
               className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed"
             >
               Master system design and technical communication through interactive practice sessions.
@@ -225,62 +359,233 @@ export function WelcomeOverlay({ onComplete }: WelcomeOverlayProps) {
             )}
           </AnimatePresence>
 
-          {/* CTA Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: showFeatures ? 1 : 0.8 }}
-            className="text-center"
-          >
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Button
-                onClick={handleGetStarted}
-                size="lg"
-                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground px-8 py-4 text-lg font-medium shadow-2xl hover:shadow-primary/25 transition-all duration-300 group"
+          {/* Onboarding Selection or CTA */}
+          <AnimatePresence mode="wait">
+            {!showOnboardingOptions ? (
+              <motion.div
+                key="cta"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: accessibilityPrefs.reducedMotion ? 0.1 : 0.8, delay: showFeatures ? 1 : 0.8 }}
+                className="text-center"
               >
-                <span className="mr-2">Start Your Journey</span>
                 <motion.div
-                  animate={{ x: [0, 4, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
+                  whileHover={accessibilityPrefs.reducedMotion ? {} : { scale: 1.05 }}
+                  whileTap={accessibilityPrefs.reducedMotion ? {} : { scale: 0.95 }}
                 >
-                  <ArrowRight className="w-5 h-5" />
+                  <Button
+                    onClick={handleGetStarted}
+                    size="lg"
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground px-8 py-4 text-lg font-medium shadow-2xl hover:shadow-primary/25 transition-all duration-300 group"
+                    aria-label="Start your ArchiComm journey"
+                  >
+                    <span className="mr-2">Start Your Journey</span>
+                    <motion.div
+                      animate={accessibilityPrefs.reducedMotion ? {} : { x: [0, 4, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                    </motion.div>
+                  </Button>
                 </motion.div>
-              </Button>
-            </motion.div>
-            
-            <p className="text-sm text-muted-foreground mt-4">
-              No signup required • Free to use • Desktop optimized
-            </p>
-          </motion.div>
+                
+                <p className="text-sm text-muted-foreground mt-4">
+                  No signup required • Free to use • Desktop optimized
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="onboarding-selection"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: accessibilityPrefs.reducedMotion ? 0.1 : 0.5 }}
+                className="max-w-4xl mx-auto"
+              >
+                {/* Skill Level Assessment */}
+                <div className="text-center mb-12">
+                  <h2 className="text-3xl font-bold mb-6 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                    Let's Personalize Your Experience
+                  </h2>
+                  
+                  <div className="mb-8">
+                    <h3 className="text-lg font-semibold mb-4">What's your experience level with system design?</h3>
+                    <div className="flex justify-center gap-4 flex-wrap">
+                      {(['beginner', 'intermediate', 'advanced'] as SkillLevel[]).map((level) => (
+                        <Button
+                          key={level}
+                          variant={skillLevel === level ? 'default' : 'outline'}
+                          onClick={() => setSkillLevel(level)}
+                          className="px-6 py-3 text-base capitalize"
+                          aria-pressed={skillLevel === level}
+                        >
+                          {level}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
 
-          {/* Floating Elements */}
-          <motion.div
-            animate={{ 
-              y: [0, -10, 0],
-              opacity: [0.5, 1, 0.5]
-            }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-20 left-20 w-2 h-2 bg-primary rounded-full"
-          />
-          <motion.div
-            animate={{ 
-              y: [0, -15, 0],
-              opacity: [0.3, 0.8, 0.3]
-            }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute top-32 right-32 w-3 h-3 bg-green-500 rounded-full"
-          />
-          <motion.div
-            animate={{ 
-              y: [0, -8, 0],
-              opacity: [0.4, 0.9, 0.4]
-            }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-            className="absolute bottom-40 left-40 w-2 h-2 bg-purple-500 rounded-full"
-          />
+                  {/* Accessibility Preferences */}
+                  <div className="mb-8">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center justify-center gap-2">
+                      <Accessibility className="w-5 h-5" />
+                      Accessibility Preferences
+                    </h3>
+                    <div className="flex justify-center gap-6 flex-wrap">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={accessibilityPrefs.reducedMotion}
+                          onChange={(e) => setAccessibilityPrefs(prev => ({ ...prev, reducedMotion: e.target.checked }))}
+                          className="rounded border-gray-300 focus:ring-2 focus:ring-primary"
+                          aria-describedby="reduced-motion-desc"
+                        />
+                        <span>Reduce motion</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={accessibilityPrefs.highContrast}
+                          onChange={(e) => setAccessibilityPrefs(prev => ({ ...prev, highContrast: e.target.checked }))}
+                          className="rounded border-gray-300 focus:ring-2 focus:ring-primary"
+                          aria-describedby="high-contrast-desc"
+                        />
+                        <span>High contrast</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={accessibilityPrefs.screenReader}
+                          onChange={(e) => setAccessibilityPrefs(prev => ({ ...prev, screenReader: e.target.checked }))}
+                          className="rounded border-gray-300 focus:ring-2 focus:ring-primary"
+                          aria-describedby="screen-reader-desc"
+                        />
+                        <span>Screen reader optimized</span>
+                      </label>
+                    </div>
+                    <div className="sr-only">
+                      <div id="reduced-motion-desc">Reduces animations and transitions for better focus</div>
+                      <div id="high-contrast-desc">Increases color contrast for better visibility</div>
+                      <div id="screen-reader-desc">Optimizes interface for screen reader users</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Onboarding Flow Selection */}
+                <div className="mb-8">
+                  <h3 className="text-xl font-semibold text-center mb-6">Choose Your Learning Path</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {getFlowsForSkillLevel().map((flow) => (
+                      <motion.div
+                        key={flow.id}
+                        whileHover={accessibilityPrefs.reducedMotion ? {} : { scale: 1.02 }}
+                        whileTap={accessibilityPrefs.reducedMotion ? {} : { scale: 0.98 }}
+                      >
+                        <Card 
+                          className={`cursor-pointer transition-all duration-300 hover:shadow-lg border-2 ${
+                            selectedFlow === flow.id 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                          onClick={() => setSelectedFlow(flow.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedFlow(flow.id);
+                            }
+                          }}
+                          aria-selected={selectedFlow === flow.id}
+                        >
+                          <CardContent className="p-6 text-center">
+                            <div className="mb-4">
+                              <Lightbulb className="w-8 h-8 mx-auto text-primary" />
+                            </div>
+                            <h4 className="text-lg font-semibold mb-2">{flow.name}</h4>
+                            <p className="text-sm text-muted-foreground mb-4">{flow.description}</p>
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{flow.duration}</span>
+                              <Badge 
+                                variant={flow.difficulty === skillLevel ? 'default' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {flow.difficulty}
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-center gap-4 flex-wrap">
+                  <Button
+                    variant="outline"
+                    onClick={handleSkipOnboarding}
+                    className="px-6 py-3"
+                  >
+                    Skip Onboarding
+                  </Button>
+                  
+                  <Button
+                    onClick={() => selectedFlow && handleOnboardingFlowSelect(selectedFlow)}
+                    disabled={!selectedFlow}
+                    size="lg"
+                    className="px-8 py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground"
+                  >
+                    Begin Learning Journey
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+                
+                <div className="text-center mt-6">
+                  <button
+                    onClick={() => setShowOnboardingOptions(false)}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors underline focus:outline-none focus:ring-2 focus:ring-primary rounded"
+                  >
+                    Back to overview
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Floating Elements - Only if not reduced motion */}
+          {!accessibilityPrefs.reducedMotion && (
+            <>
+              <motion.div
+                animate={{ 
+                  y: [0, -10, 0],
+                  opacity: [0.5, 1, 0.5]
+                }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-20 left-20 w-2 h-2 bg-primary rounded-full"
+                aria-hidden="true"
+              />
+              <motion.div
+                animate={{ 
+                  y: [0, -15, 0],
+                  opacity: [0.3, 0.8, 0.3]
+                }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                className="absolute top-32 right-32 w-3 h-3 bg-green-500 rounded-full"
+                aria-hidden="true"
+              />
+              <motion.div
+                animate={{ 
+                  y: [0, -8, 0],
+                  opacity: [0.4, 0.9, 0.4]
+                }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                className="absolute bottom-40 left-40 w-2 h-2 bg-purple-500 rounded-full"
+                aria-hidden="true"
+              />
+            </>
+          )}
         </div>
       </div>
     </motion.div>

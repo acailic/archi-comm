@@ -11,6 +11,9 @@ import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
 import { ArrowLeft, Save, Download, Image, Lightbulb, Zap } from 'lucide-react';
 import { SmartTooltip } from './ui/SmartTooltip';
 import { useUXTracker } from '../hooks/useUXTracker';
+import { useOnboarding } from '../lib/onboarding/OnboardingManager';
+import { WorkflowOptimizer } from '../lib/user-experience/WorkflowOptimizer';
+import { ShortcutLearningSystem } from '../lib/shortcuts/ShortcutLearningSystem';
 import { 
   PerformanceMonitor, 
   MemoryOptimizer, 
@@ -41,6 +44,11 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   
   // UX Tracking integration
   const { trackCanvasAction, trackKeyboardShortcut, trackPerformance, trackError } = useUXTracker();
+  
+  // UX Enhancement Systems
+  const workflowOptimizer = WorkflowOptimizer.getInstance();
+  const shortcutLearning = ShortcutLearningSystem.getInstance();
+  const { addEventListener: onboardingAddEventListener } = useOnboarding();
 
   const extendedChallenge = challengeManager.getChallengeById(challenge.id) as ExtendedChallenge || challenge;
 
@@ -78,13 +86,20 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
         setComponents(prev => [...prev, newComponent]);
         
-        // Track successful component drop with performance metrics
+              // Track successful component drop with performance metrics
         trackCanvasAction('component-drop', {
           componentType,
           position: { x, y },
           totalComponents: components.length + 1,
           designComplexity: designMetrics.complexity
         }, true);
+        
+        // Track with workflow optimizer
+        workflowOptimizer.trackAction('component_added', 500, true, 'design-canvas', {
+          componentType,
+          totalComponents: components.length + 1,
+          position: { x, y }
+        });
 
         // Track performance metrics
         trackPerformance('component-drop', {
@@ -98,6 +113,12 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           position: { x, y },
           error: error instanceof Error ? error.message : 'Unknown error'
         }, false);
+        
+        // Track failure with workflow optimizer
+        workflowOptimizer.trackAction('component_add_failed', 200, false, 'design-canvas', {
+          componentType,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
         trackError(error instanceof Error ? error : new Error('Component drop failed'));
       }
     });
@@ -493,11 +514,74 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     };
   }, [designMetrics, performanceMode, challenge.id, components.length, connections.length, trackPerformance]);
 
+  // Register contextual help content
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).contextualHelpSystem) {
+      const helpSystem = (window as any).contextualHelpSystem;
+      
+      // Register help content for key UI elements
+      helpSystem.registerHelpContent('design-canvas-back', {
+        id: 'canvas-back-help',
+        content: 'Return to challenge selection to pick a different challenge',
+        type: 'tooltip',
+        priority: 1,
+        placement: 'bottom'
+      });
+      
+      helpSystem.registerHelpContent('design-canvas-save', {
+        id: 'canvas-save-help',
+        content: 'Save your current design progress. Auto-saves every few seconds.',
+        type: 'tooltip',
+        priority: 2,
+        placement: 'bottom'
+      });
+      
+      helpSystem.registerHelpContent('design-canvas-hints', {
+        id: 'canvas-hints-help',
+        content: 'Toggle solution hints to get guidance on architectural patterns and best practices',
+        type: 'tooltip',
+        priority: 3,
+        placement: 'bottom'
+      });
+      
+      helpSystem.registerHelpContent('design-canvas-performance', {
+        id: 'canvas-performance-help',
+        content: 'Enable performance mode for better experience with large designs (50+ components)',
+        type: 'tooltip',
+        priority: 2,
+        placement: 'bottom'
+      });
+      
+      helpSystem.registerHelpContent('design-canvas-export', {
+        id: 'canvas-export-help',
+        content: 'Export your design as JSON or PNG. Perfect for sharing or documentation.',
+        type: 'panel',
+        priority: 2,
+        placement: 'bottom'
+      });
+    }
+    
+    // Register onboarding targets
+    if (typeof window !== 'undefined') {
+      // Add data attributes for onboarding system
+      const canvasElement = document.querySelector('[data-testid="design-canvas"]');
+      if (canvasElement) {
+        canvasElement.setAttribute('data-onboarding-target', 'canvas-overview');
+      }
+      
+      const toolbarElement = document.querySelector('[data-testid="canvas-toolbar"]');
+      if (toolbarElement) {
+        toolbarElement.setAttribute('data-onboarding-target', 'toolbar-features');
+      }
+    }
+  }, []);
+  
   // Keyboard shortcuts integration with performance monitoring
   useEffect(() => {
     const handleSaveProject = () => {
       performanceMonitor.current.measure('keyboard-save', () => {
         trackKeyboardShortcut('Ctrl+S', 'save-project', true);
+        shortcutLearning.trackShortcutUsage('save-project', true, 300, 'design-canvas');
         handleSave();
       });
     };
@@ -506,9 +590,11 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       performanceMonitor.current.measure('keyboard-delete', () => {
         if (selectedComponent) {
           trackKeyboardShortcut('Delete', 'delete-component', true);
+          shortcutLearning.trackShortcutUsage('delete-component', true, 200, 'design-canvas');
           handleDeleteComponent(selectedComponent);
         } else {
           trackKeyboardShortcut('Delete', 'delete-component', false);
+          shortcutLearning.trackManualAction('delete_attempt_no_selection', 100, 'design-canvas');
         }
       });
     };
@@ -516,6 +602,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     const handleAddComponent = () => {
       // Focus on component palette or show component picker
       trackKeyboardShortcut('Ctrl+N', 'add-component', true);
+      shortcutLearning.trackShortcutUsage('add-component', true, 150, 'design-canvas');
+      workflowOptimizer.trackAction('add_component_shortcut', 150, true, 'design-canvas');
       console.log('Add component shortcut triggered');
     };
 
@@ -619,90 +707,211 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="h-screen flex flex-col">
-        <div className="border-b bg-card p-4">
+        {/* Main Toolbar */}
+        <div className="border-b bg-card p-4" data-testid="canvas-toolbar">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={onBack}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
+              <SmartTooltip 
+                content="Return to challenge selection"
+                contextualHelp="Choose a different challenge or modify challenge requirements"
+                shortcut="Alt+1"
+              >
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={onBack}
+                  aria-label="Return to challenge selection"
+                  data-help-target="design-canvas-back"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back
+                </Button>
+              </SmartTooltip>
               <div>
-                <h2>{challenge.title}</h2>
-                <p className="text-sm text-muted-foreground">{challenge.description}</p>
+                <h2 id="challenge-title" className="text-lg font-semibold">{challenge.title}</h2>
+                <p className="text-sm text-muted-foreground" id="challenge-description">
+                  {challenge.description}
+                </p>
+                <div className="text-xs text-muted-foreground mt-1" aria-live="polite">
+                  Components: {components.length} • Connections: {connections.length}
+                  {designMetrics.isLargeDesign && (
+                    <span className="ml-2 text-amber-600">
+                      • Large design (consider performance mode)
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => {
-                  const newPerformanceMode = !performanceMode;
-                  setPerformanceMode(newPerformanceMode);
-                  trackCanvasAction('toggle-performance-mode', {
-                    performanceMode: newPerformanceMode,
-                    designComplexity: designMetrics.complexity
-                  }, true);
-                }}
-                className={performanceMode ? 
-                  "bg-green-50 hover:bg-green-100 border-green-200 text-green-700" :
-                  "bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700"
+            <div className="flex items-center gap-2" role="toolbar" aria-label="Canvas tools">
+              <SmartTooltip 
+                content={performanceMode ? 'Disable performance optimizations' : 'Enable performance mode for large designs'}
+                contextualHelp="Performance mode optimizes rendering for designs with 50+ components by reducing animation quality and enabling object pooling"
+              >
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    const newPerformanceMode = !performanceMode;
+                    setPerformanceMode(newPerformanceMode);
+                    workflowOptimizer.trackAction('toggle_performance_mode', 200, true, 'design-canvas', {
+                      enabled: newPerformanceMode,
+                      designComplexity: designMetrics.complexity
+                    });
+                    trackCanvasAction('toggle-performance-mode', {
+                      performanceMode: newPerformanceMode,
+                      designComplexity: designMetrics.complexity
+                    }, true);
+                  }}
+                  className={performanceMode ? 
+                    "bg-green-50 hover:bg-green-100 border-green-200 text-green-700" :
+                    "bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700"
+                  }
+                  data-help-target="design-canvas-performance"
+                  aria-pressed={performanceMode}
+                  aria-describedby="performance-mode-desc"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  {performanceMode ? 'Performance On' : 'Performance Mode'}
+                </Button>
+              </SmartTooltip>
+              <div id="performance-mode-desc" className="sr-only">
+                {performanceMode 
+                  ? 'Performance optimizations are currently enabled' 
+                  : 'Performance optimizations are disabled'
                 }
+              </div>
+              <SmartTooltip 
+                content={showHints ? 'Hide solution hints and guidance' : 'Show architectural guidance and best practices'}
+                contextualHelp="Solution hints provide context-aware suggestions for system architecture patterns, component placement, and design best practices based on your current challenge"
+                shortcut="?"
               >
-                <Zap className="w-4 h-4 mr-2" />
-                {performanceMode ? 'Performance On' : 'Performance Mode'}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => {
-                  const newHintsState = !showHints;
-                  trackCanvasAction('toggle-hints', {
-                    showHints: newHintsState,
-                    componentCount: components.length,
-                    designComplexity: designMetrics.complexity
-                  }, true);
-                  setShowHints(newHintsState);
-                }}
-                className="bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700"
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    const newHintsState = !showHints;
+                    workflowOptimizer.trackAction('toggle_hints', 200, true, 'design-canvas', {
+                      enabled: newHintsState,
+                      componentCount: components.length
+                    });
+                    trackCanvasAction('toggle-hints', {
+                      showHints: newHintsState,
+                      componentCount: components.length,
+                      designComplexity: designMetrics.complexity
+                    }, true);
+                    setShowHints(newHintsState);
+                  }}
+                  className="bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700"
+                  data-help-target="design-canvas-hints"
+                  aria-pressed={showHints}
+                  aria-describedby="hints-desc"
+                >
+                  <Lightbulb className="w-4 h-4 mr-2" />
+                  {showHints ? 'Hide Hints' : 'Show Hints'}
+                </Button>
+              </SmartTooltip>
+              <div id="hints-desc" className="sr-only">
+                {showHints 
+                  ? 'Solution hints panel is currently visible' 
+                  : 'Solution hints panel is hidden'
+                }
+              </div>
+              <SmartTooltip 
+                content="Save current design progress" 
+                contextualHelp="Saves your design locally. Auto-saves occur every few seconds when you make changes. Use Ctrl+S to manually save anytime."
+                shortcut="Ctrl+S"
               >
-                <Lightbulb className="w-4 h-4 mr-2" />
-                {showHints ? 'Hide Hints' : 'Show Hints'}
-              </Button>
-              <SmartTooltip content="Save Design" shortcut="Ctrl+S">
-                <Button variant="outline" size="icon" onClick={handleSave}>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => {
+                    handleSave();
+                    workflowOptimizer.trackAction('manual_save', 300, true, 'design-canvas');
+                  }}
+                  data-help-target="design-canvas-save"
+                  aria-label="Save design progress"
+                >
                   <Save className="w-4 h-4" />
                   <span className="sr-only">Save Design</span>
                 </Button>
               </SmartTooltip>
-              <SmartTooltip content="Export Design" shortcut="Ctrl+E">
-                <Button variant="outline" size="icon" onClick={handleExport}>
-                  <Download className="w-4 h-4" />
-                  <span className="sr-only">Export Design</span>
-                </Button>
-              </SmartTooltip>
-              <SmartTooltip content="Export as PNG" shortcut="Ctrl+Shift+E">
+              <SmartTooltip 
+                content="Export design as JSON file" 
+                contextualHelp="Downloads your complete design as a JSON file that can be imported later or shared with others. Includes all components, connections, and metadata."
+                shortcut="Ctrl+E"
+              >
                 <Button 
                   variant="outline" 
                   size="icon" 
-                  onClick={handleExportImage}
-                  disabled={isExporting}
+                  onClick={() => {
+                    handleExport();
+                    workflowOptimizer.trackAction('export_json', 500, true, 'design-canvas');
+                  }}
+                  data-help-target="design-canvas-export"
+                  aria-label="Export design as JSON"
                 >
-                  <Image className="w-4 h-4" />
-                  <span className="sr-only">Export as PNG</span>
+                  <Download className="w-4 h-4" />
+                  <span className="sr-only">Export Design as JSON</span>
                 </Button>
               </SmartTooltip>
-              <Button 
-                onClick={handleContinue} 
-                disabled={components.length === 0 || isExporting}
+              <SmartTooltip 
+                content="Export design as PNG image" 
+                contextualHelp="Creates a high-quality PNG image of your design perfect for presentations, documentation, or sharing. Large designs are automatically optimized for best quality."
+                shortcut="Ctrl+Shift+E"
               >
-                {isExporting ? 'Exporting...' : 'Continue to Recording'}
-              </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => {
+                    handleExportImage();
+                    workflowOptimizer.trackAction('export_png', 2000, true, 'design-canvas');
+                  }}
+                  disabled={isExporting}
+                  data-help-target="design-canvas-export"
+                  aria-label={isExporting ? 'Exporting PNG...' : 'Export design as PNG'}
+                  aria-describedby={isExporting ? 'export-status' : undefined}
+                >
+                  <Image className="w-4 h-4" />
+                  <span className="sr-only">{isExporting ? 'Exporting PNG...' : 'Export as PNG'}</span>
+                </Button>
+              </SmartTooltip>
+              {isExporting && (
+                <div id="export-status" className="sr-only" aria-live="polite">
+                  Exporting design as PNG image, please wait...
+                </div>
+              )}
+              <SmartTooltip 
+                content={components.length === 0 ? 'Add components to continue' : 'Proceed to record your explanation'}
+                contextualHelp="Once you're satisfied with your system design, continue to the recording phase where you'll explain your architectural decisions and thought process."
+              >
+                <Button 
+                  onClick={() => {
+                    handleContinue();
+                    workflowOptimizer.trackAction('continue_to_recording', 1000, true, 'design-canvas', {
+                      componentCount: components.length,
+                      connectionCount: connections.length,
+                      designComplexity: designMetrics.complexity
+                    });
+                  }}
+                  disabled={components.length === 0 || isExporting}
+                  aria-describedby="continue-help"
+                >
+                  {isExporting ? 'Exporting...' : 'Continue to Recording'}
+                </Button>
+              </SmartTooltip>
+              <div id="continue-help" className="sr-only">
+                {components.length === 0 
+                  ? 'You must add at least one component before continuing' 
+                  : 'Continue to the audio recording phase'
+                }
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 flex">
-          <div className="flex-1">
+        {/* Main Canvas Area */}
+        <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
+          <div className="flex-1" role="region" aria-label="Design canvas">
             <CanvasArea
               ref={canvasRef}
               components={components}
@@ -720,15 +929,24 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               onConnectionDirectionChange={handleConnectionDirectionChange}
               onStartConnection={handleStartConnection}
               onCompleteConnection={handleCompleteConnection}
+              data-testid="design-canvas"
+              aria-describedby="challenge-description"
             />
           </div>
           
           {showHints && (
-            <div className="w-80 border-l bg-card/30 backdrop-blur-sm">
+            <div 
+              className="w-80 border-l bg-card/30 backdrop-blur-sm" 
+              role="complementary" 
+              aria-label="Solution hints and guidance"
+            >
               <SolutionHints 
                 challenge={extendedChallenge}
                 currentComponents={components}
-                onClose={() => setShowHints(false)}
+                onClose={() => {
+                  setShowHints(false);
+                  workflowOptimizer.trackAction('close_hints', 200, true, 'design-canvas');
+                }}
               />
             </div>
           )}

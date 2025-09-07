@@ -30,6 +30,12 @@ import {
 } from 'lucide-react';
 import { useUXTracker } from './hooks/useUXTracker';
 import UXRecommendationToast from './components/UXRecommendationToast';
+import ContextualHelpSystem from './components/ContextualHelpSystem';
+import OnboardingOverlay from './components/OnboardingOverlay';
+import ShortcutCustomizationPanel from './components/ShortcutCustomizationPanel';
+import { OnboardingManager } from './lib/onboarding/OnboardingManager';
+import { ShortcutLearningSystem } from './lib/shortcuts/ShortcutLearningSystem';
+import { WorkflowOptimizer } from './lib/user-experience/WorkflowOptimizer';
 import { Toaster } from 'sonner';
 
 export interface Challenge {
@@ -119,7 +125,12 @@ export default function App() {
   // UX Tracking integration
   const { trackNavigation, trackKeyboardShortcut, trackError, trackPerformance } = useUXTracker();
   
-  // Log app initialization in development
+  // UX Enhancement Systems
+  const onboardingManager = OnboardingManager.getInstance();
+  const shortcutLearning = ShortcutLearningSystem.getInstance();
+  const workflowOptimizer = WorkflowOptimizer.getInstance();
+  
+  // Initialize UX systems and log app initialization
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       reloadTracker.logEvent('app-init', 'App component initialized');
@@ -127,7 +138,25 @@ export default function App() {
     
     // Track app initialization performance
     trackPerformance('app-init-time', Date.now(), { version: '1.0' });
-  }, [trackPerformance]);
+    
+    // Initialize UX enhancement systems
+    try {
+      workflowOptimizer.integrateWithUXOptimizer();
+      shortcutLearning.trackManualAction('app_init', 1000, 'startup');
+      
+      // Track workflow actions for optimization
+      const trackAction = (type: string, duration: number = 100) => {
+        workflowOptimizer.trackAction(type, duration, true, window.location.pathname);
+      };
+      
+      // Global action tracking
+      (window as any).trackWorkflowAction = trackAction;
+      
+    } catch (error) {
+      console.error('Failed to initialize UX systems:', error);
+      trackError(error as Error, { context: 'ux-system-init' });
+    }
+  }, [trackPerformance, trackError, workflowOptimizer, shortcutLearning]);
   
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
@@ -157,6 +186,7 @@ export default function App() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showChallengeManager, setShowChallengeManager] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
+  const [showShortcutCustomization, setShowShortcutCustomization] = useState(false);
   const shortcutsOverlay = useShortcutsOverlay();
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -207,7 +237,7 @@ export default function App() {
       console.error('Auto-save failed:', error);
       trackError(error as Error, { context: 'auto-save', challengeId: sessionData?.challenge?.id });
     }
-  }, [trackPerformance, trackError]);
+  }, [trackPerformance, trackError, workflowOptimizer, shortcutLearning]);
   
   const sessionDataToSave = useMemo(() => {
     if (!selectedChallenge) return null;
@@ -293,7 +323,20 @@ export default function App() {
       category: 'general',
       action: () => {
         trackKeyboardShortcut('Ctrl+Shift+C', 'challenge-manager', true);
+        shortcutLearning.trackShortcutUsage('challenge-manager', true, 500, 'navigation');
         window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
+      }
+    });
+
+    manager.register({
+      key: 'h',
+      modifiers: ['ctrl', 'shift'],
+      description: 'Open shortcut customization',
+      category: 'general',
+      action: () => {
+        trackKeyboardShortcut('Ctrl+Shift+H', 'shortcut-customization', true);
+        shortcutLearning.trackShortcutUsage('shortcut-customization', true, 300, 'settings');
+        setShowShortcutCustomization(true);
       }
     });
 
@@ -304,7 +347,20 @@ export default function App() {
       category: 'general',
       action: () => {
         trackKeyboardShortcut('Cmd+Shift+C', 'challenge-manager', true);
+        shortcutLearning.trackShortcutUsage('challenge-manager', true, 500, 'navigation');
         window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
+      }
+    });
+
+    manager.register({
+      key: 'h',
+      modifiers: ['meta', 'shift'],
+      description: 'Open shortcut customization',
+      category: 'general',
+      action: () => {
+        trackKeyboardShortcut('Cmd+Shift+H', 'shortcut-customization', true);
+        shortcutLearning.trackShortcutUsage('shortcut-customization', true, 300, 'settings');
+        setShowShortcutCustomization(true);
       }
     });
 
@@ -353,9 +409,18 @@ export default function App() {
     });
 
     // Event listeners for shortcut actions
-    const handleCommandPalette = () => setShowCommandPalette(true);
-    const handleChallengeManager = () => setShowChallengeManager(true);
-    const handleAISettings = () => setShowAIConfig(true);
+    const handleCommandPalette = () => {
+      setShowCommandPalette(true);
+      workflowOptimizer.trackAction('command_palette_open', 200, true, currentScreen);
+    };
+    const handleChallengeManager = () => {
+      setShowChallengeManager(true);
+      workflowOptimizer.trackAction('challenge_manager_open', 200, true, currentScreen);
+    };
+    const handleAISettings = () => {
+      setShowAIConfig(true);
+      workflowOptimizer.trackAction('ai_settings_open', 200, true, currentScreen);
+    };
     const handleNavigateToScreen = (event: CustomEvent) => {
       const { screen } = event.detail;
       const previousScreen = currentScreen;
@@ -364,24 +429,28 @@ export default function App() {
         case 'challenge-selection':
           if (currentScreen !== 'challenge-selection') {
             trackNavigation('challenge-selection', previousScreen);
+            workflowOptimizer.trackAction(`navigate_to_${screen}`, 300, true, previousScreen);
             setCurrentScreen('challenge-selection');
           }
           break;
         case 'design-canvas':
           if (selectedChallenge && currentScreen !== 'design-canvas') {
             trackNavigation('design-canvas', previousScreen);
+            workflowOptimizer.trackAction(`navigate_to_${screen}`, 300, true, previousScreen);
             setCurrentScreen('design-canvas');
           }
           break;
         case 'audio-recording':
           if (selectedChallenge && currentScreen !== 'audio-recording') {
             trackNavigation('audio-recording', previousScreen);
+            workflowOptimizer.trackAction(`navigate_to_${screen}`, 300, true, previousScreen);
             setCurrentScreen('audio-recording');
           }
           break;
         case 'review':
           if (selectedChallenge && currentScreen !== 'review') {
             trackNavigation('review', previousScreen);
+            workflowOptimizer.trackAction(`navigate_to_${screen}`, 300, true, previousScreen);
             setCurrentScreen('review');
           }
           break;
@@ -402,6 +471,8 @@ export default function App() {
       cleanupManager.unregister('k', ['meta']);
       cleanupManager.unregister('c', ['ctrl', 'shift']);
       cleanupManager.unregister('c', ['meta', 'shift']);
+      cleanupManager.unregister('h', ['ctrl', 'shift']);
+      cleanupManager.unregister('h', ['meta', 'shift']);
       cleanupManager.unregister('1', ['alt']);
       cleanupManager.unregister('2', ['alt']);
       cleanupManager.unregister('3', ['alt']);
@@ -413,7 +484,7 @@ export default function App() {
       window.removeEventListener('shortcut:navigate-to-screen', handleNavigateToScreen);
       window.removeEventListener('shortcut:ai-settings', handleAISettings);
     };
-  }, [selectedChallenge, trackKeyboardShortcut, trackNavigation, currentScreen]);
+  }, [selectedChallenge, trackKeyboardShortcut, trackNavigation, currentScreen, workflowOptimizer, shortcutLearning]);
 
   // Memoized window title
   const windowTitle = useMemo(() => {
@@ -435,6 +506,11 @@ export default function App() {
     
     // Track challenge selection
     trackNavigation('design-canvas', 'challenge-selection');
+    workflowOptimizer.trackAction('challenge_selected', 1000, true, 'challenge-selection', {
+      challengeId: challenge.id,
+      difficulty: challenge.difficulty,
+      category: challenge.category
+    });
     
     setIsLoading(true);
     setProgress(0);
@@ -477,12 +553,20 @@ export default function App() {
       setIsLoading(false);
       setProgress(0);
     }
-  }, [trackNavigation, trackError]);
+  }, [trackNavigation, trackError, workflowOptimizer]);
 
   const handleDesignComplete = useCallback(async (data: DesignData) => {
     if (process.env.NODE_ENV === 'development') {
       reloadTracker.logEvent('design-complete', `Design completed with ${data.components.length} components`);
     }
+    
+    // Track design completion workflow
+    workflowOptimizer.trackAction('design_completed', 2000, true, 'design-canvas', {
+      componentsCount: data.components.length,
+      connectionsCount: data.connections.length,
+      designDuration: sessionStartTime ? Date.now() - sessionStartTime.getTime() : 0
+    });
+    
     setIsLoading(true);
     
     const updatedData = {
@@ -507,6 +591,11 @@ export default function App() {
     
     // Track session completion
     trackNavigation('review', 'audio-recording');
+    workflowOptimizer.trackAction('audio_completed', data.duration * 1000, true, 'audio-recording', {
+      duration: data.duration,
+      wordCount: data.wordCount,
+      tagsCount: data.businessValueTags.length
+    });
     
     setIsLoading(true);
     
@@ -527,7 +616,7 @@ export default function App() {
     await new Promise(resolve => setTimeout(resolve, 300));
     setCurrentScreen('review');
     setIsLoading(false);
-  }, [designData.components.length, trackNavigation]);
+  }, [designData.components.length, trackNavigation, workflowOptimizer, sessionStartTime]);
 
   const handleStartOver = useCallback(async () => {
     if (process.env.NODE_ENV === 'development') {
@@ -567,7 +656,7 @@ export default function App() {
     
     await new Promise(resolve => setTimeout(resolve, 300));
     setIsLoading(false);
-  }, [trackNavigation, currentScreen]);
+  }, [trackNavigation, currentScreen, workflowOptimizer]);
 
   const goBackToDesign = useCallback(() => {
     setCurrentScreen('design-canvas');
@@ -580,7 +669,8 @@ export default function App() {
   const handleWelcomeComplete = useCallback(() => {
     setShowWelcome(false);
     setCurrentScreen('challenge-selection');
-  }, []);
+    workflowOptimizer.trackAction('welcome_completed', 500, true, 'welcome');
+  }, [workflowOptimizer]);
 
   const handleChallengeUpdate = useCallback((updatedChallenges: ExtendedChallenge[]) => {
     setAvailableChallenges(updatedChallenges);
@@ -853,6 +943,18 @@ export default function App() {
         </motion.div>
       )}
 
+      {/* UX Enhancement Systems */}
+      <ContextualHelpSystem />
+      
+      {/* Onboarding Overlay */}
+      <OnboardingOverlay />
+      
+      {/* Shortcut Customization Panel */}
+      <ShortcutCustomizationPanel
+        isOpen={showShortcutCustomization}
+        onClose={() => setShowShortcutCustomization(false)}
+      />
+      
       {/* UX Recommendation Toast System */}
       <UXRecommendationToast />
       
