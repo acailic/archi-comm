@@ -209,6 +209,27 @@ export class UXOptimizer {
   }
 
   /**
+   * Get success rate from recent user actions
+   */
+  getSuccessRate(): number {
+    if (!this.userBehavior) return 0.5;
+
+    const recentActions = this.userBehavior.actions.slice(-100);
+    if (recentActions.length === 0) return 0.5;
+
+    const successfulActions = recentActions.filter(a => a.success);
+    return successfulActions.length / recentActions.length;
+  }
+
+  /**
+   * Get current user's skill level
+   */
+  getSkillLevel(): string {
+    if (!this.userBehavior) return 'intermediate';
+    return this.userBehavior.skillLevel || 'intermediate';
+  }
+
+  /**
    * Provide contextual help
    */
   showContextualHelp(component: string): void {
@@ -650,10 +671,20 @@ export const useUXOptimizer = () => {
     uxOptimizer.enableSmartDefaults();
   }, [uxOptimizer]);
 
+  const getSuccessRate = useCallback(() => {
+    return uxOptimizer.getSuccessRate();
+  }, [uxOptimizer]);
+
+  const getSkillLevel = useCallback(() => {
+    return uxOptimizer.getSkillLevel();
+  }, [uxOptimizer]);
+
   return {
     trackAction,
     getRecommendations,
     measureSatisfaction,
+    getSuccessRate,
+    getSkillLevel,
     optimizer: uxOptimizer
   };
 };
