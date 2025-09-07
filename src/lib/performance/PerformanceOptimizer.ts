@@ -14,13 +14,38 @@ export class PerformanceMonitor {
   private lastFrameTime = 0;
   private fps = 60;
 
+  // Changes:
+  // 1. Add lazy initialization flag to PerformanceMonitor:
+  private static isInitialized = false;
+  
   static getInstance(): PerformanceMonitor {
     if (!PerformanceMonitor.instance) {
       PerformanceMonitor.instance = new PerformanceMonitor();
+      PerformanceMonitor.isInitialized = true;
     }
     return PerformanceMonitor.instance;
   }
-
+  
+  // 2. Add method to check initialization status:
+  static isReady(): boolean {
+    return PerformanceMonitor.isInitialized;
+  }
+  
+  // 3. Modify MemoryOptimizer to lazy initialize pools:
+  private static objectPools = new Map<string, any[]>();
+  
+  static getPool(type: string): any[] {
+    if (!this.objectPools.has(type)) {
+      this.objectPools.set(type, []);
+    }
+    return this.objectPools.get(type)!;
+  }
+  
+  static poolObject<T>(type: string, factory: () => T): T {
+    const pool = this.getPool(type);
+    return pool.length > 0 ? pool.pop() : factory();
+  }
+  
   constructor() {
     this.initializePerformanceObserver();
     this.startFrameRateMonitoring();

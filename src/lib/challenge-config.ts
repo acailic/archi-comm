@@ -1,3 +1,9 @@
+// Cache keys for challenge caching
+export const CACHE_KEYS = {
+  CHALLENGES: 'archicomm_cached_challenges',
+  CACHE_VERSION: 'archicomm_cache_version',
+  LAST_UPDATE: 'archicomm_last_update'
+};
 import { Challenge, DesignComponent, Connection } from '../App';
 
 // ArchiComm Community Edition - Challenge Configuration
@@ -283,6 +289,52 @@ export const defaultChallengeConfig: ChallengeConfig = {
 // Challenge loading and management functions - Community Edition
 // Provides basic challenge management for educational use
 export class ChallengeManager {
+  // Load challenges from cache with version check
+  async loadCachedChallenges(): Promise<ExtendedChallenge[]> {
+    try {
+      const cached = localStorage.getItem(CACHE_KEYS.CHALLENGES);
+      if (!cached) return [];
+      if (localStorage.getItem(CACHE_KEYS.CACHE_VERSION) !== this.config.version) {
+        this.clearCache();
+        return [];
+      }
+      return JSON.parse(cached).filter(this.validateChallenge);
+    } catch (e) {
+      console.error('Cache load failed:', e);
+      return [];
+    }
+  }
+
+  // Save challenges to cache
+  async cacheChallenges(challenges: ExtendedChallenge[]) {
+    try {
+      localStorage.setItem(CACHE_KEYS.CHALLENGES, JSON.stringify(challenges));
+      localStorage.setItem(CACHE_KEYS.CACHE_VERSION, this.config.version);
+      localStorage.setItem(CACHE_KEYS.LAST_UPDATE, new Date().toISOString());
+    } catch (e) {
+      console.error('Cache save failed:', e);
+    }
+  }
+
+  // Clear all challenge cache
+  clearCache() {
+    Object.values(CACHE_KEYS).forEach(key => localStorage.removeItem(key));
+  }
+
+  // Hybrid: cache first, refresh in background
+  async loadChallengesWithCache(source: 'tauri' | 'api' | 'file', path?: string) {
+    const cached = await this.loadCachedChallenges();
+    try {
+      const fresh = await this.loadChallengesFromSource(source, path);
+      if (fresh.length > 0) {
+        await this.cacheChallenges(fresh);
+        return { challenges: fresh, fromCache: false };
+      }
+    } catch (e) {
+      console.error('Fresh load failed:', e);
+    }
+    return { challenges: cached, fromCache: true };
+  }
   private config: ChallengeConfig;
   private customChallenges: ExtendedChallenge[] = [];
 

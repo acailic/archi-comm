@@ -870,17 +870,47 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
       )}
 
       {/* Annotation Overlay */}
-      <CanvasAnnotationOverlay
-        ref={annotationOverlayRef}
-        width={canvasRef.current?.clientWidth || 0}
-        height={canvasRef.current?.clientHeight || 0}
-        selectedTool={commentMode || undefined}
-        isActive={isCommentModeActive || false}
-        onAnnotationCreate={handleAnnotationCreate}
-        onAnnotationUpdate={handleAnnotationUpdate}
-        onAnnotationDelete={handleAnnotationDelete}
-        onAnnotationSelect={handleAnnotationSelect}
-      />
+      // Changes:
+      // 1. Convert CanvasAnnotationOverlay to lazy import:
+      const CanvasAnnotationOverlay = React.lazy(() => import('./CanvasAnnotationOverlay'));
+      
+      // 2. Defer PerformanceMonitor initialization:
+      const performanceMonitor = useRef<PerformanceMonitor | null>(null);
+      
+      useEffect(() => {
+        if (canvasNode) { // When canvas is mounted
+          performanceMonitor.current = PerformanceMonitor.getInstance();
+        }
+      }, [canvasNode]);
+      
+      // 3. Add lightweight loading state for connection calculations:
+      const [areConnectionsReady, setAreConnectionsReady] = useState(false);
+      
+      useEffect(() => {
+        // Check for WebGL/performance capabilities
+        const canvas = document.createElement('canvas');
+        const supportsWebGL = !!canvas.getContext('webgl');
+        const supportsHardwareAcceleration = 
+          window.matchMedia('(any-hover: hover)').matches &&
+          window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+          
+        setSupportsAdvancedFeatures(supportsWebGL && supportsHardwareAcceleration);
+      }, []);
+      
+      // 4. Wrap CanvasAnnotationOverlay in Suspense:
+      <React.Suspense fallback={null}>
+        <CanvasAnnotationOverlay 
+          ref={annotationOverlayRef} 
+          width={canvasRef.current?.clientWidth || 0}
+          height={canvasRef.current?.clientHeight || 0}
+          selectedTool={commentMode || undefined}
+          isActive={isCommentModeActive || false}
+          onAnnotationCreate={handleAnnotationCreate}
+          onAnnotationUpdate={handleAnnotationUpdate}
+          onAnnotationDelete={handleAnnotationDelete}
+          onAnnotationSelect={handleAnnotationSelect}
+        />
+      </React.Suspense>
 
       {/* Annotation Edit Dialog */}
       <AnnotationEditDialog

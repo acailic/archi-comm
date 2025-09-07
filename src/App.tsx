@@ -121,48 +121,60 @@ const screenIcons = {
 };
 const ProVersionPage = React.lazy(() => import('./components/ProVersionPage').then(m => ({ default: m.ProVersionPage })));
 
+// Helper to check first visit using localStorage
+function checkFirstVisit(): boolean {
+  try {
+    const flag = window.localStorage.getItem('archicomm_first_visit');
+    return flag === null;
+  } catch (e) {
+    // Fallback: treat as first visit if localStorage is unavailable
+    return true;
+  }
+}
+
 export default function App() {
   // Development reload tracking
   const preventReload = preventUnnecessaryReload('App');
   preventReload();
-  
+
   // UX Tracking integration
   const { trackNavigation, trackKeyboardShortcut, trackError, trackPerformance } = useUXTracker();
-  
+
   // UX Enhancement Systems
   const onboardingManager = OnboardingManager.getInstance();
   const shortcutLearning = ShortcutLearningSystem.getInstance();
   const workflowOptimizer = WorkflowOptimizer.getInstance();
-  
+
   // Initialize UX systems and log app initialization
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       reloadTracker.logEvent('app-init', 'App component initialized');
     }
-    
+
     // Track app initialization performance
     trackPerformance('app-init-time', Date.now(), { version: '1.0' });
-    
+
     // Initialize UX enhancement systems
     try {
       workflowOptimizer.integrateWithUXOptimizer();
       shortcutLearning.trackManualAction('app_init', 1000, 'startup');
-      
+
       // Track workflow actions for optimization
       const trackAction = (type: string, duration: number = 100) => {
         workflowOptimizer.trackAction(type, duration, true, window.location.pathname);
       };
-      
+
       // Global action tracking
       (window as any).trackWorkflowAction = trackAction;
-      
+
     } catch (error) {
       console.error('Failed to initialize UX systems:', error);
       trackError(error as Error, { context: 'ux-system-init' });
     }
   }, [trackPerformance, trackError, workflowOptimizer, shortcutLearning]);
-  
-  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
+
+  const isFirstVisit = checkFirstVisit();
+  const [currentScreen, setCurrentScreen] = useState<Screen>(isFirstVisit ? 'welcome' : 'challenge-selection');
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [designData, setDesignData] = useState<DesignData>({
     components: [],
@@ -186,7 +198,7 @@ export default function App() {
     }
   });
 
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(isFirstVisit);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showChallengeManager, setShowChallengeManager] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
@@ -202,20 +214,33 @@ export default function App() {
     visible: false
   });
 
-  // Initialize available challenges
+  // Initialize available challenges: show defaults immediately, load/cached external in background
   useEffect(() => {
-    const loadInitialChallenges = async () => {
+    // Load defaults instantly
+    setAvailableChallenges(challengeManager.getAllChallenges());
+
+    // Background load with caching
+    const loadExternalChallenges = async () => {
       try {
-        // Load any external challenges
-        const externalChallenges = await challengeManager.loadChallengesFromSource('tauri');
-        setAvailableChallenges(challengeManager.getAllChallenges());
-      } catch (error) {
-        console.error('Error loading challenges:', error);
-        setAvailableChallenges(challengeManager.getAllChallenges());
+        const cached = localStorage.getItem('archicomm_cached_challenges');
+        if (cached) {
+          JSON.parse(cached).forEach((c) => challengeManager.addCustomChallenge(c));
+          setAvailableChallenges(challengeManager.getAllChallenges());
+        }
+
+        // Fetch fresh data
+        const external = await challengeManager.loadChallengesFromSource('tauri');
+        if (external.length > 0) {
+          external.forEach((c) => challengeManager.addCustomChallenge(c));
+          setAvailableChallenges(challengeManager.getAllChallenges());
+          localStorage.setItem('archicomm_cached_challenges', JSON.stringify(external));
+        }
+      } catch (err) {
+        console.error('Background loading failed:', err);
       }
     };
-    
-    loadInitialChallenges();
+
+    setTimeout(loadExternalChallenges, 1000);
   }, []);
 
   // Session progress calculation
@@ -671,6 +696,11 @@ export default function App() {
   }, []);
 
   const handleWelcomeComplete = useCallback(() => {
+    try {
+      window.localStorage.setItem('archicomm_first_visit', 'completed');
+    } catch (e) {
+      // Ignore localStorage errors
+    }
     setShowWelcome(false);
     setCurrentScreen('challenge-selection');
     workflowOptimizer.trackAction('welcome_completed', 500, true, 'welcome');
