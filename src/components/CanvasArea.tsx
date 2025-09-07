@@ -238,12 +238,12 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
 
   const getConnectionColor = useCallback((connection: Connection) => {
     const colorMap = {
-      'data': 'hsl(var(--blue-500))',
-      'control': 'hsl(var(--purple-500))',
-      'sync': 'hsl(var(--green-500))',
-      'async': 'hsl(var(--orange-500))'
+      'data': 'hsl(var(--blue-500, 210 100% 50%))',
+      'control': 'hsl(var(--purple-500, 262 100% 50%))',
+      'sync': 'hsl(var(--green-500, 120 100% 40%))',
+      'async': 'hsl(var(--orange-500, 25 100% 50%))'
     };
-    return colorMap[connection.type] || 'hsl(var(--primary))';
+    return colorMap[connection.type] || 'hsl(var(--primary, 203 12% 15%))';
   }, []);
 
   const getConnectionStrokePattern = useCallback((connection: Connection) => {
@@ -301,8 +301,10 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
             stroke={strokeColor}
             strokeWidth={isSelected ? "3" : "2"}
             strokeDasharray={strokeDasharray}
+            strokeOpacity="1"
             fill="none"
-            {...getConnectionMarkers(connection)}
+            markerStart={markerStart}
+            markerEnd={markerEnd}
             className={`transition-all duration-200 ${isSelected ? 'drop-shadow-lg' : ''}`}
             onClick={() => setSelectedConnection(connection.id)}
           />
@@ -554,17 +556,17 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
               <path d="M 20 0 L 0 0 0 20" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" opacity="0.5"/>
             </pattern>
             
-            <marker id="arrowhead-default" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--primary))" /></marker>
-            <marker id="arrowhead-data" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--blue-500))" /></marker>
-            <marker id="arrowhead-control" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--purple-500))" /></marker>
-            <marker id="arrowhead-sync" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--green-500))" /></marker>
-            <marker id="arrowhead-async" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--orange-500))" /></marker>
+            <marker id="arrowhead-default" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--primary, 203 12% 15%))" /></marker>
+            <marker id="arrowhead-data" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--blue-500, 210 100% 50%))" /></marker>
+            <marker id="arrowhead-control" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--purple-500, 262 100% 50%))" /></marker>
+            <marker id="arrowhead-sync" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--green-500, 120 100% 40%))" /></marker>
+            <marker id="arrowhead-async" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--orange-500, 25 100% 50%))" /></marker>
             
-            <marker id="arrowhead-start-default" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--primary))" /></marker>
-            <marker id="arrowhead-start-data" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--blue-500))" /></marker>
-            <marker id="arrowhead-start-control" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--purple-500))" /></marker>
-            <marker id="arrowhead-start-sync" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--green-500))" /></marker>
-            <marker id="arrowhead-start-async" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--orange-500))" /></marker>
+            <marker id="arrowhead-start-default" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--primary, 203 12% 15%))" /></marker>
+            <marker id="arrowhead-start-data" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--blue-500, 210 100% 50%))" /></marker>
+            <marker id="arrowhead-start-control" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--purple-500, 262 100% 50%))" /></marker>
+            <marker id="arrowhead-start-sync" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--green-500, 120 100% 40%))" /></marker>
+            <marker id="arrowhead-start-async" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0, 0 3.5, 10 7" fill="hsl(var(--orange-500, 25 100% 50%))" /></marker>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>

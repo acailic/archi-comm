@@ -39,6 +39,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --blue-500: 210 100% 50%;
+  --purple-500: 262 100% 50%;
+  --green-500: 120 100% 40%;
+  --orange-500: 25 100% 50%;
 }
 
 .dark {
@@ -76,6 +80,10 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --blue-500: 210 100% 60%;
+  --purple-500: 262 100% 60%;
+  --green-500: 120 100% 50%;
+  --orange-500: 25 100% 60%;
 }
 
 @theme inline {
