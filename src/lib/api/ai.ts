@@ -12,15 +12,14 @@ interface AIResponse {
 
 export async function reviewSolution(taskId: string, solutionText: string): Promise<ReviewResp> {
   try {
-    // Try to use configured AI provider first
-    const provider = await aiConfigService.getDefaultProvider();
+    // Try to use configured OpenAI first
     const config = await aiConfigService.loadConfig();
     
-    if (provider && config[provider].enabled && config[provider].apiKey) {
+    if (config.openai.enabled && config.openai.apiKey) {
       if (!isTauri()) {
         throw new Error('AI provider calls are only available in the desktop application to protect API keys.');
       }
-      const response = await callAIProvider(provider, config, solutionText);
+      const response = await callOpenAI(config.openai.apiKey, solutionText);
       return parseAIResponse(response.content);
     }
   } catch (error) {
@@ -41,9 +40,8 @@ export async function reviewSolution(taskId: string, solutionText: string): Prom
   return ReviewRespSchema.parse({ summary: String(raw ?? ''), strengths: [], risks: [], score: 0 });
 }
 
-// Call AI provider directly
-export async function callAIProvider(
-  provider: AIProvider, 
+// Call OpenAI directly (simplified)
+export async function callOpenAIProvider(
   config: AIConfig, 
   prompt: string
 ): Promise<AIResponse> {
@@ -51,33 +49,17 @@ export async function callAIProvider(
     throw new Error('AI provider calls are only available in the desktop application to protect API keys.');
   }
   
-  const providerConfig = config[provider];
-  
-  if (!providerConfig.enabled || !providerConfig.apiKey) {
-    throw new Error(`${provider} is not configured or enabled`);
+  if (!config.openai.enabled || !config.openai.apiKey) {
+    throw new Error('OpenAI is not configured or enabled');
   }
 
-  switch (provider) {
-    case AIProvider.OPENAI:
-      return callOpenAI(providerConfig.apiKey, providerConfig.selectedModel, prompt, providerConfig.settings);
-    
-    case AIProvider.GEMINI:
-      return callGemini(providerConfig.apiKey, providerConfig.selectedModel, prompt, providerConfig.settings);
-    
-    case AIProvider.CLAUDE:
-      return callClaude(providerConfig.apiKey, providerConfig.selectedModel, prompt, providerConfig.settings);
-    
-    default:
-      throw new Error(`Unsupported AI provider: ${provider}`);
-  }
+  return callOpenAI(config.openai.apiKey, prompt);
 }
 
-// OpenAI API implementation
+// Simplified OpenAI API implementation
 async function callOpenAI(
   apiKey: string, 
-  model: string, 
-  prompt: string, 
-  settings: any
+  prompt: string
 ): Promise<AIResponse> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -86,13 +68,10 @@ async function callOpenAI(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model,
+      model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: createReviewPrompt(prompt) }],
-      temperature: settings.temperature || 0.7,
-      max_tokens: settings.maxTokens || 2000,
-      top_p: settings.topP || 1,
-      frequency_penalty: settings.frequencyPenalty || 0,
-      presence_penalty: settings.presencePenalty || 0
+      temperature: 0.7,
+      max_tokens: 1000
     })
   });
 
@@ -108,87 +87,6 @@ async function callOpenAI(
   };
 }
 
-// Gemini API implementation
-async function callGemini(
-  apiKey: string, 
-  model: string, 
-  prompt: string, 
-  settings: any
-): Promise<AIResponse> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: createReviewPrompt(prompt) }]
-        }],
-        generationConfig: {
-          temperature: settings.temperature || 0.7,
-          maxOutputTokens: settings.maxTokens || 2000,
-          topP: settings.topP || 1,
-          topK: settings.topK || 40
-        }
-      })
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  
-  return {
-    content,
-    model
-  };
-}
-
-// Claude API implementation
-async function callClaude(
-  apiKey: string, 
-  model: string, 
-  prompt: string, 
-  settings: any
-): Promise<AIResponse> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: settings.maxTokens || 2000,
-      temperature: settings.temperature || 0.7,
-      top_p: settings.topP || 1,
-      messages: [{ 
-        role: 'user', 
-        content: createReviewPrompt(prompt) 
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  const content = data.content?.[0]?.text || '';
-  
-  return {
-    content,
-    model: data.model
-  };
-}
 
 // Create a review prompt for solution analysis
 function createReviewPrompt(solutionText: string): string {
@@ -230,16 +128,11 @@ function parseAIResponse(content: string): ReviewResp {
   });
 }
 
-// Utility function to get configured AI provider
-export async function getConfiguredProvider(): Promise<AIProvider | null> {
-  return aiConfigService.getDefaultProvider();
-}
-
 // Utility function to check if AI is available
 export async function isAIAvailable(): Promise<boolean> {
   try {
-    const provider = await getConfiguredProvider();
-    return provider !== null;
+    const config = await aiConfigService.loadConfig();
+    return config.openai.enabled && config.openai.apiKey !== '';
   } catch (error) {
     return false;
   }

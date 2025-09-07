@@ -190,10 +190,10 @@ export class AIConfigService {
     }
   }
 
-  async testConnection(provider: AIProvider, apiKey?: string): Promise<ConnectionTestResult> {
+  async testConnection(apiKey?: string): Promise<ConnectionTestResult> {
     const startTime = Date.now();
     const config = await this.loadConfig();
-    const keyToTest = apiKey || config[provider].apiKey;
+    const keyToTest = apiKey || config.openai.apiKey;
 
     if (!keyToTest) {
       return {
@@ -203,7 +203,7 @@ export class AIConfigService {
       };
     }
 
-    if (!validateApiKeyFormat(provider, keyToTest)) {
+    if (!validateApiKeyFormat(keyToTest)) {
       return {
         success: false,
         error: 'Invalid API key format',
@@ -219,7 +219,7 @@ export class AIConfigService {
           responseTime: Date.now() - startTime
         };
       }
-      const result = await this.makeTestRequest(provider, keyToTest, config[provider].selectedModel);
+      const result = await this.testOpenAI(keyToTest, 'Hello, this is a test message.');
       return {
         ...result,
         responseTime: Date.now() - startTime
@@ -233,28 +233,8 @@ export class AIConfigService {
     }
   }
 
-  private async makeTestRequest(provider: AIProvider, apiKey: string, model: string): Promise<ConnectionTestResult> {
-    const testMessage = 'Hello, this is a test message. Please respond with "Test successful".';
 
-    switch (provider) {
-      case AIProvider.OPENAI:
-        return this.testOpenAI(apiKey, model, testMessage);
-      
-      case AIProvider.GEMINI:
-        return this.testGemini(apiKey, model, testMessage);
-      
-      case AIProvider.CLAUDE:
-        return this.testClaude(apiKey, model, testMessage);
-      
-      default:
-        return {
-          success: false,
-          error: 'Unsupported provider'
-        };
-    }
-  }
-
-  private async testOpenAI(apiKey: string, model: string, message: string): Promise<ConnectionTestResult> {
+  private async testOpenAI(apiKey: string, message: string): Promise<ConnectionTestResult> {
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -263,7 +243,7 @@ export class AIConfigService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model,
+          model: 'gpt-3.5-turbo',
           messages: [{ role: 'user', content: message }],
           max_tokens: 50,
           temperature: 0.1
@@ -373,31 +353,16 @@ export class AIConfigService {
     await this.saveConfig(this.config);
   }
 
-  async getEnabledProviders(): Promise<AIProvider[]> {
+  async isAIConfigured(): Promise<boolean> {
     const config = await this.loadConfig();
-    return Object.entries(config)
-      .filter(([key, value]) => 
-        key !== 'defaultProvider' && 
-        value.enabled && 
-        value.apiKey && 
-        value.selectedModel?.trim()
-      )
-      .map(([key]) => key as AIProvider);
+    return config.openai.enabled && 
+           config.openai.apiKey.trim() !== '' &&
+           validateApiKeyFormat(config.openai.apiKey);
   }
 
-  async getDefaultProvider(): Promise<AIProvider | null> {
-    const config = await this.loadConfig();
-    const enabledProviders = await this.getEnabledProviders();
-    
-    if (enabledProviders.includes(config.defaultProvider)) {
-      return config.defaultProvider;
-    }
-    
-    return enabledProviders.length > 0 ? enabledProviders[0] : null;
-  }
 
-  validateApiKey(provider: AIProvider, apiKey: string): boolean {
-    return validateApiKeyFormat(provider, apiKey);
+  validateApiKey(apiKey: string): boolean {
+    return validateApiKeyFormat(apiKey);
   }
 }
 

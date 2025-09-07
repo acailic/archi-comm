@@ -13,21 +13,18 @@ interface UseAIConfigState {
   loading: boolean;
   saving: boolean;
   error: string | null;
-  connectionTests: Record<AIProvider, ConnectionTestResult | null>;
-  testingConnections: Record<AIProvider, boolean>;
+  connectionTest: ConnectionTestResult | null;
+  testingConnection: boolean;
 }
 
 interface UseAIConfigActions {
   loadConfig: () => Promise<void>;
   saveConfig: (config: AIConfig) => Promise<boolean>;
-  testConnection: (provider: AIProvider, apiKey?: string) => Promise<ConnectionTestResult>;
+  testConnection: (apiKey?: string) => Promise<ConnectionTestResult>;
   resetToDefaults: () => Promise<void>;
-  validateProvider: (provider: AIProvider, config: Partial<AIConfig[AIProvider]>) => string[];
-  updateProvider: (provider: AIProvider, updates: Partial<AIConfig[AIProvider]>) => void;
   clearError: () => void;
-  clearTestResult: (provider: AIProvider) => void;
-  getEnabledProviders: () => AIProvider[];
-  isProviderConfigured: (provider: AIProvider) => boolean;
+  clearTestResult: () => void;
+  isAIConfigured: () => boolean;
 }
 
 export interface UseAIConfigReturn extends UseAIConfigState, UseAIConfigActions {}
@@ -37,38 +34,18 @@ const initialState: UseAIConfigState = {
   loading: false,
   saving: false,
   error: null,
-  connectionTests: {
-    [AIProvider.OPENAI]: null,
-    [AIProvider.GEMINI]: null,
-    [AIProvider.CLAUDE]: null
-  },
-  testingConnections: {
-    [AIProvider.OPENAI]: false,
-    [AIProvider.GEMINI]: false,
-    [AIProvider.CLAUDE]: false
-  }
+  connectionTest: null,
+  testingConnection: false
 };
 
 export function useAIConfig(): UseAIConfigReturn {
   const [state, setState] = useState<UseAIConfigState>(initialState);
   const lastSavedConfigRef = useRef<string>('');
 
-  // Memoized selectors
-  const enabledProviders = useMemo(() => {
-    return Object.entries(state.config)
-      .filter(([key, value]) => {
-        if (key === 'defaultProvider') return false;
-        const providerConfig = value as AIConfig[AIProvider];
-        return providerConfig.enabled && providerConfig.apiKey.trim() !== '';
-      })
-      .map(([key]) => key as AIProvider);
-  }, [state.config]);
-
-  const isProviderConfigured = useCallback((provider: AIProvider) => {
-    const providerConfig = state.config[provider];
-    return providerConfig.enabled && 
-           providerConfig.apiKey.trim() !== '' && 
-           validateApiKeyFormat(provider, providerConfig.apiKey);
+  const isAIConfigured = useCallback(() => {
+    return state.config.openai.enabled && 
+           state.config.openai.apiKey.trim() !== '' && 
+           validateApiKeyFormat(state.config.openai.apiKey);
   }, [state.config]);
 
   // Load configuration
@@ -104,23 +81,20 @@ export function useAIConfig(): UseAIConfigReturn {
     }
   }, []);
 
-  // Test connection for a provider
-  const testConnection = useCallback(async (
-    provider: AIProvider, 
-    apiKey?: string
-  ): Promise<ConnectionTestResult> => {
+  // Test connection
+  const testConnection = useCallback(async (apiKey?: string): Promise<ConnectionTestResult> => {
     try {
       setState(prev => ({ 
         ...prev, 
-        testingConnections: { ...prev.testingConnections, [provider]: true }
+        testingConnection: true
       }));
 
-      const result = await aiConfigService.testConnection(provider, apiKey);
+      const result = await aiConfigService.testConnection(apiKey);
       
       setState(prev => ({ 
         ...prev,
-        testingConnections: { ...prev.testingConnections, [provider]: false },
-        connectionTests: { ...prev.connectionTests, [provider]: result }
+        testingConnection: false,
+        connectionTest: result
       }));
 
       return result;
@@ -132,8 +106,8 @@ export function useAIConfig(): UseAIConfigReturn {
 
       setState(prev => ({ 
         ...prev,
-        testingConnections: { ...prev.testingConnections, [provider]: false },
-        connectionTests: { ...prev.connectionTests, [provider]: result }
+        testingConnection: false,
+        connectionTest: result
       }));
 
       return result;
@@ -150,7 +124,7 @@ export function useAIConfig(): UseAIConfigReturn {
         ...prev, 
         config, 
         saving: false,
-        connectionTests: initialState.connectionTests
+        connectionTest: null
       }));
     } catch (error) {
       setState(prev => ({ 
@@ -161,90 +135,21 @@ export function useAIConfig(): UseAIConfigReturn {
     }
   }, []);
 
-  // Validate provider configuration
-  const validateProvider = useCallback((
-    provider: AIProvider, 
-    config: Partial<AIConfig[AIProvider]>
-  ): string[] => {
-    const errors: string[] = [];
 
-    if (!config.apiKey || config.apiKey.trim() === '') {
-      errors.push('API key is required');
-    } else if (!validateApiKeyFormat(provider, config.apiKey)) {
-      errors.push('Invalid API key format');
-    }
-
-    if (!config.selectedModel || config.selectedModel.trim() === '') {
-      errors.push('Model selection is required');
-    }
-
-    if (config.settings) {
-      const { temperature, maxTokens, topP, topK, frequencyPenalty, presencePenalty } = config.settings;
-
-      if (temperature !== undefined && (temperature < 0 || temperature > 2)) {
-        errors.push('Temperature must be between 0 and 2');
-      }
-
-      if (maxTokens !== undefined && (maxTokens < 1 || maxTokens > 200000)) {
-        errors.push('Max tokens must be between 1 and 200,000');
-      }
-
-      if (topP !== undefined && (topP < 0 || topP > 1)) {
-        errors.push('Top P must be between 0 and 1');
-      }
-
-      if (topK !== undefined && (topK < 1 || topK > 100)) {
-        errors.push('Top K must be between 1 and 100');
-      }
-
-      if (frequencyPenalty !== undefined && (frequencyPenalty < -2 || frequencyPenalty > 2)) {
-        errors.push('Frequency penalty must be between -2 and 2');
-      }
-
-      if (presencePenalty !== undefined && (presencePenalty < -2 || presencePenalty > 2)) {
-        errors.push('Presence penalty must be between -2 and 2');
-      }
-    }
-
-    return errors;
-  }, []);
-
-  // Update a specific provider configuration
-  const updateProvider = useCallback((
-    provider: AIProvider, 
-    updates: Partial<AIConfig[AIProvider]>
-  ) => {
-    setState(prev => ({
-      ...prev,
-      config: {
-        ...prev.config,
-        [provider]: {
-          ...prev.config[provider],
-          ...updates,
-          settings: updates.settings ? {
-            ...prev.config[provider].settings,
-            ...updates.settings
-          } : prev.config[provider].settings
-        }
-      }
-    }));
-  }, []);
 
   // Clear error state
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Clear test result for a provider
-  const clearTestResult = useCallback((provider: AIProvider) => {
+  // Clear test result
+  const clearTestResult = useCallback(() => {
     setState(prev => ({
       ...prev,
-      connectionTests: { ...prev.connectionTests, [provider]: null }
+      connectionTest: null
     }));
   }, []);
 
-  // Get enabled providers list
-  const getEnabledProviders = useCallback(() => enabledProviders, [enabledProviders]);
 
   // Load configuration on mount
   useEffect(() => {
@@ -271,19 +176,16 @@ export function useAIConfig(): UseAIConfigReturn {
     loading: state.loading,
     saving: state.saving,
     error: state.error,
-    connectionTests: state.connectionTests,
-    testingConnections: state.testingConnections,
+    connectionTest: state.connectionTest,
+    testingConnection: state.testingConnection,
 
     // Actions
     loadConfig,
     saveConfig,
     testConnection,
     resetToDefaults,
-    validateProvider,
-    updateProvider,
     clearError,
     clearTestResult,
-    getEnabledProviders,
-    isProviderConfigured
+    isAIConfigured
   };
 }
