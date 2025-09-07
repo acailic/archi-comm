@@ -548,6 +548,20 @@ export class CanvasAnnotationManager {
         this.annotations.set(this.selectedAnnotation, updated);
         this.render();
       }
+    } else {
+      // Handle cursor changes for edit button hover
+      const rect = this.canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      
+      const annotation = this.getAnnotationAt(x, y);
+      if (annotation && this.selectedAnnotation === annotation.id && this.isClickOnEditButton(x, y, annotation)) {
+        this.canvas.style.cursor = 'pointer';
+      } else if (annotation) {
+        this.canvas.style.cursor = 'move';
+      } else {
+        this.canvas.style.cursor = 'default';
+      }
     }
   }
 
