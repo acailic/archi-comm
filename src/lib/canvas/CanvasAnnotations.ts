@@ -532,7 +532,19 @@ export class CanvasAnnotationManager {
     const y = event.clientY - rect.top;
 
     const annotation = this.getAnnotationAt(x, y);
-    this.selectedAnnotation = annotation ? annotation.id : null;
+    
+    if (annotation) {
+      // Check if click is on edit button area for selected annotation
+      if (this.selectedAnnotation === annotation.id && this.isClickOnEditButton(x, y, annotation)) {
+        this.startInlineEdit(annotation.id);
+        return;
+      }
+      
+      this.selectedAnnotation = annotation.id;
+    } else {
+      this.selectedAnnotation = null;
+    }
+    
     this.render();
   }
 
@@ -569,6 +581,17 @@ export class CanvasAnnotationManager {
   private isPointInAnnotation(x: number, y: number, annotation: CanvasAnnotation): boolean {
     const { x: ax, y: ay, width = 200, height = 100 } = annotation;
     return x >= ax && x <= ax + width && y >= ay && y <= ay + height;
+  }
+
+  private isClickOnEditButton(x: number, y: number, annotation: CanvasAnnotation): boolean {
+    const { x: ax, y: ay, width = 200 } = annotation;
+    // Edit button is positioned at x + width - 15, y + 15 with roughly 20x20 clickable area
+    const editButtonX = ax + width - 25; // Slightly larger clickable area
+    const editButtonY = ay + 5;
+    const buttonSize = 30; // 30x30 clickable area
+    
+    return x >= editButtonX && x <= editButtonX + buttonSize && 
+           y >= editButtonY && y <= editButtonY + buttonSize;
   }
 
   private getDefaultStyle(type: CanvasAnnotation['type'], overrides?: Partial<AnnotationStyle>): AnnotationStyle {
