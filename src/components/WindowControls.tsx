@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Minimize2, Maximize2, X, Menu } from 'lucide-react';
+import { Minimize2, Maximize2, X, Menu, Star } from 'lucide-react';
 import { tauriAPI, isTauriApp } from '../lib/tauri';
 import { motion } from 'framer-motion';
 
@@ -12,6 +12,12 @@ interface WindowControlsProps {
 }
 
 export function WindowControls({ title = "ArchiComm", showMenu = false, onMenuClick, additionalActions }: WindowControlsProps) {
+  // Determine if we should show the Pro upgrade button (not on welcome screen)
+  const [showProButton, setShowProButton] = useState(true);
+  useEffect(() => {
+    // Try to detect if on welcome screen by checking title
+    setShowProButton(title !== 'Welcome to ArchiComm');
+  }, [title]);
   const [isMaximized, setIsMaximized] = useState(false);
   const [appVersion, setAppVersion] = useState('');
 
@@ -85,6 +91,18 @@ export function WindowControls({ title = "ArchiComm", showMenu = false, onMenuCl
           </Button>
         )}
         {additionalActions}
+        {showProButton && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-2 text-yellow-600 hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+            title="Upgrade to Pro"
+            onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
+          >
+            <Star className="w-4 h-4 mr-1" />
+            <span className="hidden md:inline">Pro</span>
+          </Button>
+        )}
       </div>
 
       {/* Center - Title */}

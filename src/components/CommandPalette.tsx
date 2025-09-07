@@ -22,7 +22,8 @@ import {
   Zap,
   Settings,
   HelpCircle,
-  Keyboard
+  Keyboard,
+  Star
 } from 'lucide-react';
 
 interface CommandPaletteProps {
@@ -135,6 +136,16 @@ export function CommandPalette({
 
     return [
       // Navigation Commands
+      {
+        id: 'nav-pro-version',
+        title: 'Upgrade to Pro',
+        description: 'Access premium features, advanced AI, and exclusive content',
+        icon: Star,
+        action: () => onNavigate('pro-version'),
+        section: 'navigation',
+        shortcut: undefined,
+        available: true
+      },
       {
         id: 'nav-challenges',
         title: 'Select Challenge',

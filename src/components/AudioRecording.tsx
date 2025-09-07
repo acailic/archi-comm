@@ -219,7 +219,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
             </CardContent>
           </Card>
 
-          {/* Transcript Card */}
+          {/* Transcript Card with Pro upgrade prompt */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -237,6 +237,23 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Pro Upgrade Banner */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-4 mb-2">
+                <div className="flex-shrink-0">
+                  <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.09 6.26L21 9.27l-5 4.87L17.18 21 12 17.27 6.82 21 8 14.14l-5-4.87 6.91-1.01z" /></svg>
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-yellow-800">Unlock Pro Audio Features</div>
+                  <div className="text-sm text-yellow-700">Automatic transcription, voice analysis, and AI-powered insights are available in <span className="font-semibold">ArchiComm Pro</span>.</div>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                  onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
+                >
+                  Learn More
+                </Button>
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   Manual transcript entry (community version)
@@ -251,7 +268,6 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                   Manually enter your explanation for the system design. Automatic transcription is not available in the community version.
                 </p>
               </div>
-              
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
                   Word count: {transcript.split(' ').filter(word => word.length > 0).length}

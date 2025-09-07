@@ -14,7 +14,9 @@ import {
   Target,
   Database,
   ArrowRight,
-  PlayCircle
+  PlayCircle,
+  Lock,
+  Star
 } from 'lucide-react';
 
 interface ChallengeSelectionProps {
@@ -120,8 +122,47 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
+
+  // Simulate some premium challenges for Pro
+  const premiumChallengeIds = ['faang-system', 'company-template'];
+  const proChallenges: Challenge[] = [
+    {
+      id: 'faang-system',
+      title: 'FAANG-Style System Design',
+      description: 'Tackle a real interview scenario inspired by top tech companies. Available in Pro.',
+      requirements: [
+        'Design a scalable social network feed',
+        'Handle millions of users',
+        'Real-time notifications',
+        'Advanced caching and sharding',
+        'High availability and disaster recovery'
+      ],
+      difficulty: 'advanced',
+      estimatedTime: 60,
+      category: 'system-design'
+    },
+    {
+      id: 'company-template',
+      title: 'Company-Specific Template',
+      description: 'Practice with an interview template tailored for your target company. Available in Pro.',
+      requirements: [
+        'Industry-specific scenario',
+        'Custom evaluation criteria',
+        'Role-based requirements',
+        'Real company constraints',
+        'Advanced business logic'
+      ],
+      difficulty: 'advanced',
+      estimatedTime: 70,
+      category: 'system-design'
+    }
+  ];
+
   // Use available challenges if provided, otherwise fall back to default challenges
-  const allChallenges = availableChallenges && availableChallenges.length > 0 ? availableChallenges : challenges;
+  const allChallenges = [
+    ...(availableChallenges && availableChallenges.length > 0 ? availableChallenges : challenges),
+    ...proChallenges
+  ];
 
   const filteredChallenges = useMemo(() => {
     return allChallenges.filter(challenge => {
@@ -192,6 +233,22 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
               <div className="text-sm text-muted-foreground mb-1">Available Challenges</div>
               <div className="text-3xl font-bold text-primary">{allChallenges.length}</div>
             </motion.div>
+          </div>
+
+          {/* Pro Upgrade Banner */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-4 mb-6">
+            <Star className="w-6 h-6 text-yellow-500" />
+            <div className="flex-1">
+              <div className="font-semibold text-yellow-800">Unlock Premium Challenges</div>
+              <div className="text-sm text-yellow-700">FAANG-style scenarios and company-specific templates are available in <span className="font-semibold">ArchiComm Pro</span>.</div>
+            </div>
+            <Button
+              size="sm"
+              className="bg-yellow-500 hover:bg-yellow-600 text-white"
+              onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
+            >
+              Upgrade to Pro
+            </Button>
           </div>
 
           {/* Quick Stats */}
@@ -291,7 +348,7 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
               <AnimatePresence>
                 {filteredChallenges.map((challenge, index) => {
                   const CategoryIcon = categoryIcons[challenge.category];
-                  
+                  const isPremium = premiumChallengeIds.includes(challenge.id);
                   return (
                     <motion.div
                       key={challenge.id}
@@ -305,10 +362,10 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                       onHoverEnd={() => setHoveredCard(null)}
                       className="group"
                     >
-                      <Card className="h-full cursor-pointer transition-all duration-300 hover:shadow-2xl border border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden">
+                      <Card className={`h-full transition-all duration-300 hover:shadow-2xl border border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden ${isPremium ? 'opacity-80' : 'cursor-pointer'}`}
+                        >
                         {/* Card Header with gradient */}
                         <div className={`h-2 bg-gradient-to-r ${difficultyColors[challenge.difficulty]}`} />
-                        
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between mb-3">
                             <div className={`p-2 rounded-lg bg-gradient-to-r ${difficultyColors[challenge.difficulty]} bg-opacity-10`}>
@@ -325,18 +382,20 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                               >
                                 {challenge.difficulty}
                               </Badge>
+                              {isPremium && (
+                                <Badge className="ml-2 bg-yellow-500 text-white flex items-center gap-1">
+                                  <Lock className="w-3 h-3 mr-1" /> Pro
+                                </Badge>
+                              )}
                             </div>
                           </div>
-
-                          <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
+                          <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors flex items-center gap-2">
                             {challenge.title}
                           </CardTitle>
-                          
                           <CardDescription className="text-sm leading-relaxed">
                             {challenge.description}
                           </CardDescription>
                         </CardHeader>
-
                         <CardContent>
                           {/* Requirements Preview */}
                           <div className="mb-4">
@@ -364,25 +423,6 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                               )}
                             </ul>
                           </div>
-
-                          {/* Tags (for extended challenges) */}
-                          {'tags' in challenge && challenge.tags && challenge.tags.length > 0 && (
-                            <div className="mb-4">
-                              <div className="flex flex-wrap gap-1">
-                                {challenge.tags.slice(0, 4).map((tag, tagIndex) => (
-                                  <Badge key={tagIndex} variant="outline" className="text-xs px-1.5 py-0.5">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {challenge.tags.length > 4 && (
-                                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 opacity-60">
-                                    +{challenge.tags.length - 4}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
                           {/* Metadata */}
                           <div className="flex items-center justify-between mb-4 text-xs text-muted-foreground">
                             <div className="flex items-center space-x-1">
@@ -393,26 +433,34 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                               {challenge.category.replace('-', ' ')}
                             </Badge>
                           </div>
-
                           {/* Action Button */}
-                          <Button
-                            onClick={() => onChallengeSelect(challenge)}
-                            className="w-full group/btn bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300"
-                          >
-                            <PlayCircle className="w-4 h-4 mr-2 group-hover/btn:scale-110 transition-transform" />
-                            <span>Start Challenge</span>
-                            <motion.div
-                              animate={{ 
-                                x: hoveredCard === challenge.id ? [0, 4, 0] : 0 
-                              }}
-                              transition={{ duration: 0.5, repeat: Infinity }}
-                              className="ml-2"
+                          {isPremium ? (
+                            <Button
+                              className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
+                              onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
                             >
-                              <ArrowRight className="w-4 h-4" />
-                            </motion.div>
-                          </Button>
+                              <Lock className="w-4 h-4 mr-2" />
+                              <span>Unlock with Pro</span>
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => onChallengeSelect(challenge)}
+                              className="w-full group/btn bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300"
+                            >
+                              <PlayCircle className="w-4 h-4 mr-2 group-hover/btn:scale-110 transition-transform" />
+                              <span>Start Challenge</span>
+                              <motion.div
+                                animate={{ 
+                                  x: hoveredCard === challenge.id ? [0, 4, 0] : 0 
+                                }}
+                                transition={{ duration: 0.5, repeat: Infinity }}
+                                className="ml-2"
+                              >
+                                <ArrowRight className="w-4 h-4" />
+                              </motion.div>
+                            </Button>
+                          )}
                         </CardContent>
-
                         {/* Hover overlay */}
                         <AnimatePresence>
                           {hoveredCard === challenge.id && (

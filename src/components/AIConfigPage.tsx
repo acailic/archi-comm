@@ -179,6 +179,21 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
   return (
     <TooltipProvider>
       <div className="container mx-auto py-6 space-y-6">
+        {/* Pro Upgrade Banner */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-4 mb-4">
+          <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.09 6.26L21 9.27l-5 4.87L17.18 21 12 17.27 6.82 21 8 14.14l-5-4.87 6.91-1.01z" /></svg>
+          <div className="flex-1">
+            <div className="font-semibold text-yellow-800">Unlock Advanced AI Features</div>
+            <div className="text-sm text-yellow-700">Multiple AI providers, advanced settings, and detailed feedback are available in <span className="font-semibold">ArchiComm Pro</span>.</div>
+          </div>
+          <Button
+            size="sm"
+            className="bg-yellow-500 hover:bg-yellow-600 text-white"
+            onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
+          >
+            Learn More
+          </Button>
+        </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {onClose && (

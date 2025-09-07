@@ -99,23 +99,27 @@ export interface AudioData {
   };
 }
 
-type Screen = 'welcome' | 'challenge-selection' | 'design-canvas' | 'audio-recording' | 'review';
+type Screen = 'welcome' | 'challenge-selection' | 'design-canvas' | 'audio-recording' | 'review' | 'pro-version';
 
 const screenTitles = {
   welcome: 'Welcome to ArchiComm',
   'challenge-selection': 'Select Challenge',
   'design-canvas': 'Design System',
   'audio-recording': 'Record Explanation',
-  review: 'Session Review'
+  review: 'Session Review',
+  'pro-version': 'ArchiComm Pro'
 };
 
+import { Star } from 'lucide-react';
 const screenIcons = {
   welcome: Zap,
   'challenge-selection': Palette,
   'design-canvas': Palette,
   'audio-recording': Mic,
-  review: Eye
+  review: Eye,
+  'pro-version': Star
 };
+const ProVersionPage = React.lazy(() => import('./components/ProVersionPage').then(m => ({ default: m.ProVersionPage })));
 
 export default function App() {
   // Development reload tracking
@@ -874,6 +878,21 @@ export default function App() {
                   onBackToDesign={goBackToDesign}
                   onBackToAudio={goBackToAudio}
                 />
+              </Suspense>
+            </motion.div>
+          )}
+
+          {currentScreen === 'pro-version' && (
+            <motion.div
+              key="pro-version"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
+              className="h-full"
+            >
+              <Suspense fallback={<div className="p-6 text-sm opacity-70">Loading Pro features5</div>}>
+                <ProVersionPage />
               </Suspense>
             </motion.div>
           )}
