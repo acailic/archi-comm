@@ -14,6 +14,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { PerformanceMonitor } from '../lib/performance/PerformanceOptimizer';
+import { useUXOptimizer } from '../lib/user-experience/UXOptimizer';
 
 interface StatusBarProps {
   currentScreen: string;
@@ -28,6 +29,13 @@ interface PerformanceMetrics {
   performanceHealth: 'good' | 'warning' | 'critical';
 }
 
+interface UXMetrics {
+  userSatisfaction: number;
+  interactionSuccess: number;
+  recommendationsAvailable: number;
+  skillLevel: 'beginner' | 'intermediate' | 'advanced';
+}
+
 export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }: StatusBarProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState(0);
@@ -39,7 +47,16 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
     memoryUsage: 0,
     performanceHealth: 'good'
   });
+  const [uxMetrics, setUxMetrics] = useState<UXMetrics>({
+    userSatisfaction: 85,
+    interactionSuccess: 90,
+    recommendationsAvailable: 0,
+    skillLevel: 'intermediate'
+  });
   const [showPerformanceDetails, setShowPerformanceDetails] = useState(false);
+  
+  // UX Optimizer integration
+  const uxOptimizer = useUXOptimizer();
 
   // Update current time every second
   useEffect(() => {
@@ -87,6 +104,38 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
       return () => clearInterval(autoSaveInterval);
     }
   }, [sessionStartTime, selectedChallenge]);
+
+  // UX metrics monitoring
+  useEffect(() => {
+    if (!uxOptimizer) return;
+
+    const updateUXMetrics = () => {
+      try {
+        const satisfaction = uxOptimizer.measureSatisfaction();
+        const successRate = uxOptimizer.getSuccessRate();
+        const recommendations = uxOptimizer.getRecommendations();
+        const skillLevel = uxOptimizer.getSkillLevel();
+
+        setUxMetrics({
+          userSatisfaction: Math.round(satisfaction * 100),
+          interactionSuccess: Math.round(successRate * 100),
+          recommendationsAvailable: recommendations.length,
+          skillLevel: skillLevel || 'intermediate'
+        });
+      } catch (error) {
+        // Fallback to default values if UX optimizer fails
+        console.warn('Failed to update UX metrics:', error);
+      }
+    };
+
+    // Update UX metrics every 2 seconds
+    const uxInterval = setInterval(updateUXMetrics, 2000);
+    
+    // Initial update
+    updateUXMetrics();
+
+    return () => clearInterval(uxInterval);
+  }, [currentScreen, uxOptimizer]);
 
   // Performance metrics monitoring
   useEffect(() => {
@@ -143,6 +192,57 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
 
   const shouldShowPerformanceMetrics = () => {
     return currentScreen === 'design-canvas' || currentScreen === 'review';
+  };
+
+  const shouldShowUXMetrics = () => {
+    return currentScreen !== 'welcome' && currentScreen !== 'challenge-selection';
+  };
+
+  const getUXSatisfactionColor = () => {
+    if (uxMetrics.userSatisfaction >= 80) return 'text-green-500';
+    if (uxMetrics.userSatisfaction >= 60) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const getInteractionSuccessColor = () => {
+    if (uxMetrics.interactionSuccess >= 90) return 'text-green-500';
+    if (uxMetrics.interactionSuccess >= 75) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const getSkillLevelIcon = () => {
+    switch (uxMetrics.skillLevel) {
+      case 'beginner':
+        return '🌱';
+      case 'intermediate':
+        return '⚡';
+      case 'advanced':
+        return '🚀';
+      default:
+        return '⚡';
+    }
+  };
+
+  const getUXTooltip = () => {
+    const tips = [];
+    
+    if (uxMetrics.userSatisfaction < 70) {
+      tips.push('Low satisfaction detected - check for usability issues');
+    }
+    if (uxMetrics.interactionSuccess < 80) {
+      tips.push('Some interactions failing - consider UI improvements');
+    }
+    if (uxMetrics.recommendationsAvailable > 0) {
+      tips.push(`${uxMetrics.recommendationsAvailable} UX recommendations available`);
+    }
+
+    const baseTooltip = `UX Metrics:
+Satisfaction: ${uxMetrics.userSatisfaction}%
+Success Rate: ${uxMetrics.interactionSuccess}%
+Skill Level: ${uxMetrics.skillLevel}
+Recommendations: ${uxMetrics.recommendationsAvailable}`;
+
+    return tips.length > 0 ? `${baseTooltip}\n\nInsights:\n${tips.join('\n')}` : baseTooltip;
   };
 
   const getPerformanceColor = (metric: 'fps' | 'renderTime' | 'health') => {
@@ -266,6 +366,56 @@ Health: ${performanceMetrics.performanceHealth}`;
               <CheckCircle className="w-3 h-3 text-green-500" />
               <span>Auto-saved</span>
             </div>
+            <div className="w-px h-4 bg-border" />
+          </>
+        )}
+
+        {/* UX Metrics */}
+        {shouldShowUXMetrics() && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center space-x-3"
+            >
+              {/* User Satisfaction */}
+              <div 
+                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                title={`User Satisfaction: ${uxMetrics.userSatisfaction}%\n${uxMetrics.userSatisfaction >= 80 ? 'Excellent experience' : uxMetrics.userSatisfaction >= 60 ? 'Good experience' : 'Experience needs improvement'}`}
+              >
+                <span className="text-xs">😊</span>
+                <span className={`font-mono text-xs ${getUXSatisfactionColor()}`}>
+                  {uxMetrics.userSatisfaction}%
+                </span>
+              </div>
+
+              {/* Interaction Success Rate */}
+              <div 
+                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                title={`Interaction Success: ${uxMetrics.interactionSuccess}%\n${uxMetrics.interactionSuccess >= 90 ? 'Excellent interaction success' : uxMetrics.interactionSuccess >= 75 ? 'Good interaction success' : 'Interaction issues detected'}`}
+              >
+                <CheckCircle className={`w-3 h-3 ${getInteractionSuccessColor()}`} />
+                <span className={`font-mono text-xs ${getInteractionSuccessColor()}`}>
+                  {uxMetrics.interactionSuccess}%
+                </span>
+              </div>
+
+              {/* Skill Level & Recommendations */}
+              <div 
+                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                title={getUXTooltip()}
+              >
+                <span className="text-xs">{getSkillLevelIcon()}</span>
+                <span className="text-xs capitalize">{uxMetrics.skillLevel}</span>
+                {uxMetrics.recommendationsAvailable > 0 && (
+                  <Badge variant="outline" className="ml-1 px-1 py-0 text-xs h-4">
+                    <TrendingUp className="w-2 h-2 mr-1" />
+                    {uxMetrics.recommendationsAvailable}
+                  </Badge>
+                )}
+              </div>
+            </motion.div>
             <div className="w-px h-4 bg-border" />
           </>
         )}

@@ -15,6 +15,7 @@ import { Annotation, AnnotationType, AnnotationStyle } from '@/lib/canvas/Canvas
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { ANNOTATION_PRESETS, getPresetById } from '@/lib/canvas/annotation-presets';
+import { useUXTracker } from '@/hooks/useUXTracker';
 
 interface AnnotationEditDialogProps {
   annotation: Annotation | null;
@@ -68,6 +69,9 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
   const [newReply, setNewReply] = useState('');
   const [replyAuthor, setReplyAuthor] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  
+  // UX Tracking integration
+  const { trackDialogAction, trackKeyboardShortcut } = useUXTracker();
   
   // Auto-save state
   const dialogState = { content, author, style, replies };

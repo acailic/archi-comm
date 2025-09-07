@@ -6,9 +6,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UXOptimizer } from '../../lib/user-experience/UXOptimizer';
+import { ShortcutLearningSystem } from '../../lib/shortcuts/ShortcutLearningSystem';
 
 interface SmartTooltipProps {
-  content: string;
+  content: string | React.ReactNode;
   children: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
   delay?: number;
@@ -17,6 +18,13 @@ interface SmartTooltipProps {
   advanced?: boolean;
   learnFromUsage?: boolean;
   contextualHelp?: string;
+  isVisible?: boolean;
+  targetElement?: HTMLElement | null;
+  placement?: 'top' | 'bottom' | 'left' | 'right';
+  onClose?: () => void;
+  interactive?: boolean;
+  role?: string;
+  'aria-live'?: 'polite' | 'assertive';
 }
 
 export const SmartTooltip: React.FC<SmartTooltipProps> = ({
@@ -28,26 +36,98 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
   shortcut,
   advanced = false,
   learnFromUsage = true,
-  contextualHelp
+  contextualHelp,
+  isVisible: externalVisible,
+  targetElement,
+  placement,
+  onClose,
+  interactive = false,
+  role = 'tooltip',
+  'aria-live': ariaLive = 'polite'
 }) => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [internalVisible, setInternalVisible] = useState(false);
   const [actualPosition, setActualPosition] = useState<'top' | 'bottom' | 'left' | 'right'>('top');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [usageCount, setUsageCount] = useState(0);
+  const [focusedElement, setFocusedElement] = useState<HTMLElement | null>(null);
   
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  
   const uxOptimizer = UXOptimizer.getInstance();
+  const shortcutLearning = ShortcutLearningSystem.getInstance();
+  
+  const isVisible = externalVisible !== undefined ? externalVisible : internalVisible;
+  const currentPosition = placement || position;
 
   useEffect(() => {
     if (learnFromUsage) {
-      const storedUsage = localStorage.getItem(`tooltip-usage-${content}`);
+      const contentKey = typeof content === 'string' ? content : 'complex-content';
+      const storedUsage = localStorage.getItem(`tooltip-usage-${contentKey}`);
       if (storedUsage) {
         setUsageCount(parseInt(storedUsage, 10));
       }
     }
   }, [content, learnFromUsage]);
+
+  // Accessibility: Keyboard support
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isVisible) return;
+      
+      switch (event.key) {
+        case 'Escape':
+          event.preventDefault();
+          hideTooltip();
+          break;
+        case 'Tab':
+          if (interactive && tooltipRef.current) {
+            const focusableElements = tooltipRef.current.querySelectorAll(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            
+            if (focusableElements.length > 0) {
+              const firstElement = focusableElements[0] as HTMLElement;
+              const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+              
+              if (event.shiftKey && document.activeElement === firstElement) {
+                event.preventDefault();
+                lastElement.focus();
+              } else if (!event.shiftKey && document.activeElement === lastElement) {
+                event.preventDefault();
+                firstElement.focus();
+              }
+            }
+          }
+          break;
+      }
+    };
+
+    if (isVisible) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isVisible, interactive]);
+
+  // Focus management
+  useEffect(() => {
+    if (isVisible && interactive && tooltipRef.current) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+      
+      const firstFocusable = tooltipRef.current.querySelector(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      ) as HTMLElement;
+      
+      if (firstFocusable) {
+        firstFocusable.focus();
+      }
+    } else if (!isVisible && previousFocusRef.current) {
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
+  }, [isVisible, interactive]);
 
   const shouldShowTooltip = (): boolean => {
     if (disabled) return false;
@@ -61,9 +141,12 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
   };
 
   const calculatePosition = (): 'top' | 'bottom' | 'left' | 'right' => {
-    if (position !== 'auto' || !triggerRef.current) return position as any;
+    if (currentPosition !== 'auto') return currentPosition as any;
+    
+    const element = targetElement || triggerRef.current;
+    if (!element) return 'top';
 
-    const rect = triggerRef.current.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
@@ -84,39 +167,84 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
     return spaces.sort((a, b) => b.space - a.space)[0].position;
   };
 
-  const handleMouseEnter = () => {
+  const showTooltip = () => {
     if (!shouldShowTooltip()) return;
 
-    timeoutRef.current = setTimeout(() => {
-      setActualPosition(calculatePosition());
-      setIsVisible(true);
+    setActualPosition(calculatePosition());
+    if (externalVisible === undefined) {
+      setInternalVisible(true);
+    }
+    
+    if (learnFromUsage) {
+      const contentKey = typeof content === 'string' ? content : 'complex-content';
+      const newCount = usageCount + 1;
+      setUsageCount(newCount);
+      localStorage.setItem(`tooltip-usage-${contentKey}`, newCount.toString());
       
-      if (learnFromUsage) {
-        const newCount = usageCount + 1;
-        setUsageCount(newCount);
-        localStorage.setItem(`tooltip-usage-${content}`, newCount.toString());
-      }
+      // Track with shortcut learning system
+      shortcutLearning.trackManualAction('tooltip_shown', 200, 'help_seeking');
+    }
 
-      // Track tooltip usage for UX optimization
-      uxOptimizer.trackAction({
-        type: 'tooltip-shown',
-        data: { content, position: actualPosition, usageCount },
-        success: true,
-        context: {
-          page: window.location.pathname,
-          component: 'tooltip',
-          userIntent: 'get-help'
-        }
-      });
-    }, delay);
+    // Track tooltip usage for UX optimization
+    uxOptimizer.trackAction({
+      type: 'tooltip-shown',
+      data: { content, position: actualPosition, usageCount },
+      success: true,
+      context: {
+        page: window.location.pathname,
+        component: 'tooltip',
+        userIntent: 'get-help'
+      }
+    });
   };
 
-  const handleMouseLeave = () => {
+  const hideTooltip = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    setIsVisible(false);
+    
+    if (externalVisible === undefined) {
+      setInternalVisible(false);
+    }
+    
+    if (onClose) {
+      onClose();
+    }
+    
     setShowAdvanced(false);
+  };
+
+  const handleMouseEnter = () => {
+    if (!shouldShowTooltip()) return;
+
+    timeoutRef.current = setTimeout(showTooltip, delay);
+  };
+
+  const handleFocus = (event: React.FocusEvent) => {
+    if (!shouldShowTooltip()) return;
+    setFocusedElement(event.target as HTMLElement);
+    showTooltip();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      showTooltip();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!interactive) {
+      hideTooltip();
+    }
+  };
+
+  const handleBlur = (event: React.FocusEvent) => {
+    // Only hide if focus is moving outside the tooltip system
+    if (!interactive || (!tooltipRef.current?.contains(event.relatedTarget as Node) && 
+        !triggerRef.current?.contains(event.relatedTarget as Node))) {
+      hideTooltip();
+    }
   };
 
   const handleAdvancedToggle = () => {
@@ -134,6 +262,11 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
   };
 
   const getTooltipClasses = () => {
+    if (targetElement) {
+      // For external tooltips, use fixed positioning
+      return 'fixed z-50 px-3 py-2 text-sm text-white bg-gray-900 dark:bg-gray-800 rounded-lg shadow-lg border border-gray-700';
+    }
+    
     const base = 'absolute z-50 px-3 py-2 text-sm text-white bg-gray-900 dark:bg-gray-800 rounded-lg shadow-lg border border-gray-700';
     
     switch (actualPosition) {
@@ -147,6 +280,43 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
         return `${base} left-full top-1/2 transform -translate-y-1/2 ml-2`;
       default:
         return `${base} bottom-full left-1/2 transform -translate-x-1/2 mb-2`;
+    }
+  };
+
+  const getTooltipPosition = () => {
+    if (!targetElement) return {};
+    
+    const rect = targetElement.getBoundingClientRect();
+    const tooltipWidth = 300; // Approximate width
+    const tooltipHeight = 100; // Approximate height
+    const offset = 8;
+    
+    switch (actualPosition) {
+      case 'top':
+        return {
+          top: rect.top - tooltipHeight - offset,
+          left: rect.left + (rect.width / 2) - (tooltipWidth / 2)
+        };
+      case 'bottom':
+        return {
+          top: rect.bottom + offset,
+          left: rect.left + (rect.width / 2) - (tooltipWidth / 2)
+        };
+      case 'left':
+        return {
+          top: rect.top + (rect.height / 2) - (tooltipHeight / 2),
+          left: rect.left - tooltipWidth - offset
+        };
+      case 'right':
+        return {
+          top: rect.top + (rect.height / 2) - (tooltipHeight / 2),
+          left: rect.right + offset
+        };
+      default:
+        return {
+          top: rect.bottom + offset,
+          left: rect.left + (rect.width / 2) - (tooltipWidth / 2)
+        };
     }
   };
 
@@ -167,19 +337,13 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
     }
   };
 
-  if (disabled) {
+  if (disabled && !targetElement) {
     return <>{children}</>;
   }
 
-  return (
-    <div
-      ref={triggerRef}
-      className="relative inline-block"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {children}
-      
+  // Render external tooltip (for ContextualHelpSystem)
+  if (targetElement) {
+    return (
       <AnimatePresence>
         {isVisible && (
           <motion.div
@@ -189,13 +353,89 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
             className={getTooltipClasses()}
+            style={{
+              ...getTooltipPosition(),
+              maxWidth: '300px'
+            }}
+            role={role}
+            aria-live={ariaLive}
+            onMouseLeave={interactive ? undefined : hideTooltip}
+            onBlur={handleBlur}
+            tabIndex={interactive ? 0 : -1}
+          >
+            {/* Arrow */}
+            <div className={getArrowClasses()} />
+            
+            {/* Content */}
+            <div className="relative">
+              <div className="font-medium text-sm leading-relaxed">
+                {content}
+              </div>
+              
+              {interactive && (
+                <button
+                  onClick={hideTooltip}
+                  className="absolute top-0 right-0 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                  aria-label="Close tooltip"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
+
+  return (
+    <div
+      ref={triggerRef}
+      className="relative inline-block"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="button"
+      aria-describedby={isVisible ? 'smart-tooltip' : undefined}
+      aria-expanded={isVisible}
+    >
+      {children}
+      
+      <AnimatePresence>
+        {isVisible && (
+          <motion.div
+            ref={tooltipRef}
+            id="smart-tooltip"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className={getTooltipClasses()}
             style={{ maxWidth: '300px' }}
+            role={role}
+            aria-live={ariaLive}
+            onMouseLeave={interactive ? undefined : handleMouseLeave}
+            onBlur={handleBlur}
+            tabIndex={interactive ? 0 : -1}
           >
             {/* Arrow */}
             <div className={getArrowClasses()} />
             
             {/* Main content */}
             <div className="relative">
+              {interactive && (
+                <button
+                  onClick={hideTooltip}
+                  className="absolute top-0 right-0 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                  aria-label="Close tooltip"
+                >
+                  ✕
+                </button>
+              )}
+              
               <div className="font-medium text-sm leading-relaxed">
                 {content}
               </div>
@@ -217,7 +457,9 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
                 <div className="mt-2 pt-2 border-t border-gray-600">
                   <button
                     onClick={handleAdvancedToggle}
-                    className="flex items-center text-xs text-blue-300 hover:text-blue-200 transition-colors"
+                    className="flex items-center text-xs text-blue-300 hover:text-blue-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                    aria-expanded={showAdvanced}
+                    aria-controls="advanced-tooltip-content"
                   >
                     <span className="mr-1">
                       {showAdvanced ? '▼' : '▶'}
@@ -228,11 +470,14 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
                   <AnimatePresence>
                     {showAdvanced && (
                       <motion.div
+                        id="advanced-tooltip-content"
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
+                        role="region"
+                        aria-label="Advanced tooltip content"
                       >
                         <div className="mt-2 text-xs text-gray-300 leading-relaxed">
                           {contextualHelp || 'Advanced features available in settings.'}
