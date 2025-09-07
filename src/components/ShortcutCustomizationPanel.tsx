@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { KeyboardShortcutManager, ShortcutAction, ShortcutCategory } from '../lib/shortcuts/KeyboardShortcuts';
+import { getGlobalShortcutManager, ShortcutAction, ShortcutCategory } from '../lib/shortcuts/KeyboardShortcuts';
 import { ShortcutLearningSystem, ShortcutUsageMetrics, LearningRecommendation } from '../lib/shortcuts/ShortcutLearningSystem';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -79,7 +79,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
   const panelRef = useRef<HTMLDivElement>(null);
   const recordingInputRef = useRef<HTMLInputElement>(null);
 
-  const shortcutManager = KeyboardShortcutManager.getInstance();
+  const shortcutManager = getGlobalShortcutManager();
   const learningSystem = ShortcutLearningSystem.getInstance();
 
   // Load data
@@ -90,6 +90,8 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
   }, [isOpen]);
 
   const loadShortcutsData = useCallback(() => {
+    if (!shortcutManager) return;
+    
     const allShortcuts = shortcutManager.getAllShortcuts();
     const metrics = learningSystem.getShortcutAnalytics();
     const recs = learningSystem.getLearningRecommendations();
@@ -97,7 +99,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
     setShortcuts(allShortcuts);
     setUsageMetrics(metrics);
     setRecommendations(recs);
-  }, []);
+  }, [shortcutManager]);
 
   // Filter shortcuts
   useEffect(() => {
@@ -177,7 +179,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
   };
 
   const saveShortcut = () => {
-    if (!editingShortcut || currentKeys.length === 0) return;
+    if (!editingShortcut || currentKeys.length === 0 || !shortcutManager) return;
 
     const combination = currentKeys.join('+');
     
@@ -208,13 +210,14 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
   };
 
   const resetShortcut = (shortcutId: string) => {
+    if (!shortcutManager) return;
     shortcutManager.resetShortcut(shortcutId);
     setShortcuts(shortcutManager.getAllShortcuts());
   };
 
   const applyScheme = (schemeId: string) => {
     const scheme = SHORTCUT_SCHEMES.find(s => s.id === schemeId);
-    if (!scheme) return;
+    if (!scheme || !shortcutManager) return;
 
     // Apply scheme shortcuts
     Object.entries(scheme.shortcuts).forEach(([shortcutId, combination]) => {
@@ -250,7 +253,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
       try {
         const data = JSON.parse(e.target?.result as string);
         
-        if (data.shortcuts && Array.isArray(data.shortcuts)) {
+        if (data.shortcuts && Array.isArray(data.shortcuts) && shortcutManager) {
           data.shortcuts.forEach((shortcut: { id: string; combination: string }) => {
             shortcutManager.updateShortcut(shortcut.id, { combination: shortcut.combination });
           });
@@ -422,7 +425,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  if (window.confirm('Reset all shortcuts to defaults?')) {
+                  if (window.confirm('Reset all shortcuts to defaults?') && shortcutManager) {
                     shortcutManager.resetAllShortcuts();
                     setShortcuts(shortcutManager.getAllShortcuts());
                   }

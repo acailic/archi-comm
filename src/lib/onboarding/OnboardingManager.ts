@@ -1,5 +1,5 @@
 import { UXOptimizer } from '../user-experience/UXOptimizer';
-import { KeyboardShortcutManager } from '../shortcuts/KeyboardShortcuts';
+import { getGlobalShortcutManager } from '../shortcuts/KeyboardShortcuts';
 
 export interface OnboardingStep {
   id: string;
@@ -148,8 +148,11 @@ export class OnboardingManager {
 
     // Disable keyboard shortcuts during onboarding
     if (!this.shortcutsDisabled) {
-      KeyboardShortcutManager.getInstance().setEnabled(false);
-      this.shortcutsDisabled = true;
+      const shortcutManager = getGlobalShortcutManager();
+      if (shortcutManager) {
+        shortcutManager.setEnabled(false);
+        this.shortcutsDisabled = true;
+      }
     }
 
     this.state.isActive = true;
@@ -282,8 +285,11 @@ export class OnboardingManager {
 
     // Re-enable keyboard shortcuts
     if (this.shortcutsDisabled) {
-      KeyboardShortcutManager.getInstance().setEnabled(true);
-      this.shortcutsDisabled = false;
+      const shortcutManager = getGlobalShortcutManager();
+      if (shortcutManager) {
+        shortcutManager.setEnabled(true);
+        this.shortcutsDisabled = false;
+      }
     }
 
     this.saveProgress();
@@ -305,8 +311,11 @@ export class OnboardingManager {
     
     // Re-enable keyboard shortcuts
     if (this.shortcutsDisabled) {
-      KeyboardShortcutManager.getInstance().setEnabled(true);
-      this.shortcutsDisabled = false;
+      const shortcutManager = getGlobalShortcutManager();
+      if (shortcutManager) {
+        shortcutManager.setEnabled(true);
+        this.shortcutsDisabled = false;
+      }
     }
 
     this.emit('flow-cancelled', { 

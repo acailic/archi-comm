@@ -1,4 +1,4 @@
-import { KeyboardShortcutManager, ShortcutAction, ShortcutCategory } from './KeyboardShortcuts';
+import { getGlobalShortcutManager, ShortcutAction, ShortcutCategory } from './KeyboardShortcuts';
 import { UXOptimizer } from '../user-experience/UXOptimizer';
 
 export interface ShortcutUsageMetrics {
@@ -155,7 +155,9 @@ export class ShortcutLearningSystem {
   }
 
   public trackManualAction(actionType: string, executionTime: number, context: string = ''): void {
-    const shortcutManager = KeyboardShortcutManager.getInstance();
+    const shortcutManager = getGlobalShortcutManager();
+    if (!shortcutManager) return;
+    
     const availableShortcut = this.findShortcutForAction(actionType);
 
     const trackingData: ActionTrackingData = {
@@ -219,7 +221,9 @@ export class ShortcutLearningSystem {
 
   private generateDiscoveryRecommendations(): LearningRecommendation[] {
     const recommendations: LearningRecommendation[] = [];
-    const shortcutManager = KeyboardShortcutManager.getInstance();
+    const shortcutManager = getGlobalShortcutManager();
+    if (!shortcutManager) return recommendations;
+    
     const allShortcuts = shortcutManager.getAllShortcuts();
 
     // Find frequently performed manual actions with available shortcuts
@@ -261,7 +265,8 @@ export class ShortcutLearningSystem {
 
   private generatePracticeRecommendations(): LearningRecommendation[] {
     const recommendations: LearningRecommendation[] = [];
-    const shortcutManager = KeyboardShortcutManager.getInstance();
+    const shortcutManager = getGlobalShortcutManager();
+    if (!shortcutManager) return recommendations;
 
     this.shortcutMetrics.forEach((metrics, shortcutId) => {
       const shortcut = shortcutManager.getShortcut(shortcutId);
@@ -440,7 +445,8 @@ export class ShortcutLearningSystem {
   // Private helper methods
   private setupShortcutTracking(): void {
     // Hook into KeyboardShortcutManager to track usage automatically
-    const shortcutManager = KeyboardShortcutManager.getInstance();
+    const shortcutManager = getGlobalShortcutManager();
+    if (!shortcutManager) return;
     
     // Override the execute method to track usage
     const originalExecute = shortcutManager.executeShortcut?.bind(shortcutManager);
@@ -463,7 +469,9 @@ export class ShortcutLearningSystem {
   }
 
   private findShortcutForAction(actionType: string): ShortcutAction | null {
-    const shortcutManager = KeyboardShortcutManager.getInstance();
+    const shortcutManager = getGlobalShortcutManager();
+    if (!shortcutManager) return null;
+    
     return shortcutManager.getAllShortcuts().find(shortcut => 
       this.matchesAction(shortcut, actionType)
     ) || null;
