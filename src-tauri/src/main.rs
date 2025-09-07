@@ -112,22 +112,7 @@ impl From<ApiError> for String {
 #[cfg(debug_assertions)]
 mod dev_utils;
 
-// Audio transcription module
-mod transcription;
-
-// Data structures for transcription
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TranscriptionSegment {
-    pub text: String,
-    pub start: i64,
-    pub end: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TranscriptionResponse {
-    pub text: String,
-    pub segments: Vec<TranscriptionSegment>,
-}
+// ...existing code...
 
 // Data structures for the application
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -687,47 +672,7 @@ async fn save_audio_file(file_name: String, data: Vec<u8>, base_dir: Option<Stri
     Ok(path_str.to_string())
 }
 
-// Tauri command for audio transcription
-#[tauri::command]
-async fn transcribe_audio(file_path: String) -> Result<TranscriptionResponse, ApiError> {
-    let audio_path = PathBuf::from(&file_path);
-    
-    if !audio_path.exists() {
-        log::error!("Audio file not found at path: {}", file_path);
-        return Err(ApiError::AudioFileNotFound { path: file_path });
-    }
-
-    let config = transcription::TranscriptionConfig {
-        model: transcription::Model::Base,
-        // language field is removed as per plan
-    };
-
-    let mut transcriber = transcription::AudioTranscriber::new(config);
-    if let Err(e) = transcriber.initialize() {
-        log::error!("Failed to initialize transcriber: {}", e);
-        return Err(ApiError::TranscriptionInitError {
-            details: "Audio transcription service initialization failed. Please try again later.".to_string(),
-        });
-    }
-
-    match transcriber.transcribe_audio(&file_path) {
-        Ok(result) => {
-            log::info!("Transcription successful for file: {}", file_path);
-            // simple_transcribe_rs does not provide segments, so we return an empty vec
-            let response = TranscriptionResponse {
-                text: result.text,
-                segments: vec![],
-            };
-            Ok(response)
-        }
-        Err(e) => {
-            log::error!("Transcription failed for file: {}: {}", file_path, e);
-            Err(ApiError::TranscriptionError {
-                details: "Audio transcription failed. Please ensure the file is a valid audio format and try again.".to_string(),
-            })
-        }
-    }
-}
+// ...existing code...
 
 
 // Utility commands
@@ -875,7 +820,6 @@ fn main() {
                     export_project_data,
                     // Transcription commands
                     save_audio_file,
-                    transcribe_audio,
                     // Debug commands
                     populate_sample_data,
                 ]
@@ -904,7 +848,6 @@ fn main() {
                     export_project_data,
                     // Transcription commands
                     save_audio_file,
-                    transcribe_audio,
                 ]
             }
         })
