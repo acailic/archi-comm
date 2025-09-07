@@ -4,9 +4,8 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toPng } from 'html-to-image';
 import { useKeyboardShortcuts } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ComponentPalette } from './ComponentPalette';
+import { SidebarProvider, SidebarInset } from './ui/sidebar';
+import { VerticalSidebar } from './VerticalSidebar';
 import { CanvasArea } from './CanvasArea';
 import { SolutionHints } from './SolutionHints';
 import { CommentToolbar } from './CommentToolbar';
@@ -310,87 +309,49 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           </div>
         </div>
 
-        <div className="flex-1 flex">
-          <div className="w-80 border-r bg-card/30 backdrop-blur-sm flex flex-col">
-            <div className="flex-1 p-4">
-              <ComponentPalette />
-            </div>
-            
-            <div className="border-t border-border/30 p-4 space-y-4">
-              {selectedComponent && (
-                <Card className="bg-card/50 backdrop-blur-sm border-border/30">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-accent"></div>
-                      Properties
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    {(() => {
-                      const component = components.find(c => c.id === selectedComponent);
-                      if (!component) return null;
-                      
-                      return (
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-xs font-medium block mb-1">Label</label>
-                            <Input
-                              value={component.label}
-                              onChange={(e) => handleComponentLabelChange(component.id, e.target.value)}
-                              size="sm"
-                              className="text-xs"
-                            />
-                          </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteComponent(component.id)}
-                            className="w-full text-xs"
-                          >
-                            Delete Component
-                          </Button>
-                        </div>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-
+        <SidebarProvider>
           <div className="flex-1 flex">
-            <div className="flex-1">
-              <CanvasArea
-                ref={canvasRef}
-                components={components}
-                connections={connections}
-                selectedComponent={selectedComponent}
-                connectionStart={connectionStart}
-                commentMode={commentMode}
-                isCommentModeActive={!!commentMode}
-                onComponentDrop={handleComponentDrop}
-                onComponentMove={handleComponentMove}
-                onComponentSelect={handleComponentSelect}
-                onConnectionLabelChange={handleConnectionLabelChange}
-                onConnectionDelete={handleConnectionDelete}
-                onConnectionTypeChange={handleConnectionTypeChange}
-                onConnectionDirectionChange={handleConnectionDirectionChange}
-                onStartConnection={handleStartConnection}
-                onCompleteConnection={handleCompleteConnection}
-              />
-            </div>
+            <VerticalSidebar
+              components={components}
+              selectedComponent={selectedComponent}
+              onLabelChange={handleComponentLabelChange}
+              onDelete={handleDeleteComponent}
+            />
             
-            {showHints && (
-              <div className="w-80 border-l bg-card/30 backdrop-blur-sm">
-                <SolutionHints 
-                  challenge={extendedChallenge}
-                  currentComponents={components}
-                  onClose={() => setShowHints(false)}
+            <SidebarInset className="flex-1 flex">
+              <div className="flex-1">
+                <CanvasArea
+                  ref={canvasRef}
+                  components={components}
+                  connections={connections}
+                  selectedComponent={selectedComponent}
+                  connectionStart={connectionStart}
+                  commentMode={commentMode}
+                  isCommentModeActive={!!commentMode}
+                  onComponentDrop={handleComponentDrop}
+                  onComponentMove={handleComponentMove}
+                  onComponentSelect={handleComponentSelect}
+                  onConnectionLabelChange={handleConnectionLabelChange}
+                  onConnectionDelete={handleConnectionDelete}
+                  onConnectionTypeChange={handleConnectionTypeChange}
+                  onConnectionDirectionChange={handleConnectionDirectionChange}
+                  onStartConnection={handleStartConnection}
+                  onCompleteConnection={handleCompleteConnection}
                 />
               </div>
-            )}
+              
+              {showHints && (
+                <div className="w-80 border-l bg-card/30 backdrop-blur-sm">
+                  <SolutionHints 
+                    challenge={extendedChallenge}
+                    currentComponents={components}
+                    onClose={() => setShowHints(false)}
+                  />
+                </div>
+              )}
+            </SidebarInset>
           </div>
-        </div>
+        </SidebarProvider>
 
         {/* Comment Toolbar */}
         <CommentToolbar
