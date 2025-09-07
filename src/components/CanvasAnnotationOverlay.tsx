@@ -36,6 +36,9 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
   const annotationManager = useRef<CanvasAnnotationManager | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editInputPosition, setEditInputPosition] = useState<{x: number, y: number} | null>(null);
 
   // Initialize annotation manager
   useEffect(() => {
@@ -66,16 +69,39 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
         onAnnotationSelect?.(annotation);
       };
 
+      const handleAnnotationEditStart = (event: CustomEvent) => {
+        const annotation = event.detail;
+        setEditingAnnotation(annotation);
+        setEditContent(annotation.content || '');
+        
+        // Calculate input position
+        const rect = canvas.getBoundingClientRect();
+        setEditInputPosition({
+          x: annotation.x + rect.left,
+          y: annotation.y + rect.top
+        });
+      };
+
+      const handleAnnotationEditEnd = (event: CustomEvent) => {
+        setEditingAnnotation(null);
+        setEditContent('');
+        setEditInputPosition(null);
+      };
+
       canvas.addEventListener('annotationAdded', handleAnnotationAdded as EventListener);
       canvas.addEventListener('annotationUpdated', handleAnnotationUpdated as EventListener);
       canvas.addEventListener('annotationDeleted', handleAnnotationDeleted as EventListener);
       canvas.addEventListener('annotationSelected', handleAnnotationSelected as EventListener);
+      canvas.addEventListener('annotationEditStart', handleAnnotationEditStart as EventListener);
+      canvas.addEventListener('annotationEditEnd', handleAnnotationEditEnd as EventListener);
 
       return () => {
         canvas.removeEventListener('annotationAdded', handleAnnotationAdded as EventListener);
         canvas.removeEventListener('annotationUpdated', handleAnnotationUpdated as EventListener);
         canvas.removeEventListener('annotationDeleted', handleAnnotationDeleted as EventListener);
         canvas.removeEventListener('annotationSelected', handleAnnotationSelected as EventListener);
+        canvas.removeEventListener('annotationEditStart', handleAnnotationEditStart as EventListener);
+        canvas.removeEventListener('annotationEditEnd', handleAnnotationEditEnd as EventListener);
       };
     }
   }, [onAnnotationCreate, onAnnotationUpdate, onAnnotationDelete, onAnnotationSelect]);
@@ -213,6 +239,30 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
     }
   }), [selectedAnnotation]);
 
+  // Handle inline editing
+  const handleEditContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditContent(e.target.value);
+    annotationManager.current?.updateEditingContent(e.target.value);
+  }, []);
+
+  const handleEditSave = useCallback(() => {
+    annotationManager.current?.saveInlineEdit();
+  }, []);
+
+  const handleEditCancel = useCallback(() => {
+    annotationManager.current?.cancelInlineEdit();
+  }, []);
+
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleEditSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleEditCancel();
+    }
+  }, [handleEditSave, handleEditCancel]);
+
   // Update cursor based on mode and tool
   const getCursor = () => {
     if (!isActive) return 'default';
@@ -223,6 +273,47 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
   };
 
   return (
+    <>
+      {/* Inline editing overlay */}
+      {editingAnnotation && editInputPosition && (
+        <div
+          className="fixed z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-2"
+          style={{
+            left: editInputPosition.x,
+            top: editInputPosition.y,
+            minWidth: '200px'
+          }}
+        >
+          <textarea
+            value={editContent}
+            onChange={handleEditContentChange}
+            onKeyDown={handleEditKeyDown}
+            className="w-full p-2 border border-gray-200 rounded text-sm resize-none"
+            rows={3}
+            autoFocus
+            placeholder="Edit comment..."
+          />
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              onClick={handleEditCancel}
+              className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleEditSave}
+              className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Save
+            </button>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Ctrl/Cmd+Enter to save, Esc to cancel
+          </div>
+        </div>
+      )}
+      
+      {/* Canvas overlay */}
     <canvas
       ref={canvasRef}
       width={width}
@@ -235,5 +326,6 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
       onClick={handleCanvasClick}
       onDoubleClick={handleCanvasDoubleClick}
     />
+    </>
   );
 });

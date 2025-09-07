@@ -45,6 +45,7 @@ export class CanvasAnnotationManager {
   private selectedAnnotation: string | null = null;
   private isDragging = false;
   private dragOffset = { x: 0, y: 0 };
+  private editingAnnotation: string | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -241,6 +242,11 @@ export class CanvasAnnotationManager {
       this.renderSelectionIndicator(annotation);
     }
 
+    // Render editing indicator if being edited
+    if (this.editingAnnotation === annotation.id) {
+      this.renderEditingIndicator(annotation);
+    }
+
     this.ctx.restore();
   }
 
@@ -399,6 +405,38 @@ export class CanvasAnnotationManager {
     this.ctx.setLineDash([]);
   }
 
+  private renderEditingIndicator(annotation: CanvasAnnotation): void {
+    const { x, y, width = 200, height = 100 } = annotation;
+    const margin = 2;
+
+    // Render a different colored border for editing state
+    this.ctx.strokeStyle = '#10b981';
+    this.ctx.lineWidth = 3;
+    this.ctx.globalAlpha = 0.8;
+    this.ctx.setLineDash([6, 3]);
+    
+    this.ctx.strokeRect(
+      x - margin,
+      y - margin,
+      width + margin * 2,
+      height + margin * 2
+    );
+    
+    this.ctx.setLineDash([]);
+
+    // Add editing icon
+    this.ctx.fillStyle = '#10b981';
+    this.ctx.globalAlpha = 1;
+    this.ctx.font = '14px system-ui';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText('✏️', x + width - 15, y + 15);
+    
+    // Reset text alignment
+    this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'alphabetic';
+  }
+
   private roundedRect(x: number, y: number, width: number, height: number, radius: number): void {
     this.ctx.beginPath();
     this.ctx.moveTo(x + radius, y);
@@ -503,16 +541,28 @@ export class CanvasAnnotationManager {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Create new comment annotation on double-click
-    this.addAnnotation({
-      type: 'comment',
-      x,
-      y,
-      content: 'New comment',
-      author: 'Current User',
-      color: '#3b82f6',
-      style: this.getDefaultStyle('comment')
-    });
+    const annotation = this.getAnnotationAt(x, y);
+    
+    if (annotation) {
+      // Edit existing annotation
+      this.startInlineEdit(annotation.id);
+    } else {
+      // Create new comment annotation on double-click
+      const newAnnotation = this.addAnnotation({
+        type: 'comment',
+        x,
+        y,
+        content: 'New comment',
+        author: 'Current User',
+        color: '#3b82f6',
+        style: this.getDefaultStyle('comment')
+      });
+      
+      // Start editing the new annotation immediately
+      if (typeof newAnnotation !== 'string') {
+        setTimeout(() => this.startInlineEdit(newAnnotation.id), 100);
+      }
+    }
   }
 
 
@@ -595,11 +645,87 @@ export class CanvasAnnotationManager {
   }
 
   /**
+   * Start inline editing for an annotation
+   */
+  startInlineEdit(annotationId: string): void {
+    const annotation = this.annotations.get(annotationId);
+    if (annotation) {
+      this.editingAnnotation = annotationId;
+      this.selectedAnnotation = annotationId;
+      this.notifyListeners('annotationEditStart', annotation);
+      this.render();
+    }
+  }
+
+  /**
+   * End inline editing
+   */
+  endInlineEdit(): void {
+    if (this.editingAnnotation) {
+      const annotation = this.annotations.get(this.editingAnnotation);
+      if (annotation) {
+        this.notifyListeners('annotationEditEnd', annotation);
+      }
+      this.editingAnnotation = null;
+      this.render();
+    }
+  }
+
+  /**
+   * Update annotation content during inline editing
+   */
+  updateEditingContent(content: string): void {
+    if (this.editingAnnotation) {
+      const annotation = this.annotations.get(this.editingAnnotation);
+      if (annotation) {
+        const updated = { ...annotation, content };
+        this.annotations.set(this.editingAnnotation, updated);
+        this.render();
+      }
+    }
+  }
+
+  /**
+   * Save inline edit changes
+   */
+  saveInlineEdit(): void {
+    if (this.editingAnnotation) {
+      const annotation = this.annotations.get(this.editingAnnotation);
+      if (annotation) {
+        this.notifyListeners('annotationUpdated', annotation);
+      }
+      this.endInlineEdit();
+    }
+  }
+
+  /**
+   * Cancel inline edit changes
+   */
+  cancelInlineEdit(): void {
+    this.endInlineEdit();
+  }
+
+  /**
+   * Check if annotation is being edited
+   */
+  isEditing(annotationId: string): boolean {
+    return this.editingAnnotation === annotationId;
+  }
+
+  /**
+   * Get currently editing annotation ID
+   */
+  getEditingAnnotationId(): string | null {
+    return this.editingAnnotation;
+  }
+
+  /**
    * Clear all annotations
    */
   clearAnnotations(): void {
     this.annotations.clear();
     this.selectedAnnotation = null;
+    this.editingAnnotation = null;
     this.render();
   }
 }
