@@ -3,6 +3,8 @@
  * Ultra-optimized comment and annotation system for canvas
  */
 
+import { CanvasOptimizer, PerformanceMonitor, MemoryOptimizer } from '../performance/PerformanceOptimizer';
+
 export interface CanvasAnnotation {
   id: string;
   type: 'comment' | 'note' | 'label' | 'arrow' | 'highlight';
@@ -50,10 +52,21 @@ export class CanvasAnnotationManager {
   
   // Cache for stripped text content to avoid repeated HTML parsing
   private textContentCache: Map<string, string> = new Map();
+  
+  // Performance optimization components
+  private optimizer?: CanvasOptimizer;
+  private performanceMonitor: PerformanceMonitor;
+  
+  // Caches for expensive calculations
+  private boundingBoxCache: Map<string, DirtyRegion> = new Map();
+  private textMeasurementCache: Map<string, TextMetrics> = new Map();
+  private wrappedTextCache: Map<string, string[]> = new Map();
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, optimizer?: CanvasOptimizer) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
+    this.optimizer = optimizer;
+    this.performanceMonitor = PerformanceMonitor.getInstance();
     this.setupEventListeners();
   }
 
@@ -98,8 +111,22 @@ export class CanvasAnnotationManager {
     };
 
     this.annotations.set(id, fullAnnotation);
+    
+    // Performance monitoring and optimization
+    this.performanceMonitor.measure('annotation-add', () => {
+      // Calculate and cache bounding box
+      const boundingBox = this.getBoundingBox(fullAnnotation);
+      this.boundingBoxCache.set(id, boundingBox);
+      
+      // Mark dirty region for optimized rendering
+      if (this.optimizer) {
+        this.optimizer.markDirty(boundingBox);
+      } else {
+        this.render();
+      }
+    });
+    
     this.notifyListeners('annotationAdded', fullAnnotation);
-    this.render();
     
     // Return the full annotation if called with coordinates, otherwise return id
     return typeof annotationOrX === 'number' ? fullAnnotation : id;
@@ -111,16 +138,36 @@ export class CanvasAnnotationManager {
   updateAnnotation(id: string, updates: Partial<CanvasAnnotation>): void {
     const annotation = this.annotations.get(id);
     if (annotation) {
-      const updated = { ...annotation, ...updates };
+      this.performanceMonitor.measure('annotation-update', () => {
+        const updated = { ...annotation, ...updates };
+        
+        // Clear caches for this annotation if content or position changed
+        if (updates.content && updates.content !== annotation.content) {
+          this.textContentCache.delete(id);
+          this.wrappedTextCache.delete(id);
+          this.textMeasurementCache.delete(id);
+        }
+        
+        // Calculate new bounding box if position or size changed
+        const oldBoundingBox = this.boundingBoxCache.get(id);
+        const newBoundingBox = this.getBoundingBox(updated);
+        this.boundingBoxCache.set(id, newBoundingBox);
+        
+        this.annotations.set(id, updated);
+        
+        // Mark dirty regions for optimized rendering
+        if (this.optimizer) {
+          // Mark both old and new regions as dirty
+          if (oldBoundingBox) {
+            this.optimizer.markDirty(oldBoundingBox);
+          }
+          this.optimizer.markDirty(newBoundingBox);
+        } else {
+          this.render();
+        }
+      });
       
-      // Clear text cache for this annotation if content changed
-      if (updates.content && updates.content !== annotation.content) {
-        this.textContentCache.delete(id);
-      }
-      
-      this.annotations.set(id, updated);
-      this.notifyListeners('annotationUpdated', updated);
-      this.render();
+      this.notifyListeners('annotationUpdated', this.annotations.get(id)!);
     }
   }
 
@@ -130,10 +177,29 @@ export class CanvasAnnotationManager {
   removeAnnotation(id: string): void {
     const annotation = this.annotations.get(id);
     if (annotation) {
-      this.annotations.delete(id);
-      this.textContentCache.delete(id); // Clean up cache
+      this.performanceMonitor.measure('annotation-remove', () => {
+        // Get bounding box before removal for dirty region marking
+        const boundingBox = this.boundingBoxCache.get(id);
+        
+        // Clean up all caches
+        this.annotations.delete(id);
+        this.textContentCache.delete(id);
+        this.wrappedTextCache.delete(id);
+        this.textMeasurementCache.delete(id);
+        this.boundingBoxCache.delete(id);
+        
+        // Release pooled object
+        MemoryOptimizer.releaseObject('annotation', annotation);
+        
+        // Mark dirty region for optimized rendering
+        if (this.optimizer && boundingBox) {
+          this.optimizer.markDirty(boundingBox);
+        } else {
+          this.render();
+        }
+      });
+      
       this.notifyListeners('annotationRemoved', annotation);
-      this.render();
     }
   }
 
@@ -218,6 +284,25 @@ export class CanvasAnnotationManager {
    * Render all annotations on the canvas
    */
   render(): void {
+    this.performanceMonitor.measure('annotation-render', () => {
+      if (this.optimizer) {
+        // Use optimized rendering with render commands
+        this.renderWithOptimizer();
+      } else {
+        // Fallback to direct canvas rendering
+        this.renderDirect();
+      }
+    });
+  }
+
+  private renderWithOptimizer(): void {
+    const annotations = Array.from(this.annotations.values());
+    annotations.forEach(annotation => {
+      this.queueRenderCommands(annotation);
+    });
+  }
+
+  private renderDirect(): void {
     // Clear the canvas completely before redrawing
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
@@ -259,6 +344,38 @@ export class CanvasAnnotationManager {
     }
 
     this.ctx.restore();
+  }
+
+  private queueRenderCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    switch (annotation.type) {
+      case 'comment':
+        this.queueCommentCommands(annotation);
+        break;
+      case 'note':
+        this.queueNoteCommands(annotation);
+        break;
+      case 'label':
+        this.queueLabelCommands(annotation);
+        break;
+      case 'arrow':
+        this.queueArrowCommands(annotation);
+        break;
+      case 'highlight':
+        this.queueHighlightCommands(annotation);
+        break;
+    }
+
+    // Queue selection indicator commands if selected
+    if (this.selectedAnnotation === annotation.id) {
+      this.queueSelectionCommands(annotation);
+    }
+
+    // Queue editing indicator commands if being edited
+    if (this.editingAnnotation === annotation.id) {
+      this.queueEditingCommands(annotation);
+    }
   }
 
   private renderComment(annotation: CanvasAnnotation): void {
@@ -501,6 +618,13 @@ export class CanvasAnnotationManager {
   }
 
   private wrapText(text: string, maxWidth: number): string[] {
+    // Check cache first
+    const cacheKey = `${text}-${maxWidth}`;
+    const cached = this.wrappedTextCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // Ensure we're working with plain text for proper wrapping
     const plainText = this.stripHtmlTags(text);
     const words = plainText.split(' ');
@@ -523,7 +647,296 @@ export class CanvasAnnotationManager {
       lines.push(currentLine);
     }
 
+    // Cache the result
+    this.wrappedTextCache.set(cacheKey, lines);
     return lines;
+  }
+
+  /**
+   * Calculate accurate bounding box for an annotation
+   */
+  private getBoundingBox(annotation: CanvasAnnotation): DirtyRegion {
+    const { x, y, type, content, style } = annotation;
+    
+    switch (type) {
+      case 'comment': {
+        const maxWidth = 200;
+        const padding = 12;
+        const lines = this.wrapText(content, maxWidth - padding * 2);
+        const lineHeight = style.fontSize * 1.4;
+        const height = lines.length * lineHeight + padding * 2 + 10; // +10 for speech bubble tail
+        return { x: x - 5, y: y - 5, width: maxWidth + 10, height: height + 10 };
+      }
+      case 'note': {
+        const size = 24;
+        return { x: x - 2, y: y - 2, width: size + 4, height: size + 4 };
+      }
+      case 'label': {
+        const padding = 8;
+        this.ctx.font = `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`;
+        const textWidth = this.ctx.measureText(content).width;
+        const width = textWidth + padding * 2;
+        const height = style.fontSize + padding * 2;
+        return { x: x - 2, y: y - 2, width: width + 4, height: height + 4 };
+      }
+      case 'arrow': {
+        const width = annotation.width || 100;
+        const height = annotation.height || 0;
+        const minX = Math.min(x, x + width) - 20;
+        const maxX = Math.max(x, x + width) + 20;
+        const minY = Math.min(y, y + height) - 20;
+        const maxY = Math.max(y, y + height) + 20;
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      }
+      case 'highlight': {
+        const width = annotation.width || 100;
+        const height = annotation.height || 20;
+        return { x: x - 2, y: y - 2, width: width + 4, height: height + 4 };
+      }
+      default:
+        return { x: x - 10, y: y - 10, width: 220, height: 120 };
+    }
+  }
+
+  /**
+   * Queue render commands for comment annotation
+   */
+  private queueCommentCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    const { x, y, style, content } = annotation;
+    const padding = 12;
+    const maxWidth = 200;
+    const plainTextContent = this.stripHtmlTags(content);
+    const lines = this.wrapText(plainTextContent, maxWidth - padding * 2);
+    const lineHeight = style.fontSize * 1.4;
+    const height = lines.length * lineHeight + padding * 2;
+
+    // Queue background rectangle command
+    this.optimizer.queueRenderCommand({
+      type: 'draw-components',
+      priority: 1,
+      data: {
+        shape: 'rounded-rectangle',
+        x, y, width: maxWidth, height,
+        fillStyle: style.backgroundColor,
+        strokeStyle: style.borderColor,
+        lineWidth: style.borderWidth,
+        borderRadius: style.borderRadius,
+        globalAlpha: style.opacity
+      }
+    });
+
+    // Queue text commands
+    lines.forEach((line, index) => {
+      this.optimizer.queueRenderCommand({
+        type: 'draw-text',
+        priority: 2,
+        data: {
+          text: line,
+          x: x + padding,
+          y: y + padding + (index + 1) * lineHeight,
+          fillStyle: style.textColor,
+          font: `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`
+        }
+      });
+    });
+
+    // Queue speech bubble tail
+    this.optimizer.queueRenderCommand({
+      type: 'draw-path',
+      priority: 3,
+      data: {
+        path: [
+          { type: 'moveTo', x: x + 20, y: y + height },
+          { type: 'lineTo', x: x + 30, y: y + height + 10 },
+          { type: 'lineTo', x: x + 40, y: y + height }
+        ],
+        fillStyle: style.backgroundColor,
+        strokeStyle: style.borderColor
+      }
+    });
+  }
+
+  /**
+   * Queue render commands for other annotation types
+   */
+  private queueNoteCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    const { x, y, style } = annotation;
+    const size = 24;
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-components',
+      priority: 1,
+      data: {
+        shape: 'rounded-rectangle',
+        x, y, width: size, height: size,
+        fillStyle: style.backgroundColor,
+        borderRadius: 4,
+        globalAlpha: style.opacity
+      }
+    });
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-text',
+      priority: 2,
+      data: {
+        text: '📝',
+        x: x + size / 2,
+        y: y + size / 2,
+        fillStyle: style.textColor,
+        font: `${size - 8}px system-ui`,
+        textAlign: 'center',
+        textBaseline: 'middle'
+      }
+    });
+  }
+
+  private queueLabelCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    const { x, y, style, content } = annotation;
+    const padding = 8;
+    
+    this.ctx.font = `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`;
+    const textWidth = this.ctx.measureText(content).width;
+    const width = textWidth + padding * 2;
+    const height = style.fontSize + padding * 2;
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-components',
+      priority: 1,
+      data: {
+        shape: 'rounded-rectangle',
+        x, y, width, height,
+        fillStyle: style.backgroundColor,
+        strokeStyle: style.borderColor,
+        lineWidth: style.borderWidth,
+        borderRadius: style.borderRadius,
+        globalAlpha: style.opacity
+      }
+    });
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-text',
+      priority: 2,
+      data: {
+        text: content,
+        x: x + padding,
+        y: y + padding + style.fontSize,
+        fillStyle: style.textColor,
+        font: `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`
+      }
+    });
+  }
+
+  private queueArrowCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    const { x, y, width = 100, height = 0, style } = annotation;
+    const endX = x + width;
+    const endY = y + height;
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-connections',
+      priority: 1,
+      data: {
+        x1: x, y1: y, x2: endX, y2: endY,
+        strokeStyle: style.borderColor,
+        lineWidth: style.borderWidth,
+        globalAlpha: style.opacity
+      }
+    });
+
+    // Arrow head
+    const angle = Math.atan2(endY - y, endX - x);
+    const arrowLength = 15;
+    const arrowAngle = Math.PI / 6;
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-path',
+      priority: 2,
+      data: {
+        path: [
+          { type: 'moveTo', x: endX, y: endY },
+          { 
+            type: 'lineTo', 
+            x: endX - arrowLength * Math.cos(angle - arrowAngle),
+            y: endY - arrowLength * Math.sin(angle - arrowAngle)
+          },
+          { type: 'moveTo', x: endX, y: endY },
+          { 
+            type: 'lineTo', 
+            x: endX - arrowLength * Math.cos(angle + arrowAngle),
+            y: endY - arrowLength * Math.sin(angle + arrowAngle)
+          }
+        ],
+        strokeStyle: style.borderColor,
+        lineWidth: style.borderWidth
+      }
+    });
+  }
+
+  private queueHighlightCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    const { x, y, width = 100, height = 20, style } = annotation;
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-components',
+      priority: 1,
+      data: {
+        shape: 'rounded-rectangle',
+        x, y, width, height,
+        fillStyle: style.backgroundColor,
+        borderRadius: style.borderRadius,
+        globalAlpha: style.opacity
+      }
+    });
+  }
+
+  private queueSelectionCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    const { x, y, width = 200, height = 100 } = annotation;
+    const margin = 4;
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-selection',
+      priority: 10,
+      data: {
+        x: x - margin,
+        y: y - margin,
+        width: width + margin * 2,
+        height: height + margin * 2,
+        strokeStyle: '#3b82f6',
+        lineWidth: 2,
+        lineDash: [4, 4]
+      }
+    });
+  }
+
+  private queueEditingCommands(annotation: CanvasAnnotation): void {
+    if (!this.optimizer) return;
+
+    const { x, y, width = 200, height = 100 } = annotation;
+    const margin = 2;
+
+    this.optimizer.queueRenderCommand({
+      type: 'draw-selection',
+      priority: 10,
+      data: {
+        x: x - margin,
+        y: y - margin,
+        width: width + margin * 2,
+        height: height + margin * 2,
+        strokeStyle: '#10b981',
+        lineWidth: 3,
+        lineDash: [6, 3]
+      }
+    });
   }
 
   private setupEventListeners(): void {
@@ -556,13 +969,32 @@ export class CanvasAnnotationManager {
 
       const annotation = this.annotations.get(this.selectedAnnotation);
       if (annotation) {
-        const updated = { 
-          ...annotation, 
-          x: x - this.dragOffset.x,
-          y: y - this.dragOffset.y 
-        };
-        this.annotations.set(this.selectedAnnotation, updated);
-        this.render();
+        this.performanceMonitor.measure('annotation-drag', () => {
+          // Get old bounding box for dirty region
+          const oldBoundingBox = this.boundingBoxCache.get(this.selectedAnnotation!);
+          
+          const updated = { 
+            ...annotation, 
+            x: x - this.dragOffset.x,
+            y: y - this.dragOffset.y 
+          };
+          
+          // Calculate new bounding box
+          const newBoundingBox = this.getBoundingBox(updated);
+          this.boundingBoxCache.set(this.selectedAnnotation!, newBoundingBox);
+          
+          this.annotations.set(this.selectedAnnotation!, updated);
+          
+          // Mark dirty regions for optimized rendering
+          if (this.optimizer) {
+            if (oldBoundingBox) {
+              this.optimizer.markDirty(oldBoundingBox);
+            }
+            this.optimizer.markDirty(newBoundingBox);
+          } else {
+            this.render();
+          }
+        });
       }
     } else {
       // Handle cursor changes for edit button hover
@@ -823,11 +1255,31 @@ export class CanvasAnnotationManager {
    * Clear all annotations
    */
   clearAnnotations(): void {
-    this.annotations.clear();
-    this.textContentCache.clear(); // Clear cache
-    this.selectedAnnotation = null;
-    this.editingAnnotation = null;
-    this.render();
+    this.performanceMonitor.measure('annotation-clear', () => {
+      // Release all pooled objects
+      this.annotations.forEach(annotation => {
+        MemoryOptimizer.releaseObject('annotation', annotation);
+      });
+      
+      this.annotations.clear();
+      this.textContentCache.clear();
+      this.wrappedTextCache.clear();
+      this.textMeasurementCache.clear();
+      this.boundingBoxCache.clear();
+      this.selectedAnnotation = null;
+      this.editingAnnotation = null;
+      
+      if (this.optimizer) {
+        // Mark entire canvas as dirty
+        this.optimizer.markDirty({
+          x: 0, y: 0,
+          width: this.canvas.width,
+          height: this.canvas.height
+        });
+      } else {
+        this.render();
+      }
+    });
   }
   
   /**
@@ -935,3 +1387,11 @@ export const predefinedStyles = {
     textColor: '#047857'
   })
 };
+
+// Performance optimization interfaces
+interface DirtyRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}

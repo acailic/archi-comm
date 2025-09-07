@@ -7,8 +7,13 @@ import {
   Wifi, 
   WifiOff, 
   CheckCircle,
-  Info
+  Info,
+  Activity,
+  Zap,
+  AlertTriangle,
+  TrendingUp
 } from 'lucide-react';
+import { PerformanceMonitor } from '../lib/performance/PerformanceOptimizer';
 
 interface StatusBarProps {
   currentScreen: string;
@@ -16,11 +21,25 @@ interface StatusBarProps {
   selectedChallenge: any;
 }
 
+interface PerformanceMetrics {
+  fps: number;
+  avgRenderTime: number;
+  memoryUsage: number;
+  performanceHealth: 'good' | 'warning' | 'critical';
+}
+
 export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }: StatusBarProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
+    fps: 60,
+    avgRenderTime: 0,
+    memoryUsage: 0,
+    performanceHealth: 'good'
+  });
+  const [showPerformanceDetails, setShowPerformanceDetails] = useState(false);
 
   // Update current time every second
   useEffect(() => {
@@ -69,6 +88,45 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
     }
   }, [sessionStartTime, selectedChallenge]);
 
+  // Performance metrics monitoring
+  useEffect(() => {
+    if (!shouldShowPerformanceMetrics()) return;
+
+    const performanceMonitor = PerformanceMonitor.getInstance();
+    
+    const updatePerformanceMetrics = () => {
+      const fps = performanceMonitor.getCurrentFPS();
+      const avgRenderTime = performanceMonitor.getAverageMetric('canvas-render') || 0;
+      
+      // Estimate memory usage (simplified)
+      const memoryUsage = (performance as any).memory ? 
+        Math.round(((performance as any).memory.usedJSHeapSize / (performance as any).memory.totalJSHeapSize) * 100) : 0;
+      
+      // Calculate performance health
+      let performanceHealth: 'good' | 'warning' | 'critical' = 'good';
+      if (fps < 30 || avgRenderTime > 50) {
+        performanceHealth = 'critical';
+      } else if (fps < 50 || avgRenderTime > 20) {
+        performanceHealth = 'warning';
+      }
+
+      setPerformanceMetrics({
+        fps,
+        avgRenderTime,
+        memoryUsage,
+        performanceHealth
+      });
+    };
+
+    // Update metrics every 500ms
+    const metricsInterval = setInterval(updatePerformanceMetrics, 500);
+    
+    // Initial update
+    updatePerformanceMetrics();
+
+    return () => clearInterval(metricsInterval);
+  }, [currentScreen]);
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
@@ -81,6 +139,60 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const shouldShowPerformanceMetrics = () => {
+    return currentScreen === 'design-canvas' || currentScreen === 'review';
+  };
+
+  const getPerformanceColor = (metric: 'fps' | 'renderTime' | 'health') => {
+    switch (metric) {
+      case 'fps':
+        if (performanceMetrics.fps > 50) return 'text-green-500';
+        if (performanceMetrics.fps > 30) return 'text-yellow-500';
+        return 'text-red-500';
+      case 'renderTime':
+        if (performanceMetrics.avgRenderTime < 10) return 'text-green-500';
+        if (performanceMetrics.avgRenderTime < 20) return 'text-yellow-500';
+        return 'text-red-500';
+      case 'health':
+        if (performanceMetrics.performanceHealth === 'good') return 'text-green-500';
+        if (performanceMetrics.performanceHealth === 'warning') return 'text-yellow-500';
+        return 'text-red-500';
+    }
+  };
+
+  const getPerformanceIcon = () => {
+    switch (performanceMetrics.performanceHealth) {
+      case 'good':
+        return Activity;
+      case 'warning':
+        return TrendingUp;
+      case 'critical':
+        return AlertTriangle;
+    }
+  };
+
+  const getPerformanceTooltip = () => {
+    const tips = [];
+    
+    if (performanceMetrics.fps < 50) {
+      tips.push('Low FPS detected - consider reducing canvas complexity');
+    }
+    if (performanceMetrics.avgRenderTime > 20) {
+      tips.push('High render times - try using fewer annotations');
+    }
+    if (performanceMetrics.memoryUsage > 80) {
+      tips.push('High memory usage - consider refreshing the page');
+    }
+    
+    const baseTooltip = `Performance Metrics:
+FPS: ${performanceMetrics.fps}
+Render Time: ${performanceMetrics.avgRenderTime.toFixed(1)}ms
+Memory: ${performanceMetrics.memoryUsage}%
+Health: ${performanceMetrics.performanceHealth}`;
+
+    return tips.length > 0 ? `${baseTooltip}\n\nTips:\n${tips.join('\n')}` : baseTooltip;
   };
 
   const getScreenStatus = () => {
@@ -154,6 +266,72 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
               <CheckCircle className="w-3 h-3 text-green-500" />
               <span>Auto-saved</span>
             </div>
+            <div className="w-px h-4 bg-border" />
+          </>
+        )}
+
+        {/* Performance Metrics */}
+        {shouldShowPerformanceMetrics() && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center space-x-3"
+            >
+              {/* FPS Indicator */}
+              <div 
+                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                title={`Frame Rate: ${performanceMetrics.fps} FPS\n${performanceMetrics.fps > 50 ? 'Excellent performance' : performanceMetrics.fps > 30 ? 'Good performance' : 'Performance issues detected'}`}
+              >
+                <Zap className={`w-3 h-3 ${getPerformanceColor('fps')}`} />
+                <span className={`font-mono text-xs ${getPerformanceColor('fps')}`}>
+                  {performanceMetrics.fps}fps
+                </span>
+              </div>
+
+              {/* Render Time */}
+              {performanceMetrics.avgRenderTime > 0 && (
+                <div 
+                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                  title={`Average Render Time: ${performanceMetrics.avgRenderTime.toFixed(1)}ms\n${performanceMetrics.avgRenderTime < 10 ? 'Fast rendering' : performanceMetrics.avgRenderTime < 20 ? 'Moderate rendering' : 'Slow rendering detected'}`}
+                >
+                  <Clock className={`w-3 h-3 ${getPerformanceColor('renderTime')}`} />
+                  <span className={`font-mono text-xs ${getPerformanceColor('renderTime')}`}>
+                    {performanceMetrics.avgRenderTime.toFixed(1)}ms
+                  </span>
+                </div>
+              )}
+
+              {/* Performance Health */}
+              <div 
+                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                title={getPerformanceTooltip()}
+                onClick={() => setShowPerformanceDetails(!showPerformanceDetails)}
+              >
+                {React.createElement(getPerformanceIcon(), { 
+                  className: `w-3 h-3 ${getPerformanceColor('health')} ${performanceMetrics.performanceHealth === 'critical' ? 'animate-pulse' : ''}` 
+                })}
+                {process.env.NODE_ENV === 'development' && (
+                  <span className={`text-xs ${getPerformanceColor('health')}`}>
+                    {performanceMetrics.performanceHealth}
+                  </span>
+                )}
+              </div>
+
+              {/* Memory Usage (Development only) */}
+              {process.env.NODE_ENV === 'development' && performanceMetrics.memoryUsage > 0 && (
+                <div 
+                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                  title={`Memory Usage: ${performanceMetrics.memoryUsage}%\n${performanceMetrics.memoryUsage < 60 ? 'Normal usage' : performanceMetrics.memoryUsage < 80 ? 'High usage' : 'Critical memory usage'}`}
+                >
+                  <TrendingUp className={`w-3 h-3 ${performanceMetrics.memoryUsage > 80 ? 'text-red-500' : performanceMetrics.memoryUsage > 60 ? 'text-yellow-500' : 'text-green-500'}`} />
+                  <span className={`font-mono text-xs ${performanceMetrics.memoryUsage > 80 ? 'text-red-500' : performanceMetrics.memoryUsage > 60 ? 'text-yellow-500' : 'text-green-500'}`}>
+                    {performanceMetrics.memoryUsage}%
+                  </span>
+                </div>
+              )}
+            </motion.div>
             <div className="w-px h-4 bg-border" />
           </>
         )}
