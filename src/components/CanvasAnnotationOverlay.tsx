@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import { CanvasAnnotationManager, Annotation, AnnotationType, AnnotationStyle } from '@/lib/canvas/CanvasAnnotations';
+import { Textarea } from '@/components/ui/textarea';
 
 export interface CanvasAnnotationOverlayProps {
   width: number;
@@ -74,11 +75,10 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
         setEditingAnnotation(annotation);
         setEditContent(annotation.content || '');
         
-        // Calculate input position
-        const rect = canvas.getBoundingClientRect();
+        // Calculate input position relative to canvas
         setEditInputPosition({
-          x: annotation.x + rect.left,
-          y: annotation.y + rect.top
+          x: annotation.x,
+          y: annotation.y
         });
       };
 
@@ -181,30 +181,6 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
     }, 100);
   }, [isActive, selectedTool]);
 
-  // Handle double-click for editing annotations
-  const handleCanvasDoubleClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!annotationManager.current) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const canvasX = x * scaleX;
-    const canvasY = y * scaleY;
-
-    const annotation = annotationManager.current.getAnnotationAt(canvasX, canvasY);
-    if (annotation) {
-      setSelectedAnnotation(annotation);
-      // Trigger edit mode
-      const editEvent = new CustomEvent('editAnnotation', { detail: annotation });
-      canvas.dispatchEvent(editEvent);
-    }
-  }, []);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -273,59 +249,39 @@ export const CanvasAnnotationOverlay = forwardRef<CanvasAnnotationOverlayRef, Ca
   };
 
   return (
-    <>
-      {/* Inline editing overlay */}
+    <div className="relative">
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        className="absolute top-0 left-0 pointer-events-auto"
+        style={{
+          cursor: getCursor(),
+          zIndex: isActive ? 10 : 5
+        }}
+        onClick={handleCanvasClick}
+      />
+      
       {editingAnnotation && editInputPosition && (
-        <div
-          className="fixed z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-2"
+        <Textarea
+          autoFocus
+          value={editContent}
+          onChange={handleEditContentChange}
+          onKeyDown={handleEditKeyDown}
+          onBlur={handleEditSave}
+          className="absolute bg-white/90 border-2 border-blue-400 shadow-lg resize-none"
           style={{
             left: editInputPosition.x,
             top: editInputPosition.y,
-            minWidth: '200px'
+            width: Math.max(200, editContent.length * 8),
+            height: Math.max(60, Math.ceil(editContent.length / 25) * 20 + 40),
+            zIndex: 25,
+            fontSize: '14px',
+            lineHeight: '1.4',
+            padding: '8px'
           }}
-        >
-          <textarea
-            value={editContent}
-            onChange={handleEditContentChange}
-            onKeyDown={handleEditKeyDown}
-            className="w-full p-2 border border-gray-200 rounded text-sm resize-none"
-            rows={3}
-            autoFocus
-            placeholder="Edit comment..."
-          />
-          <div className="flex justify-end gap-2 mt-2">
-            <button
-              onClick={handleEditCancel}
-              className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleEditSave}
-              className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Save
-            </button>
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            Ctrl/Cmd+Enter to save, Esc to cancel
-          </div>
-        </div>
+        />
       )}
-      
-      {/* Canvas overlay */}
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className="absolute top-0 left-0 pointer-events-auto"
-      style={{
-        cursor: getCursor(),
-        zIndex: isActive ? 10 : 5
-      }}
-      onClick={handleCanvasClick}
-      onDoubleClick={handleCanvasDoubleClick}
-    />
-    </>
+    </div>
   );
 });

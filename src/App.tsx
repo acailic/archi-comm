@@ -28,6 +28,9 @@ import {
   Settings,
   Brain
 } from 'lucide-react';
+import { useUXTracker } from './hooks/useUXTracker';
+import UXRecommendationToast from './components/UXRecommendationToast';
+import { Toaster } from 'sonner';
 
 export interface Challenge {
   id: string;
@@ -113,12 +116,18 @@ export default function App() {
   const preventReload = preventUnnecessaryReload('App');
   preventReload();
   
+  // UX Tracking integration
+  const { trackNavigation, trackKeyboardShortcut, trackError, trackPerformance } = useUXTracker();
+  
   // Log app initialization in development
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       reloadTracker.logEvent('app-init', 'App component initialized');
     }
-  }, []);
+    
+    // Track app initialization performance
+    trackPerformance('app-init-time', Date.now(), { version: '1.0' });
+  }, [trackPerformance]);
   
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
@@ -153,6 +162,11 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [availableChallenges, setAvailableChallenges] = useState<ExtendedChallenge[]>([]);
+  const [contextMenu, setContextMenu] = useState<{x: number; y: number; visible: boolean}>({
+    x: 0,
+    y: 0,
+    visible: false
+  });
 
   // Initialize available challenges
   useEffect(() => {
@@ -187,10 +201,13 @@ export default function App() {
       if (process.env.NODE_ENV === 'development') {
         console.log('Auto-save completed');
       }
+      // Track successful auto-save
+      trackPerformance('auto-save-success', Date.now(), { challengeId: sessionData.challenge.id });
     } catch (error) {
       console.error('Auto-save failed:', error);
+      trackError(error as Error, { context: 'auto-save', challengeId: sessionData?.challenge?.id });
     }
-  }, []);
+  }, [trackPerformance, trackError]);
   
   const sessionDataToSave = useMemo(() => {
     if (!selectedChallenge) return null;
@@ -252,7 +269,10 @@ export default function App() {
       modifiers: ['ctrl'],
       description: 'Open command palette',
       category: 'general',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:command-palette'))
+      action: () => {
+        trackKeyboardShortcut('Ctrl+K', 'command-palette', true);
+        window.dispatchEvent(new CustomEvent('shortcut:command-palette'));
+      }
     });
 
     manager.register({
@@ -260,7 +280,10 @@ export default function App() {
       modifiers: ['meta'],
       description: 'Open command palette',
       category: 'general', 
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:command-palette'))
+      action: () => {
+        trackKeyboardShortcut('Cmd+K', 'command-palette', true);
+        window.dispatchEvent(new CustomEvent('shortcut:command-palette'));
+      }
     });
 
     manager.register({
@@ -268,7 +291,10 @@ export default function App() {
       modifiers: ['ctrl', 'shift'],
       description: 'Open challenge manager',
       category: 'general',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'))
+      action: () => {
+        trackKeyboardShortcut('Ctrl+Shift+C', 'challenge-manager', true);
+        window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
+      }
     });
 
     manager.register({
@@ -276,7 +302,10 @@ export default function App() {
       modifiers: ['meta', 'shift'],
       description: 'Open challenge manager',
       category: 'general',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'))
+      action: () => {
+        trackKeyboardShortcut('Cmd+Shift+C', 'challenge-manager', true);
+        window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
+      }
     });
 
     manager.register({
@@ -284,7 +313,10 @@ export default function App() {
       modifiers: ['alt'],
       description: 'Navigate to challenge selection',
       category: 'navigation',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'challenge-selection' } }))
+      action: () => {
+        trackKeyboardShortcut('Alt+1', 'navigate-challenge-selection', true);
+        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'challenge-selection' } }));
+      }
     });
 
     manager.register({
@@ -292,7 +324,10 @@ export default function App() {
       modifiers: ['alt'],
       description: 'Navigate to design canvas',
       category: 'navigation',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'design-canvas' } }))
+      action: () => {
+        trackKeyboardShortcut('Alt+2', 'navigate-design-canvas', true);
+        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'design-canvas' } }));
+      }
     });
 
     manager.register({
@@ -300,7 +335,10 @@ export default function App() {
       modifiers: ['alt'],
       description: 'Navigate to audio recording',
       category: 'navigation',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'audio-recording' } }))
+      action: () => {
+        trackKeyboardShortcut('Alt+3', 'navigate-audio-recording', true);
+        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'audio-recording' } }));
+      }
     });
 
     manager.register({
@@ -308,7 +346,10 @@ export default function App() {
       modifiers: ['alt'],
       description: 'Navigate to review',
       category: 'navigation',
-      action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'review' } }))
+      action: () => {
+        trackKeyboardShortcut('Alt+4', 'navigate-review', true);
+        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'review' } }));
+      }
     });
 
     // Event listeners for shortcut actions
@@ -317,23 +358,31 @@ export default function App() {
     const handleAISettings = () => setShowAIConfig(true);
     const handleNavigateToScreen = (event: CustomEvent) => {
       const { screen } = event.detail;
+      const previousScreen = currentScreen;
+      
       switch (screen) {
         case 'challenge-selection':
-          setCurrentScreen(prev => prev !== 'challenge-selection' ? 'challenge-selection' : prev);
+          if (currentScreen !== 'challenge-selection') {
+            trackNavigation('challenge-selection', previousScreen);
+            setCurrentScreen('challenge-selection');
+          }
           break;
         case 'design-canvas':
-          if (selectedChallenge) {
-            setCurrentScreen(prev => prev !== 'design-canvas' ? 'design-canvas' : prev);
+          if (selectedChallenge && currentScreen !== 'design-canvas') {
+            trackNavigation('design-canvas', previousScreen);
+            setCurrentScreen('design-canvas');
           }
           break;
         case 'audio-recording':
-          if (selectedChallenge) {
-            setCurrentScreen(prev => prev !== 'audio-recording' ? 'audio-recording' : prev);
+          if (selectedChallenge && currentScreen !== 'audio-recording') {
+            trackNavigation('audio-recording', previousScreen);
+            setCurrentScreen('audio-recording');
           }
           break;
         case 'review':
-          if (selectedChallenge) {
-            setCurrentScreen(prev => prev !== 'review' ? 'review' : prev);
+          if (selectedChallenge && currentScreen !== 'review') {
+            trackNavigation('review', previousScreen);
+            setCurrentScreen('review');
           }
           break;
       }
@@ -364,7 +413,7 @@ export default function App() {
       window.removeEventListener('shortcut:navigate-to-screen', handleNavigateToScreen);
       window.removeEventListener('shortcut:ai-settings', handleAISettings);
     };
-  }, [selectedChallenge]);
+  }, [selectedChallenge, trackKeyboardShortcut, trackNavigation, currentScreen]);
 
   // Memoized window title
   const windowTitle = useMemo(() => {
@@ -383,6 +432,9 @@ export default function App() {
       console.log('Challenge selected:', challenge.id);
       reloadTracker.logEvent('challenge-select', `Selected challenge: ${challenge.title}`);
     }
+    
+    // Track challenge selection
+    trackNavigation('design-canvas', 'challenge-selection');
     
     setIsLoading(true);
     setProgress(0);
@@ -420,11 +472,12 @@ export default function App() {
       
     } catch (error) {
       console.error('Error selecting challenge:', error);
+      trackError(error as Error, { context: 'challenge-selection', challengeId: challenge.id });
       clearInterval(progressInterval);
       setIsLoading(false);
       setProgress(0);
     }
-  }, []);
+  }, [trackNavigation, trackError]);
 
   const handleDesignComplete = useCallback(async (data: DesignData) => {
     if (process.env.NODE_ENV === 'development') {
@@ -451,6 +504,10 @@ export default function App() {
     if (process.env.NODE_ENV === 'development') {
       reloadTracker.logEvent('audio-complete', `Audio recorded: ${data.duration}s, ${data.wordCount} words`);
     }
+    
+    // Track session completion
+    trackNavigation('review', 'audio-recording');
+    
     setIsLoading(true);
     
     // Calculate analysis metrics
@@ -470,12 +527,16 @@ export default function App() {
     await new Promise(resolve => setTimeout(resolve, 300));
     setCurrentScreen('review');
     setIsLoading(false);
-  }, [designData.components.length]);
+  }, [designData.components.length, trackNavigation]);
 
   const handleStartOver = useCallback(async () => {
     if (process.env.NODE_ENV === 'development') {
       reloadTracker.logEvent('session-reset', 'User started over');
     }
+    
+    // Track session reset
+    trackNavigation('challenge-selection', currentScreen);
+    
     setIsLoading(true);
     
     // Reset all state
@@ -506,7 +567,7 @@ export default function App() {
     
     await new Promise(resolve => setTimeout(resolve, 300));
     setIsLoading(false);
-  }, []);
+  }, [trackNavigation, currentScreen]);
 
   const goBackToDesign = useCallback(() => {
     setCurrentScreen('design-canvas');
@@ -525,10 +586,48 @@ export default function App() {
     setAvailableChallenges(updatedChallenges);
   }, []);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      visible: true
+    });
+  }, []);
+
+  const handleReload = useCallback(() => {
+    setContextMenu({x: 0, y: 0, visible: false});
+    window.location.reload();
+  }, []);
+
+  const hideContextMenu = useCallback(() => {
+    setContextMenu({x: 0, y: 0, visible: false});
+  }, []);
+
+  useEffect(() => {
+    const handleClick = () => hideContextMenu();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') hideContextMenu();
+    };
+
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu.visible, hideContextMenu]);
+
   const currentProgress = useMemo(() => getSessionProgress(), [currentScreen]);
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden">
+    <div 
+      className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden"
+      onContextMenu={handleContextMenu}
+    >
       {/* Tauri Title Bar */}
       
       
@@ -752,6 +851,48 @@ export default function App() {
             <CommandIcon className="w-5 h-5" />
           </Button>
         </motion.div>
+      )}
+
+      {/* UX Recommendation Toast System */}
+      <UXRecommendationToast />
+      
+      {/* Toast Notifications */}
+      <Toaster 
+        position="bottom-right"
+        expand={true}
+        richColors
+        closeButton
+      />
+
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <div
+          className="fixed z-50 bg-white border border-gray-300 rounded-lg shadow-lg py-1 min-w-32"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y
+          }}
+        >
+          <button
+            onClick={handleReload}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+          >
+            <svg 
+              className="w-4 h-4" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+              />
+            </svg>
+            Reload App
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
+import { SidebarProvider, SidebarInset } from './ui/sidebar';
+import { VerticalSidebar } from './VerticalSidebar';
 import { Challenge, DesignData, AudioData } from '../App';
 import { 
   ArrowLeft, 
@@ -32,6 +34,8 @@ export function ReviewScreen({
   onBackToDesign, 
   onBackToAudio 
 }: ReviewScreenProps) {
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+  
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -62,34 +66,44 @@ export function ReviewScreen({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="border-b bg-card p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              Session Complete
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Review your system design and explanation for {challenge.title}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="w-4 h-4 mr-2" />
-              Export Session
-            </Button>
-            <Button variant="outline" size="sm" onClick={onStartOver}>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Start Over
-            </Button>
+    <SidebarProvider>
+      <div className="h-full flex flex-col">
+        {/* Header */}
+        <div className="border-b bg-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                Session Complete
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Review your system design and explanation for {challenge.title}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleExport}>
+                <Download className="w-4 h-4 mr-2" />
+                Export Session
+              </Button>
+              <Button variant="outline" size="sm" onClick={onStartOver}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Start Over
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex-1 flex">
+          <VerticalSidebar
+            components={designData.components}
+            selectedComponent={selectedComponent}
+            onLabelChange={() => {}}
+            onDelete={() => {}}
+          />
+          
+          <SidebarInset className="flex-1">
+            <div className="flex-1 overflow-auto p-8">
+              <div className="max-w-6xl mx-auto space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
@@ -235,8 +249,11 @@ export function ReviewScreen({
               Try Another Challenge
             </Button>
           </div>
+              </div>
+            </div>
+          </SidebarInset>
         </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

@@ -4,14 +4,12 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toPng } from 'html-to-image';
 import { useKeyboardShortcuts } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
-import { SidebarProvider, SidebarInset } from './ui/sidebar';
-import { VerticalSidebar } from './VerticalSidebar';
 import { CanvasArea } from './CanvasArea';
 import { SolutionHints } from './SolutionHints';
-import { CommentToolbar } from './CommentToolbar';
 import { Challenge, DesignComponent, Connection, DesignData } from '../App';
 import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
-import { ArrowLeft, Save, Download, Lightbulb, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Save, Download, Image, Lightbulb } from 'lucide-react';
+import { SmartTooltip } from './ui/SmartTooltip';
 
 interface DesignCanvasProps {
   challenge: Challenge;
@@ -27,7 +25,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
   const [commentMode, setCommentMode] = useState<string | null>(null);
-  const [showCommentToolbar, setShowCommentToolbar] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const extendedChallenge = challengeManager.getChallengeById(challenge.id) as ExtendedChallenge || challenge;
@@ -275,33 +272,30 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => setShowCommentToolbar(!showCommentToolbar)}
-                className={showCommentToolbar ? "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700" : ""}
-              >
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Comments
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
                 onClick={() => setShowHints(!showHints)}
                 className="bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700"
               >
                 <Lightbulb className="w-4 h-4 mr-2" />
                 {showHints ? 'Hide Hints' : 'Show Hints'}
               </Button>
-              <Button variant="outline" size="sm" onClick={handleSave}>
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExport}>
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportImage}>
-                <Download className="w-4 h-4 mr-2" />
-                Export PNG
-              </Button>
+              <SmartTooltip content="Save Design" shortcut="Ctrl+S">
+                <Button variant="outline" size="icon" onClick={handleSave}>
+                  <Save className="w-4 h-4" />
+                  <span className="sr-only">Save Design</span>
+                </Button>
+              </SmartTooltip>
+              <SmartTooltip content="Export Design" shortcut="Ctrl+E">
+                <Button variant="outline" size="icon" onClick={handleExport}>
+                  <Download className="w-4 h-4" />
+                  <span className="sr-only">Export Design</span>
+                </Button>
+              </SmartTooltip>
+              <SmartTooltip content="Export as PNG" shortcut="Ctrl+Shift+E">
+                <Button variant="outline" size="icon" onClick={handleExportImage}>
+                  <Image className="w-4 h-4" />
+                  <span className="sr-only">Export as PNG</span>
+                </Button>
+              </SmartTooltip>
               <Button onClick={handleContinue} disabled={components.length === 0}>
                 Continue to Recording
               </Button>
@@ -309,57 +303,39 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           </div>
         </div>
 
-        <SidebarProvider>
-          <div className="flex-1 flex">
-            <VerticalSidebar
+        <div className="flex-1 flex">
+          <div className="flex-1">
+            <CanvasArea
+              ref={canvasRef}
               components={components}
+              connections={connections}
               selectedComponent={selectedComponent}
-              onLabelChange={handleComponentLabelChange}
-              onDelete={handleDeleteComponent}
+              connectionStart={connectionStart}
+              commentMode={commentMode}
+              isCommentModeActive={!!commentMode}
+              onComponentDrop={handleComponentDrop}
+              onComponentMove={handleComponentMove}
+              onComponentSelect={handleComponentSelect}
+              onConnectionLabelChange={handleConnectionLabelChange}
+              onConnectionDelete={handleConnectionDelete}
+              onConnectionTypeChange={handleConnectionTypeChange}
+              onConnectionDirectionChange={handleConnectionDirectionChange}
+              onStartConnection={handleStartConnection}
+              onCompleteConnection={handleCompleteConnection}
             />
-            
-            <SidebarInset className="flex-1 flex">
-              <div className="flex-1">
-                <CanvasArea
-                  ref={canvasRef}
-                  components={components}
-                  connections={connections}
-                  selectedComponent={selectedComponent}
-                  connectionStart={connectionStart}
-                  commentMode={commentMode}
-                  isCommentModeActive={!!commentMode}
-                  onComponentDrop={handleComponentDrop}
-                  onComponentMove={handleComponentMove}
-                  onComponentSelect={handleComponentSelect}
-                  onConnectionLabelChange={handleConnectionLabelChange}
-                  onConnectionDelete={handleConnectionDelete}
-                  onConnectionTypeChange={handleConnectionTypeChange}
-                  onConnectionDirectionChange={handleConnectionDirectionChange}
-                  onStartConnection={handleStartConnection}
-                  onCompleteConnection={handleCompleteConnection}
-                />
-              </div>
-              
-              {showHints && (
-                <div className="w-80 border-l bg-card/30 backdrop-blur-sm">
-                  <SolutionHints 
-                    challenge={extendedChallenge}
-                    currentComponents={components}
-                    onClose={() => setShowHints(false)}
-                  />
-                </div>
-              )}
-            </SidebarInset>
           </div>
-        </SidebarProvider>
+          
+          {showHints && (
+            <div className="w-80 border-l bg-card/30 backdrop-blur-sm">
+              <SolutionHints 
+                challenge={extendedChallenge}
+                currentComponents={components}
+                onClose={() => setShowHints(false)}
+              />
+            </div>
+          )}
+        </div>
 
-        {/* Comment Toolbar */}
-        <CommentToolbar
-          visible={showCommentToolbar}
-          onToggle={() => setShowCommentToolbar(!showCommentToolbar)}
-          selectedTool={commentMode || undefined}
-          onToolSelect={(tool) => setCommentMode(tool)}
-        />
       </div>
     </DndProvider>
   );

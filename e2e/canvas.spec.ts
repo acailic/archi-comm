@@ -181,3 +181,144 @@ test('should temporarily hide UI overlays during export', async ({ page }) => {
   await expect(page.getByText('Database').first()).toBeVisible();
 });
 
+test('inline annotation editing functionality', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /start your journey/i }).click();
+  
+  // Open first challenge
+  await page.getByRole('button', { name: /start challenge/i }).first().click();
+  
+  const canvas = page.locator('[data-testid="canvas"]');
+  
+  // Add components to create content for annotation
+  const server = page.locator('[data-testid="palette-item-server"]').first();
+  await server.dragTo(canvas);
+  
+  // Test inline edit activation - double-click on canvas to create annotation
+  await canvas.dblclick({ position: { x: 200, y: 200 } });
+  
+  // Verify inline textarea appears
+  const inlineTextarea = page.locator('textarea').first();
+  await expect(inlineTextarea).toBeVisible();
+  await expect(inlineTextarea).toBeFocused();
+  
+  // Test real-time content updates - type in the textarea
+  await inlineTextarea.fill('Test annotation content');
+  
+  // Test Ctrl+Enter saves changes (Cmd+Enter on Mac)
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await inlineTextarea.press(`${modifier}+Enter`);
+  
+  // Verify textarea disappears and annotation is saved
+  await expect(inlineTextarea).not.toBeVisible();
+  await expect(page.getByText('Test annotation content')).toBeVisible();
+});
+
+test('inline editing keyboard shortcuts', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /start your journey/i }).click();
+  
+  // Open first challenge
+  await page.getByRole('button', { name: /start challenge/i }).first().click();
+  
+  const canvas = page.locator('[data-testid="canvas"]');
+  
+  // Create annotation by double-clicking
+  await canvas.dblclick({ position: { x: 150, y: 150 } });
+  
+  const inlineTextarea = page.locator('textarea').first();
+  await expect(inlineTextarea).toBeVisible();
+  
+  // Type some content
+  await inlineTextarea.fill('Original content');
+  
+  // Change content then test Escape key cancels editing
+  await inlineTextarea.fill('Modified content');
+  await inlineTextarea.press('Escape');
+  
+  // Verify textarea disappears and original content is restored
+  await expect(inlineTextarea).not.toBeVisible();
+  await expect(page.getByText('New comment')).toBeVisible(); // Original default content
+  await expect(page.getByText('Modified content')).not.toBeVisible();
+});
+
+test('inline editing blur to save', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /start your journey/i }).click();
+  
+  // Open first challenge
+  await page.getByRole('button', { name: /start challenge/i }).first().click();
+  
+  const canvas = page.locator('[data-testid="canvas"]');
+  
+  // Create annotation
+  await canvas.dblclick({ position: { x: 100, y: 100 } });
+  
+  const inlineTextarea = page.locator('textarea').first();
+  await expect(inlineTextarea).toBeVisible();
+  
+  // Type content and blur (click outside)
+  await inlineTextarea.fill('Blur save test');
+  await canvas.click({ position: { x: 300, y: 300 } });
+  
+  // Verify changes are saved
+  await expect(inlineTextarea).not.toBeVisible();
+  await expect(page.getByText('Blur save test')).toBeVisible();
+});
+
+test('inline editing visual feedback', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /start your journey/i }).click();
+  
+  // Open first challenge
+  await page.getByRole('button', { name: /start challenge/i }).first().click();
+  
+  const canvas = page.locator('[data-testid="canvas"]');
+  
+  // Create annotation
+  await canvas.dblclick({ position: { x: 250, y: 100 } });
+  
+  const inlineTextarea = page.locator('textarea').first();
+  await expect(inlineTextarea).toBeVisible();
+  
+  // Verify textarea styling indicates editing state
+  await expect(inlineTextarea).toHaveCSS('border-color', /blue/i);
+  await expect(inlineTextarea).toHaveCSS('background-color', /rgba.*0\.9/); // semi-transparent
+  
+  // Verify high z-index for overlay
+  const zIndex = await inlineTextarea.evaluate(el => getComputedStyle(el).zIndex);
+  expect(parseInt(zIndex)).toBeGreaterThan(20);
+});
+
+test('inline editing integration with dialog system', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /start your journey/i }).click();
+  
+  // Open first challenge
+  await page.getByRole('button', { name: /start challenge/i }).first().click();
+  
+  const canvas = page.locator('[data-testid="canvas"]');
+  
+  // Create annotation with inline editing
+  await canvas.dblclick({ position: { x: 200, y: 150 } });
+  
+  const inlineTextarea = page.locator('textarea').first();
+  await inlineTextarea.fill('Inline edited content');
+  
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await inlineTextarea.press(`${modifier}+Enter`);
+  
+  // Verify annotation exists and can be edited via dialog
+  const annotation = page.getByText('Inline edited content');
+  await expect(annotation).toBeVisible();
+  
+  // Test that dialog editing still works after inline editing
+  await annotation.click(); // Select annotation
+  
+  // If edit dialog is available, verify it opens and contains the content
+  const editDialog = page.locator('[role="dialog"]').first();
+  if (await editDialog.isVisible()) {
+    await expect(editDialog).toContainText('Inline edited content');
+  }
+});
+

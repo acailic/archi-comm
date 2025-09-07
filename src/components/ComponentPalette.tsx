@@ -543,19 +543,22 @@ export function ComponentPalette() {
       <CardHeader className="pb-3 bg-gradient-to-r from-muted/30 via-card to-muted/20 border-b border-border/20">
         <CardTitle className="flex items-center justify-between text-sm">
           <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-            Component Library
           </span>
-          <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
-            {filteredComponents.length}
-          </Badge>
+          
         </CardTitle>
         <div className="space-y-3">
-          <Input
-            placeholder="Search components..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="text-sm bg-background/50 backdrop-blur-sm border-border/30 focus:bg-background/80 transition-all duration-200"
-          />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="text-sm bg-background/50 backdrop-blur-sm border-border/30 focus:bg-background/80 transition-all duration-200 pl-10"
+            />
+          </div>
+           <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+            {filteredComponents.length}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0">

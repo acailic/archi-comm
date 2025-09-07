@@ -6,8 +6,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Trash2, Plus, MessageCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Slider } from '@/components/ui/slider';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { ColorPicker } from '@/components/ui/color-picker';
+import { Trash2, Plus, MessageCircle, Undo, Redo, ChevronDown, Palette, Type, Save, Clock } from 'lucide-react';
 import { Annotation, AnnotationType, AnnotationStyle } from '@/lib/canvas/CanvasAnnotations';
+import { useAutoSave } from '@/hooks/useAutoSave';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { ANNOTATION_PRESETS, getPresetById } from '@/lib/canvas/annotation-presets';
 
 interface AnnotationEditDialogProps {
   annotation: Annotation | null;
@@ -24,15 +31,12 @@ interface Reply {
   timestamp: Date;
 }
 
-const colorOptions = [
-  { label: 'Yellow', value: '#fef3c7', border: '#f59e0b' },
-  { label: 'Blue', value: '#dbeafe', border: '#3b82f6' },
-  { label: 'Green', value: '#dcfce7', border: '#22c55e' },
-  { label: 'Red', value: '#fee2e2', border: '#ef4444' },
-  { label: 'Purple', value: '#ede9fe', border: '#8b5cf6' },
-  { label: 'Pink', value: '#fce7f3', border: '#ec4899' },
-  { label: 'Gray', value: '#f3f4f6', border: '#6b7280' },
-];
+interface DialogState {
+  content: string;
+  author: string;
+  style: AnnotationStyle;
+  replies: Reply[];
+}
 
 const fontSizes = [
   { label: 'Small', value: 12 },
@@ -50,27 +54,87 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
 }) => {
   const [content, setContent] = useState('');
   const [author, setAuthor] = useState('');
-  const [selectedColor, setSelectedColor] = useState(colorOptions[0]);
-  const [fontSize, setFontSize] = useState(14);
+  const [style, setStyle] = useState<AnnotationStyle>({
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+    textColor: '#374151',
+    fontSize: 14,
+    fontWeight: 'normal',
+    opacity: 0.95,
+    borderRadius: 8,
+    borderWidth: 1
+  });
   const [replies, setReplies] = useState<Reply[]>([]);
   const [newReply, setNewReply] = useState('');
   const [replyAuthor, setReplyAuthor] = useState('');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  
+  // Auto-save state
+  const dialogState = { content, author, style, replies };
+  const { isSaving, forceSave } = useAutoSave(
+    dialogState,
+    async (data) => {
+      if (!annotation) return;
+      const updatedAnnotation = {
+        ...annotation,
+        content: data.content,
+        author: data.author,
+        style: data.style,
+        replies: data.replies.map(reply => ({
+          id: reply.id,
+          author: reply.author,
+          content: reply.content,
+          timestamp: reply.timestamp.getTime()
+        }))
+      };
+      onSave(updatedAnnotation);
+    },
+    { enabled: isOpen && !!annotation }
+  );
+  
+  // Undo/Redo functionality
+  const {
+    currentState: undoRedoState,
+    canUndo,
+    canRedo,
+    pushState,
+    undo,
+    redo,
+    clearHistory
+  } = useUndoRedo<DialogState>(
+    { content: '', author: '', style, replies: [] },
+    { enableGlobalShortcuts: true }
+  );
+  
+  // Update local state when undo/redo state changes
+  useEffect(() => {
+    if (undoRedoState && isOpen) {
+      setContent(undoRedoState.content);
+      setAuthor(undoRedoState.author);
+      setStyle(undoRedoState.style);
+      setReplies(undoRedoState.replies);
+    }
+  }, [undoRedoState, isOpen]);
 
   // Load annotation data when dialog opens
   useEffect(() => {
     if (annotation && isOpen) {
-      setContent(annotation.content || '');
-      setAuthor(annotation.author || '');
+      const initialContent = annotation.content || '';
+      const initialAuthor = annotation.author || '';
+      const initialStyle = annotation.style || {
+        backgroundColor: '#fef3c7',
+        borderColor: '#f59e0b',
+        textColor: '#374151',
+        fontSize: 14,
+        fontWeight: 'normal',
+        opacity: 0.95,
+        borderRadius: 8,
+        borderWidth: 1
+      };
       
-      // Find matching color option
-      const colorOption = colorOptions.find(
-        option => option.value === annotation.style?.backgroundColor
-      );
-      if (colorOption) {
-        setSelectedColor(colorOption);
-      }
-      
-      setFontSize(annotation.style?.fontSize || 14);
+      setContent(initialContent);
+      setAuthor(initialAuthor);
+      setStyle(initialStyle);
       
       // Load replies from annotation replies array
       const annotationReplies = annotation.replies?.map(reply => ({
@@ -80,19 +144,38 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
         timestamp: new Date(reply.timestamp)
       })) || [];
       setReplies(annotationReplies);
+      
+      // Initialize undo/redo with current state
+      const initialState = {
+        content: initialContent,
+        author: initialAuthor,
+        style: initialStyle,
+        replies: annotationReplies
+      };
+      clearHistory();
+      pushState(initialState);
     } else {
       // Reset form when closing
       setContent('');
       setAuthor('');
-      setSelectedColor(colorOptions[0]);
-      setFontSize(14);
+      setStyle({
+        backgroundColor: '#fef3c7',
+        borderColor: '#f59e0b',
+        textColor: '#374151',
+        fontSize: 14,
+        fontWeight: 'normal',
+        opacity: 0.95,
+        borderRadius: 8,
+        borderWidth: 1
+      });
       setReplies([]);
       setNewReply('');
       setReplyAuthor('');
+      setShowAdvancedOptions(false);
     }
-  }, [annotation, isOpen]);
+  }, [annotation, isOpen, clearHistory, pushState]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!annotation) return;
 
     const updatedReplies = replies.map(reply => ({
@@ -107,17 +190,12 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
       content,
       author,
       replies: updatedReplies,
-      style: {
-        ...annotation.style,
-        backgroundColor: selectedColor.value,
-        borderColor: selectedColor.border,
-        fontSize
-      }
+      style
     };
 
     onSave(updatedAnnotation);
     onClose();
-  }, [annotation, content, author, selectedColor, fontSize, replies, onSave, onClose]);
+  }, [annotation, content, author, style, replies, onSave, onClose]);
 
   const handleDelete = useCallback(() => {
     if (!annotation) return;
@@ -138,14 +216,47 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
       timestamp: new Date()
     };
 
-    setReplies(prev => [...prev, reply]);
+    const newReplies = [...replies, reply];
+    setReplies(newReplies);
     setNewReply('');
     setReplyAuthor('');
-  }, [newReply, replyAuthor]);
+    
+    // Push to undo/redo history
+    pushState({ content, author, style, replies: newReplies });
+  }, [newReply, replyAuthor, replies, content, author, style, pushState]);
 
   const handleDeleteReply = useCallback((replyId: string) => {
-    setReplies(prev => prev.filter(reply => reply.id !== replyId));
-  }, []);
+    const newReplies = replies.filter(reply => reply.id !== replyId);
+    setReplies(newReplies);
+    
+    // Push to undo/redo history
+    pushState({ content, author, style, replies: newReplies });
+  }, [replies, content, author, style, pushState]);
+  
+  // Handle content changes with undo/redo
+  const handleContentChange = useCallback((newContent: string) => {
+    setContent(newContent);
+    pushState({ content: newContent, author, style, replies });
+  }, [author, style, replies, pushState]);
+  
+  const handleAuthorChange = useCallback((newAuthor: string) => {
+    setAuthor(newAuthor);
+    pushState({ content, author: newAuthor, style, replies });
+  }, [content, style, replies, pushState]);
+  
+  const handleStyleChange = useCallback((newStyle: Partial<AnnotationStyle>) => {
+    const updatedStyle = { ...style, ...newStyle };
+    setStyle(updatedStyle);
+    pushState({ content, author, style: updatedStyle, replies });
+  }, [content, author, style, replies, pushState]);
+  
+  const handlePresetSelect = useCallback((presetId: string) => {
+    const preset = getPresetById(presetId);
+    if (preset) {
+      setStyle(preset.style);
+      pushState({ content, author, style: preset.style, replies });
+    }
+  }, [content, author, replies, pushState]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -171,9 +282,37 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
-            Edit {annotation.type.charAt(0).toUpperCase() + annotation.type.slice(1)}
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Edit {annotation.type.charAt(0).toUpperCase() + annotation.type.slice(1)}
+            </div>
+            <div className="flex items-center gap-2">
+              {isSaving && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3 animate-pulse" />
+                  Saving...
+                </div>
+              )}
+              <Button
+                onClick={undo}
+                disabled={!canUndo}
+                variant="ghost"
+                size="sm"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={redo}
+                disabled={!canRedo}
+                variant="ghost"
+                size="sm"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo className="h-4 w-4" />
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -181,12 +320,10 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
           {/* Content */}
           <div className="space-y-2">
             <Label htmlFor="content">Content</Label>
-            <Textarea
-              id="content"
+            <RichTextEditor
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={handleContentChange}
               placeholder={`Enter ${annotation.type} content...`}
-              rows={3}
             />
           </div>
 
@@ -196,37 +333,53 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
             <Input
               id="author"
               value={author}
-              onChange={(e) => setAuthor(e.target.value)}
+              onChange={(e) => handleAuthorChange(e.target.value)}
               placeholder="Enter author name..."
             />
           </div>
 
-          {/* Style options */}
+          {/* Style Presets */}
+          <div className="space-y-2">
+            <Label>Style Presets</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {ANNOTATION_PRESETS.map((preset) => (
+                <Button
+                  key={preset.id}
+                  onClick={() => handlePresetSelect(preset.id)}
+                  variant="outline"
+                  size="sm"
+                  className="h-auto p-2 flex flex-col items-center gap-1"
+                  style={{
+                    backgroundColor: preset.style.backgroundColor,
+                    borderColor: preset.style.borderColor,
+                    color: preset.style.textColor
+                  }}
+                >
+                  <span className="font-medium text-xs">{preset.name}</span>
+                  <span className="text-xs opacity-75">{preset.description.split(' ').slice(0, 2).join(' ')}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Basic Style Options */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Color */}
+            {/* Color Picker */}
             <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="grid grid-cols-4 gap-2">
-                {colorOptions.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-8 h-8 rounded border-2 ${
-                      selectedColor.value === color.value
-                        ? 'border-gray-900 ring-2 ring-gray-300'
-                        : 'border-gray-300'
-                    }`}
-                    style={{ backgroundColor: color.value }}
-                    title={color.label}
-                  />
-                ))}
-              </div>
+              <Label>Background Color</Label>
+              <ColorPicker
+                value={style.backgroundColor}
+                onChange={(color) => handleStyleChange({ backgroundColor: color, borderColor: color })}
+              />
             </div>
 
             {/* Font Size */}
             <div className="space-y-2">
               <Label>Font Size</Label>
-              <Select value={fontSize.toString()} onValueChange={(value) => setFontSize(parseInt(value))}>
+              <Select 
+                value={style.fontSize.toString()} 
+                onValueChange={(value) => handleStyleChange({ fontSize: parseInt(value) })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -241,18 +394,82 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
             </div>
           </div>
 
+          {/* Advanced Options */}
+          <Collapsible open={showAdvancedOptions} onOpenChange={setShowAdvancedOptions}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between">
+                <div className="flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Advanced Styling
+                </div>
+                <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Font Weight */}
+                <div className="space-y-2">
+                  <Label>Font Weight</Label>
+                  <Select
+                    value={style.fontWeight}
+                    onValueChange={(value: 'normal' | 'bold') => handleStyleChange({ fontWeight: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="bold">Bold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Text Color */}
+                <div className="space-y-2">
+                  <Label>Text Color</Label>
+                  <ColorPicker
+                    value={style.textColor}
+                    onChange={(color) => handleStyleChange({ textColor: color })}
+                  />
+                </div>
+              </div>
+
+              {/* Opacity */}
+              <div className="space-y-2">
+                <Label>Opacity: {Math.round(style.opacity * 100)}%</Label>
+                <Slider
+                  value={[style.opacity * 100]}
+                  onValueChange={([value]) => handleStyleChange({ opacity: value / 100 })}
+                  max={100}
+                  min={10}
+                  step={5}
+                  className="w-full"
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
           {/* Preview */}
           <div className="space-y-2">
             <Label>Preview</Label>
             <div
-              className="p-3 rounded border min-h-[50px] flex items-center"
+              className="p-3 rounded border min-h-[60px] flex items-center"
               style={{
-                backgroundColor: selectedColor.value,
-                borderColor: selectedColor.border,
-                fontSize: `${fontSize}px`
+                backgroundColor: style.backgroundColor,
+                borderColor: style.borderColor,
+                color: style.textColor,
+                fontSize: `${style.fontSize}px`,
+                fontWeight: style.fontWeight,
+                opacity: style.opacity,
+                borderRadius: `${style.borderRadius}px`,
+                borderWidth: `${style.borderWidth}px`
               }}
             >
-              {content || `Sample ${annotation.type} text`}
+              <div 
+                dangerouslySetInnerHTML={{ 
+                  __html: content || `Sample ${annotation.type} with <strong>rich text</strong> formatting` 
+                }}
+              />
             </div>
           </div>
 
@@ -340,8 +557,12 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
             <Button onClick={onClose} variant="outline">
               Cancel
             </Button>
+            <Button onClick={forceSave} variant="ghost" title="Force save now">
+              <Save className="h-4 w-4 mr-2" />
+              Save Now
+            </Button>
             <Button onClick={handleSave}>
-              Save Changes
+              Save & Close
             </Button>
           </div>
         </DialogFooter>

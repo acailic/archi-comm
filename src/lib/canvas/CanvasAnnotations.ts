@@ -46,6 +46,10 @@ export class CanvasAnnotationManager {
   private isDragging = false;
   private dragOffset = { x: 0, y: 0 };
   private editingAnnotation: string | null = null;
+  private originalEditContent: string | null = null;
+  
+  // Cache for stripped text content to avoid repeated HTML parsing
+  private textContentCache: Map<string, string> = new Map();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -108,6 +112,12 @@ export class CanvasAnnotationManager {
     const annotation = this.annotations.get(id);
     if (annotation) {
       const updated = { ...annotation, ...updates };
+      
+      // Clear text cache for this annotation if content changed
+      if (updates.content && updates.content !== annotation.content) {
+        this.textContentCache.delete(id);
+      }
+      
       this.annotations.set(id, updated);
       this.notifyListeners('annotationUpdated', updated);
       this.render();
@@ -121,6 +131,7 @@ export class CanvasAnnotationManager {
     const annotation = this.annotations.get(id);
     if (annotation) {
       this.annotations.delete(id);
+      this.textContentCache.delete(id); // Clean up cache
       this.notifyListeners('annotationRemoved', annotation);
       this.render();
     }
@@ -255,9 +266,12 @@ export class CanvasAnnotationManager {
     const padding = 12;
     const maxWidth = 200;
     
+    // Strip HTML tags from rich text content for canvas rendering
+    const plainTextContent = this.stripHtmlTags(content);
+    
     // Measure text
     this.ctx.font = `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`;
-    const lines = this.wrapText(content, maxWidth - padding * 2);
+    const lines = this.wrapText(plainTextContent, maxWidth - padding * 2);
     const lineHeight = style.fontSize * 1.4;
     const height = lines.length * lineHeight + padding * 2;
 
@@ -487,7 +501,9 @@ export class CanvasAnnotationManager {
   }
 
   private wrapText(text: string, maxWidth: number): string[] {
-    const words = text.split(' ');
+    // Ensure we're working with plain text for proper wrapping
+    const plainText = this.stripHtmlTags(text);
+    const words = plainText.split(' ');
     const lines: string[] = [];
     let currentLine = '';
 
@@ -723,6 +739,7 @@ export class CanvasAnnotationManager {
     const annotation = this.annotations.get(annotationId);
     if (annotation) {
       this.editingAnnotation = annotationId;
+      this.originalEditContent = annotation.content;
       this.selectedAnnotation = annotationId;
       this.notifyListeners('annotationEditStart', annotation);
       this.render();
@@ -739,6 +756,7 @@ export class CanvasAnnotationManager {
         this.notifyListeners('annotationEditEnd', annotation);
       }
       this.editingAnnotation = null;
+      this.originalEditContent = null;
       this.render();
     }
   }
@@ -752,6 +770,7 @@ export class CanvasAnnotationManager {
       if (annotation) {
         const updated = { ...annotation, content };
         this.annotations.set(this.editingAnnotation, updated);
+        this.notifyListeners('annotationUpdated', updated);
         this.render();
       }
     }
@@ -774,6 +793,15 @@ export class CanvasAnnotationManager {
    * Cancel inline edit changes
    */
   cancelInlineEdit(): void {
+    if (this.editingAnnotation && this.originalEditContent !== null) {
+      const annotation = this.annotations.get(this.editingAnnotation);
+      if (annotation) {
+        const reverted = { ...annotation, content: this.originalEditContent };
+        this.annotations.set(this.editingAnnotation, reverted);
+        this.render();
+      }
+    }
+    this.originalEditContent = null;
     this.endInlineEdit();
   }
 
@@ -796,9 +824,34 @@ export class CanvasAnnotationManager {
    */
   clearAnnotations(): void {
     this.annotations.clear();
+    this.textContentCache.clear(); // Clear cache
     this.selectedAnnotation = null;
     this.editingAnnotation = null;
     this.render();
+  }
+  
+  /**
+   * Strip HTML tags from content with caching for performance
+   */
+  private stripHtmlTags(content: string): string {
+    if (!content) return '';
+    
+    // Use the exported utility function
+    return stripHtmlTags(content);
+  }
+  
+  /**
+   * Get cached plain text content for an annotation
+   */
+  private getCachedTextContent(annotationId: string, htmlContent: string): string {
+    const cached = this.textContentCache.get(annotationId);
+    if (cached !== undefined) {
+      return cached;
+    }
+    
+    const plainText = this.stripHtmlTags(htmlContent);
+    this.textContentCache.set(annotationId, plainText);
+    return plainText;
   }
 }
 
@@ -821,6 +874,43 @@ export const createAnnotationStyle = (overrides: Partial<AnnotationStyle> = {}):
     borderWidth: 1,
     ...overrides
   };
+};
+
+/**
+ * Utility function to strip HTML tags from rich text content
+ * Used when rendering annotations on canvas where only plain text is supported
+ */
+export const stripHtmlTags = (html: string): string => {
+  if (!html) return '';
+  
+  // Remove HTML tags but preserve content
+  return html
+    .replace(/<[^>]*>/g, '') // Remove all HTML tags
+    .replace(/&nbsp;/g, ' ') // Replace &nbsp; with regular spaces
+    .replace(/&amp;/g, '&') // Replace &amp; with &
+    .replace(/&lt;/g, '<') // Replace &lt; with <
+    .replace(/&gt;/g, '>') // Replace &gt; with >
+    .replace(/&quot;/g, '"') // Replace &quot; with "
+    .trim(); // Remove leading/trailing whitespace
+};
+
+/**
+ * Basic HTML sanitization for user input
+ * Removes potentially harmful tags while preserving basic formatting
+ */
+export const sanitizeHtmlContent = (html: string): string => {
+  if (!html) return '';
+  
+  // Allow only safe HTML tags for rich text formatting
+  const allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'ul', 'ol', 'li'];
+  const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
+  
+  return html.replace(tagRegex, (match, tagName) => {
+    if (allowedTags.includes(tagName.toLowerCase())) {
+      return match;
+    }
+    return ''; // Remove disallowed tags
+  });
 };
 
 export const predefinedStyles = {
