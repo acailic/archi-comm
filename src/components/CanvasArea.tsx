@@ -8,7 +8,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Trash2 } from 'lucide-react';
 import { Annotation } from '../lib/canvas/CanvasAnnotations';
-import { globalShortcutManager, ShortcutConfig } from '../lib/shortcuts/KeyboardShortcuts';
+import { getGlobalShortcutManager, ShortcutConfig } from '../lib/shortcuts/KeyboardShortcuts';
 
 // Component dimension constants
 const COMPONENT_WIDTH = 128;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 // Comment 1: Move relevantKeys to a module-level Set for performance
 const RELEVANT_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter', 'Escape']);
 import { motion, AnimatePresence } from 'framer-motion';
-import { getAllShortcuts, formatShortcutKey, globalShortcutManager, getShortcutsVersion } from '../lib/shortcuts/KeyboardShortcuts';
+import { getAllShortcuts, formatShortcutKey, getGlobalShortcutManager, getShortcutsVersion } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent } from './ui/dialog';

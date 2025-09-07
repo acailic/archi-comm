@@ -243,8 +243,11 @@ export default function App() {
 
   // Global keyboard shortcuts integration
   useEffect(() => {
+    const manager = getGlobalShortcutManager();
+    if (!manager) return;
+
     // Register App-specific shortcuts
-    globalShortcutManager.register({
+    manager.register({
       key: 'k',
       modifiers: ['ctrl'],
       description: 'Open command palette',
@@ -252,7 +255,7 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:command-palette'))
     });
 
-    globalShortcutManager.register({
+    manager.register({
       key: 'k',
       modifiers: ['meta'],
       description: 'Open command palette',
@@ -260,7 +263,7 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:command-palette'))
     });
 
-    globalShortcutManager.register({
+    manager.register({
       key: 'c',
       modifiers: ['ctrl', 'shift'],
       description: 'Open challenge manager',
@@ -268,7 +271,7 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'))
     });
 
-    globalShortcutManager.register({
+    manager.register({
       key: 'c',
       modifiers: ['meta', 'shift'],
       description: 'Open challenge manager',
@@ -276,7 +279,7 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'))
     });
 
-    globalShortcutManager.register({
+    manager.register({
       key: '1',
       modifiers: ['alt'],
       description: 'Navigate to challenge selection',
@@ -284,7 +287,7 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'challenge-selection' } }))
     });
 
-    globalShortcutManager.register({
+    manager.register({
       key: '2',
       modifiers: ['alt'],
       description: 'Navigate to design canvas',
@@ -292,7 +295,7 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'design-canvas' } }))
     });
 
-    globalShortcutManager.register({
+    manager.register({
       key: '3',
       modifiers: ['alt'],
       description: 'Navigate to audio recording',
@@ -300,7 +303,7 @@ export default function App() {
       action: () => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'audio-recording' } }))
     });
 
-    globalShortcutManager.register({
+    manager.register({
       key: '4',
       modifiers: ['alt'],
       description: 'Navigate to review',
@@ -342,15 +345,18 @@ export default function App() {
     window.addEventListener('shortcut:ai-settings', handleAISettings);
 
     return () => {
+      const cleanupManager = getGlobalShortcutManager();
+      if (!cleanupManager) return;
+
       // Cleanup shortcuts
-      globalShortcutManager.unregister('k', ['ctrl']);
-      globalShortcutManager.unregister('k', ['meta']);
-      globalShortcutManager.unregister('c', ['ctrl', 'shift']);
-      globalShortcutManager.unregister('c', ['meta', 'shift']);
-      globalShortcutManager.unregister('1', ['alt']);
-      globalShortcutManager.unregister('2', ['alt']);
-      globalShortcutManager.unregister('3', ['alt']);
-      globalShortcutManager.unregister('4', ['alt']);
+      cleanupManager.unregister('k', ['ctrl']);
+      cleanupManager.unregister('k', ['meta']);
+      cleanupManager.unregister('c', ['ctrl', 'shift']);
+      cleanupManager.unregister('c', ['meta', 'shift']);
+      cleanupManager.unregister('1', ['alt']);
+      cleanupManager.unregister('2', ['alt']);
+      cleanupManager.unregister('3', ['alt']);
+      cleanupManager.unregister('4', ['alt']);
 
       // Cleanup event listeners
       window.removeEventListener('shortcut:command-palette', handleCommandPalette);
