@@ -14,7 +14,7 @@ const AIConfigPage = React.lazy(() => import('@modules/settings').then(m => ({ d
 import { tauriAPI, isTauriApp } from './lib/tauri';
 import { challengeManager, ExtendedChallenge } from './lib/challenge-config';
 import { reloadTracker, preventUnnecessaryReload } from './lib/reload-tracker';
-import { globalShortcutManager } from './lib/shortcuts/KeyboardShortcuts';
+import { getGlobalShortcutManager } from './lib/shortcuts/KeyboardShortcuts';
 import { ShortcutsOverlay, useShortcutsOverlay } from './components/shortcuts/ShortcutsOverlay';
 import { Button } from './components/ui/button';
 import { Progress } from './components/ui/progress';

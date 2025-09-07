@@ -7,7 +7,7 @@ import { appDataDir, join } from '@tauri-apps/api/path';
 
 // Helper function to check if we're running in Tauri
 export const isTauri = () => {
-  return typeof window !== 'undefined' && !!window.__TAURI__;
+  return !!(globalThis.__TAURI__ || globalThis.__TAURI_IPC__);
 };
 
 
@@ -36,6 +36,12 @@ export const notificationUtils = {
     }
   },
 };
+
+// Helper function for error handling in IPC operations
+function handleIpcError(context: string, error: any): never {
+  console.error(`Failed to ${context}:`, error);
+  throw error;
+}
 
 // IPC communication helpers
 export const ipcUtils = {
@@ -79,14 +85,11 @@ export const ipcUtils = {
         try {
           unlistenFn();
         } catch (error) {
-          console.error(`Failed to unlisten for event "${event}":`, error);
-          // Optionally re-throw or handle as needed
-          throw error;
+          handleIpcError(`unlisten for event "${event}"`, error);
         }
       };
     } catch (error) {
-      console.error(`Failed to set up listener for event "${event}":`, error);
-      throw error;
+      handleIpcError(`set up listener for event "${event}"`, error);
     }
   },
 };
@@ -301,7 +304,7 @@ export const diagramUtils = {
  * Note: This function sorts a copy of the segments array by start time before checking for overlaps,
  * so the overlap check is always reliable regardless of backend order.
  */
-function isValidTranscriptionResponse(response: any): response is TranscriptionResponse {
+function isValidTranscriptionResponse(response: any, maxSegments: number = Infinity): response is TranscriptionResponse {
   if (typeof response !== 'object' || response === null) {
     console.error("Validation Error: Response is not an object.", response);
     return false;
@@ -331,8 +334,8 @@ function isValidTranscriptionResponse(response: any): response is TranscriptionR
       return false;
     }
 
-    const start = typeof segment.start === 'string' ? parseFloat(segment.start) : segment.start;
-    const end = typeof segment.end === 'string' ? parseFloat(segment.end) : segment.end;
+    const start = Number.isFinite(Number(segment.start)) ? Number(segment.start) : NaN;
+    const end = Number.isFinite(Number(segment.end)) ? Number(segment.end) : NaN;
 
     if (!Number.isFinite(start) || start < 0) {
       console.error(`Validation Error: Segment ${i} 'start' is not a non-negative finite number.`, segment);
@@ -397,8 +400,8 @@ function sanitizeTranscriptionResponse(response: TranscriptionResponse, maxSegme
   if (sanitizedResponse.segments.length > maxSegments) {
     console.warn(`Sanitization: Number of segments (${sanitizedResponse.segments.length}) exceeds the limit of ${maxSegments}. Truncating.`);
     sanitizedResponse.segments = sanitizedResponse.segments.slice(0, maxSegments);
-    // Optionally, you could also regenerate the full text from the truncated segments
-    // sanitizedResponse.text = sanitizedResponse.segments.map(s => s.text).join(' ').trim();
+    // Recompute the text property after truncating segments
+    sanitizedResponse.text = sanitizedResponse.segments.map(s => s.text).join(' ').trim();
   }
 
   return sanitizedResponse;
@@ -472,7 +475,7 @@ export const transcriptionUtils = {
 
       const response = await ipcUtils.invoke('transcribe_audio', invokeParams);
       
-      if (!isValidTranscriptionResponse(response)) {
+      if (!isValidTranscriptionResponse(response, maxSegments)) {
         throw new Error(
           `Invalid transcription response structure received from backend: ${JSON.stringify(response)}`
         );

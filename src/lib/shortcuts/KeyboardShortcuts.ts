@@ -535,8 +535,20 @@ export const useKeyboardShortcuts = (shortcuts: ShortcutConfig[]) => {
   return managerRef.current;
 };
 
-// Global keyboard shortcut manager instance
-export const globalShortcutManager = new KeyboardShortcutManager();
+// Global keyboard shortcut manager instance - lazy singleton
+let _globalShortcutManager: KeyboardShortcutManager | null = null;
+
+export const getGlobalShortcutManager = (): KeyboardShortcutManager | null => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return null;
+  }
+  
+  if (!_globalShortcutManager) {
+    _globalShortcutManager = new KeyboardShortcutManager();
+  }
+  
+  return _globalShortcutManager;
+};
 
 // Utility functions for formatted shortcut display
 export const formatShortcutKey = (key: string, modifiers?: KeyModifier[]): string => {
@@ -567,17 +579,21 @@ export const formatShortcutKey = (key: string, modifiers?: KeyModifier[]): strin
 };
 
 export const getShortcutsByCategory = (category: ShortcutCategory): ShortcutConfig[] => {
-  return globalShortcutManager.getShortcutsByCategory(category);
+  const manager = getGlobalShortcutManager();
+  return manager ? manager.getShortcutsByCategory(category) : [];
 };
 
 export const getAllShortcuts = (): ShortcutConfig[] => {
-  return globalShortcutManager.getAllShortcuts();
+  const manager = getGlobalShortcutManager();
+  return manager ? manager.getAllShortcuts() : [];
 };
 
 export const getShortcutsVersion = (): number => {
-  return globalShortcutManager.getShortcutsVersion();
+  const manager = getGlobalShortcutManager();
+  return manager ? manager.getShortcutsVersion() : 0;
 };
 
 export const onShortcutsChange = (callback: () => void): () => void => {
-  return globalShortcutManager.onShortcutsChange(callback);
+  const manager = getGlobalShortcutManager();
+  return manager ? manager.onShortcutsChange(callback) : () => false;
 };
