@@ -53,9 +53,36 @@ export class CanvasAnnotationManager {
   }
 
   /**
-   * Add a new annotation
+   * Add a new annotation (overloaded methods for convenience)
    */
-  addAnnotation(annotation: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'>): string {
+  addAnnotation(annotation: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'>): string;
+  addAnnotation(x: number, y: number, type: CanvasAnnotation['type'], content: string, style?: Partial<AnnotationStyle>): CanvasAnnotation;
+  addAnnotation(
+    annotationOrX: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'> | number,
+    y?: number,
+    type?: CanvasAnnotation['type'],
+    content?: string,
+    style?: Partial<AnnotationStyle>
+  ): string | CanvasAnnotation {
+    let annotation: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'>;
+    
+    if (typeof annotationOrX === 'number' && y !== undefined && type && content !== undefined) {
+      // Called with parameters: addAnnotation(x, y, type, content, style?)
+      annotation = {
+        type,
+        x: annotationOrX,
+        y,
+        content,
+        author: 'Current User',
+        color: '#3b82f6',
+        style: this.getDefaultStyle(type, style)
+      };
+    } else if (typeof annotationOrX === 'object') {
+      // Called with full annotation object
+      annotation = annotationOrX;
+    } else {
+      throw new Error('Invalid arguments for addAnnotation');
+    }
     const id = `annotation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const fullAnnotation: CanvasAnnotation = {
       ...annotation,
@@ -68,7 +95,9 @@ export class CanvasAnnotationManager {
     this.annotations.set(id, fullAnnotation);
     this.notifyListeners('annotationAdded', fullAnnotation);
     this.render();
-    return id;
+    
+    // Return the full annotation if called with coordinates, otherwise return id
+    return typeof annotationOrX === 'number' ? fullAnnotation : id;
   }
 
   /**
@@ -133,6 +162,37 @@ export class CanvasAnnotationManager {
   }
 
   /**
+   * Get annotation by ID (alias for compatibility)
+   */
+  getAnnotationById(id: string): CanvasAnnotation | undefined {
+    return this.getAnnotation(id);
+  }
+
+  /**
+   * Get annotation at specific coordinates
+   */
+  getAnnotationAt(x: number, y: number): CanvasAnnotation | null {
+    const annotations = Array.from(this.annotations.values());
+    
+    // Check in reverse order (top to bottom)
+    for (let i = annotations.length - 1; i >= 0; i--) {
+      const annotation = annotations[i];
+      if (this.isPointInAnnotation(x, y, annotation)) {
+        return annotation;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get all annotations (alias for compatibility)
+   */
+  getAnnotations(): CanvasAnnotation[] {
+    return this.getAllAnnotations();
+  }
+
+  /**
    * Get annotations in a specific area
    */
   getAnnotationsInArea(x: number, y: number, width: number, height: number): CanvasAnnotation[] {
@@ -146,9 +206,10 @@ export class CanvasAnnotationManager {
    * Render all annotations on the canvas
    */
   render(): void {
-    // Clear annotation layer (assuming it's overlaid)
-    const annotations = Array.from(this.annotations.values());
+    // Clear the canvas completely before redrawing
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
+    const annotations = Array.from(this.annotations.values());
     annotations.forEach(annotation => {
       this.renderAnnotation(annotation);
     });
@@ -404,14 +465,26 @@ export class CanvasAnnotationManager {
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
-      this.updateAnnotation(this.selectedAnnotation, {
-        x: x - this.dragOffset.x,
-        y: y - this.dragOffset.y
-      });
+      const annotation = this.annotations.get(this.selectedAnnotation);
+      if (annotation) {
+        const updated = { 
+          ...annotation, 
+          x: x - this.dragOffset.x,
+          y: y - this.dragOffset.y 
+        };
+        this.annotations.set(this.selectedAnnotation, updated);
+        this.render();
+      }
     }
   }
 
   private handleMouseUp(): void {
+    if (this.isDragging && this.selectedAnnotation) {
+      const annotation = this.annotations.get(this.selectedAnnotation);
+      if (annotation) {
+        this.notifyListeners('annotationUpdated', annotation);
+      }
+    }
     this.isDragging = false;
   }
 
@@ -442,26 +515,13 @@ export class CanvasAnnotationManager {
     });
   }
 
-  private getAnnotationAt(x: number, y: number): CanvasAnnotation | null {
-    const annotations = Array.from(this.annotations.values());
-    
-    // Check in reverse order (top to bottom)
-    for (let i = annotations.length - 1; i >= 0; i--) {
-      const annotation = annotations[i];
-      if (this.isPointInAnnotation(x, y, annotation)) {
-        return annotation;
-      }
-    }
-    
-    return null;
-  }
 
   private isPointInAnnotation(x: number, y: number, annotation: CanvasAnnotation): boolean {
     const { x: ax, y: ay, width = 200, height = 100 } = annotation;
     return x >= ax && x <= ax + width && y >= ay && y <= ay + height;
   }
 
-  private getDefaultStyle(type: CanvasAnnotation['type']): AnnotationStyle {
+  private getDefaultStyle(type: CanvasAnnotation['type'], overrides?: Partial<AnnotationStyle>): AnnotationStyle {
     const baseStyle: AnnotationStyle = {
       backgroundColor: '#ffffff',
       borderColor: '#e5e7eb',
@@ -473,20 +533,28 @@ export class CanvasAnnotationManager {
       borderWidth: 1
     };
 
+    let typeStyle: AnnotationStyle;
     switch (type) {
       case 'comment':
-        return { ...baseStyle, backgroundColor: '#fef3c7', borderColor: '#f59e0b' };
+        typeStyle = { ...baseStyle, backgroundColor: '#fef3c7', borderColor: '#f59e0b' };
+        break;
       case 'note':
-        return { ...baseStyle, backgroundColor: '#dbeafe', borderColor: '#3b82f6' };
+        typeStyle = { ...baseStyle, backgroundColor: '#dbeafe', borderColor: '#3b82f6' };
+        break;
       case 'label':
-        return { ...baseStyle, backgroundColor: '#f3f4f6', borderColor: '#6b7280' };
+        typeStyle = { ...baseStyle, backgroundColor: '#f3f4f6', borderColor: '#6b7280' };
+        break;
       case 'arrow':
-        return { ...baseStyle, borderColor: '#ef4444', borderWidth: 2 };
+        typeStyle = { ...baseStyle, borderColor: '#ef4444', borderWidth: 2 };
+        break;
       case 'highlight':
-        return { ...baseStyle, backgroundColor: '#fef08a', opacity: 0.5 };
+        typeStyle = { ...baseStyle, backgroundColor: '#fef08a', opacity: 0.5 };
+        break;
       default:
-        return baseStyle;
+        typeStyle = baseStyle;
     }
+    
+    return overrides ? { ...typeStyle, ...overrides } : typeStyle;
   }
 
   private notifyListeners(event: string, data: any): void {
@@ -537,6 +605,10 @@ export class CanvasAnnotationManager {
 }
 
 export type AnnotationEventListener = (event: string, data: any) => void;
+
+// Export alias for compatibility
+export type Annotation = CanvasAnnotation;
+export type AnnotationType = CanvasAnnotation['type'];
 
 // Utility functions
 export const createAnnotationStyle = (overrides: Partial<AnnotationStyle> = {}): AnnotationStyle => {

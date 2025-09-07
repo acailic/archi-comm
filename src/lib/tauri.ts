@@ -189,6 +189,7 @@ export interface TranscriptionProgressEvent {
   partialText?: string;
   status?: string;
   timestamp: number;
+  jobId?: string; // Job ID to filter events for concurrent transcriptions
 }
 
 export type TranscriptionProgressCallback = (event: TranscriptionProgressEvent) => void;
@@ -370,7 +371,28 @@ function isValidTranscriptionResponse(response: any): response is TranscriptionR
  * @returns A new, sanitized transcription response object.
  */
 function sanitizeTranscriptionResponse(response: TranscriptionResponse, maxSegments: number): TranscriptionResponse {
-  const sanitizedResponse = { ...response, segments: [...response.segments] };
+  // Deep clone the segments array and individual segment objects using structuredClone or fallback
+  let clonedSegments: TranscriptionSegment[];
+  try {
+    clonedSegments = structuredClone(response.segments);
+  } catch {
+    // Fallback for environments without structuredClone support
+    clonedSegments = response.segments.map(segment => ({
+      text: segment.text,
+      start: segment.start,
+      end: segment.end,
+      confidence: segment.confidence,
+      speaker: segment.speaker,
+      words: segment.words ? segment.words.map(word => ({
+        word: word.word,
+        start: word.start,
+        end: word.end,
+        confidence: word.confidence
+      })) : undefined
+    }));
+  }
+  
+  const sanitizedResponse = { ...response, segments: clonedSegments };
 
   if (sanitizedResponse.segments.length > maxSegments) {
     console.warn(`Sanitization: Number of segments (${sanitizedResponse.segments.length}) exceeds the limit of ${maxSegments}. Truncating.`);
@@ -436,7 +458,10 @@ export const transcriptionUtils = {
         progressUnlisten = await ipcUtils.listen<TranscriptionProgressEvent>(
           'transcription-progress',
           (event) => {
-            onProgress({ ...event, timestamp: Date.now() });
+            // Only invoke onProgress if jobId matches or if no jobId filtering is needed
+            if (!jobId || !event.jobId || event.jobId === jobId) {
+              onProgress({ ...event, timestamp: Date.now() });
+            }
           }
         );
       }

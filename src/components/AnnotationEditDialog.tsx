@@ -60,7 +60,7 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
   useEffect(() => {
     if (annotation && isOpen) {
       setContent(annotation.content || '');
-      setAuthor(annotation.metadata?.author || '');
+      setAuthor(annotation.author || '');
       
       // Find matching color option
       const colorOption = colorOptions.find(
@@ -72,8 +72,13 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
       
       setFontSize(annotation.style?.fontSize || 14);
       
-      // Load replies from metadata
-      const annotationReplies = annotation.metadata?.replies || [];
+      // Load replies from annotation replies array
+      const annotationReplies = annotation.replies?.map(reply => ({
+        id: reply.id,
+        author: reply.author,
+        content: reply.content,
+        timestamp: new Date(reply.timestamp)
+      })) || [];
       setReplies(annotationReplies);
     } else {
       // Reset form when closing
@@ -90,15 +95,18 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
   const handleSave = useCallback(() => {
     if (!annotation) return;
 
+    const updatedReplies = replies.map(reply => ({
+      id: reply.id,
+      author: reply.author,
+      content: reply.content,
+      timestamp: reply.timestamp.getTime()
+    }));
+
     const updatedAnnotation: Annotation = {
       ...annotation,
       content,
-      metadata: {
-        ...annotation.metadata,
-        author,
-        replies,
-        lastModified: new Date().toISOString()
-      },
+      author,
+      replies: updatedReplies,
       style: {
         ...annotation.style,
         backgroundColor: selectedColor.value,
@@ -124,7 +132,7 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
     if (!newReply.trim() || !replyAuthor.trim()) return;
 
     const reply: Reply = {
-      id: crypto.randomUUID(),
+      id: `reply-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       author: replyAuthor,
       content: newReply,
       timestamp: new Date()
