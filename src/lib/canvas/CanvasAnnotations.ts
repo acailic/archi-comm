@@ -390,6 +390,7 @@ export class CanvasAnnotationManager {
     const { x, y, width = 200, height = 100 } = annotation;
     const margin = 4;
 
+    // Render selection border
     this.ctx.strokeStyle = '#3b82f6';
     this.ctx.lineWidth = 2;
     this.ctx.globalAlpha = 1;
@@ -403,6 +404,40 @@ export class CanvasAnnotationManager {
     );
     
     this.ctx.setLineDash([]);
+
+    // Render edit button
+    this.renderEditButton(annotation);
+  }
+
+  private renderEditButton(annotation: CanvasAnnotation): void {
+    const { x, y, width = 200 } = annotation;
+    const buttonX = x + width - 25;
+    const buttonY = y + 5;
+    const buttonSize = 20;
+
+    // Draw button background
+    this.ctx.fillStyle = '#3b82f6';
+    this.ctx.globalAlpha = 0.9;
+    this.roundedRect(buttonX, buttonY, buttonSize, buttonSize, 4);
+    this.ctx.fill();
+
+    // Draw button border
+    this.ctx.strokeStyle = '#1d4ed8';
+    this.ctx.lineWidth = 1;
+    this.ctx.globalAlpha = 1;
+    this.ctx.stroke();
+
+    // Draw edit icon (pen)
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.globalAlpha = 1;
+    this.ctx.font = '12px system-ui';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText('✏️', buttonX + buttonSize/2, buttonY + buttonSize/2);
+    
+    // Reset text alignment
+    this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'alphabetic';
   }
 
   private renderEditingIndicator(annotation: CanvasAnnotation): void {
