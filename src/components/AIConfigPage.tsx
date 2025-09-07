@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { 
   Eye, 
   EyeOff, 
@@ -19,11 +18,9 @@ import {
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
@@ -31,12 +28,10 @@ import { Slider } from './ui/slider';
 
 import { useAIConfig } from '../hooks/useAIConfig';
 import { 
-  AIProvider, 
   AIConfig, 
-  AVAILABLE_MODELS, 
-  DEFAULT_MODELS,
   AIConfigSchema,
-  validateApiKeyFormat
+  validateApiKeyFormat,
+  DEFAULT_SETTINGS
 } from '../lib/types/AIConfig';
 
 const FormSchema = AIConfigSchema;
@@ -46,27 +41,23 @@ interface AIConfigPageProps {
 }
 
 export function AIConfigPage({ onClose }: AIConfigPageProps) {
-  const [showApiKeys, setShowApiKeys] = useState<Record<AIProvider, boolean>>({
-    [AIProvider.OPENAI]: false,
-    [AIProvider.GEMINI]: false,
-    [AIProvider.CLAUDE]: false
-  });
-
-  const [testingProvider, setTestingProvider] = useState<AIProvider | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [temperature, setTemperature] = useState(DEFAULT_SETTINGS.temperature || 0.7);
+  const [maxTokens, setMaxTokens] = useState(DEFAULT_SETTINGS.maxTokens || 1000);
 
   const {
     config,
     loading,
     saving,
     error,
-    connectionTests,
-    testingConnections,
+    connectionTest,
+    testingConnection,
     saveConfig,
     testConnection,
     resetToDefaults,
     clearError,
     clearTestResult,
-    isProviderConfigured
+    isAIConfigured
   } = useAIConfig();
 
   const form = useForm<AIConfig>({
@@ -75,6 +66,12 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
     values: config
   });
 
+  // Update local state when config changes
+  useEffect(() => {
+    setTemperature(DEFAULT_SETTINGS.temperature || 0.7);
+    setMaxTokens(DEFAULT_SETTINGS.maxTokens || 1000);
+  }, [config]);
+
   const onSubmit = async (data: AIConfig) => {
     const success = await saveConfig(data);
     if (success) {
@@ -82,23 +79,20 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
     }
   };
 
-  const handleTestConnection = async (provider: AIProvider) => {
-    setTestingProvider(provider);
-    const apiKey = form.getValues(`${provider}.apiKey`);
-    await testConnection(provider, apiKey);
-    setTestingProvider(null);
+  const handleTestConnection = async () => {
+    const apiKey = form.getValues('openai.apiKey');
+    await testConnection(apiKey);
   };
 
-  const toggleApiKeyVisibility = (provider: AIProvider) => {
-    setShowApiKeys(prev => ({
-      ...prev,
-      [provider]: !prev[provider]
-    }));
+  const toggleApiKeyVisibility = () => {
+    setShowApiKey(prev => !prev);
   };
 
   const handleResetToDefaults = async () => {
     await resetToDefaults();
     form.reset(config);
+    setTemperature(DEFAULT_SETTINGS.temperature || 0.7);
+    setMaxTokens(DEFAULT_SETTINGS.maxTokens || 1000);
   };
 
   const handleClose = () => {
@@ -130,10 +124,10 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
     }
   }, [onClose, handleClose]);
 
-  const getConnectionStatus = (provider: AIProvider) => {
-    const test = connectionTests[provider];
-    const isConfigured = isProviderConfigured(provider);
-    const isTesting = testingConnections[provider];
+  const getConnectionStatus = () => {
+    const test = connectionTest;
+    const configured = isAIConfigured();
+    const isTesting = testingConnection;
 
     if (isTesting) {
       return (
@@ -144,7 +138,7 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
       );
     }
 
-    if (!test && !isConfigured) {
+    if (!test && !configured) {
       return (
         <div className="flex items-center gap-2 text-gray-500">
           <Info className="h-4 w-4" />
@@ -251,478 +245,151 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  AI Provider Settings
-                </CardTitle>
-                <CardDescription>
-                  Configure your preferred AI providers and their settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue={AIProvider.OPENAI} className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value={AIProvider.OPENAI}>OpenAI</TabsTrigger>
-                    <TabsTrigger value={AIProvider.GEMINI}>Gemini</TabsTrigger>
-                    <TabsTrigger value={AIProvider.CLAUDE}>Claude</TabsTrigger>
-                  </TabsList>
-
-                  {Object.values(AIProvider).map((provider) => (
-                    <TabsContent key={provider} value={provider} className="space-y-6">
-                      <Card>
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <CardTitle className="capitalize">{provider} Configuration</CardTitle>
-                              <CardDescription>
-                                Configure your {provider} API settings
-                              </CardDescription>
-                            </div>
-                            {getConnectionStatus(provider)}
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                          <FormField
-                            control={form.control}
-                            name={`${provider}.enabled`}
-                            render={({ field }) => (
-                              <FormItem className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Enable {provider.toUpperCase()}</FormLabel>
-                                  <FormDescription>
-                                    Enable this AI provider for use in the application
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`${provider}.apiKey`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>API Key</FormLabel>
-                                <FormDescription>
-                                  Your {provider.toUpperCase()} API key (encrypted when saved)
-                                </FormDescription>
-                                <div className="flex gap-2">
-                                  <div className="relative flex-1">
-                                    <FormControl>
-                                      <Input
-                                        type={showApiKeys[provider] ? 'text' : 'password'}
-                                        placeholder={`Enter your ${provider.toUpperCase()} API key`}
-                                        {...field}
-                                        onChange={(e) => {
-                                          field.onChange(e);
-                                          // Clear test results when API key changes
-                                          clearTestResult(provider);
-                                        }}
-                                      />
-                                    </FormControl>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                                      onClick={() => toggleApiKeyVisibility(provider)}
-                                    >
-                                      {showApiKeys[provider] ? (
-                                        <EyeOff className="h-4 w-4" />
-                                      ) : (
-                                        <Eye className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => handleTestConnection(provider)}
-                                    disabled={!field.value || testingProvider === provider}
-                                  >
-                                    <TestTube className="h-4 w-4 mr-2" />
-                                    Test
-                                  </Button>
-                                </div>
-                                <FormMessage />
-                                {connectionTests[provider] && !connectionTests[provider]?.success && (
-                                  <Alert variant="destructive">
-                                    <XCircle className="h-4 w-4" />
-                                    <AlertDescription>
-                                      {connectionTests[provider]?.error}
-                                    </AlertDescription>
-                                  </Alert>
-                                )}
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`${provider}.selectedModel`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Model</FormLabel>
-                                <FormDescription>
-                                  Choose the AI model to use for this provider
-                                </FormDescription>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a model" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {AVAILABLE_MODELS[provider].map((model) => (
-                                      <SelectItem key={model.id} value={model.id}>
-                                        <div>
-                                          <div className="font-medium">{model.name}</div>
-                                          <div className="text-sm text-muted-foreground">
-                                            {model.description}
-                                          </div>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          {/* Advanced Settings */}
-                          <Card>
-                            <CardHeader>
-                              <CardTitle className="text-base">Advanced Settings</CardTitle>
-                              <CardDescription>
-                                Fine-tune the behavior of the AI model
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                              <FormField
-                                control={form.control}
-                                name={`${provider}.settings.temperature`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="flex items-center gap-2">
-                                      Temperature
-                                      <Tooltip>
-                                        <TooltipTrigger>
-                                          <Info className="h-4 w-4" />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          Controls randomness. Lower values = more focused, higher values = more creative
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </FormLabel>
-                                    <FormControl>
-                                      <div className="space-y-2">
-                                        <Slider
-                                          value={[field.value || 0.7]}
-                                          onValueChange={([value]) => field.onChange(value)}
-                                          max={2}
-                                          min={0}
-                                          step={0.1}
-                                          className="w-full"
-                                        />
-                                        <div className="text-center text-sm text-muted-foreground">
-                                          {field.value?.toFixed(1) || '0.7'}
-                                        </div>
-                                      </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              <FormField
-                                control={form.control}
-                                name={`${provider}.settings.maxTokens`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Max Tokens</FormLabel>
-                                    <FormDescription>
-                                      Maximum number of tokens in the response
-                                    </FormDescription>
-                                    <FormControl>
-                                      <Input
-                                        type="number"
-                                        min="1"
-                                        max="200000"
-                                        {...field}
-                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-
-                              {/* Provider-specific advanced settings */}
-                              {provider === AIProvider.OPENAI && (
-                                <>
-                                  <FormField
-                                    control={form.control}
-                                    name={`${provider}.settings.topP`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                          Top P
-                                          <Tooltip>
-                                            <TooltipTrigger>
-                                              <Info className="h-4 w-4" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Controls diversity via nucleus sampling. Lower values = more focused
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <div className="space-y-2">
-                                            <Slider
-                                              value={[field.value || 1]}
-                                              onValueChange={([value]) => field.onChange(value)}
-                                              max={1}
-                                              min={0}
-                                              step={0.1}
-                                              className="w-full"
-                                            />
-                                            <div className="text-center text-sm text-muted-foreground">
-                                              {field.value?.toFixed(1) || '1.0'}
-                                            </div>
-                                          </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-
-                                  <FormField
-                                    control={form.control}
-                                    name={`${provider}.settings.frequencyPenalty`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                          Frequency Penalty
-                                          <Tooltip>
-                                            <TooltipTrigger>
-                                              <Info className="h-4 w-4" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Reduces repetition of frequent tokens. Higher values = less repetition
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <div className="space-y-2">
-                                            <Slider
-                                              value={[field.value || 0]}
-                                              onValueChange={([value]) => field.onChange(value)}
-                                              max={2}
-                                              min={-2}
-                                              step={0.1}
-                                              className="w-full"
-                                            />
-                                            <div className="text-center text-sm text-muted-foreground">
-                                              {field.value?.toFixed(1) || '0.0'}
-                                            </div>
-                                          </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-
-                                  <FormField
-                                    control={form.control}
-                                    name={`${provider}.settings.presencePenalty`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                          Presence Penalty
-                                          <Tooltip>
-                                            <TooltipTrigger>
-                                              <Info className="h-4 w-4" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Reduces repetition of any tokens. Higher values = more diverse topics
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <div className="space-y-2">
-                                            <Slider
-                                              value={[field.value || 0]}
-                                              onValueChange={([value]) => field.onChange(value)}
-                                              max={2}
-                                              min={-2}
-                                              step={0.1}
-                                              className="w-full"
-                                            />
-                                            <div className="text-center text-sm text-muted-foreground">
-                                              {field.value?.toFixed(1) || '0.0'}
-                                            </div>
-                                          </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                </>
-                              )}
-
-                              {provider === AIProvider.GEMINI && (
-                                <>
-                                  <FormField
-                                    control={form.control}
-                                    name={`${provider}.settings.topP`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                          Top P
-                                          <Tooltip>
-                                            <TooltipTrigger>
-                                              <Info className="h-4 w-4" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Controls diversity via nucleus sampling. Lower values = more focused
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <div className="space-y-2">
-                                            <Slider
-                                              value={[field.value || 1]}
-                                              onValueChange={([value]) => field.onChange(value)}
-                                              max={1}
-                                              min={0}
-                                              step={0.1}
-                                              className="w-full"
-                                            />
-                                            <div className="text-center text-sm text-muted-foreground">
-                                              {field.value?.toFixed(1) || '1.0'}
-                                            </div>
-                                          </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-
-                                  <FormField
-                                    control={form.control}
-                                    name={`${provider}.settings.topK`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                          Top K
-                                          <Tooltip>
-                                            <TooltipTrigger>
-                                              <Info className="h-4 w-4" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Limits token selection to top K most likely tokens
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            type="number"
-                                            min="1"
-                                            max="100"
-                                            {...field}
-                                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                </>
-                              )}
-
-                              {provider === AIProvider.CLAUDE && (
-                                <FormField
-                                  control={form.control}
-                                  name={`${provider}.settings.topP`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel className="flex items-center gap-2">
-                                        Top P
-                                        <Tooltip>
-                                          <TooltipTrigger>
-                                            <Info className="h-4 w-4" />
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            Controls diversity via nucleus sampling. Lower values = more focused
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </FormLabel>
-                                      <FormControl>
-                                        <div className="space-y-2">
-                                          <Slider
-                                            value={[field.value || 1]}
-                                            onValueChange={([value]) => field.onChange(value)}
-                                            max={1}
-                                            min={0}
-                                            step={0.1}
-                                            className="w-full"
-                                          />
-                                          <div className="text-center text-sm text-muted-foreground">
-                                            {field.value?.toFixed(1) || '1.0'}
-                                          </div>
-                                        </div>
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              )}
-                            </CardContent>
-                          </Card>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  ))}
-                </Tabs>
-
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Default Provider</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      OpenAI Configuration
+                    </CardTitle>
                     <CardDescription>
-                      Choose which AI provider to use by default
+                      Configure your OpenAI API settings for AI-powered features
+                    </CardDescription>
+                  </div>
+                  {getConnectionStatus()}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="openai.enabled"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <FormLabel>Enable AI Features</FormLabel>
+                        <FormDescription>
+                          Enable AI-powered features using OpenAI
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="openai.apiKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>OpenAI API Key</FormLabel>
+                      <FormDescription>
+                        Your OpenAI API key (encrypted when saved)
+                      </FormDescription>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <FormControl>
+                            <Input
+                              type={showApiKey ? 'text' : 'password'}
+                              placeholder="Enter your OpenAI API key (sk-...)"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                // Clear test results when API key changes
+                                clearTestResult();
+                              }}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                            onClick={toggleApiKeyVisibility}
+                          >
+                            {showApiKey ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleTestConnection}
+                          disabled={!field.value || testingConnection}
+                        >
+                          <TestTube className="h-4 w-4 mr-2" />
+                          Test
+                        </Button>
+                      </div>
+                      <FormMessage />
+                      {connectionTest && !connectionTest.success && (
+                        <Alert variant="destructive">
+                          <XCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {connectionTest.error}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </FormItem>
+                  )}
+                />
+
+                {/* Basic Settings */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">AI Settings</CardTitle>
+                    <CardDescription>
+                      Configure basic AI behavior settings
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <FormField
-                      control={form.control}
-                      name="defaultProvider"
-                      render={({ field }) => (
-                        <FormItem>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select default provider" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {Object.values(AIProvider).map((provider) => (
-                                <SelectItem key={provider} value={provider}>
-                                  {provider.toUpperCase()}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <CardContent className="space-y-4">
+                    <div>
+                      <FormLabel className="flex items-center gap-2">
+                        Temperature
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Controls randomness. Lower values = more focused, higher values = more creative
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="space-y-2 mt-2">
+                        <Slider
+                          value={[temperature]}
+                          onValueChange={([value]) => setTemperature(value)}
+                          max={2}
+                          min={0}
+                          step={0.1}
+                          className="w-full"
+                        />
+                        <div className="text-center text-sm text-muted-foreground">
+                          {temperature.toFixed(1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <FormLabel>Max Tokens</FormLabel>
+                      <FormDescription>
+                        Maximum number of tokens in the response (1-4000)
+                      </FormDescription>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="4000"
+                        value={maxTokens}
+                        onChange={(e) => setMaxTokens(parseInt(e.target.value) || 1000)}
+                        className="mt-2"
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               </CardContent>

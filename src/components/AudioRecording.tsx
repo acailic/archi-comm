@@ -239,14 +239,17 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">
-                  Manual transcript
+                  Manual transcript entry (community version)
                 </label>
                 <textarea
                   className="w-full h-32 p-3 border rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Type your explanation here..."
+                  placeholder="Type your system design explanation here..."
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Manually enter your explanation for the system design. Automatic transcription is not available in the community version.
+                </p>
               </div>
               
               <div className="flex items-center justify-between text-xs text-muted-foreground">

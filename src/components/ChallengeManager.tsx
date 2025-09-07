@@ -9,8 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
-import { Separator } from './ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Alert, AlertDescription } from './ui/alert';
 import { 
   Plus, 
@@ -22,13 +21,12 @@ import {
   FileText, 
   Settings,
   Copy,
-  Eye,
   CheckCircle,
   AlertCircle,
-  Lightbulb,
-  Target
+  Target,
+  BookOpen
 } from 'lucide-react';
-import { ExtendedChallenge, challengeManager, tauriChallengeAPI, SolutionHint } from '../lib/challenge-config';
+import { ExtendedChallenge, challengeManager, tauriChallengeAPI } from '../lib/challenge-config';
 import { Challenge } from '../App';
 
 interface ChallengeManagerProps {
@@ -37,6 +35,8 @@ interface ChallengeManagerProps {
   onClose: () => void;
 }
 
+// ArchiComm Community Edition - Challenge Manager
+// Simplified challenge management for educational use
 interface ChallengeFormData {
   id: string;
   title: string;
@@ -46,8 +46,6 @@ interface ChallengeFormData {
   estimatedTime: number;
   category: string;
   tags: string[];
-  learningObjectives: string[];
-  solutionHints: SolutionHint[];
 }
 
 const defaultFormData: ChallengeFormData = {
@@ -55,20 +53,10 @@ const defaultFormData: ChallengeFormData = {
   title: '',
   description: '',
   requirements: [''],
-  difficulty: 'intermediate',
+  difficulty: 'beginner',
   estimatedTime: 30,
   category: 'system-design',
-  tags: [],
-  learningObjectives: [''],
-  solutionHints: []
-};
-
-const defaultHint: SolutionHint = {
-  id: '',
-  title: '',
-  content: '',
-  type: 'architecture',
-  difficulty: 'intermediate'
+  tags: []
 };
 
 export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: ChallengeManagerProps) {
@@ -115,9 +103,7 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
       difficulty: challenge.difficulty,
       estimatedTime: challenge.estimatedTime,
       category: challenge.category,
-      tags: challenge.tags || [],
-      learningObjectives: challenge.learningObjectives || [],
-      solutionHints: challenge.solutionHints || []
+      tags: challenge.tags || []
     });
     setShowCreateDialog(true);
   };
@@ -133,9 +119,7 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
       const challengeData: ExtendedChallenge = {
         ...formData,
         requirements: formData.requirements.filter(req => req.trim() !== ''),
-        tags: formData.tags.filter(tag => tag.trim() !== ''),
-        learningObjectives: formData.learningObjectives.filter(obj => obj.trim() !== ''),
-        solutionHints: formData.solutionHints.filter(hint => hint.title.trim() !== '' && hint.content.trim() !== '')
+        tags: formData.tags.filter(tag => tag.trim() !== '')
       };
 
       if (editingChallenge) {
@@ -170,15 +154,12 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
   const handleImportChallenges = async () => {
     setImportExportState('importing');
     try {
-      const filePath = await tauriChallengeAPI.selectChallengeFile();
-      if (filePath) {
-        const importedChallenges = await tauriChallengeAPI.loadChallengesFromFile(filePath);
-        // In a real implementation, this would import the challenges
-        showMessage('success', `Imported ${importedChallenges.length} challenges`);
-        loadChallenges();
-      }
+      // Basic import functionality for community edition
+      const importedChallenges = await tauriChallengeAPI.loadChallengesFromFile('challenges.json');
+      showMessage('success', `Imported ${importedChallenges.length} challenges`);
+      loadChallenges();
     } catch (error) {
-      showMessage('error', 'Failed to import challenges');
+      showMessage('error', 'Failed to import challenges. Please check file format.');
     } finally {
       setImportExportState('idle');
     }
@@ -188,10 +169,8 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
     setImportExportState('exporting');
     try {
       const exportData = challengeManager.exportChallenges();
-      const filePath = await tauriChallengeAPI.saveChallengeFile(exportData);
-      if (filePath) {
-        showMessage('success', 'Challenges exported successfully');
-      }
+      await tauriChallengeAPI.saveChallenges(challengeManager.getAllChallenges(), 'exported-challenges.json');
+      showMessage('success', 'Challenges exported successfully');
     } catch (error) {
       showMessage('error', 'Failed to export challenges');
     } finally {
@@ -199,21 +178,21 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
     }
   };
 
-  const addArrayItem = (field: 'requirements' | 'learningObjectives' | 'solutionHints', value?: any) => {
+  const addArrayItem = (field: 'requirements', value?: any) => {
     setFormData(prev => ({
       ...prev,
-      [field]: [...prev[field], value || (field === 'solutionHints' ? { ...defaultHint, id: `hint-${Date.now()}` } : '')]
+      [field]: [...prev[field], value || '']
     }));
   };
 
-  const updateArrayItem = (field: 'requirements' | 'learningObjectives' | 'solutionHints', index: number, value: any) => {
+  const updateArrayItem = (field: 'requirements', index: number, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].map((item, i) => i === index ? value : item)
     }));
   };
 
-  const removeArrayItem = (field: 'requirements' | 'learningObjectives' | 'solutionHints', index: number) => {
+  const removeArrayItem = (field: 'requirements', index: number) => {
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index)
@@ -236,11 +215,11 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
       <DialogContent className="max-w-6xl h-[80vh] p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="flex items-center space-x-2">
-            <Settings className="w-5 h-5" />
-            <span>Challenge Manager</span>
+            <BookOpen className="w-5 h-5" />
+            <span>Challenge Manager - Community Edition</span>
           </DialogTitle>
           <DialogDescription>
-            Create, edit, and manage system design challenges
+            Create and manage basic system design challenges for learning fundamental concepts
           </DialogDescription>
         </DialogHeader>
 
@@ -342,7 +321,7 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                         </CardHeader>
 
                         <CardContent className="pt-0">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                             <div>
                               <span className="text-muted-foreground">Requirements:</span>
                               <span className="ml-1 font-medium">{challenge.requirements.length}</span>
@@ -350,10 +329,6 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                             <div>
                               <span className="text-muted-foreground">Time:</span>
                               <span className="ml-1 font-medium">{challenge.estimatedTime}m</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Hints:</span>
-                              <span className="ml-1 font-medium">{challenge.solutionHints?.length || 0}</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Tags:</span>
@@ -366,9 +341,9 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
 
                     {challenges.length === 0 && (
                       <div className="text-center py-12">
-                        <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-2">No custom challenges</h3>
-                        <p className="text-muted-foreground mb-4">Create your first challenge to get started</p>
+                        <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium mb-2">No custom challenges yet</h3>
+                        <p className="text-muted-foreground mb-4">Create your first educational challenge to practice system design concepts</p>
                         <Button onClick={handleCreateChallenge}>
                           <Plus className="w-4 h-4 mr-2" />
                           Create Challenge
@@ -391,7 +366,7 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                         <span>Import Challenges</span>
                       </CardTitle>
                       <CardDescription>
-                        Load challenges from a JSON file
+                        Import basic challenges from a JSON file for educational use
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -422,8 +397,8 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                       <div className="text-sm text-muted-foreground">
                         <p>Supported formats:</p>
                         <ul className="list-disc list-inside mt-1 space-y-1">
-                          <li>JSON files with challenge arrays</li>
-                          <li>Exported ArchiComm challenge files</li>
+                          <li>JSON files with basic challenge data</li>
+                          <li>Community challenge collections</li>
                         </ul>
                       </div>
                     </CardContent>
@@ -437,7 +412,7 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                         <span>Export Challenges</span>
                       </CardTitle>
                       <CardDescription>
-                        Save your custom challenges to a file
+                        Save your educational challenges for sharing and backup
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -469,8 +444,8 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                         <p>Export includes:</p>
                         <ul className="list-disc list-inside mt-1 space-y-1">
                           <li>All custom challenges</li>
-                          <li>Solution hints and templates</li>
-                          <li>Tags and metadata</li>
+                          <li>Basic challenge metadata</li>
+                          <li>Tags and requirements</li>
                         </ul>
                       </div>
                     </CardContent>
@@ -489,7 +464,7 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                 {editingChallenge ? 'Edit Challenge' : 'Create New Challenge'}
               </DialogTitle>
               <DialogDescription>
-                {editingChallenge ? 'Modify the challenge details' : 'Define a new system design challenge'}
+                {editingChallenge ? 'Modify the educational challenge details' : 'Create a new basic system design challenge for learning'}
               </DialogDescription>
             </DialogHeader>
 
@@ -570,8 +545,10 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                       value={formData.estimatedTime}
                       onChange={(e) => setFormData(prev => ({ ...prev, estimatedTime: parseInt(e.target.value) || 30 }))}
                       min="15"
-                      max="180"
+                      max="90"
+                      placeholder="30"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">Recommended: 15-60 minutes for educational challenges</p>
                   </div>
                 </div>
 
@@ -589,13 +566,14 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                       Add
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground mb-2">Define clear, achievable requirements for learning system design concepts</p>
                   <div className="space-y-2">
                     {formData.requirements.map((req, index) => (
                       <div key={index} className="flex space-x-2">
                         <Input
                           value={req}
                           onChange={(e) => updateArrayItem('requirements', index, e.target.value)}
-                          placeholder="Requirement description"
+                          placeholder="e.g., Handle user authentication and basic CRUD operations"
                         />
                         <Button
                           type="button"
@@ -609,6 +587,21 @@ export function ChallengeManager({ onChallengeUpdate, isOpen, onClose }: Challen
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <Label htmlFor="tags">Tags (comma-separated)</Label>
+                  <Input
+                    id="tags"
+                    value={formData.tags.join(', ')}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag !== '') 
+                    }))}
+                    placeholder="e.g., web-services, databases, authentication"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Add relevant tags to help categorize your challenge</p>
                 </div>
               </div>
             </ScrollArea>

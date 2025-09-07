@@ -1,7 +1,6 @@
 import { ReviewResp as ReviewRespSchema, type ReviewResp } from '../contracts/schema';
-import { invoke } from '@tauri-apps/api/tauri';
 import { aiConfigService } from '../services/AIConfigService';
-import { AIProvider, AIConfig } from '../types/AIConfig';
+import { DEFAULT_SETTINGS } from '../types/AIConfig';
 import { isTauri } from '../tauri';
 
 // AI API Response interface for different providers
@@ -11,49 +10,18 @@ interface AIResponse {
 }
 
 export async function reviewSolution(taskId: string, solutionText: string): Promise<ReviewResp> {
-  try {
-    // Try to use configured OpenAI first
-    const config = await aiConfigService.loadConfig();
-    
-    if (config.openai.enabled && config.openai.apiKey) {
-      if (!isTauri()) {
-        throw new Error('AI provider calls are only available in the desktop application to protect API keys.');
-      }
-      const response = await callOpenAI(config.openai.apiKey, solutionText);
-      return parseAIResponse(response.content);
-    }
-  } catch (error) {
-    console.warn('Failed to use configured AI provider, falling back to Tauri backend:', error);
-  }
-
-  // Fallback to existing Tauri backend implementation
-  const raw = await invoke<any>('ai_review', { req: { task_id: taskId, solution_text: solutionText } });
-  
-  // Accept either our shaped response or a raw OpenAI content string
-  if (raw && typeof raw === 'object' && 'summary' in raw) {
-    return ReviewRespSchema.parse(raw);
-  }
-  if (raw && typeof raw === 'string') {
-    return ReviewRespSchema.parse({ summary: raw, strengths: [], risks: [], score: 0 });
-  }
-  // Fallback for unexpected shapes
-  return ReviewRespSchema.parse({ summary: String(raw ?? ''), strengths: [], risks: [], score: 0 });
-}
-
-// Call OpenAI directly (simplified)
-export async function callOpenAIProvider(
-  config: AIConfig, 
-  prompt: string
-): Promise<AIResponse> {
   if (!isTauri()) {
     throw new Error('AI provider calls are only available in the desktop application to protect API keys.');
   }
+
+  const config = await aiConfigService.loadConfig();
   
   if (!config.openai.enabled || !config.openai.apiKey) {
     throw new Error('OpenAI is not configured or enabled');
   }
 
-  return callOpenAI(config.openai.apiKey, prompt);
+  const response = await callOpenAI(config.openai.apiKey, solutionText);
+  return parseAIResponse(response.content);
 }
 
 // Simplified OpenAI API implementation
@@ -61,6 +29,13 @@ async function callOpenAI(
   apiKey: string, 
   prompt: string
 ): Promise<AIResponse> {
+  const config = await aiConfigService.loadConfig();
+  const settings = {
+    temperature: DEFAULT_SETTINGS.temperature,
+    maxTokens: DEFAULT_SETTINGS.maxTokens,
+    ...config
+  };
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -70,14 +45,13 @@ async function callOpenAI(
     body: JSON.stringify({
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: createReviewPrompt(prompt) }],
-      temperature: 0.7,
-      max_tokens: 1000
+      temperature: settings.temperature,
+      max_tokens: settings.maxTokens
     })
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+    throw new Error(`OpenAI API error: ${response.status}`);
   }
 
   const data = await response.json();
@@ -130,11 +104,7 @@ function parseAIResponse(content: string): ReviewResp {
 
 // Utility function to check if AI is available
 export async function isAIAvailable(): Promise<boolean> {
-  try {
-    const config = await aiConfigService.loadConfig();
-    return config.openai.enabled && config.openai.apiKey !== '';
-  } catch (error) {
-    return false;
-  }
+  const config = await aiConfigService.loadConfig();
+  return config.openai.enabled && config.openai.apiKey !== '';
 }
 

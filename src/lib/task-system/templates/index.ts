@@ -1,46 +1,55 @@
 import { TaskTemplate, ComponentDefinition, TaskConstraint, EvaluationCriteria } from '../TaskPlugin';
 
 /**
- * Microservices Architecture Design Task
+ * ArchiComm Community Edition - Basic Templates Only
+ * 
+ * This file contains basic, educational templates suitable for learning
+ * system design fundamentals. Advanced enterprise templates are available
+ * in the premium version.
+ */
+
+/**
+ * Basic Microservices Architecture Design Task
+ * Simplified for educational purposes in the community edition
  */
 export const microservicesTemplate: TaskTemplate = {
   id: 'microservices-basic',
-  name: 'Design a Microservices E-commerce Platform',
-  description: 'Design a scalable e-commerce platform using microservices architecture with proper service boundaries, communication patterns, and data management.',
+  name: 'Design a Simple Microservices Blog Platform',
+  description: 'Design a basic blog platform using microservices architecture. Learn fundamental concepts of service separation, API design, and data management.',
   category: 'Architecture Patterns',
-  difficulty: 'intermediate',
-  estimatedTime: 45,
-  tags: ['microservices', 'e-commerce', 'scalability', 'distributed-systems'],
+  difficulty: 'beginner',
+  estimatedTime: 30,
+  tags: ['microservices', 'blog', 'api-design', 'basic-architecture'],
   learningObjectives: [
-    'Understand microservices architecture principles',
-    'Learn to identify proper service boundaries',
-    'Master inter-service communication patterns',
-    'Apply data management in distributed systems'
+    'Understand basic microservices principles',
+    'Learn to separate concerns into services',
+    'Practice simple API design',
+    'Apply basic data management concepts'
   ],
   prerequisites: [
-    'Basic understanding of web architecture',
-    'Familiarity with APIs and databases',
-    'Knowledge of scalability concepts'
+    'Basic understanding of web applications',
+    'Familiarity with REST APIs',
+    'Basic database knowledge'
   ],
   
   steps: [
     {
       id: 'identify-services',
       title: 'Identify Core Services',
-      description: 'Break down the e-commerce domain into logical microservices',
+      description: 'Break down the blog platform into simple microservices',
       type: 'component',
       required: true,
       hints: [
-        'Think about business capabilities: user management, product catalog, orders, payments, inventory',
-        'Each service should have a single responsibility',
-        'Consider data ownership boundaries'
+        'Think about basic capabilities: user management, blog posts, comments',
+        'Each service should handle one main responsibility',
+        'Keep it simple for learning purposes'
       ],
       validation: {
         rules: [
           {
             type: 'component-count',
-            condition: '4',
-            message: 'You should have at least 4 microservices for a basic e-commerce platform',
+            condition: '3',
+            message: 'You should have at least 3 microservices for a basic blog platform',
             severity: 'warning'
           }
         ],
@@ -50,20 +59,20 @@ export const microservicesTemplate: TaskTemplate = {
     {
       id: 'define-communication',
       title: 'Define Service Communication',
-      description: 'Establish how services will communicate with each other',
+      description: 'Establish how services will communicate using REST APIs',
       type: 'connection',
       required: true,
       hints: [
-        'Use synchronous communication (HTTP/gRPC) for request-response patterns',
-        'Use asynchronous communication (events/messages) for loose coupling',
-        'Consider API Gateway for external access'
+        'Use HTTP REST APIs for service communication',
+        'Consider an API Gateway for external access',
+        'Keep communication patterns simple'
       ],
       validation: {
         rules: [
           {
             type: 'connection-exists',
             condition: 'api',
-            message: 'Services should be connected through APIs or message queues',
+            message: 'Services should be connected through REST APIs',
             severity: 'error'
           }
         ],
@@ -72,26 +81,14 @@ export const microservicesTemplate: TaskTemplate = {
     },
     {
       id: 'data-management',
-      title: 'Design Data Management',
-      description: 'Design data storage and management strategy for each service',
+      title: 'Design Data Storage',
+      description: 'Design simple data storage for each service',
       type: 'component',
       required: true,
       hints: [
-        'Each service should own its data',
-        'Choose appropriate database types for each service',
-        'Consider data consistency patterns'
-      ]
-    },
-    {
-      id: 'infrastructure',
-      title: 'Add Infrastructure Components',
-      description: 'Add necessary infrastructure components for the system',
-      type: 'component',
-      required: true,
-      hints: [
-        'Consider load balancers, API gateways, service discovery',
-        'Add monitoring and logging components',
-        'Include caching layers where appropriate'
+        'Each service should have its own database',
+        'Use simple database choices (PostgreSQL, MongoDB)',
+        'Focus on data separation between services'
       ]
     }
   ],
@@ -101,85 +98,55 @@ export const microservicesTemplate: TaskTemplate = {
       id: 'user-service',
       name: 'User Service',
       type: 'service',
-      description: 'Manages user authentication, profiles, and preferences',
+      description: 'Manages user registration, authentication, and profiles',
       icon: 'user-circle',
       color: '#3b82f6',
       properties: [
         { key: 'database', label: 'Database Type', type: 'select', options: [
           { value: 'postgresql', label: 'PostgreSQL' },
-          { value: 'mongodb', label: 'MongoDB' },
-          { value: 'mysql', label: 'MySQL' }
+          { value: 'mongodb', label: 'MongoDB' }
         ]},
         { key: 'auth_method', label: 'Authentication', type: 'select', options: [
           { value: 'jwt', label: 'JWT' },
-          { value: 'oauth', label: 'OAuth' },
           { value: 'session', label: 'Session-based' }
         ]}
       ],
       connectionPoints: [
-        { id: 'api-out', name: 'REST API', type: 'output', protocol: 'HTTP' },
-        { id: 'events-out', name: 'User Events', type: 'output', protocol: 'Message Queue' }
+        { id: 'api-out', name: 'REST API', type: 'output', protocol: 'HTTP' }
       ]
     },
     {
-      id: 'product-service',
-      name: 'Product Catalog',
+      id: 'blog-service',
+      name: 'Blog Service',
       type: 'service',
-      description: 'Manages product information, categories, and search',
-      icon: 'shopping-bag',
+      description: 'Manages blog posts, categories, and content',
+      icon: 'document-text',
       color: '#10b981',
       properties: [
-        { key: 'search_engine', label: 'Search Technology', type: 'select', options: [
-          { value: 'elasticsearch', label: 'Elasticsearch' },
-          { value: 'solr', label: 'Apache Solr' },
-          { value: 'algolia', label: 'Algolia' }
-        ]},
-        { key: 'cache_strategy', label: 'Caching', type: 'select', options: [
-          { value: 'redis', label: 'Redis' },
-          { value: 'memcached', label: 'Memcached' },
-          { value: 'none', label: 'No Cache' }
+        { key: 'database', label: 'Database Type', type: 'select', options: [
+          { value: 'postgresql', label: 'PostgreSQL' },
+          { value: 'mongodb', label: 'MongoDB' }
         ]}
       ],
       connectionPoints: [
-        { id: 'api-out', name: 'Product API', type: 'output', protocol: 'HTTP' },
-        { id: 'search-out', name: 'Search API', type: 'output', protocol: 'HTTP' }
+        { id: 'api-out', name: 'Blog API', type: 'output', protocol: 'HTTP' }
       ]
     },
     {
-      id: 'order-service',
-      name: 'Order Service',
+      id: 'comment-service',
+      name: 'Comment Service',
       type: 'service',
-      description: 'Handles order processing, status tracking, and fulfillment',
-      icon: 'clipboard-list',
+      description: 'Handles comments on blog posts',
+      icon: 'chat-bubble-left',
       color: '#f59e0b',
       properties: [
-        { key: 'state_machine', label: 'Order State Management', type: 'boolean', defaultValue: true },
-        { key: 'saga_pattern', label: 'Use Saga Pattern', type: 'boolean', defaultValue: false }
+        { key: 'database', label: 'Database Type', type: 'select', options: [
+          { value: 'postgresql', label: 'PostgreSQL' },
+          { value: 'mongodb', label: 'MongoDB' }
+        ]}
       ],
       connectionPoints: [
-        { id: 'api-out', name: 'Order API', type: 'output', protocol: 'HTTP' },
-        { id: 'events-in', name: 'Order Events', type: 'input', protocol: 'Message Queue' },
-        { id: 'events-out', name: 'Order Events', type: 'output', protocol: 'Message Queue' }
-      ]
-    },
-    {
-      id: 'payment-service',
-      name: 'Payment Service',
-      type: 'service',
-      description: 'Processes payments, handles billing, and manages transactions',
-      icon: 'credit-card',
-      color: '#ef4444',
-      properties: [
-        { key: 'payment_provider', label: 'Payment Provider', type: 'multiselect', options: [
-          { value: 'stripe', label: 'Stripe' },
-          { value: 'paypal', label: 'PayPal' },
-          { value: 'square', label: 'Square' }
-        ]},
-        { key: 'encryption', label: 'PCI Compliance', type: 'boolean', defaultValue: true }
-      ],
-      connectionPoints: [
-        { id: 'api-out', name: 'Payment API', type: 'output', protocol: 'HTTPS' },
-        { id: 'webhook-in', name: 'Payment Webhooks', type: 'input', protocol: 'HTTPS' }
+        { id: 'api-out', name: 'Comment API', type: 'output', protocol: 'HTTP' }
       ]
     }
   ],
@@ -188,65 +155,50 @@ export const microservicesTemplate: TaskTemplate = {
     {
       id: 'service-limit',
       type: 'component-limit',
-      description: 'Should have at least 3 core services but not more than 10 to keep complexity manageable',
-      rule: '10',
+      description: 'Should have 3-5 services to keep it simple for learning',
+      rule: '5',
       enforcement: 'soft'
     },
     {
       id: 'data-ownership',
       type: 'pattern-required',
-      description: 'Each service should have its own database (no shared databases)',
+      description: 'Each service should have its own database',
       rule: 'database-per-service',
       enforcement: 'hard'
-    },
-    {
-      id: 'api-gateway',
-      type: 'pattern-required',
-      description: 'Should include an API Gateway for external client access',
-      rule: 'api-gateway-present',
-      enforcement: 'soft'
     }
   ],
 
   evaluation: {
     completeness: {
-      weight: 25,
+      weight: 30,
       criteria: [
         'All required services are present',
-        'Infrastructure components are included',
-        'Data storage is defined for each service'
+        'Data storage is defined for each service',
+        'API connections are established'
       ]
     },
     correctness: {
-      weight: 30,
+      weight: 40,
       criteria: [
-        'Proper service boundaries are defined',
-        'Communication patterns are appropriate',
-        'Data consistency is addressed'
+        'Service boundaries make sense',
+        'Communication patterns are simple and clear',
+        'Data separation is properly implemented'
       ]
     },
-    efficiency: {
+    clarity: {
       weight: 20,
       criteria: [
-        'Appropriate technology choices',
-        'Caching strategies are considered',
-        'Performance optimizations are present'
-      ]
-    },
-    scalability: {
-      weight: 15,
-      criteria: [
-        'Services can scale independently',
-        'Load balancing is considered',
-        'Database scaling is addressed'
+        'Design is easy to understand',
+        'Service responsibilities are clear',
+        'Architecture is well-organized'
       ]
     },
     bestPractices: {
       weight: 10,
       criteria: [
-        'Security considerations are included',
-        'Monitoring and logging are planned',
-        'DevOps practices are considered'
+        'Basic security considerations',
+        'Simple monitoring approach',
+        'Clean API design'
       ]
     }
   },
@@ -258,153 +210,8 @@ export const microservicesTemplate: TaskTemplate = {
 };
 
 /**
- * Event-Driven Architecture Task
- */
-export const eventDrivenTemplate: TaskTemplate = {
-  id: 'event-driven-basic',
-  name: 'Design Event-Driven Real-time Analytics Platform',
-  description: 'Design a real-time analytics platform using event-driven architecture with proper event sourcing, CQRS, and stream processing.',
-  category: 'Architecture Patterns',
-  difficulty: 'advanced',
-  estimatedTime: 60,
-  tags: ['event-driven', 'real-time', 'analytics', 'stream-processing', 'cqrs'],
-  learningObjectives: [
-    'Master event-driven architecture patterns',
-    'Understand event sourcing and CQRS',
-    'Learn stream processing concepts',
-    'Apply real-time data processing techniques'
-  ],
-  prerequisites: [
-    'Understanding of microservices',
-    'Knowledge of message queues',
-    'Familiarity with databases',
-    'Basic knowledge of streaming concepts'
-  ],
-
-  steps: [
-    {
-      id: 'event-sources',
-      title: 'Identify Event Sources',
-      description: 'Define what generates events in the system',
-      type: 'component',
-      required: true,
-      hints: [
-        'Consider user interactions, system events, external integrations',
-        'Think about high-volume vs low-volume event sources',
-        'Consider event schemas and versioning'
-      ]
-    },
-    {
-      id: 'event-backbone',
-      title: 'Design Event Backbone',
-      description: 'Design the central event streaming infrastructure',
-      type: 'component',
-      required: true,
-      hints: [
-        'Choose appropriate streaming platform (Kafka, Pulsar, etc.)',
-        'Consider partitioning and replication strategies',
-        'Plan for event ordering and exactly-once semantics'
-      ]
-    },
-    {
-      id: 'stream-processors',
-      title: 'Add Stream Processors',
-      description: 'Design components that process event streams in real-time',
-      type: 'component',
-      required: true,
-      hints: [
-        'Consider windowing operations for aggregations',
-        'Think about stateful vs stateless processing',
-        'Plan for fault tolerance and recovery'
-      ]
-    },
-    {
-      id: 'read-write-models',
-      title: 'Separate Read/Write Models',
-      description: 'Implement CQRS pattern with separate read and write models',
-      type: 'component',
-      required: true,
-      hints: [
-        'Write models should be optimized for commands',
-        'Read models should be optimized for queries',
-        'Consider eventual consistency implications'
-      ]
-    }
-  ],
-
-  components: [
-    {
-      id: 'event-store',
-      name: 'Event Store',
-      type: 'database',
-      description: 'Stores all events as the single source of truth',
-      icon: 'database',
-      color: '#8b5cf6',
-      properties: [
-        { key: 'store_type', label: 'Store Type', type: 'select', options: [
-          { value: 'eventstore', label: 'EventStore' },
-          { value: 'kafka', label: 'Apache Kafka' },
-          { value: 'postgresql', label: 'PostgreSQL' }
-        ]},
-        { key: 'retention', label: 'Event Retention (days)', type: 'number', defaultValue: 365 }
-      ],
-      connectionPoints: [
-        { id: 'events-in', name: 'Event Input', type: 'input', protocol: 'Event Stream' },
-        { id: 'events-out', name: 'Event Output', type: 'output', protocol: 'Event Stream' }
-      ]
-    },
-    {
-      id: 'stream-processor',
-      name: 'Stream Processor',
-      type: 'service',
-      description: 'Processes event streams in real-time for analytics',
-      icon: 'zap',
-      color: '#f59e0b',
-      properties: [
-        { key: 'processing_engine', label: 'Processing Engine', type: 'select', options: [
-          { value: 'kafka-streams', label: 'Kafka Streams' },
-          { value: 'flink', label: 'Apache Flink' },
-          { value: 'storm', label: 'Apache Storm' }
-        ]},
-        { key: 'windowing', label: 'Window Type', type: 'select', options: [
-          { value: 'tumbling', label: 'Tumbling' },
-          { value: 'sliding', label: 'Sliding' },
-          { value: 'session', label: 'Session' }
-        ]}
-      ],
-      connectionPoints: [
-        { id: 'events-in', name: 'Input Stream', type: 'input', protocol: 'Event Stream' },
-        { id: 'processed-out', name: 'Processed Events', type: 'output', protocol: 'Event Stream' }
-      ]
-    }
-  ],
-
-  constraints: [
-    {
-      id: 'event-ordering',
-      type: 'pattern-required',
-      description: 'Event ordering must be maintained within partitions',
-      rule: 'partition-ordering',
-      enforcement: 'hard'
-    }
-  ],
-
-  evaluation: {
-    completeness: { weight: 25, criteria: ['All event flows are defined', 'CQRS is properly implemented'] },
-    correctness: { weight: 30, criteria: ['Event schemas are well-defined', 'Consistency patterns are correct'] },
-    efficiency: { weight: 20, criteria: ['Stream processing is optimized', 'Storage is efficient'] },
-    scalability: { weight: 15, criteria: ['Can handle high event volumes', 'Horizontal scaling is possible'] },
-    bestPractices: { weight: 10, criteria: ['Event versioning strategy', 'Monitoring and observability'] }
-  },
-
-  author: 'ArchiComm Team',
-  version: '1.0.0',
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z'
-};
-
-/**
- * Serverless Architecture Task
+ * Serverless Architecture Task - Community Edition
+ * Perfect for beginners learning cloud and serverless concepts
  */
 export const serverlessTemplate: TaskTemplate = {
   id: 'serverless-basic',
@@ -533,15 +340,14 @@ export const serverlessTemplate: TaskTemplate = {
   updatedAt: '2024-01-01T00:00:00Z'
 };
 
-// Export all templates
+// Export community templates only
+// Advanced templates (event-driven, enterprise patterns) are available in premium version
 export const builtInTemplates = [
   microservicesTemplate,
-  eventDrivenTemplate,
   serverlessTemplate
 ];
 
 export default {
   microservices: microservicesTemplate,
-  eventDriven: eventDrivenTemplate,
   serverless: serverlessTemplate
 };

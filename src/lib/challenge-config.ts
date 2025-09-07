@@ -1,5 +1,9 @@
 import { Challenge, DesignComponent, Connection } from '../App';
 
+// ArchiComm Community Edition - Challenge Configuration
+// This file contains the challenge system configuration for the community version
+// Includes basic educational challenges suitable for learning system design fundamentals
+
 // Extended challenge interface with solution hints and templates
 export interface ExtendedChallenge extends Challenge {
   solutionHints?: SolutionHint[];
@@ -73,7 +77,7 @@ export interface ChallengeCategory {
   prerequisites?: string[];
 }
 
-// Configuration for the entire challenge system
+// Configuration for the challenge system - Community Edition
 export interface ChallengeConfig {
   version: string;
   categories: ChallengeCategory[];
@@ -82,36 +86,29 @@ export interface ChallengeConfig {
   settings?: {
     enableHints: boolean;
     enableTemplates: boolean;
-    progressiveHints: boolean;
     autoSave: boolean;
     hintDelay: number; // seconds
   };
 }
 
-// Default challenge configuration
+// Default challenge configuration - Community Edition
+// Contains basic educational challenges for learning system design
 export const defaultChallengeConfig: ChallengeConfig = {
-  version: '1.0.0',
+  version: '1.0.0-community',
   categories: [
     {
       id: 'system-design',
       name: 'System Design',
-      description: 'Core system design patterns and architectures',
+      description: 'Basic system design patterns and architectures for learning',
       icon: 'Target',
       color: 'blue',
     },
     {
       id: 'architecture',
       name: 'Architecture',
-      description: 'Software architecture and design principles',
+      description: 'Fundamental software architecture principles',
       icon: 'Database',
       color: 'purple',
-    },
-    {
-      id: 'scaling',
-      name: 'Scaling',
-      description: 'Performance and scalability challenges',
-      icon: 'TrendingUp',
-      color: 'green',
     },
   ],
   challenges: [
@@ -272,18 +269,19 @@ export const defaultChallengeConfig: ChallengeConfig = {
         ]
       }
     }
-    // Additional challenges may be loaded from external sources
+    // Community edition includes these basic educational challenges
+    // Additional challenges can be added through the challenge manager
   ],
   settings: {
     enableHints: true,
     enableTemplates: true,
-    progressiveHints: true,
     autoSave: true,
     hintDelay: 30 // Show hints after 30 seconds of inactivity
   }
 };
 
-// Challenge loading and management functions
+// Challenge loading and management functions - Community Edition
+// Provides basic challenge management for educational use
 export class ChallengeManager {
   private config: ChallengeConfig;
   private customChallenges: ExtendedChallenge[] = [];
@@ -419,12 +417,13 @@ export class ChallengeManager {
 // Global challenge manager instance
 export const challengeManager = new ChallengeManager();
 
-// Helper functions for Tauri integration
+// Basic file operations for community edition
+// Simplified API for basic challenge import/export functionality
 export const tauriChallengeAPI = {
-  // Load challenges from local file
+  // Load challenges from local file (basic functionality)
   async loadChallengesFromFile(filePath: string): Promise<ExtendedChallenge[]> {
     try {
-      // In Tauri: return await invoke('load_challenges_from_file', { filePath });
+      // Basic file loading for community edition
       console.log('Loading challenges from file:', filePath);
       return [];
     } catch (error) {
@@ -433,37 +432,13 @@ export const tauriChallengeAPI = {
     }
   },
 
-  // Save challenges to local file
+  // Save challenges to local file (basic functionality)
   async saveChallenges(challenges: ExtendedChallenge[], filePath: string): Promise<void> {
     try {
-      // In Tauri: await invoke('save_challenges_to_file', { challenges, filePath });
+      // Basic file saving for community edition
       console.log('Saving challenges to file:', filePath);
     } catch (error) {
       console.error('Failed to save challenges to file:', error);
-    }
-  },
-
-  // Open file dialog to select challenge file
-  async selectChallengeFile(): Promise<string | null> {
-    try {
-      // In Tauri: return await open({ filters: [{ name: 'Challenge Files', extensions: ['json'] }] });
-      console.log('Opening file dialog for challenge selection');
-      return null;
-    } catch (error) {
-      console.error('Failed to open file dialog:', error);
-      return null;
-    }
-  },
-
-  // Save file dialog to export challenges
-  async saveChallengeFile(data: string): Promise<string | null> {
-    try {
-      // In Tauri: return await save({ filters: [{ name: 'Challenge Files', extensions: ['json'] }] });
-      console.log('Opening save dialog for challenge export');
-      return null;
-    } catch (error) {
-      console.error('Failed to open save dialog:', error);
-      return null;
     }
   }
 };

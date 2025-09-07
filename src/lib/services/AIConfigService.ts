@@ -92,14 +92,6 @@ export class AIConfigService {
       openai: {
         ...config.openai,
         apiKey: this.encryptApiKey(config.openai.apiKey)
-      },
-      gemini: {
-        ...config.gemini,
-        apiKey: this.encryptApiKey(config.gemini.apiKey)
-      },
-      claude: {
-        ...config.claude,
-        apiKey: this.encryptApiKey(config.claude.apiKey)
       }
     };
   }
@@ -110,14 +102,6 @@ export class AIConfigService {
       openai: {
         ...encryptedConfig.openai,
         apiKey: this.decryptApiKey(encryptedConfig.openai.apiKey)
-      },
-      gemini: {
-        ...encryptedConfig.gemini,
-        apiKey: this.decryptApiKey(encryptedConfig.gemini.apiKey)
-      },
-      claude: {
-        ...encryptedConfig.claude,
-        apiKey: this.decryptApiKey(encryptedConfig.claude.apiKey)
       }
     };
   }
@@ -271,82 +255,6 @@ export class AIConfigService {
     }
   }
 
-  private async testGemini(apiKey: string, model: string, message: string): Promise<ConnectionTestResult> {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: message }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 50,
-            temperature: 0.1
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          error: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`
-        };
-      }
-
-      const data = await response.json();
-      return {
-        success: true,
-        model: model
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Network error'
-      };
-    }
-  }
-
-  private async testClaude(apiKey: string, model: string, message: string): Promise<ConnectionTestResult> {
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 50,
-          temperature: 0.1,
-          messages: [{ role: 'user', content: message }]
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          error: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`
-        };
-      }
-
-      const data = await response.json();
-      return {
-        success: true,
-        model: data.model
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Network error'
-      };
-    }
-  }
 
   async resetToDefaults(): Promise<void> {
     this.config = getDefaultConfig();

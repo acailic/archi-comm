@@ -22,133 +22,83 @@ interface ChallengeSelectionProps {
   availableChallenges?: ExtendedChallenge[];
 }
 
+// ArchiComm Community Edition - Basic Educational Challenges
+// Focused on fundamental system design concepts for learning
 const challenges: Challenge[] = [
+  {
+    id: 'todo-app',
+    title: 'Todo List Application',
+    description: 'Design a simple todo list application with user accounts and basic CRUD operations.',
+    requirements: [
+      'User registration and authentication',
+      'Create, read, update, delete todos',
+      'Mark todos as complete/incomplete',
+      'Basic data persistence',
+      'Simple user interface'
+    ],
+    difficulty: 'beginner',
+    estimatedTime: 20,
+    category: 'system-design'
+  },
+  {
+    id: 'blog-platform',
+    title: 'Simple Blog Platform',
+    description: 'Create a basic blogging platform where users can write and publish articles.',
+    requirements: [
+      'User authentication and profiles',
+      'Create and edit blog posts',
+      'View published articles',
+      'Basic commenting system',
+      'Simple search functionality'
+    ],
+    difficulty: 'beginner',
+    estimatedTime: 25,
+    category: 'system-design'
+  },
   {
     id: 'url-shortener',
     title: 'URL Shortener Service',
-    description: 'Design a scalable URL shortening service like bit.ly or tinyurl.com with analytics and custom domains.',
+    description: 'Design a scalable URL shortening service like bit.ly with basic analytics.',
     requirements: [
-      'Handle 100M URLs shortened per day',
-      'Support custom aliases and domains',
-      'Provide real-time analytics and click tracking',
-      'Ensure high availability (99.9% uptime)',
-      'Implement rate limiting and spam protection'
+      'Shorten long URLs to unique short codes',
+      'Redirect short URLs to original URLs',
+      'Basic click tracking and analytics',
+      'Custom alias support',
+      'Simple rate limiting'
     ],
     difficulty: 'intermediate',
     estimatedTime: 45,
     category: 'system-design'
   },
   {
-    id: 'ecommerce-platform',
-    title: 'E-commerce Platform',
-    description: 'Create a comprehensive e-commerce platform handling millions of products and users globally.',
-    requirements: [
-      'Product catalog with search and filtering',
-      'Shopping cart and secure checkout flow',
-      'Payment processing with multiple providers',
-      'Order management and tracking system',
-      'User authentication and profile management',
-      'Inventory management and supplier integration'
-    ],
-    difficulty: 'advanced',
-    estimatedTime: 60,
-    category: 'system-design'
-  },
-  {
-    id: 'notification-system',
-    title: 'Multi-Channel Notification System',
-    description: 'Scale a notification system to handle millions of users across email, SMS, and push channels.',
-    requirements: [
-      'Support multiple channels (email, SMS, push, in-app)',
-      'Handle 10M+ notifications per day',
-      'Ensure delivery guarantees and retry logic',
-      'Support user preferences and opt-outs',
-      'Provide detailed delivery analytics',
-      'Template management and A/B testing'
-    ],
-    difficulty: 'advanced',
-    estimatedTime: 55,
-    category: 'scaling'
-  },
-  {
-    id: 'file-storage',
-    title: 'Distributed File Storage Service',
-    description: 'Build a scalable file storage service like Dropbox with sync, sharing, and version control.',
-    requirements: [
-      'File upload, download, and streaming',
-      'Real-time synchronization across devices',
-      'File sharing with granular permissions',
-      'Version control and conflict resolution',
-      'Storage optimization and deduplication',
-      'Cross-platform client applications'
-    ],
-    difficulty: 'advanced',
-    estimatedTime: 70,
-    category: 'architecture'
-  },
-  {
-    id: 'ride-sharing',
-    title: 'Real-time Ride-sharing Platform',
-    description: 'Design a ride-sharing application handling real-time matching, routing, and payments.',
-    requirements: [
-      'Real-time driver and rider matching',
-      'GPS tracking and route optimization',
-      'Dynamic pricing and surge handling',
-      'Payment processing and splitting',
-      'Driver and rider profiles with ratings',
-      'Trip history and receipt generation'
-    ],
-    difficulty: 'intermediate',
-    estimatedTime: 50,
-    category: 'system-design'
-  },
-  {
-    id: 'social-media',
-    title: 'Social Media Feed System',
-    description: 'Build a scalable social media platform with timeline generation and content distribution.',
-    requirements: [
-      'User profiles and friend/follow system',
-      'Timeline generation (push vs pull)',
-      'Content creation and media handling',
-      'Real-time notifications and messaging',
-      'Content moderation and spam detection',
-      'Analytics and recommendation engine'
-    ],
-    difficulty: 'advanced',
-    estimatedTime: 65,
-    category: 'scaling'
-  },
-  {
     id: 'chat-system',
     title: 'Real-time Chat System',
-    description: 'Design a messaging platform supporting millions of concurrent users with rich features.',
+    description: 'Design a basic messaging platform with real-time communication features.',
     requirements: [
       'Real-time message delivery',
-      'Group chats and channels',
-      'File sharing and media messages',
-      'Message encryption and security',
-      'Online presence and typing indicators',
-      'Message history and search'
+      'User authentication and profiles',
+      'Basic group chat functionality',
+      'Message history storage',
+      'Online presence indicators'
     ],
     difficulty: 'intermediate',
     estimatedTime: 40,
     category: 'system-design'
   },
   {
-    id: 'search-engine',
-    title: 'Distributed Search Engine',
-    description: 'Build a search engine capable of indexing and searching billions of web pages.',
+    id: 'ride-sharing',
+    title: 'Real-time Ride-sharing Platform',
+    description: 'Design a simplified ride-sharing application with basic matching and tracking.',
     requirements: [
-      'Web crawling and content indexing',
-      'Distributed search infrastructure',
-      'Ranking algorithm implementation',
-      'Query processing and optimization',
-      'Auto-complete and spell correction',
-      'Search analytics and insights'
+      'Driver and rider registration',
+      'Basic location tracking',
+      'Simple ride matching algorithm',
+      'Trip booking and management',
+      'Basic rating system'
     ],
-    difficulty: 'advanced',
-    estimatedTime: 80,
-    category: 'architecture'
+    difficulty: 'intermediate',
+    estimatedTime: 50,
+    category: 'system-design'
   }
 ];
 
