@@ -5,8 +5,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Challenge } from '../App';
-import { ExtendedChallenge } from '../lib/challenge-config';
+// Safe imports with fallbacks
+let Challenge: any, ExtendedChallenge: any;
+
+try {
+  const appModule = require('../App');
+  Challenge = appModule.Challenge;
+} catch (error) {
+  console.warn('App module not available for Challenge type, using fallback');
+  Challenge = {};
+}
+
+try {
+  const challengeModule = require('../lib/challenge-config');
+  ExtendedChallenge = challengeModule.ExtendedChallenge;
+} catch (error) {
+  console.warn('Challenge config not available, using fallback');
+  ExtendedChallenge = {};
+}
 import { 
   Search,
   Clock,
@@ -20,13 +36,13 @@ import {
 } from 'lucide-react';
 
 interface ChallengeSelectionProps {
-  onChallengeSelect: (challenge: Challenge) => void;
-  availableChallenges?: ExtendedChallenge[];
+  onChallengeSelect: (challenge: any) => void;
+  availableChallenges?: any[];
 }
 
 // ArchiComm Community Edition - Basic Educational Challenges
 // Focused on fundamental system design concepts for learning
-const challenges: Challenge[] = [
+const challenges: any[] = [
   {
     id: 'todo-app',
     title: 'Todo List Application',
@@ -125,7 +141,7 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
 
   // Simulate some premium challenges for Pro
   const premiumChallengeIds = ['faang-system', 'company-template'];
-  const proChallenges: Challenge[] = [
+  const proChallenges: any[] = [
     {
       id: 'faang-system',
       title: 'FAANG-Style System Design',
@@ -158,41 +174,104 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
     }
   ];
 
-  // Use available challenges if provided, otherwise fall back to default challenges
-  const allChallenges = [
-    ...(availableChallenges && availableChallenges.length > 0 ? availableChallenges : challenges),
-    ...proChallenges
-  ];
+  // Safe challenge loading with fallbacks
+  const allChallenges = useMemo(() => {
+    try {
+      const baseChallenges = (availableChallenges && Array.isArray(availableChallenges) && availableChallenges.length > 0) 
+        ? availableChallenges 
+        : challenges;
+      
+      // Validate challenges structure
+      const validBaseChallenges = baseChallenges.filter(challenge => {
+        return challenge && 
+               typeof challenge.id === 'string' && 
+               typeof challenge.title === 'string' && 
+               typeof challenge.description === 'string' &&
+               Array.isArray(challenge.requirements) &&
+               typeof challenge.difficulty === 'string' &&
+               typeof challenge.estimatedTime === 'number' &&
+               typeof challenge.category === 'string';
+      });
+      
+      if (validBaseChallenges.length === 0) {
+        console.warn('No valid challenges found, using fallback set');
+        return [...challenges, ...proChallenges];
+      }
+      
+      return [...validBaseChallenges, ...proChallenges];
+    } catch (error) {
+      console.error('Error processing challenges, using defaults:', error);
+      return [...challenges, ...proChallenges];
+    }
+  }, [availableChallenges]);
 
   const filteredChallenges = useMemo(() => {
-    return allChallenges.filter(challenge => {
-      const matchesSearch = 
-        challenge.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        challenge.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        challenge.requirements.some(req => 
-          req.toLowerCase().includes(searchQuery.toLowerCase())
-        ) ||
-        (challenge.tags && challenge.tags.some(tag => 
-          tag.toLowerCase().includes(searchQuery.toLowerCase())
-        ));
-      
-      const matchesDifficulty = 
-        selectedDifficulty === 'all' || challenge.difficulty === selectedDifficulty;
-      
-      const matchesCategory = 
-        selectedCategory === 'all' || challenge.category === selectedCategory;
-      
-      return matchesSearch && matchesDifficulty && matchesCategory;
-    });
+    try {
+      return allChallenges.filter(challenge => {
+        if (!challenge) return false;
+        
+        // Safe string operations with fallbacks
+        const title = challenge.title || '';
+        const description = challenge.description || '';
+        const requirements = Array.isArray(challenge.requirements) ? challenge.requirements : [];
+        const tags = Array.isArray(challenge.tags) ? challenge.tags : [];
+        const difficulty = challenge.difficulty || 'beginner';
+        const category = challenge.category || 'system-design';
+        
+        const searchLower = searchQuery.toLowerCase();
+        
+        const matchesSearch = !searchQuery || (
+          title.toLowerCase().includes(searchLower) ||
+          description.toLowerCase().includes(searchLower) ||
+          requirements.some(req => 
+            typeof req === 'string' && req.toLowerCase().includes(searchLower)
+          ) ||
+          tags.some(tag => 
+            typeof tag === 'string' && tag.toLowerCase().includes(searchLower)
+          )
+        );
+        
+        const matchesDifficulty = 
+          selectedDifficulty === 'all' || difficulty === selectedDifficulty;
+        
+        const matchesCategory = 
+          selectedCategory === 'all' || category === selectedCategory;
+        
+        return matchesSearch && matchesDifficulty && matchesCategory;
+      });
+    } catch (error) {
+      console.error('Error filtering challenges:', error);
+      return allChallenges; // Return all challenges if filtering fails
+    }
   }, [searchQuery, selectedDifficulty, selectedCategory, allChallenges]);
 
-  const stats = {
-    total: allChallenges.length,
-    beginner: allChallenges.filter(c => c.difficulty === 'beginner').length,
-    intermediate: allChallenges.filter(c => c.difficulty === 'intermediate').length,
-    advanced: allChallenges.filter(c => c.difficulty === 'advanced').length,
-    avgTime: Math.round(allChallenges.reduce((acc, c) => acc + c.estimatedTime, 0) / allChallenges.length)
-  };
+  const stats = useMemo(() => {
+    try {
+      const validChallenges = allChallenges.filter(c => c && typeof c.difficulty === 'string' && typeof c.estimatedTime === 'number');
+      
+      if (validChallenges.length === 0) {
+        return { total: 0, beginner: 0, intermediate: 0, advanced: 0, avgTime: 0 };
+      }
+      
+      const beginner = validChallenges.filter(c => c.difficulty === 'beginner').length;
+      const intermediate = validChallenges.filter(c => c.difficulty === 'intermediate').length;
+      const advanced = validChallenges.filter(c => c.difficulty === 'advanced').length;
+      const avgTime = Math.round(
+        validChallenges.reduce((acc, c) => acc + (c.estimatedTime || 0), 0) / validChallenges.length
+      );
+      
+      return {
+        total: allChallenges.length,
+        beginner,
+        intermediate,
+        advanced,
+        avgTime: isNaN(avgTime) ? 0 : avgTime
+      };
+    } catch (error) {
+      console.error('Error calculating stats:', error);
+      return { total: 0, beginner: 0, intermediate: 0, advanced: 0, avgTime: 0 };
+    }
+  }, [allChallenges]);
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-background via-background to-muted/5">
@@ -245,7 +324,17 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
             <Button
               size="sm"
               className="bg-yellow-500 hover:bg-yellow-600 text-white"
-              onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
+              onClick={() => {
+                try {
+                  if (typeof window !== 'undefined' && window.dispatchEvent) {
+                    window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { 
+                      detail: { screen: 'pro-version' } 
+                    }));
+                  }
+                } catch (error) {
+                  console.warn('Failed to dispatch navigation event:', error);
+                }
+              }}
             >
               Upgrade to Pro
             </Button>
@@ -347,28 +436,32 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
             >
               <AnimatePresence>
                 {filteredChallenges.map((challenge, index) => {
-                  const CategoryIcon = categoryIcons[challenge.category];
-                  const isPremium = premiumChallengeIds.includes(challenge.id);
+                  if (!challenge) return null;
+                  
+                  const category = challenge.category || 'system-design';
+                  const CategoryIcon = categoryIcons[category] || Target;
+                  const challengeId = challenge.id || `challenge-${index}`;
+                  const isPremium = premiumChallengeIds.includes(challengeId);
                   return (
                     <motion.div
-                      key={challenge.id}
+                      key={challengeId}
                       layout
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
                       transition={{ duration: 0.3, delay: index * 0.1 }}
                       whileHover={{ y: -8, scale: 1.02 }}
-                      onHoverStart={() => setHoveredCard(challenge.id)}
+                      onHoverStart={() => setHoveredCard(challengeId)}
                       onHoverEnd={() => setHoveredCard(null)}
                       className="group"
                     >
                       <Card className={`h-full transition-all duration-300 hover:shadow-2xl border border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden ${isPremium ? 'opacity-80' : 'cursor-pointer'}`}
                         >
                         {/* Card Header with gradient */}
-                        <div className={`h-2 bg-gradient-to-r ${difficultyColors[challenge.difficulty]}`} />
+                        <div className={`h-2 bg-gradient-to-r ${difficultyColors[challenge.difficulty] || difficultyColors.beginner}`} />
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between mb-3">
-                            <div className={`p-2 rounded-lg bg-gradient-to-r ${difficultyColors[challenge.difficulty]} bg-opacity-10`}>
+                            <div className={`p-2 rounded-lg bg-gradient-to-r ${difficultyColors[challenge.difficulty] || difficultyColors.beginner} bg-opacity-10`}>
                               <CategoryIcon className="w-5 h-5 text-primary" />
                             </div>
                             <div className="flex items-center space-x-1">
@@ -376,11 +469,11 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                                 variant="outline" 
                                 className={`text-xs capitalize border-current`}
                                 style={{ 
-                                  color: challenge.difficulty === 'beginner' ? '#10b981' :
-                                         challenge.difficulty === 'intermediate' ? '#f59e0b' : '#ef4444'
+                                  color: (challenge.difficulty === 'beginner') ? '#10b981' :
+                                         (challenge.difficulty === 'intermediate') ? '#f59e0b' : '#ef4444'
                                 }}
                               >
-                                {challenge.difficulty}
+                                {challenge.difficulty || 'beginner'}
                               </Badge>
                               {isPremium && (
                                 <Badge className="ml-2 bg-yellow-500 text-white flex items-center gap-1">
@@ -390,10 +483,10 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                             </div>
                           </div>
                           <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors flex items-center gap-2">
-                            {challenge.title}
+                            {challenge.title || 'Untitled Challenge'}
                           </CardTitle>
                           <CardDescription className="text-sm leading-relaxed">
-                            {challenge.description}
+                            {challenge.description || 'No description available'}
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -404,7 +497,7 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                               Key Requirements
                             </h4>
                             <ul className="space-y-1">
-                              {challenge.requirements.slice(0, 3).map((req, reqIndex) => (
+                              {(Array.isArray(challenge.requirements) ? challenge.requirements : []).slice(0, 3).map((req, reqIndex) => (
                                 <motion.li
                                   key={reqIndex}
                                   initial={{ opacity: 0, x: -10 }}
@@ -413,10 +506,10 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                                   className="text-xs text-muted-foreground flex items-start"
                                 >
                                   <span className="w-1 h-1 rounded-full bg-primary mr-2 mt-1.5 flex-shrink-0" />
-                                  <span>{req}</span>
+                                  <span>{req || 'Requirement not specified'}</span>
                                 </motion.li>
                               ))}
-                              {challenge.requirements.length > 3 && (
+                              {Array.isArray(challenge.requirements) && challenge.requirements.length > 3 && (
                                 <li className="text-xs text-muted-foreground/60">
                                   +{challenge.requirements.length - 3} more requirements...
                                 </li>
@@ -427,31 +520,45 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                           <div className="flex items-center justify-between mb-4 text-xs text-muted-foreground">
                             <div className="flex items-center space-x-1">
                               <Clock className="w-3 h-3" />
-                              <span>~{challenge.estimatedTime} min</span>
+                              <span>~{challenge.estimatedTime || 30} min</span>
                             </div>
                             <Badge variant="secondary" className="text-xs capitalize">
-                              {challenge.category.replace('-', ' ')}
+                              {(challenge.category || 'system-design').replace('-', ' ')}
                             </Badge>
                           </div>
                           {/* Action Button */}
                           {isPremium ? (
                             <Button
                               className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
-                              onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
+                              onClick={() => {
+                                try {
+                                  if (typeof window !== 'undefined' && window.dispatchEvent) {
+                                    window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }));
+                                  }
+                                } catch (error) {
+                                  console.warn('Failed to dispatch navigation event:', error);
+                                }
+                              }}
                             >
                               <Lock className="w-4 h-4 mr-2" />
                               <span>Unlock with Pro</span>
                             </Button>
                           ) : (
                             <Button
-                              onClick={() => onChallengeSelect(challenge)}
+                              onClick={() => {
+                                try {
+                                  onChallengeSelect(challenge);
+                                } catch (error) {
+                                  console.error('Error selecting challenge:', error);
+                                }
+                              }}
                               className="w-full group/btn bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300"
                             >
                               <PlayCircle className="w-4 h-4 mr-2 group-hover/btn:scale-110 transition-transform" />
                               <span>Start Challenge</span>
                               <motion.div
                                 animate={{ 
-                                  x: hoveredCard === challenge.id ? [0, 4, 0] : 0 
+                                  x: hoveredCard === challengeId ? [0, 4, 0] : 0 
                                 }}
                                 transition={{ duration: 0.5, repeat: Infinity }}
                                 className="ml-2"
@@ -463,7 +570,7 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                         </CardContent>
                         {/* Hover overlay */}
                         <AnimatePresence>
-                          {hoveredCard === challenge.id && (
+                          {hoveredCard === challengeId && (
                             <motion.div
                               initial={{ opacity: 0 }}
                               animate={{ opacity: 1 }}

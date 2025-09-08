@@ -14,8 +14,8 @@ export default defineConfig({
       fastRefresh: true,
       // Reduce bundle size by excluding development helpers in production
       devTarget: 'esnext',
-      // Enable SWC optimizations
-      jsxImportSource: '@emotion/react'
+      // Enable SWC optimizations (use default React JSX runtime)
+      // Note: Removing Emotion jsxImportSource avoids requiring '@emotion/react'
     })
   ],
   

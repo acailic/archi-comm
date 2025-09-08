@@ -273,11 +273,14 @@ const TimeoutWrapper: React.FC<{
   timeout: number;
   onTimeout: () => void;
   children: ReactNode;
-}> = ({ timeout, onTimeout, children }) => {
+  enabled?: boolean;
+}> = ({ timeout, onTimeout, children, enabled = true }) => {
   useEffect(() => {
+    if (!enabled) return;
+    
     const timeoutId = window.setTimeout(onTimeout, timeout);
     return () => window.clearTimeout(timeoutId);
-  }, [timeout, onTimeout]);
+  }, [timeout, onTimeout, enabled]);
 
   return <>{children}</>;
 };
@@ -301,6 +304,7 @@ export const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = ({
   onLoad,
 }) => {
   const [isTimeout, setIsTimeout] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [loadStartTime] = useState(performance.now());
 
   const handleTimeout = useCallback(() => {
@@ -321,6 +325,16 @@ export const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = ({
       loadTime,
     });
   }, [componentName, loadStartTime, onLoad]);
+
+  useEffect(() => {
+    setLoaded(true);
+  }, [children]);
+
+  useEffect(() => {
+    if (loaded) {
+      handleLoad();
+    }
+  }, [loaded, handleLoad]);
 
   // Show timeout error after specified timeout
   if (isTimeout) {
@@ -353,10 +367,8 @@ export const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = ({
       onRetry={onRetry}
     >
       <Suspense fallback={fallback}>
-        <TimeoutWrapper timeout={timeout} onTimeout={handleTimeout}>
-          <div onLoad={handleLoad}>
-            {children}
-          </div>
+        <TimeoutWrapper timeout={timeout} onTimeout={handleTimeout} enabled={!loaded}>
+          {children}
         </TimeoutWrapper>
       </Suspense>
     </LazyErrorBoundary>
