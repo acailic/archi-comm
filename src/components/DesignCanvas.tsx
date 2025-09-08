@@ -18,8 +18,9 @@ import {
   useOptimizedMemo 
 } from '../lib/performance/PerformanceOptimizer';
 
-// Lazy load heavy components
-const LazyCanvasArea = React.lazy(() => import('./CanvasArea').then(module => ({ default: module.CanvasArea })));
+// Eagerly load core canvas to avoid Suspense fallback hanging
+import { CanvasArea } from './CanvasArea';
+// Keep hints lazy as an optional panel
 const LazySolutionHints = React.lazy(() => import('./SolutionHints').then(module => ({ default: module.SolutionHints })));
 
 // Loading components
@@ -517,7 +518,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           
           const link = document.createElement('a');
           link.href = cacheEntry.value;
-          link.download = `${challenge.id}-design.png`;
+          link.download = `${challenge?.id || 'design'}-design.png`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -907,28 +908,26 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         {/* Main Canvas Area */}
         <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
           <div className="flex-1" role="region" aria-label="Design canvas">
-            <Suspense fallback={<CanvasLoadingState />}>
-              <LazyCanvasArea
-                ref={canvasRef}
-                components={components}
-                connections={connections}
-                selectedComponent={selectedComponent}
-                connectionStart={connectionStart}
-                commentMode={commentMode}
-                isCommentModeActive={!!commentMode}
-                onComponentDrop={handleComponentDrop}
-                onComponentMove={handleComponentMove}
-                onComponentSelect={handleComponentSelect}
-                onConnectionLabelChange={handleConnectionLabelChange}
-                onConnectionDelete={handleConnectionDelete}
-                onConnectionTypeChange={handleConnectionTypeChange}
-                onConnectionDirectionChange={handleConnectionDirectionChange}
-                onStartConnection={handleStartConnection}
-                onCompleteConnection={handleCompleteConnection}
-                data-testid="design-canvas"
-                aria-describedby="challenge-description"
-              />
-            </Suspense>
+            <CanvasArea
+              ref={canvasRef}
+              components={components}
+              connections={connections}
+              selectedComponent={selectedComponent}
+              connectionStart={connectionStart}
+              commentMode={commentMode}
+              isCommentModeActive={!!commentMode}
+              onComponentDrop={handleComponentDrop}
+              onComponentMove={handleComponentMove}
+              onComponentSelect={handleComponentSelect}
+              onConnectionLabelChange={handleConnectionLabelChange}
+              onConnectionDelete={handleConnectionDelete}
+              onConnectionTypeChange={handleConnectionTypeChange}
+              onConnectionDirectionChange={handleConnectionDirectionChange}
+              onStartConnection={handleStartConnection}
+              onCompleteConnection={handleCompleteConnection}
+              data-testid="design-canvas"
+              aria-describedby="challenge-description"
+            />
           </div>
           
           {/* Solution Hints Panel */}

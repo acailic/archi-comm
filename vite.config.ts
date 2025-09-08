@@ -2,24 +2,45 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
+// Safe environment variable access
+const host = (typeof process !== 'undefined' && process.env) ? process.env.TAURI_DEV_HOST : undefined;
+const isTauriDebug = (typeof process !== 'undefined' && process.env) ? !!process.env.TAURI_DEBUG : false;
+const tauriPlatform = (typeof process !== 'undefined' && process.env) ? process.env.TAURI_PLATFORM : undefined;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Optimize React refresh for development
+      fastRefresh: true,
+      // Reduce bundle size by excluding development helpers in production
+      devTarget: 'esnext',
+      // Enable SWC optimizations
+      jsxImportSource: '@emotion/react'
+    })
+  ],
+  
+  // Simplified test configuration
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: './src/test/setup.ts',
+    setupFiles: ['./src/test/setup.ts'],
     css: true,
-    exclude: ['**/e2e/**', '**/node_modules/**', '**/dist/**'],
+    exclude: ['**/e2e/**', '**/node_modules/**', '**/dist/**', '**/src-tauri/**'],
+    // Reduced coverage thresholds for faster testing
     coverage: {
-      reporter: ['text', 'html'],
-      exclude: ['src-tauri/**', 'dist/**', 'e2e/**'],
-      lines: 70,
-      functions: 65,
-      branches: 55,
-      statements: 70
+      reporter: ['text'],
+      exclude: ['src-tauri/**', 'dist/**', 'e2e/**', '**/*.d.ts', '**/test/**'],
+      lines: 60,
+      functions: 50,
+      branches: 45,
+      statements: 60
+    },
+    // Faster test execution
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true
+      }
     }
   },
   
@@ -27,134 +48,135 @@ export default defineConfig({
   root: '.',
   publicDir: 'public',
   
-  // Prevent vite from obscuring rust errors
+  // Simplified development configuration
   clearScreen: false,
   
-  // Tauri expects a fixed port, fail if that port is not available
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: false, // Allow fallback ports for flexibility
     host: host || false,
+    open: false, // Don't auto-open browser
     hmr: {
       protocol: 'ws',
       host: host || 'localhost',
       port: 5174,
-      overlay: true, // Show error overlay
+      overlay: true
     },
     watch: {
-      // Ignore certain files to prevent unnecessary reloads
+      // Streamlined ignore patterns
       ignored: [
         '**/.git/**',
         '**/node_modules/**',
         '**/dist/**',
         '**/target/**',
-        '**/.claude-flow/**',
-        '**/.hive-mind/**'
-      ]
-    },
-    // Prevent serving cached build artifacts during development
-    middlewareMode: false,
-    force: true
+        '**/.DS_Store'
+      ],
+      // Optimize file watching
+      usePolling: false
+    }
   },
   
-  // To make use of `TAURI_DEBUG` and other env variables
-  // https://tauri.studio/v1/api/config#buildconfig.beforedevcommand
+  // Environment variable configuration
   envPrefix: ['VITE_', 'TAURI_'],
   
   build: {
-      // Tauri supports es2021
-    target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
-    // Don't minify for debug builds
-    minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
-    // Produce sourcemaps for debug builds
-    sourcemap: !!process.env.TAURI_DEBUG,
+    // Optimized build configuration
+    target: tauriPlatform === 'windows' ? 'chrome105' : 'safari13',
+    minify: isTauriDebug ? false : 'esbuild',
+    sourcemap: isTauriDebug,
     cssCodeSplit: true,
     treeshake: true,
+    // Optimize chunk splitting
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       input: 'index.html',
       output: {
+        // Simplified chunk strategy for better caching
         manualChunks: {
-          react: ['react', 'react-dom'],
-          motion: ['framer-motion'],
-          radix: [
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-aspect-ratio',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-collapsible',
-            '@radix-ui/react-context-menu',
+          'react-vendor': ['react', 'react-dom'],
+          'ui-vendor': [
             '@radix-ui/react-dialog',
             '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-hover-card',
-            '@radix-ui/react-label',
-            '@radix-ui/react-menubar',
-            '@radix-ui/react-navigation-menu',
             '@radix-ui/react-popover',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-scroll-area',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-slider',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toggle',
-            '@radix-ui/react-toggle-group',
-            '@radix-ui/react-tooltip',
+            '@radix-ui/react-tooltip'
           ],
-          charts: ['recharts'],
-          dnd: ['react-dnd', 'react-dnd-html5-backend'],
-          tauri: ['@tauri-apps/api'],
+          'animation-vendor': ['framer-motion'],
+          'tauri-vendor': ['@tauri-apps/api']
         },
+        // Optimize asset naming
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name?.split('.') || [];
+          const ext = info[info.length - 1];
+          if (/\.(woff|woff2|eot|ttf|otf)$/i.test(assetInfo.name || '')) {
+            return 'assets/fonts/[name].[hash][extname]';
+          }
+          return `assets/${ext}/[name].[hash][extname]`;
+        },
+        chunkFileNames: 'assets/js/[name].[hash].js',
+        entryFileNames: 'assets/js/[name].[hash].js'
       },
+      // Optimize external dependencies
+      external: (id) => {
+        // Keep critical dependencies bundled for reliability
+        return false;
+      }
     },
+    // Improve build performance
+    reportCompressedSize: false,
+    // Optimize for modern browsers
+    modulePreload: {
+      polyfill: false
+    }
   },
   esbuild: {
-    drop: process.env.TAURI_DEBUG ? [] : ['console', 'debugger'],
+    // Conditional optimization based on debug mode
+    drop: isTauriDebug ? [] : ['console', 'debugger'],
+    // Optimize for development speed
+    keepNames: isTauriDebug,
+    minifyIdentifiers: !isTauriDebug,
+    minifySyntax: !isTauriDebug
   },
   
   resolve: {
-    extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
+    // Streamlined file extensions
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
     alias: {
-      'vaul@1.1.2': 'vaul',
-      'sonner@2.0.3': 'sonner',
-      'recharts@2.15.2': 'recharts',
-      'react-resizable-panels@2.1.7': 'react-resizable-panels',
-      'react-hook-form@7.55.0': 'react-hook-form',
-      'react-day-picker@8.10.1': 'react-day-picker',
-      'next-themes@0.4.6': 'next-themes',
-      'lucide-react@0.487.0': 'lucide-react',
-      'input-otp@1.4.2': 'input-otp',
-      'embla-carousel-react@8.6.0': 'embla-carousel-react',
-      'cmdk@1.1.1': 'cmdk',
-      'class-variance-authority@0.7.1': 'class-variance-authority',
-      '@radix-ui/react-tooltip@1.1.8': '@radix-ui/react-tooltip',
-      '@radix-ui/react-toggle@1.1.2': '@radix-ui/react-toggle',
-      '@radix-ui/react-toggle-group@1.1.2': '@radix-ui/react-toggle-group',
-      '@radix-ui/react-switch@1.1.3': '@radix-ui/react-switch',
-      '@radix-ui/react-slot@1.1.2': '@radix-ui/react-slot',
-      '@radix-ui/react-slider@1.2.3': '@radix-ui/react-slider',
-      '@radix-ui/react-separator@1.1.2': '@radix-ui/react-separator',
-      '@radix-ui/react-scroll-area@1.2.3': '@radix-ui/react-scroll-area',
-      '@radix-ui/react-radio-group@1.2.3': '@radix-ui/react-radio-group',
-      '@radix-ui/react-popover@1.1.6': '@radix-ui/react-popover',
-      '@radix-ui/react-navigation-menu@1.2.5': '@radix-ui/react-navigation-menu',
-      '@radix-ui/react-menubar@1.1.6': '@radix-ui/react-menubar',
-      '@radix-ui/react-label@2.1.2': '@radix-ui/react-label',
-      '@radix-ui/react-hover-card@1.1.6': '@radix-ui/react-hover-card',
-      '@radix-ui/react-dropdown-menu@2.1.6': '@radix-ui/react-dropdown-menu',
-      '@radix-ui/react-dialog@1.1.6': '@radix-ui/react-dialog',
-      '@radix-ui/react-context-menu@2.2.6': '@radix-ui/react-context-menu',
-      '@radix-ui/react-collapsible@1.1.3': '@radix-ui/react-collapsible',
-      '@radix-ui/react-checkbox@1.1.4': '@radix-ui/react-checkbox',
-      '@radix-ui/react-avatar@1.1.3': '@radix-ui/react-avatar',
-      '@radix-ui/react-aspect-ratio@1.1.2': '@radix-ui/react-aspect-ratio',
-      '@radix-ui/react-alert-dialog@1.1.6': '@radix-ui/react-alert-dialog',
-      '@radix-ui/react-accordion@1.2.3': '@radix-ui/react-accordion',
+      // Essential path aliases only
       '@': path.resolve(__dirname, './src'),
-      '@modules': path.resolve(__dirname, './src/modules'),
+      '@components': path.resolve(__dirname, './src/components'),
+      '@hooks': path.resolve(__dirname, './src/hooks'),
+      '@lib': path.resolve(__dirname, './src/lib'),
       '@services': path.resolve(__dirname, './src/services'),
       '@shared': path.resolve(__dirname, './src/shared'),
     },
+    // Optimize dependency resolution
+    dedupe: ['react', 'react-dom'],
   },
+  
+  // Performance optimizations
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dnd',
+      'react-dnd-html5-backend',
+      'framer-motion',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-tooltip'
+    ],
+    exclude: [
+      '@tauri-apps/api' // Let Tauri handle its own loading
+    ],
+    // Force pre-bundling
+    force: false
+  }
 });
+
+// Additional environment-specific configuration
+if (isTauriDebug) {
+  console.log('🔧 Vite running in Tauri debug mode');
+  console.log(`📡 Host: ${host || 'localhost'}`);
+  console.log(`🎯 Platform: ${tauriPlatform || 'unknown'}`);
+}

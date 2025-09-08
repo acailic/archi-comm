@@ -4,7 +4,22 @@ export const CACHE_KEYS = {
   CACHE_VERSION: 'archicomm_cache_version',
   LAST_UPDATE: 'archicomm_last_update'
 };
-import { Challenge, DesignComponent, Connection } from '../App';
+
+// Fallback imports with error handling
+let Challenge: any, DesignComponent: any, Connection: any;
+
+try {
+  const appModule = require('../App');
+  Challenge = appModule.Challenge;
+  DesignComponent = appModule.DesignComponent;
+  Connection = appModule.Connection;
+} catch (error) {
+  console.warn('App module not available for types, using fallbacks');
+  // Provide fallback type definitions
+  Challenge = {};
+  DesignComponent = { type: '' };
+  Connection = { type: '' };
+}
 
 // ArchiComm Community Edition - Challenge Configuration
 // This file contains the challenge system configuration for the community version
@@ -289,18 +304,49 @@ export const defaultChallengeConfig: ChallengeConfig = {
 // Challenge loading and management functions - Community Edition
 // Provides basic challenge management for educational use
 export class ChallengeManager {
+  private config: ChallengeConfig;
+  private customChallenges: ExtendedChallenge[] = [];
+
+  constructor(config: ChallengeConfig = defaultChallengeConfig) {
+    this.config = config;
+  }
+
   // Load challenges from cache with version check
   async loadCachedChallenges(): Promise<ExtendedChallenge[]> {
     try {
+      // Check if localStorage is available
+      if (typeof localStorage === 'undefined') {
+        console.warn('localStorage not available, skipping cache');
+        return [];
+      }
+
       const cached = localStorage.getItem(CACHE_KEYS.CHALLENGES);
       if (!cached) return [];
-      if (localStorage.getItem(CACHE_KEYS.CACHE_VERSION) !== this.config.version) {
+      
+      const cacheVersion = localStorage.getItem(CACHE_KEYS.CACHE_VERSION);
+      if (cacheVersion !== this.config.version) {
         this.clearCache();
         return [];
       }
-      return JSON.parse(cached).filter(this.validateChallenge);
+      
+      const parsedChallenges = JSON.parse(cached);
+      if (!Array.isArray(parsedChallenges)) {
+        console.warn('Invalid cached challenge format, clearing cache');
+        this.clearCache();
+        return [];
+      }
+      
+      return parsedChallenges.filter(challenge => {
+        try {
+          return this.validateChallenge(challenge);
+        } catch (e) {
+          console.warn('Invalid cached challenge, filtering out:', e);
+          return false;
+        }
+      });
     } catch (e) {
       console.error('Cache load failed:', e);
+      this.clearCache(); // Clear potentially corrupted cache
       return [];
     }
   }
@@ -313,13 +359,24 @@ export class ChallengeManager {
   // Check cache freshness without loading
   isCacheFresh(): boolean {
     try {
+      if (typeof localStorage === 'undefined') {
+        return false;
+      }
+      
       const lastUpdate = localStorage.getItem(CACHE_KEYS.LAST_UPDATE);
       if (!lastUpdate) return false;
+      
       const cacheTime = new Date(lastUpdate).getTime();
+      if (isNaN(cacheTime)) {
+        console.warn('Invalid cache timestamp, treating as stale');
+        return false;
+      }
+      
       const now = Date.now();
       const maxAge = 1000 * 60 * 30; // 30 minutes
       return (now - cacheTime) < maxAge;
     } catch (e) {
+      console.warn('Cache freshness check failed:', e);
       return false;
     }
   }
@@ -327,13 +384,30 @@ export class ChallengeManager {
   // Get cache loading statistics
   getCacheStats(): { hasCached: boolean; isFresh: boolean; size: number } {
     try {
+      if (typeof localStorage === 'undefined') {
+        return { hasCached: false, isFresh: false, size: 0 };
+      }
+      
       const cached = localStorage.getItem(CACHE_KEYS.CHALLENGES);
+      if (!cached) {
+        return { hasCached: false, isFresh: false, size: 0 };
+      }
+      
+      let size = 0;
+      try {
+        const parsedCache = JSON.parse(cached);
+        size = Array.isArray(parsedCache) ? parsedCache.length : 0;
+      } catch (parseError) {
+        console.warn('Failed to parse cached challenges for stats:', parseError);
+      }
+      
       return {
-        hasCached: !!cached,
+        hasCached: true,
         isFresh: this.isCacheFresh(),
-        size: cached ? JSON.parse(cached).length : 0
+        size
       };
     } catch (e) {
+      console.error('Failed to get cache stats:', e);
       return { hasCached: false, isFresh: false, size: 0 };
     }
   }
@@ -341,17 +415,61 @@ export class ChallengeManager {
   // Save challenges to cache
   async cacheChallenges(challenges: ExtendedChallenge[]) {
     try {
-      localStorage.setItem(CACHE_KEYS.CHALLENGES, JSON.stringify(challenges));
+      if (typeof localStorage === 'undefined') {
+        console.warn('localStorage not available, skipping cache save');
+        return;
+      }
+      
+      if (!Array.isArray(challenges)) {
+        console.warn('Invalid challenges data for caching');
+        return;
+      }
+      
+      // Validate challenges before caching
+      const validChallenges = challenges.filter(challenge => {
+        try {
+          return this.validateChallenge(challenge);
+        } catch (e) {
+          console.warn('Invalid challenge filtered out during caching:', e);
+          return false;
+        }
+      });
+      
+      const challengeData = JSON.stringify(validChallenges);
+      const timestamp = new Date().toISOString();
+      
+      localStorage.setItem(CACHE_KEYS.CHALLENGES, challengeData);
       localStorage.setItem(CACHE_KEYS.CACHE_VERSION, this.config.version);
-      localStorage.setItem(CACHE_KEYS.LAST_UPDATE, new Date().toISOString());
+      localStorage.setItem(CACHE_KEYS.LAST_UPDATE, timestamp);
+      
+      console.log(`Cached ${validChallenges.length} challenges successfully`);
     } catch (e) {
       console.error('Cache save failed:', e);
+      // Attempt to clear potentially corrupted cache
+      this.clearCache();
     }
   }
 
   // Clear all challenge cache
   clearCache() {
-    Object.values(CACHE_KEYS).forEach(key => localStorage.removeItem(key));
+    try {
+      if (typeof localStorage === 'undefined') {
+        console.warn('localStorage not available for cache clearing');
+        return;
+      }
+      
+      Object.values(CACHE_KEYS).forEach(key => {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          console.warn(`Failed to remove cache key ${key}:`, e);
+        }
+      });
+      
+      console.log('Challenge cache cleared successfully');
+    } catch (e) {
+      console.error('Failed to clear challenge cache:', e);
+    }
   }
 
   // Optimized cache-first loading with performance tracking
@@ -361,45 +479,71 @@ export class ChallengeManager {
     performanceTracker?: (event: string, duration: number, meta?: any) => void
   ) {
     const startTime = Date.now();
-    const cached = await this.loadCachedChallenges();
+    let cached: ExtendedChallenge[] = [];
+    let cacheLoadError: any = null;
+    
+    try {
+      cached = await this.loadCachedChallenges();
+    } catch (e) {
+      console.warn('Cache load failed, continuing with empty cache:', e);
+      cacheLoadError = e;
+      cached = [];
+    }
     
     if (performanceTracker) {
       performanceTracker('cache-load', Date.now() - startTime, {
         found: cached.length,
-        fresh: this.isCacheFresh()
+        fresh: this.isCacheFresh(),
+        error: cacheLoadError ? String(cacheLoadError) : null
       });
     }
 
     // Return cached immediately if available and fresh
     if (cached.length > 0 && this.isCacheFresh()) {
-      // Still try to refresh in background
-      this.refreshChallengesInBackground(source, path, performanceTracker);
+      // Still try to refresh in background (non-blocking)
+      this.refreshChallengesInBackground(source, path, performanceTracker).catch(e => {
+        console.warn('Background refresh failed:', e);
+      });
       return { challenges: cached, fromCache: true, fresh: true };
     }
 
+    // Attempt to load fresh data
     try {
       const loadStart = Date.now();
       const fresh = await this.loadChallengesFromSource(source, path);
       
       if (performanceTracker) {
         performanceTracker('external-load', Date.now() - loadStart, {
-          found: fresh.length,
+          found: fresh ? fresh.length : 0,
           source
         });
       }
 
-      if (fresh.length > 0) {
-        await this.cacheChallenges(fresh);
+      if (fresh && fresh.length > 0) {
+        // Cache new data (don't await to avoid blocking)
+        this.cacheChallenges(fresh).catch(e => {
+          console.warn('Failed to cache fresh challenges:', e);
+        });
         return { challenges: fresh, fromCache: false, fresh: true };
       }
     } catch (e) {
       console.error('Fresh load failed:', e);
       if (performanceTracker) {
-        performanceTracker('external-load-error', Date.now() - startTime, { error: e });
+        performanceTracker('external-load-error', Date.now() - startTime, { 
+          error: String(e),
+          source 
+        });
       }
     }
     
-    return { challenges: cached, fromCache: true, fresh: false };
+    // Fallback to cached data (even if stale) or defaults
+    if (cached.length > 0) {
+      return { challenges: cached, fromCache: true, fresh: false };
+    }
+    
+    // Final fallback to built-in challenges
+    const defaults = this.getDefaultChallenges();
+    return { challenges: defaults, fromCache: false, fresh: false };
   }
 
   // Background refresh that doesn't throw errors
@@ -412,7 +556,7 @@ export class ChallengeManager {
       const startTime = Date.now();
       const fresh = await this.loadChallengesFromSource(source, path);
       
-      if (fresh.length > 0) {
+      if (fresh && fresh.length > 0) {
         await this.cacheChallenges(fresh);
         
         if (performanceTracker) {
@@ -422,49 +566,97 @@ export class ChallengeManager {
         }
 
         // Emit event for listeners that new challenges are available
-        window.dispatchEvent(new CustomEvent('challenges-updated', {
-          detail: { challenges: fresh, source: 'background' }
-        }));
+        try {
+          if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('challenges-updated', {
+              detail: { challenges: fresh, source: 'background' }
+            }));
+          }
+        } catch (eventError) {
+          console.warn('Failed to dispatch challenges-updated event:', eventError);
+        }
       }
     } catch (e) {
       // Silent fail for background operations
       console.warn('Background challenge refresh failed:', e);
       if (performanceTracker) {
-        performanceTracker('background-refresh-error', 0, { error: e });
+        performanceTracker('background-refresh-error', 0, { error: String(e) });
       }
     }
-  }
-  private config: ChallengeConfig;
-  private customChallenges: ExtendedChallenge[] = [];
-
-  constructor(config: ChallengeConfig = defaultChallengeConfig) {
-    this.config = config;
   }
 
   // Load challenges from external source (Tauri, API, file)
   async loadChallengesFromSource(source: 'tauri' | 'api' | 'file', path?: string): Promise<ExtendedChallenge[]> {
+    const timeout = 10000; // 10 second timeout
+    
     try {
-      switch (source) {
-        case 'tauri':
-          // In a real Tauri app, this would call Tauri commands
-          // return await invoke('load_challenges');
-          return this.loadChallengesFromFile(path || 'challenges.json');
-        
-        case 'api':
-          const response = await fetch(path || '/api/challenges');
-          const data = await response.json();
-          return data.challenges || [];
-        
-        case 'file':
-          // This would typically be handled by Tauri file system APIs
-          return this.loadChallengesFromFile(path || 'challenges.json');
-        
-        default:
-          throw new Error(`Unsupported source: ${source}`);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Challenge loading timeout')), timeout);
+      });
+      
+      const loadPromise = this.executeLoadFromSource(source, path);
+      
+      const result = await Promise.race([loadPromise, timeoutPromise]);
+      
+      // Validate result
+      if (!Array.isArray(result)) {
+        console.warn('Invalid challenge data received from source:', source);
+        return [];
       }
+      
+      // Filter and validate challenges
+      const validChallenges = result.filter(challenge => {
+        try {
+          return this.validateChallenge(challenge);
+        } catch (e) {
+          console.warn('Invalid challenge from source, filtering out:', e);
+          return false;
+        }
+      });
+      
+      console.log(`Loaded ${validChallenges.length} valid challenges from ${source}`);
+      return validChallenges;
+      
     } catch (error) {
-      console.error('Failed to load challenges from source:', error);
+      console.error('Failed to load challenges from source:', source, error);
       return [];
+    }
+  }
+  
+  private async executeLoadFromSource(source: 'tauri' | 'api' | 'file', path?: string): Promise<ExtendedChallenge[]> {
+    switch (source) {
+      case 'tauri':
+        // In a real Tauri app, this would call Tauri commands
+        // return await invoke('load_challenges');
+        return this.loadChallengesFromFile(path || 'challenges.json');
+      
+      case 'api':
+        if (typeof fetch === 'undefined') {
+          console.warn('fetch not available, cannot load from API');
+          return [];
+        }
+        
+        const response = await fetch(path || '/api/challenges', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        return data.challenges || data || [];
+      
+      case 'file':
+        // This would typically be handled by Tauri file system APIs
+        return this.loadChallengesFromFile(path || 'challenges.json');
+      
+      default:
+        throw new Error(`Unsupported source: ${source}`);
     }
   }
 
@@ -562,20 +754,93 @@ export class ChallengeManager {
 
   // Validate challenge structure
   private validateChallenge(challenge: any): challenge is ExtendedChallenge {
-    return (
-      typeof challenge.id === 'string' &&
-      typeof challenge.title === 'string' &&
-      typeof challenge.description === 'string' &&
-      Array.isArray(challenge.requirements) &&
-      ['beginner', 'intermediate', 'advanced'].includes(challenge.difficulty) &&
-      typeof challenge.estimatedTime === 'number' &&
-      typeof challenge.category === 'string'
-    );
+    try {
+      if (!challenge || typeof challenge !== 'object') {
+        return false;
+      }
+      
+      // Required fields validation
+      const requiredFields = {
+        id: 'string',
+        title: 'string', 
+        description: 'string',
+        difficulty: ['beginner', 'intermediate', 'advanced'],
+        estimatedTime: 'number',
+        category: 'string'
+      };
+      
+      for (const [field, expectedType] of Object.entries(requiredFields)) {
+        const value = challenge[field];
+        
+        if (Array.isArray(expectedType)) {
+          if (!expectedType.includes(value)) {
+            console.warn(`Invalid challenge ${field}: ${value}`);
+            return false;
+          }
+        } else if (typeof value !== expectedType) {
+          console.warn(`Invalid challenge ${field} type: expected ${expectedType}, got ${typeof value}`);
+          return false;
+        }
+      }
+      
+      // Requirements must be an array
+      if (!Array.isArray(challenge.requirements)) {
+        console.warn('Challenge requirements must be an array');
+        return false;
+      }
+      
+      // Validate optional arrays if present
+      const optionalArrays = ['tags', 'prerequisites', 'learningObjectives', 'requirements'];
+      for (const field of optionalArrays) {
+        if (challenge[field] !== undefined && !Array.isArray(challenge[field])) {
+          console.warn(`Challenge ${field} must be an array if present`);
+          return false;
+        }
+      }
+      
+      // Basic value validation
+      if (challenge.estimatedTime <= 0) {
+        console.warn('Challenge estimatedTime must be positive');
+        return false;
+      }
+      
+      if (challenge.id.length === 0 || challenge.title.length === 0) {
+        console.warn('Challenge id and title cannot be empty');
+        return false;
+      }
+      
+      return true;
+      
+    } catch (error) {
+      console.error('Challenge validation error:', error);
+      return false;
+    }
   }
 }
 
-// Global challenge manager instance
-export const challengeManager = new ChallengeManager();
+// Global challenge manager instance with error handling
+let challengeManager: ChallengeManager;
+
+try {
+  challengeManager = new ChallengeManager();
+} catch (error) {
+  console.error('Failed to initialize challenge manager:', error);
+  // Create a minimal fallback instance
+  challengeManager = {
+    getDefaultChallenges: () => [],
+    getAllChallenges: () => [],
+    getChallengeById: () => undefined,
+    loadCachedChallenges: async () => [],
+    cacheChallenges: async () => {},
+    clearCache: () => {},
+    getCacheStats: () => ({ hasCached: false, isFresh: false, size: 0 }),
+    isCacheFresh: () => false,
+    getConfig: () => defaultChallengeConfig,
+    getChallengeCount: () => ({ total: 0, builtin: 0, custom: 0 })
+  } as any;
+}
+
+export { challengeManager };
 
 // Basic file operations for community edition
 // Simplified API for basic challenge import/export functionality
@@ -583,8 +848,16 @@ export const tauriChallengeAPI = {
   // Load challenges from local file (basic functionality)
   async loadChallengesFromFile(filePath: string): Promise<ExtendedChallenge[]> {
     try {
+      if (!filePath || typeof filePath !== 'string') {
+        console.warn('Invalid file path provided');
+        return [];
+      }
+      
       // Basic file loading for community edition
       console.log('Loading challenges from file:', filePath);
+      
+      // In a real implementation, this would use Tauri's file system APIs
+      // For now, return empty array as this is placeholder functionality
       return [];
     } catch (error) {
       console.error('Failed to load challenges from file:', error);
@@ -592,13 +865,42 @@ export const tauriChallengeAPI = {
     }
   },
 
-  // Save challenges to local file (basic functionality)
+  // Save challenges to local file (basic functionality) 
   async saveChallenges(challenges: ExtendedChallenge[], filePath: string): Promise<void> {
     try {
+      if (!Array.isArray(challenges)) {
+        throw new Error('Challenges must be an array');
+      }
+      
+      if (!filePath || typeof filePath !== 'string') {
+        throw new Error('Invalid file path provided');
+      }
+      
       // Basic file saving for community edition
-      console.log('Saving challenges to file:', filePath);
+      console.log('Saving challenges to file:', filePath, `(${challenges.length} challenges)`);
+      
+      // Validate challenges before saving
+      const manager = new ChallengeManager();
+      const validChallenges = challenges.filter(challenge => {
+        try {
+          return manager['validateChallenge'](challenge);
+        } catch (e) {
+          console.warn('Invalid challenge filtered out during save:', e);
+          return false;
+        }
+      });
+      
+      if (validChallenges.length !== challenges.length) {
+        console.warn(`Filtered out ${challenges.length - validChallenges.length} invalid challenges`);
+      }
+      
+      // In a real implementation, this would use Tauri's file system APIs
+      // For now, this is placeholder functionality
+      console.log(`Would save ${validChallenges.length} valid challenges`);
+      
     } catch (error) {
       console.error('Failed to save challenges to file:', error);
+      throw error; // Re-throw for caller handling
     }
   }
 };
