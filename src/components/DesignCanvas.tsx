@@ -30,6 +30,12 @@ interface DesignCanvasProps {
 }
 
 export function DesignCanvas({ challenge, initialData, onComplete, onBack }: DesignCanvasProps) {
+  // Memoized optimized components for performance mode
+    const optimizedComponents = useMemo(() => {
+      return performanceMode ? 
+        components.filter(c => isInViewport(c)) : 
+        components;
+    }, [components, performanceMode]);
   const [components, setComponents] = useState<DesignComponent[]>(initialData.components);
   const [connections, setConnections] = useState<Connection[]>(initialData.connections);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
@@ -756,147 +762,24 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   {performanceMode ? 'Performance Mode: ON' : 'Performance Mode: OFF'}
                 </Button>
                 
-                {/* Move the useMemo hook outside of JSX */}
                 </SmartTooltip>
-                
-                // Apply optimizations conditionally
-                const optimizedComponents = useMemo(() => {
-                  return performanceMode ? 
-                    components.filter(c => isInViewport(c)) : 
-                    components;
-                }, [components, performanceMode]);
-                
                 <div id="performance-mode-desc" className="sr-only">
                 {performanceMode 
                   ? 'Performance optimizations are currently enabled' 
                   : 'Performance optimizations are disabled'
                 }
               </div>
+            </div>
+            <div className="flex items-center gap-2">
               <SmartTooltip 
-                content={showHints ? 'Hide solution hints and guidance' : 'Show architectural guidance and best practices'}
-                contextualHelp="Solution hints provide context-aware suggestions for system architecture patterns, component placement, and design best practices based on your current challenge"
-                shortcut="?"
+                content="View available components"
+                contextualHelp="Drag components from the palette to the canvas to build your design"
               >
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    const newHintsState = !showHints;
-                    workflowOptimizer.trackAction('toggle_hints', 200, true, 'design-canvas', {
-                      enabled: newHintsState,
-                      componentCount: components.length
-                    });
-                    trackCanvasAction('toggle-hints', {
-                      showHints: newHintsState,
-                      componentCount: components.length,
-                      designComplexity: designMetrics.complexity
-                    }, true);
-                    setShowHints(newHintsState);
-                  }}
-                  className="bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700"
-                  data-help-target="design-canvas-hints"
-                  aria-pressed={showHints}
-                  aria-describedby="hints-desc"
-                >
-                  <Lightbulb className="w-4 h-4 mr-2" />
-                  {showHints ? 'Hide Hints' : 'Show Hints'}
+                <Button variant="ghost" size="sm" onClick={() => setShowHints(!showHints)}>
+                  <Component className="mr-2 h-4 w-4" />
+                  Palette
                 </Button>
               </SmartTooltip>
-              <div id="hints-desc" className="sr-only">
-                {showHints 
-                  ? 'Solution hints panel is currently visible' 
-                  : 'Solution hints panel is hidden'
-                }
-              </div>
-              <SmartTooltip 
-                content="Save current design progress" 
-                contextualHelp="Saves your design locally. Auto-saves occur every few seconds when you make changes. Use Ctrl+S to manually save anytime."
-                shortcut="Ctrl+S"
-              >
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => {
-                    handleSave();
-                    workflowOptimizer.trackAction('manual_save', 300, true, 'design-canvas');
-                  }}
-                  data-help-target="design-canvas-save"
-                  aria-label="Save design progress"
-                >
-                  <Save className="w-4 h-4" />
-                  <span className="sr-only">Save Design</span>
-                </Button>
-              </SmartTooltip>
-              <SmartTooltip 
-                content="Export design as JSON file" 
-                contextualHelp="Downloads your complete design as a JSON file that can be imported later or shared with others. Includes all components, connections, and metadata."
-                shortcut="Ctrl+E"
-              >
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => {
-                    handleExport();
-                    workflowOptimizer.trackAction('export_json', 500, true, 'design-canvas');
-                  }}
-                  data-help-target="design-canvas-export"
-                  aria-label="Export design as JSON"
-                >
-                  <Download className="w-4 h-4" />
-                  <span className="sr-only">Export Design as JSON</span>
-                </Button>
-              </SmartTooltip>
-              <SmartTooltip 
-                content="Export design as PNG image" 
-                contextualHelp="Creates a high-quality PNG image of your design perfect for presentations, documentation, or sharing. Large designs are automatically optimized for best quality."
-                shortcut="Ctrl+Shift+E"
-              >
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => {
-                    handleExportImage();
-                    workflowOptimizer.trackAction('export_png', 2000, true, 'design-canvas');
-                  }}
-                  disabled={isExporting}
-                  data-help-target="design-canvas-export"
-                  aria-label={isExporting ? 'Exporting PNG...' : 'Export design as PNG'}
-                  aria-describedby={isExporting ? 'export-status' : undefined}
-                >
-                  <Image className="w-4 h-4" />
-                  <span className="sr-only">{isExporting ? 'Exporting PNG...' : 'Export as PNG'}</span>
-                </Button>
-              </SmartTooltip>
-              {isExporting && (
-                <div id="export-status" className="sr-only" aria-live="polite">
-                  Exporting design as PNG image, please wait...
-                </div>
-              )}
-              <SmartTooltip 
-                content={components.length === 0 ? 'Add components to continue' : 'Proceed to record your explanation'}
-                contextualHelp="Once you're satisfied with your system design, continue to the recording phase where you'll explain your architectural decisions and thought process."
-              >
-                <Button 
-                  onClick={() => {
-                    handleContinue();
-                    workflowOptimizer.trackAction('continue_to_recording', 1000, true, 'design-canvas', {
-                      componentCount: components.length,
-                      connectionCount: connections.length,
-                      designComplexity: designMetrics.complexity
-                    });
-                  }}
-                  disabled={components.length === 0 || isExporting}
-                  aria-describedby="continue-help"
-                >
-                  {isExporting ? 'Exporting...' : 'Continue to Recording'}
-                </Button>
-              </SmartTooltip>
-              <div id="continue-help" className="sr-only">
-                {components.length === 0 
-                  ? 'You must add at least one component before continuing' 
-                  : 'Continue to the audio recording phase'
-                }
-              </div>
             </div>
           </div>
         </div>
@@ -906,7 +789,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           <div className="flex-1" role="region" aria-label="Design canvas">
             <CanvasArea
               ref={canvasRef}
-              components={components}
+              components={optimizedComponents}
+              connections={stableConnections}
               connections={connections}
               selectedComponent={selectedComponent}
               connectionStart={connectionStart}
@@ -1361,7 +1245,6 @@ const handleComponentDrop = useOptimizedCallback((...) => {
                   {performanceMode ? 'Performance Mode: ON' : 'Performance Mode: OFF'}
                 </Button>
                 
-                // Apply optimizations conditionally
                 const optimizedComponents = useMemo(() => {
                   return performanceMode ? 
                     components.filter(c => isInViewport(c)) : 

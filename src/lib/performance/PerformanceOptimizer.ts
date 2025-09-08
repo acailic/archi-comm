@@ -3,7 +3,7 @@
  * Designed to achieve top 0.01% performance benchmarks
  */
 
-import { useCallback, useRef, useMemo, useEffect, startTransition } from 'react';
+import { useCallback, useRef, useMemo, useEffect, useState, startTransition } from 'react';
 
 // Performance monitoring and metrics
 export class PerformanceMonitor {
@@ -419,45 +419,55 @@ export const useVirtualizedList = <T>(
 };
 
 // Memory management utilities
-export class MemoryOptimizer {
-  private static weakMap = new WeakMap();
-  private static objectPool = new Map<string, any[]>();
-  
-  static poolObject<T>(type: string, factory: () => T): T {
-    if (!this.objectPool.has(type)) {
-      this.objectPool.set(type, []);
+// Modify MemoryOptimizer to support deferred initialization
+class MemoryOptimizer {
+  private static pools = new Map<string, any[]>();
+  private static isInitialized = false;
+
+  static initialize() {
+    if (this.isInitialized) return;
+    
+    // Initialize with smaller default pool sizes
+    this.pools.set('svg-path', []);
+    this.pools.set('component-data', []);
+    this.pools.set('connection-data', []);
+    
+    this.isInitialized = true;
+  }
+
+  static getPool(type: string): any[] {
+    if (!this.isInitialized) {
+      this.initialize();
     }
     
-    const pool = this.objectPool.get(type)!;
+    if (!this.pools.has(type)) {
+      this.pools.set(type, []);
+    }
+    return this.pools.get(type)!;
+  }
+
+  static poolObject<T>(type: string, factory: () => T): T {
+    const pool = this.getPool(type);
     return pool.length > 0 ? pool.pop() : factory();
   }
-  
-  static releaseObject(type: string, object: any) {
-    if (!this.objectPool.has(type)) {
-      this.objectPool.set(type, []);
-    }
-    
-    const pool = this.objectPool.get(type)!;
-    if (pool.length < 10) { // Limit pool size
-      pool.push(object);
-    }
+
+  static releaseObject(type: string, obj: any) {
+    const pool = this.getPool(type);
+    pool.push(obj);
   }
-  
-  static memoizeWeak<T extends object, R>(
-    fn: (arg: T) => R,
-    keyFn?: (arg: T) => any
-  ): (arg: T) => R {
-    return (arg: T) => {
-      const key = keyFn ? keyFn(arg) : arg;
+
+  static memoizeWeak<T extends (...args: any[]) => any>(fn: T, keyFn?: (...args: Parameters<T>) => string): T {
+    const cache = new WeakMap<object, any>();
+    
+    return ((...args: Parameters<T>): ReturnType<T> => {
+      const key = keyFn ? keyFn(...args) : JSON.stringify(args);
       
-      if (this.weakMap.has(key)) {
-        return this.weakMap.get(key);
+      if (!cache.has(key)) {
+        cache.set(key, fn(...args));
       }
       
-      const result = fn(arg);
-      this.weakMap.set(key, result);
-      return result;
-    };
+      return cache.get(key);
+    }) as T;
   }
 }
 
@@ -547,6 +557,25 @@ interface DirtyRegion {
   y: number;
   width: number;
   height: number;
+}
+
+// Add lightweight performance monitoring for initialization phase
+function usePerformanceMonitor() {
+  const [isReady, setIsReady] = useState(false);
+  
+  useEffect(() => {
+    const init = async () => {
+      if (typeof window !== 'undefined') {
+        // Initialize the performance monitor if needed
+        PerformanceMonitor.getInstance();
+        setIsReady(true);
+      }
+    };
+    
+    init();
+  }, []);
+  
+  return isReady;
 }
 
 // Export performance utilities

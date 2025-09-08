@@ -173,6 +173,9 @@ export default function App() {
     }
   }, [trackPerformance, trackError, workflowOptimizer, shortcutLearning]);
 
+  // Performance optimization: prevent unnecessary re-renders of availableChallenges
+  const memoizedChallenges = useMemo(() => availableChallenges, [availableChallenges.length]);
+
   const isFirstVisit = checkFirstVisit();
   const [currentScreen, setCurrentScreen] = useState<Screen>(isFirstVisit ? 'welcome' : 'challenge-selection');
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
@@ -844,7 +847,7 @@ export default function App() {
               <Suspense fallback={<div className="p-6 text-sm opacity-70">Loading challenges…</div>}>
                 <ChallengeSelection 
                   onChallengeSelect={handleChallengeSelect}
-                  availableChallenges={availableChallenges}
+                  availableChallenges={memoizedChallenges}
                 />
               </Suspense>
             </motion.div>

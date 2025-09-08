@@ -305,6 +305,39 @@ export class ChallengeManager {
     }
   }
 
+  // Get only default challenges immediately (no async calls)
+  getDefaultChallenges(): ExtendedChallenge[] {
+    return [...this.config.challenges];
+  }
+
+  // Check cache freshness without loading
+  isCacheFresh(): boolean {
+    try {
+      const lastUpdate = localStorage.getItem(CACHE_KEYS.LAST_UPDATE);
+      if (!lastUpdate) return false;
+      const cacheTime = new Date(lastUpdate).getTime();
+      const now = Date.now();
+      const maxAge = 1000 * 60 * 30; // 30 minutes
+      return (now - cacheTime) < maxAge;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Get cache loading statistics
+  getCacheStats(): { hasCached: boolean; isFresh: boolean; size: number } {
+    try {
+      const cached = localStorage.getItem(CACHE_KEYS.CHALLENGES);
+      return {
+        hasCached: !!cached,
+        isFresh: this.isCacheFresh(),
+        size: cached ? JSON.parse(cached).length : 0
+      };
+    } catch (e) {
+      return { hasCached: false, isFresh: false, size: 0 };
+    }
+  }
+
   // Save challenges to cache
   async cacheChallenges(challenges: ExtendedChallenge[]) {
     try {
@@ -321,19 +354,85 @@ export class ChallengeManager {
     Object.values(CACHE_KEYS).forEach(key => localStorage.removeItem(key));
   }
 
-  // Hybrid: cache first, refresh in background
-  async loadChallengesWithCache(source: 'tauri' | 'api' | 'file', path?: string) {
+  // Optimized cache-first loading with performance tracking
+  async loadChallengesWithCache(
+    source: 'tauri' | 'api' | 'file', 
+    path?: string,
+    performanceTracker?: (event: string, duration: number, meta?: any) => void
+  ) {
+    const startTime = Date.now();
     const cached = await this.loadCachedChallenges();
+    
+    if (performanceTracker) {
+      performanceTracker('cache-load', Date.now() - startTime, {
+        found: cached.length,
+        fresh: this.isCacheFresh()
+      });
+    }
+
+    // Return cached immediately if available and fresh
+    if (cached.length > 0 && this.isCacheFresh()) {
+      // Still try to refresh in background
+      this.refreshChallengesInBackground(source, path, performanceTracker);
+      return { challenges: cached, fromCache: true, fresh: true };
+    }
+
     try {
+      const loadStart = Date.now();
       const fresh = await this.loadChallengesFromSource(source, path);
+      
+      if (performanceTracker) {
+        performanceTracker('external-load', Date.now() - loadStart, {
+          found: fresh.length,
+          source
+        });
+      }
+
       if (fresh.length > 0) {
         await this.cacheChallenges(fresh);
-        return { challenges: fresh, fromCache: false };
+        return { challenges: fresh, fromCache: false, fresh: true };
       }
     } catch (e) {
       console.error('Fresh load failed:', e);
+      if (performanceTracker) {
+        performanceTracker('external-load-error', Date.now() - startTime, { error: e });
+      }
     }
-    return { challenges: cached, fromCache: true };
+    
+    return { challenges: cached, fromCache: true, fresh: false };
+  }
+
+  // Background refresh that doesn't throw errors
+  private async refreshChallengesInBackground(
+    source: 'tauri' | 'api' | 'file',
+    path?: string,
+    performanceTracker?: (event: string, duration: number, meta?: any) => void
+  ): Promise<void> {
+    try {
+      const startTime = Date.now();
+      const fresh = await this.loadChallengesFromSource(source, path);
+      
+      if (fresh.length > 0) {
+        await this.cacheChallenges(fresh);
+        
+        if (performanceTracker) {
+          performanceTracker('background-refresh-success', Date.now() - startTime, {
+            found: fresh.length
+          });
+        }
+
+        // Emit event for listeners that new challenges are available
+        window.dispatchEvent(new CustomEvent('challenges-updated', {
+          detail: { challenges: fresh, source: 'background' }
+        }));
+      }
+    } catch (e) {
+      // Silent fail for background operations
+      console.warn('Background challenge refresh failed:', e);
+      if (performanceTracker) {
+        performanceTracker('background-refresh-error', 0, { error: e });
+      }
+    }
   }
   private config: ChallengeConfig;
   private customChallenges: ExtendedChallenge[] = [];
@@ -381,9 +480,18 @@ export class ChallengeManager {
     this.customChallenges.push(challenge);
   }
 
-  // Get all challenges (built-in + custom)
+  // Get all challenges (built-in + custom) - optimized for frequent calls
   getAllChallenges(): ExtendedChallenge[] {
     return [...this.config.challenges, ...this.customChallenges];
+  }
+
+  // Get challenge count for performance monitoring
+  getChallengeCount(): { total: number; builtin: number; custom: number } {
+    return {
+      total: this.config.challenges.length + this.customChallenges.length,
+      builtin: this.config.challenges.length,
+      custom: this.customChallenges.length
+    };
   }
 
   // Get challenges by category
