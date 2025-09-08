@@ -223,7 +223,7 @@ export default function App() {
       console.error('Failed to load challenges:', error);
       trackError(error as Error, { context: 'challenge-loading' });
     }
-  }, [trackError]);
+  }, []);
 
   // Global dev shortcuts and events
   useEffect(() => {

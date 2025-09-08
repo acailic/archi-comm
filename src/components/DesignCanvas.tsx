@@ -67,6 +67,16 @@ interface DesignCanvasProps {
 }
 
 export function DesignCanvas({ challenge, initialData, onComplete, onBack }: DesignCanvasProps) {
+  // Guard for differing react-dnd backend expectations (class vs factory)
+  const dndBackendFactory = useMemo(() => {
+    try {
+      // Some react-dnd versions expect a function factory, others accept the class directly.
+      // This factory always constructs the backend with `new` to avoid "class constructor without new" errors.
+      return ((manager: unknown, context: unknown) => new (HTML5Backend as unknown as any)(manager, context)) as unknown as any;
+    } catch {
+      return HTML5Backend as unknown as any;
+    }
+  }, []);
   const [components, setComponents] = useState<DesignComponent[]>(initialData.components);
   const [connections, setConnections] = useState<Connection[]>(initialData.connections);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
@@ -734,7 +744,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   useKeyboardShortcuts([]);
 
   return (
-    <DndProvider backend={HTML5Backend}>
+    <DndProvider backend={dndBackendFactory}>
       <div className="h-screen flex flex-col">
         {/* Main Toolbar */}
         <div className="border-b bg-card p-4" data-testid="canvas-toolbar">

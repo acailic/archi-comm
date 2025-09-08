@@ -21,7 +21,7 @@ const LazyCanvasAnnotationOverlay = React.lazy(() => import('./CanvasAnnotationO
 
 // Lightweight loading indicator for canvas initialization
 const CanvasInitializingState = () => (
-  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
     <div className="text-center">
       <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
       <span className="text-sm text-muted-foreground">Initializing canvas...</span>
@@ -46,7 +46,8 @@ const useLightweightCanvas = () => {
     if (!performanceMonitor) {
       const { PerformanceMonitor, MemoryOptimizer, OptimizedEventSystem } = await import('../lib/performance/PerformanceOptimizer');
       setPerformanceMonitor(PerformanceMonitor.getInstance());
-      setMemoryOptimizer(MemoryOptimizer);
+      // Important: wrap class in function to avoid React treating it as an updater
+      setMemoryOptimizer(() => MemoryOptimizer);
       setOptimizedEventSystem(OptimizedEventSystem.getInstance());
       setIsFullyInitialized(true);
     }

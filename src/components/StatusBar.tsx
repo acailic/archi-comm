@@ -55,8 +55,13 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
   });
   const [showPerformanceDetails, setShowPerformanceDetails] = useState(false);
   
-  // UX Optimizer integration
-  const uxOptimizer = useUXOptimizer();
+  // UX Optimizer integration (use stable callbacks, not the whole object)
+  const {
+    measureSatisfaction,
+    getSuccessRate,
+    getRecommendations,
+    getSkillLevel,
+  } = useUXOptimizer();
 
   // Update current time every second
   useEffect(() => {
@@ -107,14 +112,13 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
 
   // UX metrics monitoring
   useEffect(() => {
-    if (!uxOptimizer) return;
-
+    
     const updateUXMetrics = () => {
       try {
-        const satisfaction = uxOptimizer.measureSatisfaction();
-        const successRate = uxOptimizer.getSuccessRate();
-        const recommendations = uxOptimizer.getRecommendations();
-        const skillLevel = uxOptimizer.getSkillLevel();
+        const satisfaction = measureSatisfaction();
+        const successRate = getSuccessRate();
+        const recommendations = getRecommendations();
+        const skillLevel = getSkillLevel();
 
         setUxMetrics({
           userSatisfaction: Math.round(satisfaction * 100),
@@ -135,7 +139,7 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }
     updateUXMetrics();
 
     return () => clearInterval(uxInterval);
-  }, [currentScreen, uxOptimizer]);
+  }, [currentScreen, measureSatisfaction, getSuccessRate, getRecommendations, getSkillLevel]);
 
   // Performance metrics monitoring
   useEffect(() => {
