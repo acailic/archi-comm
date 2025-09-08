@@ -180,6 +180,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       initializePerformanceMonitor(performanceLevel === 'full' ? 'full' : 'basic');
     }
     const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    const nextTotalComponents = components.length + 1;
     return measureFn('component-drop', () => {
       try {
         // Create new component (pooling will be added when MemoryOptimizer loads)
@@ -225,9 +226,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         }
         
         // Track interaction pattern for performance mode suggestions
-        if (totalComponents > 25 && performanceLevel === 'off') {
+        if (nextTotalComponents > 25 && performanceLevel === 'off') {
           trackPerformance('large-design-detected', {
-            componentCount: totalComponents,
+            componentCount: nextTotalComponents,
             suggestionTriggered: true
           });
         }
