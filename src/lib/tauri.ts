@@ -4,11 +4,17 @@ import { appWindow } from '@tauri-apps/api/window';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/api/notification';
 import { writeTextFile, createDir } from '@tauri-apps/api/fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
+import { isTauriEnvironment } from './environment';
+// Domain types are centralized in services/tauri
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import type { Project, Component, DiagramElement, Connection } from '../services/tauri';
 
 // Helper function to check if we're running in Tauri
-export const isTauri = () => {
-  return !!(globalThis.__TAURI__ || globalThis.__TAURI_IPC__);
-};
+/**
+ * Deprecated aliases: use isTauriEnvironment() from ./environment instead.
+ * These aliases route to the centralized helper to avoid drift.
+ */
+export const isTauri = isTauriEnvironment;
 
 
 // Window management utilities
@@ -113,41 +119,9 @@ export const fileUtils = {
   },
 };
 
-// Data types matching Rust backend
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  created_at: string;
-  updated_at: string;
-  status: 'Planning' | 'InProgress' | 'Review' | 'Complete';
-  components: Component[];
-}
-
-export interface Component {
-  id: string;
-  name: string;
-  component_type: 'Frontend' | 'Backend' | 'Database' | 'Api' | 'Service' | 'Integration';
-  description: string;
-  dependencies: string[];
-  status: 'NotStarted' | 'InProgress' | 'Testing' | 'Done';
-  metadata: Record<string, string>;
-}
-
-export interface DiagramElement {
-  id: string;
-  element_type: string;
-  position: { x: number; y: number };
-  properties: Record<string, string>;
-}
-
-export interface Connection {
-  id: string;
-  source_id: string;
-  target_id: string;
-  connection_type: string;
-  properties: Record<string, string>;
-}
+// Re-export canonical domain types from services/tauri
+// Prefer importing these types from '../services/tauri'
+export type { Project, Component, DiagramElement, Connection } from '../services/tauri';
 
 
 // Project management utilities (matching actual Rust backend commands)

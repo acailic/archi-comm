@@ -230,7 +230,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                 <Button
                   onClick={() => setTranscript('')}
                   size="sm"
-                  variant="ghost"mod transcription;
+                  variant="ghost"
                 >
                   Clear
                 </Button>

@@ -568,14 +568,16 @@ export class TauriAPI {
       return null;
     }
     
+    const startTime = performance.now();
     try {
-      DEBUG.logPerformance(`Tauri.${command}`, performance.now());
       const result = await invoke(command, args);
-      DEBUG.logPerformance(`Tauri.${command}`, performance.now(), { success: true });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance(`Tauri.${command}`, duration, { success: true });
       return result;
     } catch (error) {
       console.error(`Tauri command '${command}' failed:`, error);
-      DEBUG.logPerformance(`Tauri.${command}`, performance.now(), { success: false, error });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance(`Tauri.${command}`, duration, { success: false, error });
       return null;
     }
   }
@@ -611,9 +613,10 @@ export const setupTauriListeners = () => {
   }
   
   try {
+    const start = performance.now();
     // This can be expanded to listen to Tauri events
     // For example, file system events, window events, etc.
-    DEBUG.logPerformance('setupTauriListeners', performance.now());
+    DEBUG.logPerformance('setupTauriListeners', performance.now() - start);
     console.log('Tauri listeners setup completed');
   } catch (error) {
     console.error('Failed to setup Tauri listeners:', error);

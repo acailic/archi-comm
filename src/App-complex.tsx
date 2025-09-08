@@ -685,6 +685,7 @@ function AppContent() {
             <ChallengeSelection 
               onChallengeSelect={handleChallengeSelect}
               availableChallenges={memoizedChallenges}
+              onNavigateToPro={() => navigateTo('pro-version')}
             />
           </ScreenWrapper>
           

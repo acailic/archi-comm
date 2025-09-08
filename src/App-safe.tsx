@@ -467,6 +467,7 @@ export default function App() {
               <ChallengeSelection 
                 onChallengeSelect={handleChallengeSelect}
                 availableChallenges={memoizedChallenges}
+                onNavigateToPro={() => setCurrentScreen('pro-version')}
               />
             </motion.div>
           )}

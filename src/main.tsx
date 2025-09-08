@@ -16,31 +16,7 @@ window.addEventListener('error', (event) => {
 });
 
 // Safe App import with fallback
-let App: any;
-try {
-  // Dynamic import to handle potential loading issues
-  const appModule = await import('./App');
-  App = appModule.default;
-} catch (error) {
-  console.error('Failed to load main App component:', error);
-  // Fallback App component
-  App = () => (
-    <div className="h-screen w-screen flex items-center justify-center bg-background">
-      <div className="max-w-md text-center p-6">
-        <h1 className="text-2xl font-bold text-foreground mb-4">ArchiComm</h1>
-        <p className="text-muted-foreground mb-6">
-          The application is currently loading. If this message persists, please refresh the page.
-        </p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-        >
-          Refresh Page
-        </button>
-      </div>
-    </div>
-  );
-}
+// App is dynamically loaded later to avoid top-level await
 
 // Enhanced loading fallback
 const LoadingFallback = () => (
@@ -57,13 +33,12 @@ const LoadingFallback = () => (
   </div>
 );
 
+import { isTauriEnvironment } from './lib/environment';
+
 // Environment detection and setup
 const initializeEnvironment = () => {
   try {
-    // Detect Tauri environment safely
-    const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
-    
-    if (isTauri) {
+    if (isTauriEnvironment()) {
       // Tauri-specific initialization
       console.log('🚀 Running in Tauri environment');
       
@@ -133,53 +108,91 @@ try {
   throw error;
 }
 
-// Application rendering with comprehensive error boundaries
-try {
-  root.render(
-    <StrictMode>
-      <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <App />
-        </Suspense>
-      </ErrorBoundary>
-    </StrictMode>
-  );
-  
-  // Mark initialization complete
-  if (typeof performance !== 'undefined' && performance.mark) {
-    performance.mark('app-init-complete');
-    performance.measure('app-initialization', 'app-init-start', 'app-init-complete');
-  }
-  
-  console.log('✅ ArchiComm initialized successfully');
-  
-} catch (error) {
-  console.error('Failed to render application:', error);
-  
-  // Fallback rendering
-  rootElement.innerHTML = `
-    <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui; background: #f8f9fa;">
-      <div style="text-align: center; max-width: 500px; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-        <h1 style="margin-bottom: 1rem; color: #dc3545;">Application Error</h1>
-        <p style="margin-bottom: 1rem; color: #666; line-height: 1.5;">
-          ArchiComm encountered an error during startup. This might be due to a network issue or a temporary problem.
-        </p>
-        <div style="margin-bottom: 1rem;">
-          <button onclick="window.location.reload()" style="padding: 0.75rem 1.5rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">
-            Refresh Page
-          </button>
-          <button onclick="localStorage.clear(); window.location.reload()" style="padding: 0.75rem 1.5rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            Reset & Refresh
-          </button>
+const renderWith = (AppComponent: any) => {
+  try {
+    root.render(
+      <StrictMode>
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <AppComponent />
+          </Suspense>
+        </ErrorBoundary>
+      </StrictMode>
+    );
+
+    if (typeof performance !== 'undefined' && performance.mark) {
+      performance.mark('app-init-complete');
+      performance.measure('app-initialization', 'app-init-start', 'app-init-complete');
+    }
+
+    console.log('✅ ArchiComm initialized successfully');
+  } catch (error) {
+    console.error('Failed to render application:', error);
+    rootElement.innerHTML = `
+      <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui; background: #f8f9fa;">
+        <div style="text-align: center; max-width: 500px; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+          <h1 style="margin-bottom: 1rem; color: #dc3545;">Application Error</h1>
+          <p style="margin-bottom: 1rem; color: #666; line-height: 1.5;">
+            ArchiComm encountered an error during startup. This might be due to a network issue or a temporary problem.
+          </p>
+          <div style="margin-bottom: 1rem;">
+            <button onclick="window.location.reload()" style="padding: 0.75rem 1.5rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">
+              Refresh Page
+            </button>
+            <button onclick="localStorage.clear(); window.location.reload()" style="padding: 0.75rem 1.5rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Reset & Refresh
+            </button>
+          </div>
+          <details style="text-align: left; margin-top: 1rem;">
+            <summary style="cursor: pointer; color: #666;">Technical Details</summary>
+            <pre style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.8rem; overflow-x: auto;">${(window as any).__APP_LOAD_ERROR__?.message || ''}</pre>
+          </details>
         </div>
-        <details style="text-align: left; margin-top: 1rem;">
-          <summary style="cursor: pointer; color: #666;">Technical Details</summary>
-          <pre style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.8rem; overflow-x: auto;">${error.message}</pre>
-        </details>
       </div>
-    </div>
-  `;
+    `;
+  }
+};
+
+// Load App dynamically without top-level await, then render
+function loadAndRenderApp() {
+  import('./App')
+    .then((appModule) => {
+      renderWith(appModule.default);
+    })
+    .catch((error) => {
+      console.error('Failed to load main App component:', error);
+      try {
+        (window as any).__APP_LOAD_ERROR__ = error;
+      } catch {}
+      const Fallback = () => (
+        <div className="h-screen w-screen flex items-center justify-center bg-background">
+          <div className="max-w-md text-center p-6">
+            <h1 className="text-2xl font-bold text-foreground mb-4">ArchiComm</h1>
+            <p className="text-muted-foreground mb-6">
+              The application is currently loading. If this message persists, please refresh the page.
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+            >
+              Refresh Page
+            </button>
+            <div className="text-left mt-4">
+              <details>
+                <summary className="cursor-pointer text-sm text-muted-foreground">Technical details</summary>
+                <pre className="mt-2 text-xs overflow-auto max-h-48 p-2 bg-muted rounded">
+{String((window as any).__APP_LOAD_ERROR__?.stack || (window as any).__APP_LOAD_ERROR__?.message || (window as any).__APP_LOAD_ERROR__ || '')}
+                </pre>
+              </details>
+            </div>
+          </div>
+        </div>
+      );
+      renderWith(Fallback);
+    });
 }
+
+loadAndRenderApp();
 
 // Development-only debugging
 if (import.meta.env.DEV) {

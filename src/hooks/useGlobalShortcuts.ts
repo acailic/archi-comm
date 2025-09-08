@@ -62,7 +62,8 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
   } = options;
 
   const managerRef = useRef<KeyboardShortcutManager | null>(null);
-  const shortcutRegistrationsRef = useRef<Set<string>>(new Set());
+  // Track unregister functions to avoid key reconstruction issues
+  const unregisterSetRef = useRef<Set<() => boolean>>(new Set());
 
   // Initialize manager
   useEffect(() => {
@@ -74,21 +75,23 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
     managerRef.current = getGlobalShortcutManager();
     
     if (managerRef.current) {
-      DEBUG.logPerformance('shortcuts-initialized', performance.now(), {
+      const t0 = performance.now();
+      DEBUG.logPerformance('shortcuts-initialized', Math.max(0, performance.now() - t0), {
         environment: isTauriEnvironment() ? 'tauri' : 'web',
         totalShortcuts: managerRef.current.getAllShortcuts().length,
       });
     }
 
     return () => {
-      if (managerRef.current) {
-        // Clean up custom registrations
-        shortcutRegistrationsRef.current.forEach(shortcutKey => {
-          const [key, ...modifiers] = shortcutKey.split('+');
-          managerRef.current?.unregister(key, modifiers as any);
-        });
-        shortcutRegistrationsRef.current.clear();
-      }
+      // Unregister everything exactly once
+      unregisterSetRef.current.forEach((unregister) => {
+        try {
+          unregister();
+        } catch (e) {
+          console.warn('Shortcut unregister failed during cleanup:', e);
+        }
+      });
+      unregisterSetRef.current.clear();
     };
   }, []);
 
@@ -106,7 +109,6 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
       let error: Error | null = null;
 
       try {
-        DEBUG.logPerformance(`shortcut-${config.key}`, startTime);
         await originalAction(event);
         
         // Track successful shortcut usage
@@ -151,7 +153,7 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
         }
       }
 
-      DEBUG.logPerformance(`shortcut-${config.key}`, performance.now(), { 
+      DEBUG.logPerformance(`shortcut-${config.key}`, Math.max(0, performance.now() - startTime), { 
         success, 
         error: error?.message 
       });
@@ -160,12 +162,11 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
     const enhancedConfig = { ...config, action: enhancedAction };
     const unregister = managerRef.current.register(enhancedConfig);
     
-    // Track registration for cleanup
-    const shortcutKey = `${config.key}+${config.modifiers?.join('+') || ''}`;
-    shortcutRegistrationsRef.current.add(shortcutKey);
+    // Track unregister for cleanup
+    unregisterSetRef.current.add(unregister);
 
     return () => {
-      shortcutRegistrationsRef.current.delete(shortcutKey);
+      unregisterSetRef.current.delete(unregister);
       return unregister();
     };
   }, [tracking, currentScreen]);
@@ -178,26 +179,26 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
 
     // Command palette shortcuts
     if (handlers.onCommandPalette) {
-      registrations.push(
-        registerShortcut({
-          key: 'k',
-          modifiers: ['ctrl'],
-          description: 'Open command palette',
-          category: 'general',
-          action: handlers.onCommandPalette,
-        })
-      );
+        registrations.push(
+          registerShortcut({
+            key: 'k',
+            modifiers: ['ctrl'],
+            description: 'Open command palette',
+            category: 'general',
+            action: handlers.onCommandPalette,
+          })
+        );
 
-      registrations.push(
-        registerShortcut({
-          key: 'k',
-          modifiers: ['meta'],
-          description: 'Open command palette',
-          category: 'general',
-          action: handlers.onCommandPalette,
-        })
-      );
-    }
+        registrations.push(
+          registerShortcut({
+            key: 'k',
+            modifiers: ['meta'],
+            description: 'Open command palette',
+            category: 'general',
+            action: handlers.onCommandPalette,
+          })
+        );
+      }
 
     // Challenge manager shortcuts
     if (handlers.onChallengeManager) {
@@ -275,6 +276,8 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
         { key: '2', screen: 'design-canvas', name: 'design canvas' },
         { key: '3', screen: 'audio-recording', name: 'audio recording' },
         { key: '4', screen: 'review', name: 'review' },
+        // Optional mapping for Pro screen
+        { key: '5', screen: 'pro-version', name: 'pro version' },
       ];
 
       navigationShortcuts.forEach(({ key, screen, name }) => {
@@ -440,7 +443,13 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
 
     // Cleanup function
     return () => {
-      registrations.forEach(unregister => unregister());
+      registrations.forEach(unregister => {
+        try {
+          unregister();
+        } finally {
+          unregisterSetRef.current.delete(unregister);
+        }
+      });
     };
   }, [
     handlers,
@@ -463,6 +472,7 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
     managerRef.current?.enableShortcuts();
   }, []);
 
+  // Deprecated: prefer using the unregister function returned by registerShortcut
   const unregisterShortcut = useCallback((key: string, modifiers?: string[]) => {
     if (!managerRef.current) return false;
     return managerRef.current.unregister(key, modifiers as any);

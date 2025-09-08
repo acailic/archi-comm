@@ -12,8 +12,8 @@ import {
   ComponentType,
   ComponentStatus
 } from '../services/tauri';
-import { isTauriEnvironment, DEBUG, FEATURES } from '../lib/environment';
-import { webNotificationManager, initializeWebFallbacks } from '../services/web-fallback';
+import { isTauriEnvironment, isWebEnvironment, DEBUG, FEATURES, CONFIG } from '../lib/environment';
+import { webNotificationManager, initializeWebFallbacks, webAutoSave } from '../services/web-fallback';
 
 /**
  * Hook for project management with environment-aware functionality
@@ -29,9 +29,10 @@ export const useProjects = () => {
       setLoading(true);
       setError(null);
       
-      DEBUG.logPerformance('fetchProjects.start', performance.now());
+      const startTime = performance.now();
       const projectList = await ProjectAPI.getProjects();
-      DEBUG.logPerformance('fetchProjects.end', performance.now(), { count: projectList.length });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('fetchProjects', duration, { count: projectList.length });
       
       setProjects(projectList);
     } catch (err) {
@@ -53,9 +54,10 @@ export const useProjects = () => {
     try {
       setError(null);
       
-      DEBUG.logPerformance('createProject.start', performance.now());
+      const startTime = performance.now();
       const newProject = await ProjectAPI.createProject(name, description);
-      DEBUG.logPerformance('createProject.end', performance.now(), { projectId: newProject.id });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('createProject', duration, { projectId: newProject.id });
       
       setProjects(prev => [newProject, ...prev]); // Add to beginning for recency
       
@@ -89,9 +91,10 @@ export const useProjects = () => {
     try {
       setError(null);
       
-      DEBUG.logPerformance('updateProject.start', performance.now());
+      const startTime = performance.now();
       const updatedProject = await ProjectAPI.updateProject(projectId, updates);
-      DEBUG.logPerformance('updateProject.end', performance.now(), { projectId, updates });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('updateProject', duration, { projectId, updates });
       
       if (updatedProject) {
         setProjects(prev => 
@@ -130,9 +133,10 @@ export const useProjects = () => {
       const project = projects.find(p => p.id === projectId);
       const projectName = project?.name || 'Unknown Project';
       
-      DEBUG.logPerformance('deleteProject.start', performance.now());
+      const startTime = performance.now();
       const success = await ProjectAPI.deleteProject(projectId);
-      DEBUG.logPerformance('deleteProject.end', performance.now(), { projectId, success });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('deleteProject', duration, { projectId, success });
       
       if (success) {
         setProjects(prev => prev.filter(p => p.id !== projectId));
@@ -204,9 +208,10 @@ export const useProject = (projectId: string | null) => {
       setLoading(true);
       setError(null);
       
-      DEBUG.logPerformance('fetchProject.start', performance.now());
+      const startTime = performance.now();
       const projectData = await ProjectAPI.getProject(projectId);
-      DEBUG.logPerformance('fetchProject.end', performance.now(), { projectId, found: !!projectData });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('fetchProject', duration, { projectId, found: !!projectData });
       
       setProject(projectData);
       
@@ -241,9 +246,10 @@ export const useProject = (projectId: string | null) => {
     try {
       setError(null);
       
-      DEBUG.logPerformance('addComponent.start', performance.now());
+      const startTime = performance.now();
       const newComponent = await ComponentAPI.addComponent(projectId, name, componentType, description);
-      DEBUG.logPerformance('addComponent.end', performance.now(), { componentId: newComponent?.id });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('addComponent', duration, { componentId: newComponent?.id });
       
       if (newComponent && project) {
         setProject({
@@ -290,9 +296,10 @@ export const useProject = (projectId: string | null) => {
     try {
       setError(null);
       
-      DEBUG.logPerformance('updateComponent.start', performance.now());
+      const startTime = performance.now();
       const updatedComponent = await ComponentAPI.updateComponent(projectId, componentId, updates);
-      DEBUG.logPerformance('updateComponent.end', performance.now(), { componentId, updates });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('updateComponent', duration, { componentId, updates });
       
       if (updatedComponent && project) {
         setProject({
@@ -337,9 +344,10 @@ export const useProject = (projectId: string | null) => {
       const component = project?.components.find(c => c.id === componentId);
       const componentName = component?.name || 'Unknown Component';
       
-      DEBUG.logPerformance('removeComponent.start', performance.now());
+      const startTime = performance.now();
       const success = await ComponentAPI.removeComponent(projectId, componentId);
-      DEBUG.logPerformance('removeComponent.end', performance.now(), { componentId, success });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('removeComponent', duration, { componentId, success });
       
       if (success && project) {
         setProject({
@@ -415,12 +423,25 @@ export const useDiagram = (projectId: string | null) => {
       setLoading(true);
       setError(null);
       
-      DEBUG.logPerformance('loadDiagram.start', performance.now());
+      if (isWebEnvironment()) {
+        const autoSavedData = webAutoSave.load();
+        if (autoSavedData && autoSavedData.projectId === projectId) {
+          setElements(autoSavedData.elements || []);
+          setConnections(autoSavedData.connections || []);
+          setIsDirty(false);
+          setLoading(false);
+          DEBUG.logPerformance('loadDiagram.web.autosave', 0, { success: true });
+          return;
+        }
+      }
+
+      const startTime = performance.now();
       const [diagramElements, diagramConnections] = await Promise.all([
         DiagramAPI.loadDiagram(projectId),
         DiagramAPI.loadConnections(projectId),
       ]);
-      DEBUG.logPerformance('loadDiagram.end', performance.now(), { 
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('loadDiagram', duration, { 
         elementsCount: diagramElements.length, 
         connectionsCount: diagramConnections.length 
       });
@@ -452,12 +473,13 @@ export const useDiagram = (projectId: string | null) => {
     try {
       setError(null);
       
-      DEBUG.logPerformance('saveDiagram.start', performance.now());
+      const startTime = performance.now();
       await Promise.all([
         DiagramAPI.saveDiagram(projectId, newElements),
         DiagramAPI.saveConnections(projectId, newConnections),
       ]);
-      DEBUG.logPerformance('saveDiagram.end', performance.now(), { 
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('saveDiagram', duration, { 
         elementsCount: newElements.length, 
         connectionsCount: newConnections.length 
       });
@@ -465,6 +487,10 @@ export const useDiagram = (projectId: string | null) => {
       setElements(newElements);
       setConnections(newConnections);
       setIsDirty(false);
+      // Stop web autosave after explicit save
+      if (isWebEnvironment()) {
+        webAutoSave.stop();
+      }
       
       if (FEATURES.NOTIFICATIONS) {
         await webNotificationManager.showNotification({
@@ -490,18 +516,23 @@ export const useDiagram = (projectId: string | null) => {
   }, [projectId]);
 
   // Auto-save functionality
-  const scheduleAutoSave = useCallback((elements: DiagramElement[], connections: Connection[]) => {
+  const scheduleAutoSave = useCallback((elementsToSave: DiagramElement[], connectionsToSave: Connection[]) => {
     if (!FEATURES.AUTO_SAVE || !projectId) return;
     
     setIsDirty(true);
+
+    if (isWebEnvironment()) {
+      webAutoSave.start(() => ({ projectId, elements: elementsToSave, connections: connectionsToSave }), CONFIG.AUTO_SAVE_INTERVAL);
+      return;
+    }
     
     if (autoSaveTimer) {
       clearTimeout(autoSaveTimer);
     }
     
     const timer = window.setTimeout(() => {
-      saveDiagram(elements, connections);
-    }, 5000); // Auto-save after 5 seconds of inactivity
+      saveDiagram(elementsToSave, connectionsToSave);
+    }, CONFIG.AUTO_SAVE_INTERVAL);
     
     setAutoSaveTimer(timer);
   }, [projectId, autoSaveTimer, saveDiagram]);
@@ -523,6 +554,9 @@ export const useDiagram = (projectId: string | null) => {
     
     // Cleanup auto-save timer on unmount
     return () => {
+      if (isWebEnvironment()) {
+        webAutoSave.stop();
+      }
       if (autoSaveTimer) {
         clearTimeout(autoSaveTimer);
       }
@@ -539,6 +573,11 @@ export const useDiagram = (projectId: string | null) => {
     loadDiagram,
     updateElements,
     updateConnections,
+    clearAutoSave: () => {
+      if (isWebEnvironment()) {
+        webAutoSave.clear();
+      }
+    },
     // Environment information
     isOnline: isTauriEnvironment(),
     hasAutoSave: FEATURES.AUTO_SAVE,
@@ -554,10 +593,11 @@ export const useUtilities = () => {
   const [environment, setEnvironment] = useState<string>('');
 
   const getAppVersion = useCallback(async () => {
+    const startTime = performance.now();
     try {
-      DEBUG.logPerformance('getAppVersion.start', performance.now());
       const version = await UtilityAPI.getAppVersion();
-      DEBUG.logPerformance('getAppVersion.end', performance.now(), { version });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('getAppVersion', duration, { version });
       
       setAppVersion(version);
       setEnvironment(isTauriEnvironment() ? 'Tauri Desktop' : 'Web Browser');
@@ -569,10 +609,11 @@ export const useUtilities = () => {
   }, []);
 
   const showInFolder = useCallback(async (path: string) => {
+    const startTime = performance.now();
     try {
-      DEBUG.logPerformance('showInFolder.start', performance.now());
       await UtilityAPI.showInFolder(path);
-      DEBUG.logPerformance('showInFolder.end', performance.now(), { path });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('showInFolder', duration, { path });
     } catch (err) {
       console.error('Failed to show in folder:', err);
       
@@ -586,10 +627,11 @@ export const useUtilities = () => {
   }, []);
 
   const exportProject = useCallback(async (projectId: string) => {
+    const startTime = performance.now();
     try {
-      DEBUG.logPerformance('exportProject.start', performance.now());
       const result = await UtilityAPI.exportProjectData(projectId);
-      DEBUG.logPerformance('exportProject.end', performance.now(), { projectId, size: result?.length });
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance('exportProject', duration, { projectId, size: result?.length });
       
       if (result && FEATURES.NOTIFICATIONS) {
         await webNotificationManager.showNotification({

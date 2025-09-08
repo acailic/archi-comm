@@ -38,6 +38,7 @@ import {
 interface ChallengeSelectionProps {
   onChallengeSelect: (challenge: any) => void;
   availableChallenges?: any[];
+  onNavigateToPro?: () => void;
 }
 
 // ArchiComm Community Edition - Basic Educational Challenges
@@ -132,7 +133,7 @@ const categoryIcons = {
   'scaling': TrendingUp
 };
 
-export function ChallengeSelection({ onChallengeSelect, availableChallenges }: ChallengeSelectionProps) {
+export function ChallengeSelection({ onChallengeSelect, availableChallenges, onNavigateToPro }: ChallengeSelectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -325,15 +326,7 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
               size="sm"
               className="bg-yellow-500 hover:bg-yellow-600 text-white"
               onClick={() => {
-                try {
-                  if (typeof window !== 'undefined' && window.dispatchEvent) {
-                    window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { 
-                      detail: { screen: 'pro-version' } 
-                    }));
-                  }
-                } catch (error) {
-                  console.warn('Failed to dispatch navigation event:', error);
-                }
+                onNavigateToPro?.();
               }}
             >
               Upgrade to Pro
@@ -531,13 +524,7 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges }: C
                             <Button
                               className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
                               onClick={() => {
-                                try {
-                                  if (typeof window !== 'undefined' && window.dispatchEvent) {
-                                    window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }));
-                                  }
-                                } catch (error) {
-                                  console.warn('Failed to dispatch navigation event:', error);
-                                }
+                                onNavigateToPro?.();
                               }}
                             >
                               <Lock className="w-4 h-4 mr-2" />

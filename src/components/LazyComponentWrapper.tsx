@@ -3,16 +3,18 @@
  * Provides robust lazy loading with retry logic and graceful degradation
  */
 
-import React, { 
-  Suspense, 
-  Component, 
-  ComponentType, 
-  ReactNode, 
-  useState, 
-  useEffect, 
-  useCallback, 
-  lazy, 
-  LazyExoticComponent 
+import {
+  Suspense,
+  Component,
+  type ComponentType,
+  type ReactNode,
+  useState,
+  useEffect,
+  useCallback,
+  lazy,
+  type LazyExoticComponent,
+  type FC,
+  type ErrorInfo,
 } from 'react';
 import { isTauriEnvironment, DEBUG, CONFIG } from '../lib/environment';
 import { webNotificationManager } from '../services/web-fallback';
@@ -21,7 +23,7 @@ import { webNotificationManager } from '../services/web-fallback';
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
-  errorInfo: React.ErrorInfo | null;
+  errorInfo: ErrorInfo | null;
   retryCount: number;
 }
 
@@ -33,13 +35,13 @@ export interface LazyWrapperOptions {
   retryDelay?: number;
   preload?: boolean;
   timeout?: number;
-  onError?: (error: Error, info: React.ErrorInfo) => void;
+  onError?: (error: Error, info: ErrorInfo) => void;
   onRetry?: (attempt: number) => void;
   onLoad?: (componentName: string, loadTime: number) => void;
 }
 
 // Loading skeleton components
-const DefaultLoadingSkeleton: React.FC = () => (
+const DefaultLoadingSkeleton: FC = () => (
   <div className="lazy-loading-skeleton" role="status" aria-label="Loading component">
     <div className="skeleton-header"></div>
     <div className="skeleton-content">
@@ -86,7 +88,7 @@ const DefaultLoadingSkeleton: React.FC = () => (
   </div>
 );
 
-const DefaultErrorFallback: React.FC<{ error: Error; retry: () => void; componentName?: string }> = ({ 
+const DefaultErrorFallback: FC<{ error: Error; retry: () => void; componentName?: string }> = ({ 
   error, 
   retry, 
   componentName = 'Component' 
@@ -158,12 +160,13 @@ class LazyErrorBoundary extends Component<
     maxRetries?: number;
     retryDelay?: number;
     componentName?: string;
-    onError?: (error: Error, info: React.ErrorInfo) => void;
+    onError?: (error: Error, info: ErrorInfo) => void;
     onRetry?: (attempt: number) => void;
   },
   ErrorBoundaryState
 > {
   private retryTimeoutId: number | null = null;
+  private loadStartTime: number = performance.now();
 
   constructor(props: any) {
     super(props);
@@ -182,7 +185,7 @@ class LazyErrorBoundary extends Component<
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
     
     if (this.props.onError) {
@@ -190,7 +193,7 @@ class LazyErrorBoundary extends Component<
     }
 
     // Log error with debug info
-    DEBUG.logPerformance('lazy-component-error', performance.now(), {
+    DEBUG.logPerformance('lazy-component-error', Math.max(0, performance.now() - this.loadStartTime), {
       componentName: this.props.componentName,
       error: error.message,
       retryCount: this.state.retryCount,
@@ -224,7 +227,7 @@ class LazyErrorBoundary extends Component<
       onRetry(retryCount + 1);
     }
 
-    DEBUG.logPerformance('lazy-component-retry', performance.now(), {
+    DEBUG.logPerformance('lazy-component-retry', Math.max(0, performance.now() - this.loadStartTime), {
       componentName: this.props.componentName,
       attempt: retryCount + 1,
     });
@@ -269,7 +272,7 @@ class LazyErrorBoundary extends Component<
 }
 
 // Timeout wrapper for slow loading components
-const TimeoutWrapper: React.FC<{
+const TimeoutWrapper: FC<{
   timeout: number;
   onTimeout: () => void;
   children: ReactNode;
@@ -291,7 +294,7 @@ export interface LazyComponentWrapperProps extends LazyWrapperOptions {
   componentName?: string;
 }
 
-export const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = ({
+export const LazyComponentWrapper: FC<LazyComponentWrapperProps> = ({
   children,
   componentName = 'Component',
   fallback = <DefaultLoadingSkeleton />,
@@ -309,7 +312,7 @@ export const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = ({
 
   const handleTimeout = useCallback(() => {
     setIsTimeout(true);
-    DEBUG.logPerformance('lazy-component-timeout', performance.now(), {
+    DEBUG.logPerformance('lazy-component-timeout', Math.max(0, performance.now() - loadStartTime), {
       componentName,
       timeout,
     });
@@ -320,7 +323,7 @@ export const LazyComponentWrapper: React.FC<LazyComponentWrapperProps> = ({
     if (onLoad) {
       onLoad(componentName, loadTime);
     }
-    DEBUG.logPerformance('lazy-component-loaded', performance.now(), {
+    DEBUG.logPerformance('lazy-component-loaded', Math.max(0, loadTime), {
       componentName,
       loadTime,
     });

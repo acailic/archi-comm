@@ -36,25 +36,7 @@ const StatusBar = React.lazy(() =>
     .catch(() => ({ default: () => null }))
 );
 
-// Environment detection with fallbacks
-let isTauriEnvironment: () => boolean;
-let DEBUG: any;
-
-try {
-  const envModule = require('./lib/environment');
-  isTauriEnvironment = envModule.isTauriEnvironment || (() => false);
-  DEBUG = envModule.DEBUG || { logPerformance: () => {} };
-} catch (error) {
-  console.warn('Environment module not available, using fallbacks');
-  isTauriEnvironment = () => {
-    try {
-      return typeof window !== 'undefined' && !!(window as any).__TAURI__;
-    } catch {
-      return false;
-    }
-  };
-  DEBUG = { logPerformance: () => {} };
-}
+import { isTauriEnvironment, DEBUG } from './lib/environment';
 
 // Legacy imports for compatibility
 import { challengeManager, ExtendedChallenge } from './lib/challenge-config';
@@ -218,9 +200,8 @@ export default function App() {
   }, [windowTitle]);
 
   const handleChallengeSelect = useCallback(async (challenge: Challenge) => {
+    const startTime = performance.now();
     try {
-      DEBUG.logPerformance?.('challenge-select-start', performance.now());
-      
       trackNavigation('design-canvas', 'challenge-selection');
       
       setIsLoading(true);
@@ -253,6 +234,8 @@ export default function App() {
         setCurrentScreen('design-canvas');
         setIsLoading(false);
         setProgress(0);
+        const duration = performance.now() - startTime;
+        DEBUG.logPerformance?.('challenge-select', duration);
       }, 300);
       
     } catch (error) {
@@ -264,6 +247,7 @@ export default function App() {
   }, [trackNavigation, trackError]);
 
   const handleDesignComplete = useCallback(async (data: DesignData) => {
+    const startTime = performance.now();
     try {
       setIsLoading(true);
       
@@ -280,6 +264,8 @@ export default function App() {
       await new Promise(resolve => setTimeout(resolve, 300));
       setCurrentScreen('audio-recording');
       setIsLoading(false);
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance?.('design-complete', duration);
     } catch (error) {
       console.error('Error completing design:', error);
       setIsLoading(false);
@@ -287,6 +273,7 @@ export default function App() {
   }, []);
 
   const handleAudioComplete = useCallback(async (data: AudioData) => {
+    const startTime = performance.now();
     try {
       setIsLoading(true);
       
@@ -306,6 +293,8 @@ export default function App() {
       await new Promise(resolve => setTimeout(resolve, 300));
       setCurrentScreen('review');
       setIsLoading(false);
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance?.('audio-complete', duration);
     } catch (error) {
       console.error('Error completing audio:', error);
       setIsLoading(false);
@@ -313,6 +302,7 @@ export default function App() {
   }, [designData.components.length]);
 
   const handleStartOver = useCallback(async () => {
+    const startTime = performance.now();
     try {
       setIsLoading(true);
       
@@ -343,6 +333,8 @@ export default function App() {
       
       await new Promise(resolve => setTimeout(resolve, 300));
       setIsLoading(false);
+      const duration = performance.now() - startTime;
+      DEBUG.logPerformance?.('session-reset', duration);
     } catch (error) {
       console.error('Error starting over:', error);
       setIsLoading(false);
@@ -467,6 +459,7 @@ export default function App() {
               <ChallengeSelection 
                 onChallengeSelect={handleChallengeSelect}
                 availableChallenges={memoizedChallenges}
+                onNavigateToPro={() => setCurrentScreen('pro-version')}
               />
             </motion.div>
           )}

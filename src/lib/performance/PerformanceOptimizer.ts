@@ -475,7 +475,7 @@ export const useVirtualizedList = <T>(
 
 // Memory management utilities
 // Modify MemoryOptimizer to support deferred initialization
-class MemoryOptimizer {
+export class MemoryOptimizer {
   private static pools = new Map<string, any[]>();
   private static isInitialized = false;
 
@@ -512,15 +512,14 @@ class MemoryOptimizer {
   }
 
   static memoizeWeak<T extends (...args: any[]) => any>(fn: T, keyFn?: (...args: Parameters<T>) => string): T {
-    const cache = new WeakMap<object, any>();
+    // Use a regular Map keyed by string to avoid WeakMap key constraints
+    const cache = new Map<string, any>();
     
     return ((...args: Parameters<T>): ReturnType<T> => {
       const key = keyFn ? keyFn(...args) : JSON.stringify(args);
-      
       if (!cache.has(key)) {
         cache.set(key, fn(...args));
       }
-      
       return cache.get(key);
     }) as T;
   }

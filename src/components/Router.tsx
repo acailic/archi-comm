@@ -160,12 +160,13 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
   // Helper function to check if navigation is valid
   const isValidNavigation = useCallback((targetScreen: Screen): boolean => {
     try {
+      const t0 = performance.now();
       const rules = navigationRules[targetScreen];
       
       // Check if challenge is required
       if (rules?.requiresChallenge && !selectedChallenge) {
         if (DEBUG?.logPerformance) {
-          DEBUG.logPerformance('navigation-blocked', performance.now(), { 
+          DEBUG.logPerformance('navigation-blocked', Math.max(0, performance.now() - t0), { 
             reason: 'no-challenge', 
             target: targetScreen 
           });
@@ -176,7 +177,7 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
       // Check allowed previous screens
       if (rules?.allowedFrom && !rules.allowedFrom.includes(navigationState.currentScreen)) {
         if (DEBUG?.logPerformance) {
-          DEBUG.logPerformance('navigation-blocked', performance.now(), { 
+          DEBUG.logPerformance('navigation-blocked', Math.max(0, performance.now() - t0), { 
             reason: 'invalid-flow', 
             from: navigationState.currentScreen,
             to: targetScreen 
@@ -204,6 +205,7 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
     screen: Screen, 
     options: NavigationOptions = {}
   ): Promise<boolean> => {
+    const navStart = performance.now();
     const { force = false, skipHistory = false, onBeforeNavigate, onAfterNavigate } = options;
     
     try {
@@ -246,12 +248,7 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
         }
       }
 
-      if (DEBUG?.logPerformance) {
-        DEBUG.logPerformance('navigation.start', performance.now(), {
-          from: navigationState.currentScreen,
-          to: screen,
-        });
-      }
+      // Unified navigation timing; single measurement
 
       const previousScreen = navigationState.currentScreen;
 
@@ -281,9 +278,10 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
       }
 
       if (DEBUG?.logPerformance) {
-        DEBUG.logPerformance('navigation.complete', performance.now(), {
+        DEBUG.logPerformance('navigation', performance.now() - navStart, {
           from: previousScreen,
           to: screen,
+          blocked: false,
         });
       }
 
@@ -319,10 +317,11 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
 
   // Set challenge with validation
   const setChallenge = useCallback((challenge: Challenge | null) => {
+    const t0 = performance.now();
     setSelectedChallenge(challenge);
     
     if (challenge && DEBUG?.logPerformance) {
-      DEBUG.logPerformance('challenge-selected', performance.now(), {
+      DEBUG.logPerformance('challenge-selected', Math.max(0, performance.now() - t0), {
         challengeId: challenge.id,
         difficulty: challenge.difficulty,
       });
