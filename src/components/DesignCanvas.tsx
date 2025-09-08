@@ -104,6 +104,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   // Progressive enhancement states
   const [isCanvasActive, setIsCanvasActive] = useState(false);
   
+  // UX Tracking integration (must be declared before using in deps below)
+  const { trackCanvasAction, trackKeyboardShortcut, trackPerformance, trackError } = useUXTracker();
+
   // Progressive performance enhancement hook
   const useProgressivePerformance = useCallback(() => {
     const interactionPatterns = useRef({ componentAdds: 0, moves: 0, connections: 0 });
@@ -131,9 +134,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const { trackInteractionPattern } = useProgressivePerformance();
   const [canvasReady, setCanvasReady] = useState(false);
   const [hintsReady, setHintsReady] = useState(false);
-  
-  // UX Tracking integration
-  const { trackCanvasAction, trackKeyboardShortcut, trackPerformance, trackError } = useUXTracker();
   
   // UX Enhancement Systems
   const workflowOptimizer = WorkflowOptimizer.getInstance();
@@ -759,20 +759,20 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             </div>
             <div className="flex items-center gap-2" role="toolbar" aria-label="Canvas tools">
               <SmartTooltip 
-                content={performanceMode ? 'Disable performance optimizations' : 'Enable performance mode for large designs'}
+                content={performanceModeEnabled ? 'Disable performance optimizations' : 'Enable performance mode for large designs'}
                 contextualHelp="Performance mode optimizes rendering for designs with 50+ components by reducing animation quality and enabling object pooling"
               >
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  onClick={() => setPerformanceMode(!performanceMode)}
+                  onClick={() => setPerformanceModeEnabled(!performanceModeEnabled)}
                 >
                   <Zap className="mr-2 h-4 w-4" />
-                  {performanceMode ? 'Performance Mode: ON' : 'Performance Mode: OFF'}
+                  {performanceModeEnabled ? 'Performance Mode: ON' : 'Performance Mode: OFF'}
                 </Button>
               </SmartTooltip>
               <div id="performance-mode-desc" className="sr-only">
-                {performanceMode 
+                {performanceModeEnabled 
                   ? 'Performance optimizations are currently enabled' 
                   : 'Performance optimizations are disabled'
                 }

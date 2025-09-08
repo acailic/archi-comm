@@ -1,17 +1,70 @@
 import { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
+import { getLogger, logger, LogLevel } from './lib/logger';
+import { errorStore, addGlobalError } from './lib/errorStore';
+import { isDevelopment, isTauriEnvironment } from './lib/environment';
 import './index.css';
 
-// Global error handlers for unhandled promise rejections and errors
+// Initialize logger early in the application lifecycle
+const mainLogger = getLogger('main');
+
+// Enhanced global error handlers with centralized logging and error store integration
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
+  const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+  
+  // Log through centralized logger with full context
+  mainLogger.error('Unhandled promise rejection', error, {
+    type: 'unhandledrejection',
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+    timestamp: Date.now(),
+    stack: error.stack,
+    reason: event.reason
+  });
+  
+  // Add to error store for development mode tracking
+  addGlobalError(error, {
+    userActions: ['Promise rejection occurred'],
+    additionalData: {
+      type: 'unhandledrejection',
+      reason: event.reason,
+      url: window.location.href
+    }
+  });
+  
   // Prevent default browser error handling
   event.preventDefault();
 });
 
 window.addEventListener('error', (event) => {
-  console.error('Global error caught:', event.error);
+  const error = event.error || new Error(event.message || 'Unknown error');
+  
+  // Log through centralized logger with full context
+  mainLogger.error('Global error caught', error, {
+    type: 'global',
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+    url: window.location.href,
+    userAgent: navigator.userAgent,
+    timestamp: Date.now(),
+    message: event.message
+  });
+  
+  // Add to error store for development mode tracking
+  addGlobalError(error, {
+    userActions: ['Global error occurred'],
+    additionalData: {
+      type: 'global',
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      message: event.message,
+      url: window.location.href
+    }
+  });
+  
   // Don't prevent default for regular errors
 });
 
@@ -33,14 +86,16 @@ const LoadingFallback = () => (
   </div>
 );
 
-import { isTauriEnvironment } from './lib/environment';
-
-// Environment detection and setup
+// Environment detection and setup with enhanced logging
 const initializeEnvironment = () => {
+  const envLogger = getLogger('environment');
   try {
     if (isTauriEnvironment()) {
       // Tauri-specific initialization
-      console.log('🚀 Running in Tauri environment');
+      envLogger.info('🚀 Running in Tauri environment', {
+        platform: navigator.platform,
+        userAgent: navigator.userAgent
+      });
       
       // Disable right-click context menu in production
       document.addEventListener('contextmenu', (e) => {
@@ -53,6 +108,7 @@ const initializeEnvironment = () => {
         if (appElement && navigator.platform.toLowerCase().includes('mac')) {
           appElement.style.borderRadius = '8px';
           appElement.style.overflow = 'hidden';
+          envLogger.debug('Applied macOS window styling');
         }
       });
       
@@ -60,23 +116,69 @@ const initializeEnvironment = () => {
       document.documentElement.classList.add('tauri-app');
     } else {
       // Web environment initialization
-      console.log('🌐 Running in web environment');
+      envLogger.info('🌐 Running in web environment', {
+        url: window.location.href,
+        userAgent: navigator.userAgent
+      });
       document.documentElement.classList.add('web-app');
     }
     
-    // Performance monitoring setup
+    // Performance monitoring setup with logging
     if (typeof performance !== 'undefined' && performance.mark) {
       performance.mark('app-init-start');
+      envLogger.debug('Performance monitoring initialized');
     }
     
+    envLogger.info('Environment initialization completed successfully');
     return true;
   } catch (error) {
-    console.warn('Environment initialization failed:', error);
+    envLogger.error('Environment initialization failed', error);
+    addGlobalError(error instanceof Error ? error : new Error(String(error)), {
+      userActions: ['Environment initialization'],
+      additionalData: { phase: 'environment-setup' }
+    });
     return false;
   }
 };
 
-// Initialize environment
+// Initialize logger configuration based on environment
+const initializeLogging = () => {
+  const loggingLogger = getLogger('logging');
+  
+  try {
+    // Set log level based on environment
+    if (isDevelopment()) {
+      logger.setLevel(LogLevel.DEBUG);
+      loggingLogger.info('Development logging enabled', {
+        level: 'DEBUG',
+        features: ['console', 'memory-buffer', 'file-logging']
+      });
+    } else {
+      logger.setLevel(LogLevel.WARN);
+      loggingLogger.info('Production logging enabled', {
+        level: 'WARN',
+        features: ['console', 'memory-buffer']
+      });
+    }
+    
+    // Log application startup
+    loggingLogger.info('ArchiComm application starting', {
+      timestamp: new Date().toISOString(),
+      environment: isDevelopment() ? 'development' : 'production',
+      runtime: isTauriEnvironment() ? 'tauri' : 'web',
+      url: window.location.href,
+      userAgent: navigator.userAgent
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize logging:', error);
+    return false;
+  }
+};
+
+// Initialize logging and environment
+const loggingReady = initializeLogging();
 const environmentReady = initializeEnvironment();
 
 // Root element validation
@@ -85,12 +187,25 @@ if (!rootElement) {
   throw new Error('Root element not found. Please ensure index.html contains <div id="root"></div>');
 }
 
-// Enhanced root creation with error handling
+// Enhanced root creation with error handling and logging
 let root: any;
+const rootLogger = getLogger('react-root');
+
 try {
   root = createRoot(rootElement);
+  rootLogger.info('React root created successfully');
 } catch (error) {
-  console.error('Failed to create React root:', error);
+  const rootError = error instanceof Error ? error : new Error(String(error));
+  rootLogger.fatal('Failed to create React root', rootError);
+  
+  addGlobalError(rootError, {
+    userActions: ['Application initialization', 'React root creation'],
+    additionalData: { 
+      phase: 'react-root-creation',
+      rootElement: rootElement ? 'found' : 'missing'
+    }
+  });
+  
   // Fallback to legacy rendering if available
   rootElement.innerHTML = `
     <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui;">
@@ -109,7 +224,11 @@ try {
 }
 
 const renderWith = (AppComponent: any) => {
+  const renderLogger = getLogger('render');
+  
   try {
+    renderLogger.time('app-render');
+    
     root.render(
       <StrictMode>
         <ErrorBoundary>
@@ -120,14 +239,53 @@ const renderWith = (AppComponent: any) => {
       </StrictMode>
     );
 
+    renderLogger.timeEnd('app-render');
+
+    // Enhanced performance monitoring with logging
     if (typeof performance !== 'undefined' && performance.mark) {
       performance.mark('app-init-complete');
-      performance.measure('app-initialization', 'app-init-start', 'app-init-complete');
+      
+      try {
+        performance.measure('app-initialization', 'app-init-start', 'app-init-complete');
+        const measures = performance.getEntriesByName('app-initialization');
+        if (measures.length > 0) {
+          const initTime = measures[0].duration;
+          renderLogger.info('Application initialization completed', {
+            initializationTime: `${initTime.toFixed(2)}ms`,
+            performanceMarks: performance.getEntriesByType('mark').map(m => m.name)
+          });
+          
+          // Log performance warning if initialization is slow
+          if (initTime > 3000) {
+            renderLogger.warn('Slow application initialization detected', {
+              duration: initTime,
+              threshold: 3000
+            });
+          }
+        }
+      } catch (perfError) {
+        renderLogger.warn('Performance measurement failed', perfError);
+      }
     }
 
-    console.log('✅ ArchiComm initialized successfully');
+    renderLogger.info('✅ ArchiComm initialized successfully', {
+      timestamp: new Date().toISOString(),
+      environment: isDevelopment() ? 'development' : 'production',
+      runtime: isTauriEnvironment() ? 'tauri' : 'web'
+    });
+    
   } catch (error) {
-    console.error('Failed to render application:', error);
+    const renderError = error instanceof Error ? error : new Error(String(error));
+    renderLogger.fatal('Failed to render application', renderError);
+    
+    addGlobalError(renderError, {
+      userActions: ['Application rendering', 'Component mounting'],
+      additionalData: { 
+        phase: 'app-render',
+        component: AppComponent?.name || 'Unknown'
+      }
+    });
+    
     rootElement.innerHTML = `
       <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui; background: #f8f9fa;">
         <div style="text-align: center; max-width: 500px; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
@@ -153,17 +311,39 @@ const renderWith = (AppComponent: any) => {
   }
 };
 
-// Load App dynamically without top-level await, then render
+// Load App dynamically with enhanced error handling and logging
 function loadAndRenderApp() {
+  const loadLogger = getLogger('app-loader');
+  
+  loadLogger.time('app-load');
+  loadLogger.info('Starting dynamic App component import');
+  
   import('./App')
     .then((appModule) => {
+      loadLogger.timeEnd('app-load');
+      loadLogger.info('App component loaded successfully', {
+        hasDefault: !!appModule.default,
+        exports: Object.keys(appModule)
+      });
       renderWith(appModule.default);
     })
     .catch((error) => {
-      console.error('Failed to load main App component:', error);
+      loadLogger.timeEnd('app-load');
+      const loadError = error instanceof Error ? error : new Error(String(error));
+      loadLogger.fatal('Failed to load main App component', loadError);
+      
+      addGlobalError(loadError, {
+        userActions: ['Application loading', 'Dynamic import'],
+        additionalData: { 
+          phase: 'app-import',
+          importPath: './App'
+        }
+      });
+      
       try {
         (window as any).__APP_LOAD_ERROR__ = error;
       } catch {}
+      
       const Fallback = () => (
         <div className="h-screen w-screen flex items-center justify-center bg-background">
           <div className="max-w-md text-center p-6">
@@ -192,22 +372,41 @@ function loadAndRenderApp() {
     });
 }
 
+// Start the application with logging
+const startLogger = getLogger('startup');
+startLogger.info('Starting ArchiComm application', {
+  timestamp: new Date().toISOString(),
+  readiness: {
+    logging: loggingReady,
+    environment: environmentReady
+  }
+});
+
 loadAndRenderApp();
 
-// Development-only debugging
-if (import.meta.env.DEV) {
-  // Add helpful debugging information
-  console.log('🔧 Development mode active');
-  console.log('Environment ready:', environmentReady);
-  console.log('Root element:', rootElement);
+// Enhanced development-only debugging with logging integration
+if (isDevelopment()) {
+  const debugLogger = getLogger('debug');
   
-  // Make debugging utilities available globally
+  // Add helpful debugging information
+  debugLogger.info('🔧 Development mode active', {
+    loggingReady,
+    environmentReady,
+    rootElement: !!rootElement,
+    logLevel: logger.getLevel(),
+    errorStoreStats: errorStore.getStats()
+  });
+  
+  // Enhanced debugging utilities with logging integration
   (window as any).ArchiCommDebug = {
+    // Storage utilities
     clearStorage: () => {
       localStorage.clear();
       sessionStorage.clear();
-      console.log('Storage cleared');
+      debugLogger.info('Storage cleared');
     },
+    
+    // Performance utilities
     getPerformanceMarks: () => {
       if (performance.getEntriesByType) {
         return performance.getEntriesByType('mark');
@@ -219,8 +418,72 @@ if (import.meta.env.DEV) {
         return performance.getEntriesByType('measure');
       }
       return [];
+    },
+    
+    // Logging utilities
+    logger: {
+      getLevel: () => logger.getLevel(),
+      setLevel: (level: LogLevel) => {
+        logger.setLevel(level);
+        debugLogger.info(`Log level changed to ${LogLevel[level]}`);
+      },
+      getLogs: (filter?: any) => logger.getFilteredLogs(filter),
+      exportLogs: (format?: 'json' | 'csv' | 'txt') => logger.exportLogs(format),
+      downloadLogs: (filename?: string, format?: 'json' | 'csv' | 'txt') => logger.downloadLogs(filename, format),
+      clearLogs: () => {
+        logger.clearLogs();
+        debugLogger.info('Logs cleared');
+      }
+    },
+    
+    // Error store utilities
+    errorStore: {
+      getState: () => errorStore.getState(),
+      getStats: () => errorStore.getStats(),
+      clearErrors: () => {
+        errorStore.clearErrors();
+        debugLogger.info('Error store cleared');
+      },
+      exportErrors: () => errorStore.exportErrors(),
+      addTestError: () => {
+        addGlobalError('Test error for debugging', {
+          userActions: ['Debug test'],
+          additionalData: { source: 'ArchiCommDebug' }
+        });
+        debugLogger.info('Test error added');
+      }
+    },
+    
+    // System utilities
+    getSystemInfo: () => ({
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      language: navigator.language,
+      cookieEnabled: navigator.cookieEnabled,
+      onLine: navigator.onLine,
+      memory: (performance as any).memory,
+      timing: performance.timing,
+      url: window.location.href,
+      referrer: document.referrer,
+      timestamp: new Date().toISOString()
+    }),
+    
+    // Environment utilities
+    environment: {
+      isDevelopment: isDevelopment(),
+      isTauri: isTauriEnvironment(),
+      loggingReady,
+      environmentReady
     }
   };
   
-  console.log('🛠️ Debug utilities available at window.ArchiCommDebug');
+  // Make logger and error store globally accessible for debugging
+  (window as any).__ARCHICOMM_LOGGER__ = logger;
+  (window as any).__ARCHICOMM_ERROR_STORE__ = errorStore;
+  
+  debugLogger.info('🛠️ Enhanced debug utilities available', {
+    ArchiCommDebug: 'window.ArchiCommDebug',
+    logger: 'window.__ARCHICOMM_LOGGER__',
+    errorStore: 'window.__ARCHICOMM_ERROR_STORE__'
+  });
 }

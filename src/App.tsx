@@ -4,36 +4,77 @@ import { motion, AnimatePresence } from 'framer-motion';
 // Core components (eagerly loaded)
 import { ChallengeSelection } from './components/ChallengeSelection';
 import { DesignCanvas } from './components/DesignCanvas';
+import { getLogger } from './lib/logger';
+import { isDevelopment } from './lib/environment';
 
-// Lazy components - with safe fallbacks
+// Enhanced lazy loading helpers
+const lazyLogger = getLogger('lazy-loader');
+
+function createLazyFallback(name: string, error?: unknown) {
+  if (error) lazyLogger.error(`Failed to load ${name}`, error);
+  const Fallback: React.FC = () => (
+    <div className="p-4 border rounded-md bg-amber-50 text-amber-900">
+      <div className="font-medium mb-1">{name} is temporarily unavailable.</div>
+      <div className="text-sm opacity-80 mb-3">Please try again. If the problem persists, refresh the page.</div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => window.location.reload()}
+          className="px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700"
+        >
+          Refresh
+        </button>
+      </div>
+      {isDevelopment() && error instanceof Error && (
+        <details className="mt-3 text-xs opacity-80">
+          <summary>Technical details</summary>
+          <pre className="mt-1 whitespace-pre-wrap">{error.message}</pre>
+        </details>
+      )}
+    </div>
+  );
+  return Fallback;
+}
+
+// Lazy components - with safe fallbacks + logging
 const AudioRecording = React.lazy(() => 
   import('./components/AudioRecording')
     .then(m => ({ default: m.AudioRecording }))
-    .catch(() => ({ default: () => <div>Audio Recording not available</div> }))
+    .catch((err) => ({ default: createLazyFallback('Audio Recording', err) }))
 );
 
 const ReviewScreen = React.lazy(() => 
   import('./components/ReviewScreen')
     .then(m => ({ default: m.ReviewScreen }))
-    .catch(() => ({ default: () => <div>Review Screen not available</div> }))
+    .catch((err) => ({ default: createLazyFallback('Review Screen', err) }))
 );
 
 const WindowControls = React.lazy(() => 
   import('./components/WindowControls')
     .then(m => ({ default: m.WindowControls }))
-    .catch(() => ({ default: () => <div>Window Controls not available</div> }))
+    .catch((err) => ({ default: createLazyFallback('Window Controls', err) }))
 );
 
 const WelcomeOverlay = React.lazy(() => 
   import('./components/WelcomeOverlay')
     .then(m => ({ default: m.WelcomeOverlay }))
-    .catch(() => ({ default: ({ onComplete }: any) => <div><button onClick={onComplete}>Welcome - Click to Continue</button></div> }))
+    .catch((err) => ({ default: ({ onComplete }: any) => (
+      <div className="p-4 border rounded-md bg-amber-50 text-amber-900">
+        <div className="font-medium mb-2">Welcome overlay failed to load.</div>
+        <button onClick={onComplete} className="px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700">Continue</button>
+        {isDevelopment() && err instanceof Error && (
+          <details className="mt-3 text-xs opacity-80">
+            <summary>Technical details</summary>
+            <pre className="mt-1 whitespace-pre-wrap">{err.message}</pre>
+          </details>
+        )}
+      </div>
+    ) }))
 );
 
 const StatusBar = React.lazy(() => 
   import('./components/StatusBar')
     .then(m => ({ default: m.StatusBar }))
-    .catch(() => ({ default: () => null }))
+    .catch((err) => ({ default: createLazyFallback('Status Bar', err) }))
 );
 
 import { isTauriEnvironment, DEBUG } from './lib/environment';
@@ -49,6 +90,8 @@ import {
 } from 'lucide-react';
 import { useUXTracker } from './hooks/useUXTracker';
 import { Toaster } from 'sonner';
+import DevOverlay from './components/DevOverlay';
+import DeveloperDiagnosticsPage from './components/DeveloperDiagnosticsPage';
 
 export interface Challenge {
   id: string;
@@ -164,6 +207,10 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [availableChallenges, setAvailableChallenges] = useState<ExtendedChallenge[]>([]);
+  // Developer tooling state
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showDevOverlay, setShowDevOverlay] = useState(true);
+  const [diagnosticsContext, setDiagnosticsContext] = useState<{ errorId?: string } | null>(null);
 
   // Memoized challenges
   const memoizedChallenges = useMemo(() => availableChallenges, [availableChallenges]);
@@ -177,6 +224,34 @@ export default function App() {
       trackError(error as Error, { context: 'challenge-loading' });
     }
   }, [trackError]);
+
+  // Global dev shortcuts and events
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const ctrlOrMeta = e.ctrlKey || e.metaKey;
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        setShowDiagnostics(true);
+      }
+      if (ctrlOrMeta && e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        setShowDevOverlay(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const onOpenDiagnostics = (event: Event) => {
+      const anyEvent = event as CustomEvent<{ errorId?: string }>;
+      const errorId = anyEvent.detail?.errorId;
+      if (errorId) setDiagnosticsContext({ errorId });
+      setShowDiagnostics(true);
+    };
+    window.addEventListener('openDeveloperDiagnostics', onOpenDiagnostics as EventListener);
+    return () => window.removeEventListener('openDeveloperDiagnostics', onOpenDiagnostics as EventListener);
+  }, []);
 
   // Window title management
   const windowTitle = useMemo(() => {
@@ -542,6 +617,14 @@ export default function App() {
         richColors
         closeButton
       />
+
+      {/* Dev Overlays */}
+      {showDevOverlay && (
+        <DevOverlay onOpenDiagnostics={() => setShowDiagnostics(true)} />
+      )}
+      {showDiagnostics && (
+        <DeveloperDiagnosticsPage isOpen={showDiagnostics} onClose={() => setShowDiagnostics(false)} />
+      )}
     </div>
   );
 }
