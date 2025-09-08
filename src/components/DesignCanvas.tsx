@@ -72,7 +72,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
   const [commentMode, setCommentMode] = useState<string | null>(null);
-  const [performanceMode, setPerformanceMode] = useState(false);
+  const [performanceModeEnabled, setPerformanceModeEnabled] = useState(false);
+  const [performanceLevel, setPerformanceLevel] = useState<'off' | 'basic' | 'full'>('off');
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const performanceMonitorRef = useRef<any | null>(null);
@@ -85,17 +87,47 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     maxSize: 10
   });
   
-  // Deferred performance monitor initialization
-  const initializePerformanceMonitor = useCallback(() => {
+  // Enhanced deferred performance monitor initialization
+  const initializePerformanceMonitor = useCallback((level: 'basic' | 'full' = 'basic') => {
+    if (!performanceModeEnabled && !userHasInteracted) return;
+    
     if (!performanceMonitorRef.current) {
-      import('../lib/performance/PerformanceOptimizer').then(({ PerformanceMonitor }) => {
-        performanceMonitorRef.current = PerformanceMonitor.getInstance();
+      import('../lib/performance/PerformanceOptimizer').then(({ createPerformanceUtils }) => {
+        createPerformanceUtils(level).then((utils) => {
+          performanceMonitorRef.current = utils.monitor;
+        });
       });
     }
-  }, []);
+  }, [performanceModeEnabled, userHasInteracted]);
   
   // Progressive enhancement states
   const [isCanvasActive, setIsCanvasActive] = useState(false);
+  
+  // Progressive performance enhancement hook
+  const useProgressivePerformance = useCallback(() => {
+    const interactionPatterns = useRef({ componentAdds: 0, moves: 0, connections: 0 });
+    
+    const trackInteractionPattern = useCallback((type: 'add' | 'move' | 'connect') => {
+      interactionPatterns.current[type === 'add' ? 'componentAdds' : type === 'move' ? 'moves' : 'connections']++;
+      
+      const totalInteractions = Object.values(interactionPatterns.current).reduce((sum, count) => sum + count, 0);
+      
+      // Auto-suggest performance mode when design complexity increases
+      if (totalInteractions > 15 && components.length > 20 && performanceLevel === 'off') {
+        // Non-intrusive suggestion for performance mode
+        console.log('Consider enabling performance mode for better experience with complex designs');
+        trackPerformance('performance-suggestion-triggered', {
+          totalInteractions,
+          componentCount: components.length,
+          connectionCount: connections.length
+        });
+      }
+    }, []);
+    
+    return { trackInteractionPattern };
+  }, [components.length, connections.length, performanceLevel, trackPerformance]);
+  
+  const { trackInteractionPattern } = useProgressivePerformance();
   const [canvasReady, setCanvasReady] = useState(false);
   const [hintsReady, setHintsReady] = useState(false);
   
@@ -117,8 +149,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const designMetrics = useOptimizedMemo(() => {
     const componentCount = components.length;
     const connectionCount = connections.length;
-    const canvasSize = canvasRef.current ? 
-      canvasRef.current.offsetWidth * canvasRef.current.offsetHeight : 0;
+    const canvasElement = canvasRef.current;
+    const canvasSize = canvasElement ? 
+      canvasElement.offsetWidth * canvasElement.offsetHeight : 0;
     
     return {
       componentCount,
@@ -130,7 +163,21 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, [components.length, connections.length]);
 
   const handleComponentDrop = useOptimizedCallback((componentType: DesignComponent['type'], x: number, y: number) => {
-    if (performanceMode) initializePerformanceMonitor();
+    // Smart performance activation based on interaction patterns
+    if (!userHasInteracted) {
+      setUserHasInteracted(true);
+    }
+    
+    trackInteractionPattern('add');
+    
+    // Auto-suggest performance mode when component count > 20
+    if (components.length > 20 && performanceLevel === 'off') {
+      console.log('💡 Tip: Enable performance mode for smoother experience with large designs');
+    }
+    
+    if (performanceModeEnabled || performanceLevel !== 'off') {
+      initializePerformanceMonitor(performanceLevel === 'full' ? 'full' : 'basic');
+    }
     const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
     return measureFn('component-drop', () => {
       try {
@@ -175,6 +222,14 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         if (!isCanvasActive) {
           setIsCanvasActive(true);
         }
+        
+        // Track interaction pattern for performance mode suggestions
+        if (totalComponents > 25 && performanceLevel === 'off') {
+          trackPerformance('large-design-detected', {
+            componentCount: totalComponents,
+            suggestionTriggered: true
+          });
+        }
 
       } catch (error) {
         trackCanvasAction('component-drop', {
@@ -191,9 +246,10 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         trackError(error instanceof Error ? error : new Error('Component drop failed'));
       }
     });
-  }, [performanceMode, initializePerformanceMonitor, trackCanvasAction, trackPerformance, trackError, designMetrics.complexity, isCanvasActive, workflowOptimizer]);
+  }, [performanceModeEnabled, performanceLevel, userHasInteracted, initializePerformanceMonitor, trackCanvasAction, trackPerformance, trackError, designMetrics.complexity, isCanvasActive, workflowOptimizer, trackInteractionPattern]);
 
   const handleComponentMove = useOptimizedCallback((id: string, x: number, y: number) => {
+    trackInteractionPattern('move');
     const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
     return measureFn('component-move', () => {
       const component = components.find(c => c.id === id);
@@ -244,6 +300,13 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const handleCompleteConnection = useOptimizedCallback((fromId: string, toId: string) => {
     if (fromId === toId) return;
     
+    trackInteractionPattern('connect');
+    
+    // Auto-suggest performance mode when connections > 30
+    if (connections.length > 30 && performanceLevel === 'off') {
+      console.log('💡 Tip: Performance mode recommended for designs with many connections');
+    }
+    
     const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
     return measureFn('connection-create', () => {
       try {
@@ -292,7 +355,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         trackError(error instanceof Error ? error : new Error('Connection creation failed'));
       }
     });
-  }, [components, trackCanvasAction, trackPerformance, trackError, designMetrics]);
+  }, [components, trackCanvasAction, trackPerformance, trackError, designMetrics, trackInteractionPattern, connections.length, performanceLevel]);
 
   const handleComponentLabelChange = useCallback((id: string, label: string) => {
     setComponents(prev => prev.map(comp => 
@@ -470,7 +533,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         }
 
         // Temporarily hide UI overlays for clean export
-        canvasRef.current.classList.add('export-mode');
+        if (canvasRef.current) {
+          canvasRef.current.classList.add('export-mode');
+        }
         
         // Progressive rendering for large designs
         const exportOptions = designMetrics.isLargeDesign ? {
@@ -597,32 +662,43 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
   // Performance monitoring and cleanup
   useEffect(() => {
-    // Monitor design complexity and provide warnings
-    if (designMetrics.isLargeDesign && !performanceMode) {
-      console.warn('Large design detected. Consider enabling performance mode for better experience.');
-      trackPerformance('large-design-warning', {
+    // Performance budget warnings (only when performance mode is enabled)
+    if (performanceModeEnabled && designMetrics.isLargeDesign) {
+      trackPerformance('performance-budget-warning', {
         componentCount: designMetrics.componentCount,
         connectionCount: designMetrics.connectionCount,
-        complexity: designMetrics.complexity
+        complexity: designMetrics.complexity,
+        performanceLevel
+      });
+    }
+    
+    // Smart performance mode suggestions
+    if (designMetrics.isLargeDesign && performanceLevel === 'off') {
+      console.log('💡 Large design detected. Performance mode can improve responsiveness.');
+    }
+
+    // Lazy cleanup of export cache (only when performance mode is off)
+    if (performanceLevel === 'off') {
+      const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
+      const currentCacheKeys = Array.from(exportCacheRef.current.cache.keys());
+      currentCacheKeys.forEach(key => {
+        if (key !== cacheKey) {
+          exportCacheRef.current.cache.delete(key);
+        }
       });
     }
 
-    // Cleanup export cache when design changes significantly
-    const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
-    const currentCacheKeys = Array.from(exportCacheRef.current.cache.keys());
-    currentCacheKeys.forEach(key => {
-      if (key !== cacheKey) {
-        exportCacheRef.current.cache.delete(key);
-      }
-    });
-
     return () => {
       // Cleanup performance monitoring on unmount
+      if (performanceMonitorRef.current && (performanceModeEnabled || performanceLevel !== 'off')) {
+        performanceMonitorRef.current = null;
+      }
+      
       if (exportCacheRef.current.cache.size > exportCacheRef.current.maxSize) {
         exportCacheRef.current.cache.clear();
       }
     };
-  }, [designMetrics, performanceMode, challenge.id, components.length, connections.length, trackPerformance]);
+  }, [designMetrics, performanceModeEnabled, performanceLevel, challenge.id, components.length, connections.length, trackPerformance]);
 
   // Progressive canvas initialization
   useEffect(() => {

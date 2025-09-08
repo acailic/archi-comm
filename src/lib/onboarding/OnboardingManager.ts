@@ -79,12 +79,12 @@ export class OnboardingManager {
   }
 
   public previousStep(): boolean {
-    if (this.state.currentStepIndex <= 0) {
+    if (this.state.currentStepIndex <= 0 || !this.state.currentFlow) {
       return false;
     }
 
     this.state.currentStepIndex--;
-    this.state.currentStep = this.state.currentFlow!.steps[this.state.currentStepIndex];
+    this.state.currentStep = this.state.currentFlow.steps[this.state.currentStepIndex];
     return true;
   }
 
