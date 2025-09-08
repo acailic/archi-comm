@@ -15,6 +15,7 @@ use std::fs;
 use std::process;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use serde_json::Value as JsonValue;
 
 // Operation name constants for consistent error handling
 pub struct OperationNames;
@@ -677,6 +678,91 @@ async fn load_connections(
     Ok(connections)
 }
 
+// ---- Challenge Plugin I/O Commands ----
+// Minimal validation for incoming challenge objects to avoid malformed data
+fn validate_challenge_value(ch: &JsonValue) -> bool {
+    let Some(obj) = ch.as_object() else { return false };
+    // Check required string fields
+    let required_str = ["id", "title", "description", "category"];
+    for key in required_str.iter() {
+        if !obj.get(*key).and_then(|v| v.as_str()).is_some() { return false; }
+    }
+    // difficulty must be one of the allowed values
+    if let Some(diff) = obj.get("difficulty").and_then(|v| v.as_str()) {
+        match diff {
+            "beginner" | "intermediate" | "advanced" => {}
+            _ => return false,
+        }
+    } else { return false; }
+    // estimatedTime must be number
+    if !obj.get("estimatedTime").and_then(|v| v.as_f64()).is_some() { return false; }
+    // requirements must be array
+    if !obj.get("requirements").and_then(|v| v.as_array()).is_some() { return false; }
+    true
+}
+
+#[tauri::command]
+async fn load_challenges_from_file(path: String) -> Result<Vec<JsonValue>, ApiError> {
+    // Read file contents
+    let content = fs::read_to_string(&path).map_err(|e| ApiError::FileSystemError {
+        operation: OperationNames::FILE_SYSTEM.to_string(),
+        details: format!("Failed to read file '{}': {}", path, e),
+        source: Some(Box::new(e)),
+    })?;
+
+    // Parse JSON – file may be array of challenges or object containing { challenges: [...] }
+    let json: JsonValue = serde_json::from_str(&content).map_err(|e| ApiError::SerializationError {
+        operation: OperationNames::SERIALIZATION.to_string(),
+        details: format!("Invalid JSON in '{}': {}", path, e),
+        source: Some(Box::new(e)),
+    })?;
+
+    let challenges: Vec<JsonValue> = if let Some(arr) = json.as_array() {
+        arr.clone()
+    } else if let Some(arr) = json.get("challenges").and_then(|v| v.as_array()) {
+        arr.clone()
+    } else {
+        Vec::new()
+    };
+
+    // Filter valid challenges only
+    let valid: Vec<JsonValue> = challenges.into_iter().filter(|c| validate_challenge_value(c)).collect();
+    log::info!("Loaded {} valid challenges from {}", valid.len(), path);
+    Ok(valid)
+}
+
+#[tauri::command]
+async fn save_challenges_to_file(path: String, challenges: Vec<JsonValue>) -> Result<(), ApiError> {
+    // Validate all challenges before saving
+    let filtered: Vec<JsonValue> = challenges.into_iter().filter(|c| validate_challenge_value(c)).collect();
+    if filtered.is_empty() {
+        return Err(ApiError::InvalidProjectData {
+            details: "No valid challenges to save".to_string(),
+            source: None,
+        });
+    }
+
+    let payload = serde_json::json!({
+        "version": "1.0.0",
+        "challenges": filtered,
+        "exportedAt": Utc::now().to_rfc3339(),
+    });
+
+    let data = serde_json::to_string_pretty(&payload).map_err(|e| ApiError::SerializationError {
+        operation: OperationNames::SERIALIZATION.to_string(),
+        details: format!("Failed to serialize challenges: {}", e),
+        source: Some(Box::new(e)),
+    })?;
+
+    fs::write(&path, data).map_err(|e| ApiError::FileSystemError {
+        operation: OperationNames::FILE_WRITE.to_string(),
+        details: format!("Failed to write file '{}': {}", path, e),
+        source: Some(Box::new(e)),
+    })?;
+    log::info!("Saved challenges to {}", path);
+    Ok(())
+}
+
 // Helper function to validate and sanitize file names
 fn validate_filename(file_name: &str) -> Result<(), ApiError> {
     // Check for empty filename
@@ -1019,7 +1105,11 @@ fn main() {
                         get_app_version,
                         show_in_folder,
                         export_project_data,
-                        save_audio_file
+                        save_audio_file,
+
+                        // Challenge Plugin I/O
+                        load_challenges_from_file,
+                        save_challenges_to_file
                     ]
                 };
                 (with_debug) => {
@@ -1047,6 +1137,10 @@ fn main() {
                         show_in_folder,
                         export_project_data,
                         save_audio_file,
+
+                        // Challenge Plugin I/O
+                        load_challenges_from_file,
+                        save_challenges_to_file,
                         
                         // Debug Commands
                         populate_sample_data

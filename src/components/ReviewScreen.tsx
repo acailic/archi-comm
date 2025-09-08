@@ -184,6 +184,23 @@ export function ReviewScreen({
             </CardContent>
           </Card>
 
+          {/* Self-Assessment Checklist */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Self-Assessment Checklist</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {(challenge.requirements || []).map((req, idx) => (
+                  <label key={idx} className="flex items-start gap-2 text-sm">
+                    <input type="checkbox" className="mt-1" />
+                    <span>{req}</span>
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Design Summary */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -199,6 +216,10 @@ export function ReviewScreen({
                   <div className="flex justify-between">
                     <span>Connections:</span>
                     <Badge variant="secondary">{designData.connections.length}</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Complexity (approx):</span>
+                    <Badge variant="secondary">{designData.components.length + designData.connections.length * 2}</Badge>
                   </div>
                   <div className="flex justify-between">
                     <span>Challenge:</span>

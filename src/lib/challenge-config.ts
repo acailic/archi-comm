@@ -21,6 +21,10 @@ try {
   Connection = { type: '' };
 }
 
+// Tauri integration
+import { isTauriEnvironment } from './environment';
+import { invoke } from '@tauri-apps/api/tauri';
+
 // ArchiComm Community Edition - Challenge Configuration
 // This file contains the challenge system configuration for the community version
 // Includes basic educational challenges suitable for learning system design fundamentals
@@ -626,9 +630,7 @@ export class ChallengeManager {
   private async executeLoadFromSource(source: 'tauri' | 'api' | 'file', path?: string): Promise<ExtendedChallenge[]> {
     switch (source) {
       case 'tauri':
-        // In a real Tauri app, this would call Tauri commands
-        // return await invoke('load_challenges');
-        return this.loadChallengesFromFile(path || 'challenges.json');
+        return tauriChallengeAPI.loadChallengesFromFile(path || 'challenges.json');
       
       case 'api':
         if (typeof fetch === 'undefined') {
@@ -652,8 +654,7 @@ export class ChallengeManager {
         return data.challenges || data || [];
       
       case 'file':
-        // This would typically be handled by Tauri file system APIs
-        return this.loadChallengesFromFile(path || 'challenges.json');
+        return tauriChallengeAPI.loadChallengesFromFile(path || 'challenges.json');
       
       default:
         throw new Error(`Unsupported source: ${source}`);
@@ -662,9 +663,7 @@ export class ChallengeManager {
 
   // Load challenges from a JSON file (simulated for web version)
   private async loadChallengesFromFile(path: string): Promise<ExtendedChallenge[]> {
-    // In a Tauri app, this would use the file system APIs
-    // For now, return empty array as external challenges would be loaded separately
-    return [];
+    return tauriChallengeAPI.loadChallengesFromFile(path);
   }
 
   // Add a custom challenge
@@ -853,12 +852,13 @@ export const tauriChallengeAPI = {
         return [];
       }
       
-      // Basic file loading for community edition
-      console.log('Loading challenges from file:', filePath);
-      
-      // In a real implementation, this would use Tauri's file system APIs
-      // For now, return empty array as this is placeholder functionality
-      return [];
+      if (!isTauriEnvironment()) {
+        console.warn('loadChallengesFromFile called outside Tauri, returning []');
+        return [];
+      }
+      const result = await invoke<any>('load_challenges_from_file', { path: filePath });
+      if (!Array.isArray(result)) return [];
+      return result as ExtendedChallenge[];
     } catch (error) {
       console.error('Failed to load challenges from file:', error);
       return [];
@@ -871,36 +871,23 @@ export const tauriChallengeAPI = {
       if (!Array.isArray(challenges)) {
         throw new Error('Challenges must be an array');
       }
-      
       if (!filePath || typeof filePath !== 'string') {
         throw new Error('Invalid file path provided');
       }
-      
-      // Basic file saving for community edition
-      console.log('Saving challenges to file:', filePath, `(${challenges.length} challenges)`);
-      
-      // Validate challenges before saving
-      const manager = new ChallengeManager();
-      const validChallenges = challenges.filter(challenge => {
-        try {
-          return manager['validateChallenge'](challenge);
-        } catch (e) {
-          console.warn('Invalid challenge filtered out during save:', e);
-          return false;
-        }
-      });
-      
-      if (validChallenges.length !== challenges.length) {
-        console.warn(`Filtered out ${challenges.length - validChallenges.length} invalid challenges`);
+      if (!isTauriEnvironment()) {
+        console.warn('saveChallenges called outside Tauri, skipping');
+        return;
       }
-      
-      // In a real implementation, this would use Tauri's file system APIs
-      // For now, this is placeholder functionality
-      console.log(`Would save ${validChallenges.length} valid challenges`);
-      
+      // Validate before sending
+      const manager = new ChallengeManager();
+      const validChallenges = challenges.filter(ch => manager['validateChallenge'](ch));
+      await invoke('save_challenges_to_file', {
+        path: filePath,
+        challenges: validChallenges as any,
+      });
     } catch (error) {
       console.error('Failed to save challenges to file:', error);
-      throw error; // Re-throw for caller handling
+      throw error;
     }
   }
 };

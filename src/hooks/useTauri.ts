@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   Project, 
   Component, 
@@ -207,6 +207,9 @@ export const useProject = (projectId: string | null) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Memoize derived values to stabilize references across renders
+  const projectComponents = useMemo(() => project?.components ?? [], [project]);
+
   const fetchProject = useCallback(async () => {
     const startTime = performance.now();
     if (!projectId) {
@@ -242,6 +245,7 @@ export const useProject = (projectId: string | null) => {
       }
     } finally {
       setLoading(false);
+      // Use project presence at the time of logging for accuracy
       logDuration('fetchProject', startTime, { projectId, found: !!project });
     }
   }, [projectId]);
@@ -257,12 +261,12 @@ export const useProject = (projectId: string | null) => {
     try {
       setError(null);
       const newComponent = await ComponentAPI.addComponent(projectId, name, componentType, description);
-      if (newComponent && project) {
-        setProject({
-          ...project,
-          components: [...(project.components || []), newComponent],
+      if (newComponent) {
+        setProject(prev => prev ? {
+          ...prev,
+          components: [...(prev.components || []), newComponent],
           updated_at: new Date().toISOString(),
-        });
+        } : prev);
         if (FEATURES.NOTIFICATIONS) {
           webNotificationManager
             .showNotification({
@@ -288,7 +292,7 @@ export const useProject = (projectId: string | null) => {
     } finally {
       logDuration('addComponent', startTime, { componentType, projectId });
     }
-  }, [projectId, project]);
+  }, [projectId]);
 
   const updateComponent = useCallback(async (
     componentId: string,
@@ -305,14 +309,12 @@ export const useProject = (projectId: string | null) => {
     try {
       setError(null);
       const updatedComponent = await ComponentAPI.updateComponent(projectId, componentId, updates);
-      if (updatedComponent && project) {
-        setProject({
-          ...project,
-          components: (project.components || []).map(c => 
-            (c?.id === componentId) ? updatedComponent : c
-          ),
+      if (updatedComponent) {
+        setProject(prev => prev ? {
+          ...prev,
+          components: (prev.components || []).map(c => (c?.id === componentId) ? updatedComponent : c),
           updated_at: new Date().toISOString(),
-        });
+        } : prev);
         if (FEATURES.NOTIFICATIONS && updates.status) {
           webNotificationManager
             .showNotification({
@@ -338,7 +340,7 @@ export const useProject = (projectId: string | null) => {
     } finally {
       logDuration('updateComponent', startTime, { componentId, projectId });
     }
-  }, [projectId, project]);
+  }, [projectId]);
 
   const removeComponent = useCallback(async (componentId: string) => {
     const startTime = performance.now();
@@ -440,7 +442,9 @@ export const useDiagram = (projectId: string | null) => {
           setConnections(Array.isArray(autoSavedData.connections) ? autoSavedData.connections : []);
           setIsDirty(false);
           setLoading(false);
-          DEBUG.logPerformance('loadDiagram.web.autosave', 0, { success: true });
+          // Measure actual elapsed time for autosave load path
+          const duration = performance.now() - startTime;
+          DEBUG.logPerformance('loadDiagram.web.autosave', duration, { success: true });
           return;
         }
       }
@@ -472,6 +476,11 @@ export const useDiagram = (projectId: string | null) => {
       });
     }
   }, [projectId]);
+
+  // Memoize derived counts to provide stable references
+  const elementsCount = useMemo(() => elements.length, [elements]);
+  const connectionsCount = useMemo(() => connections.length, [connections]);
+  const hasDiagramData = useMemo(() => elements.length > 0 || connections.length > 0, [elements, connections]);
 
   const saveDiagram = useCallback(async (
     newElements: DiagramElement[],
@@ -574,6 +583,9 @@ export const useDiagram = (projectId: string | null) => {
   return {
     elements,
     connections,
+    elementsCount,
+    connectionsCount,
+    hasDiagramData,
     loading,
     error,
     isDirty,
@@ -636,8 +648,9 @@ export const useUtilities = () => {
 
   const exportProject = useCallback(async (projectId: string) => {
     const startTime = performance.now();
+    let result: unknown = null;
     try {
-      const result = await UtilityAPI.exportProjectData(projectId);
+      result = await UtilityAPI.exportProjectData(projectId);
       if (result && FEATURES.NOTIFICATIONS) {
         webNotificationManager
           .showNotification({
@@ -660,7 +673,16 @@ export const useUtilities = () => {
       }
       return null;
     } finally {
-      logDuration('exportProject', startTime, { projectId });
+      // Compute size of result accurately based on type
+      let size = 0;
+      if (typeof result === 'string') {
+        size = result.length;
+      } else if (typeof Blob !== 'undefined' && result instanceof Blob) {
+        size = result.size;
+      } else if (result instanceof Uint8Array) {
+        size = result.byteLength;
+      }
+      logDuration('exportProject', startTime, { projectId, size });
     }
   }, []);
 

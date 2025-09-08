@@ -1,4 +1,5 @@
 import { TaskTemplate, ComponentDefinition, TaskConstraint, EvaluationCriteria } from '../TaskPlugin';
+import type { DesignComponent, Connection } from '../../../App';
 
 /**
  * ArchiComm Community Edition - Basic Templates Only
@@ -351,3 +352,35 @@ export default {
   microservices: microservicesTemplate,
   serverless: serverlessTemplate
 };
+
+// Helper: convert a TaskTemplate into canvas components and naive connections
+export function convertTemplateToCanvas(template: TaskTemplate): { components: DesignComponent[]; connections: Connection[] } {
+  const now = Date.now();
+  // Place components on a simple grid
+  const components: DesignComponent[] = template.components.map((c, idx) => {
+    const col = idx % 4;
+    const row = Math.floor(idx / 4);
+    return {
+      id: `${c.type}-${now}-${idx}`,
+      type: c.type,
+      x: 120 + col * 180,
+      y: 100 + row * 140,
+      label: c.name,
+      description: c.description,
+      properties: {},
+    } as DesignComponent;
+  });
+
+  // Naive connections: connect sequential components
+  const connections: Connection[] = components.slice(1).map((comp, idx) => ({
+    id: `conn-${now}-${idx}`,
+    from: components[idx].id,
+    to: comp.id,
+    label: 'flow',
+    type: 'sync',
+    protocol: 'HTTP',
+    direction: 'end',
+  }));
+
+  return { components, connections };
+}

@@ -71,6 +71,14 @@ const useCanvasInteraction = () => {
     setInteractionCount(prev => prev + 1);
   }, []);
   
+  // Fallback: auto-mark interaction shortly after mount so canvas initializes
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setHasInteracted(true);
+    }, 150);
+    return () => window.clearTimeout(id);
+  }, []);
+  
   return { hasInteracted, interactionCount, markInteraction };
 };
 
@@ -181,7 +189,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   // Optimized edge intersection utility function with conditional memoization
   const calculateEdgeIntersection = useMemo(() => {
     const baseFunction = (fromComp: DesignComponent, toComp: DesignComponent) => {
-      const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+      const measureFn = performanceMonitor
+        ? performanceMonitor.measure.bind(performanceMonitor)
+        : ((name: string, fn: () => any) => fn());
       return measureFn('edge-intersection', () => {
         const fromCenterX = fromComp.x + COMPONENT_WIDTH / 2;
         const fromCenterY = fromComp.y + COMPONENT_HEIGHT / 2;
@@ -224,7 +234,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
     accept: ['component', 'connection-point'],
     drop: (item: any, monitor) => {
       markInteraction(); // Mark that user has interacted
-      const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+      const measureFn = performanceMonitor
+        ? performanceMonitor.measure.bind(performanceMonitor)
+        : ((name: string, fn: () => any) => fn());
       measureFn('drag-drop-operation', () => {
         try {
           if (monitor.getItemType() === 'component') {
@@ -249,7 +261,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
 
   // Path generation for connections
   const generatePath = useOptimizedCallback((x1: number, y1: number, x2: number, y2: number, style: string) => {
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+                        const measureFn = performanceMonitor
+                          ? performanceMonitor.measure.bind(performanceMonitor)
+                          : ((name: string, fn: () => any) => fn());
     return measureFn('path-generation', () => {
       // Use object pooling if available, otherwise generate directly
       const pathFactory = () => {
@@ -299,7 +313,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
 
   // Virtualized connection rendering for large datasets
   const renderConnections = useOptimizedMemo(() => {
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
     return measureFn('connection-rendering', () => {
       const connectionsToRender = stableConnections.length > VIRTUALIZATION_THRESHOLD 
         ? stableConnections.filter(connection => {
@@ -348,7 +364,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
               strokeWidth="12"
               fill="none"
               onClick={() => {
-                const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+                const measureFn = performanceMonitor
+                  ? performanceMonitor.measure.bind(performanceMonitor)
+                  : ((name: string, fn: () => any) => fn());
                 measureFn('connection-selection', () => setSelectedConnection(connection.id));
               }}
             />
@@ -362,7 +380,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
               fill="none"
               className={`transition-all duration-200 ${isSelected ? 'drop-shadow-lg' : ''}`}
               onClick={() => {
-                const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+                const measureFn = performanceMonitor
+                  ? performanceMonitor.measure.bind(performanceMonitor)
+                  : ((name: string, fn: () => any) => fn());
                 measureFn('connection-selection', () => setSelectedConnection(connection.id));
               }}
             />
@@ -418,7 +438,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
                           className="h-6 w-6 p-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+                            const measureFn = performanceMonitor
+                              ? performanceMonitor.measure.bind(performanceMonitor)
+                              : ((name: string, fn: () => any) => fn());
                             measureFn('connection-deletion', () => {
                               onConnectionDelete?.(connection.id);
                               setSelectedConnection(null);
@@ -466,14 +488,18 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
 
   // Optimized annotation event handlers with conditional performance monitoring
   const handleAnnotationCreate = useOptimizedCallback((annotation: Annotation) => {
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
     measureFn('annotation-create', () => {
       setAnnotations(prev => [...prev, annotation]);
     });
   }, [performanceMonitor]);
 
   const handleAnnotationUpdate = useOptimizedCallback((updatedAnnotation: Annotation) => {
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
     measureFn('annotation-update', () => {
       setAnnotations(prev => 
         prev.map(ann => ann.id === updatedAnnotation.id ? updatedAnnotation : ann)
@@ -484,7 +510,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   }, [performanceMonitor]);
 
   const handleAnnotationDelete = useOptimizedCallback((annotationId: string) => {
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
     measureFn('annotation-delete', () => {
       setAnnotations(prev => prev.filter(ann => ann.id !== annotationId));
       setSelectedAnnotation(null);
@@ -493,7 +521,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   }, [performanceMonitor]);
 
   const handleAnnotationSelect = useOptimizedCallback((annotation: Annotation | null) => {
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
     measureFn('annotation-select', () => {
       setSelectedAnnotation(annotation);
     });
@@ -503,7 +533,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   useEffect(() => {
     if (!optimizedEventSystem) return; // Only initialize when event system is loaded
     
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
     
     const handleSelectAll = () => {
       measureFn('select-all-operation', () => {
@@ -566,7 +598,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   useEffect(() => {
     if (!canvasNode || !optimizedEventSystem) return;
     
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
     
     const handleEditAnnotation = (event: CustomEvent) => {
       measureFn('annotation-edit-trigger', () => {
@@ -589,7 +623,9 @@ export const CanvasArea = forwardRef<HTMLDivElement, CanvasAreaProps>(function C
   useEffect(() => {
     if (!canvasRef.current || !optimizedEventSystem) return;
 
-    const measureFn = performanceMonitor?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitor
+      ? performanceMonitor.measure.bind(performanceMonitor)
+      : ((name: string, fn: () => any) => fn());
 
     const handleMouseMove = (event: MouseEvent) => {
       // Throttled mouse move for performance

@@ -66,6 +66,12 @@ Build binaries: `npm run build` (Tauri bundles for your OS).
 - Interview mode: time-boxed session, hints, rubric, and exportable scorecard
 - Exports: diagrams (SVG/PNG), notes (Markdown), and ADR templates
 
+New in this build:
+- File-based custom challenges (import JSON via Challenge Selection > Import Challenge)
+- Architecture templates pre-seeding (load suggested components and links)
+- Progressive solution hints (manual toggle or contextual prompts)
+- Auto-save of canvas to Tauri backend (diagram + connections)
+
 <details>
 <summary><b>Pro Version Features (Upgrade)</b></summary>
 
@@ -133,6 +139,70 @@ Example scenarios included:
 </details>
 
 ---
+
+## System Design Practice Workflow
+
+1) Select or import a challenge in Challenge Selection.
+2) Start designing on the canvas. Optionally load the architecture template when prompted.
+3) Toggle Solution Hints for progressive guidance. Hints group by topic and difficulty.
+4) Your work auto-saves to the local Tauri backend (no network required).
+5) Record your explanation, then review your session and export.
+
+### Importing Custom Challenges (File-Based)
+
+- Click Import Challenge in Challenge Selection (Tauri only).
+- Pick a `.json` file containing either an array of challenges or an object: `{ "version": "...", "challenges": [...] }`.
+- Valid entries must include: `id`, `title`, `description`, `requirements[]`, `difficulty`, `estimatedTime`, `category`.
+- Optional fields: `solutionHints[]`, `architectureTemplate`, `tags[]`, `prerequisites[]`, `learningObjectives[]`, `resources[]`, `variants[]`.
+
+Minimal JSON example:
+
+```
+{
+  "version": "1.0.0",
+  "challenges": [
+    {
+      "id": "hello-world",
+      "title": "Hello World Service",
+      "description": "Design a tiny service that returns a greeting.",
+      "requirements": ["Expose HTTP endpoint", "Return greeting"],
+      "difficulty": "beginner",
+      "estimatedTime": 10,
+      "category": "system-design",
+      "solutionHints": [
+        { "id": "h1", "title": "API Shape", "content": "Keep it simple.", "type": "architecture", "difficulty": "beginner" }
+      ],
+      "architectureTemplate": {
+        "name": "Hello World",
+        "description": "API + Service",
+        "components": [
+          { "type": "api-gateway", "label": "API", "description": "HTTP entry" },
+          { "type": "server", "label": "Service", "description": "Business logic" }
+        ],
+        "connections": [
+          { "from": "API", "to": "Service", "label": "HTTP", "type": "sync", "protocol": "REST" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Templates and Hints
+
+- When a challenge contains an `architectureTemplate`, you’ll see a prompt to load it. You can also load it from the Solution Hints panel.
+- Hints appear in categories like architecture, scaling, technology, tradeoff, and optimization; toggle them anytime from the toolbar.
+
+### Persistence
+
+- The canvas auto-saves to the Tauri backend (in-memory for this build) keyed by challenge id.
+- Manual save triggers are available from the toolbar; exports (JSON/PNG) remain available.
+
+### Troubleshooting
+
+- Import fails: ensure your JSON matches the minimal format above. Invalid entries are ignored with warnings.
+- No auto-save: verify you’re running the Tauri desktop build. Web preview skips native persistence.
+- Template didn’t load: some components must have unique labels; the loader maps connections by label.
 
 ## AI Review (Community Edition)
 

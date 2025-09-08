@@ -64,8 +64,8 @@ export const FEATURES = {
   // Native notifications are available in both environments
   NOTIFICATIONS: true,
   
-  // Auto-save to file system only in Tauri, localStorage in web
-  AUTO_SAVE: true,
+  // Auto-save disabled per request; can re-enable later via flag
+  AUTO_SAVE: false,
   
   // Window management only in Tauri
   WINDOW_MANAGEMENT: isTauriEnvironment(),

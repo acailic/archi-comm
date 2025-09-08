@@ -9,6 +9,9 @@ interface UseAutoSaveReturn<T> {
   isSaving: boolean;
   forceSave: () => void;
   cancelAutoSave: () => void;
+  status: 'idle' | 'saving' | 'saved' | 'error';
+  lastError?: string | null;
+  lastSavedAt?: number | null;
 }
 
 /**
@@ -23,9 +26,13 @@ export function useAutoSave<T>(
   const { delay = 3000, enabled = true } = options;
   
   const [isSaving, setIsSaving] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveDataRef = useRef<string>('');
   const onSaveRef = useRef(onSave);
+  const retryScheduledRef = useRef(false);
 
   // Update the callback ref when onSave changes
   useEffect(() => {
@@ -36,14 +43,30 @@ export function useAutoSave<T>(
     if (!dataToSave) return;
     
     setIsSaving(true);
+    setStatus('saving');
+    setLastError(null);
     try {
       await onSaveRef.current(dataToSave);
       if (process.env.NODE_ENV === 'development') {
         console.log('Auto-save completed successfully');
       }
+      setStatus('saved');
+      setLastSavedAt(Date.now());
+      retryScheduledRef.current = false;
     } catch (error) {
       console.error('Auto-save failed:', error);
-      // Could emit an error event here if needed
+      setStatus('error');
+      setLastError(error instanceof Error ? error.message : String(error));
+      // simple one-shot retry
+      if (!retryScheduledRef.current) {
+        retryScheduledRef.current = true;
+        autoSaveTimeoutRef.current && clearTimeout(autoSaveTimeoutRef.current);
+        autoSaveTimeoutRef.current = setTimeout(() => {
+          if (dataToSave) {
+            void performSave(dataToSave);
+          }
+        }, Math.min(delay * 2, 10000));
+      }
     } finally {
       setIsSaving(false);
     }
@@ -106,6 +129,9 @@ export function useAutoSave<T>(
   return {
     isSaving,
     forceSave,
-    cancelAutoSave
+    cancelAutoSave,
+    status,
+    lastError,
+    lastSavedAt
   };
 }

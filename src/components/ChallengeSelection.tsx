@@ -34,6 +34,8 @@ import {
   Lock,
   Star
 } from 'lucide-react';
+import { isTauriEnvironment } from '../lib/environment';
+import type { ExtendedChallenge } from '../lib/challenge-config';
 
 interface ChallengeSelectionProps {
   onChallengeSelect: (challenge: any) => void;
@@ -138,6 +140,7 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges, onN
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [importedChallenges, setImportedChallenges] = useState<ExtendedChallenge[]>([]);
 
 
   // Simulate some premium challenges for Pro
@@ -199,12 +202,12 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges, onN
         return [...challenges, ...proChallenges];
       }
       
-      return [...validBaseChallenges, ...proChallenges];
+      return [...validBaseChallenges, ...importedChallenges, ...proChallenges];
     } catch (error) {
       console.error('Error processing challenges, using defaults:', error);
-      return [...challenges, ...proChallenges];
+      return [...challenges, ...importedChallenges, ...proChallenges];
     }
-  }, [availableChallenges]);
+  }, [availableChallenges, importedChallenges]);
 
   const filteredChallenges = useMemo(() => {
     try {
@@ -312,6 +315,30 @@ export function ChallengeSelection({ onChallengeSelect, availableChallenges, onN
             >
               <div className="text-sm text-muted-foreground mb-1">Available Challenges</div>
               <div className="text-3xl font-bold text-primary">{allChallenges.length}</div>
+              {isTauriEnvironment() && (
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const { open } = await import('@tauri-apps/api/dialog');
+                        const selected = await open({ multiple: false, filters: [{ name: 'JSON', extensions: ['json'] }] });
+                        if (!selected || typeof selected !== 'string') return;
+                        const { tauriChallengeAPI } = await import('../lib/challenge-config');
+                        const loaded = await tauriChallengeAPI.loadChallengesFromFile(selected);
+                        if (Array.isArray(loaded) && loaded.length > 0) {
+                          setImportedChallenges(prev => [...prev, ...loaded]);
+                        }
+                      } catch (e) {
+                        console.error('Failed to import challenges:', e);
+                      }
+                    }}
+                  >
+                    Import Challenge
+                  </Button>
+                </div>
+              )}
             </motion.div>
           </div>
 

@@ -45,9 +45,23 @@ type SidebarContextProps = {
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
 function useSidebar() {
+  // Always compute mobile hint so fallback behaves reasonably
+  const isMobile = useIsMobile();
   const context = React.useContext(SidebarContext);
   if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider.");
+    // Graceful fallback to avoid hard crashes when provider is missing
+    if (typeof console !== 'undefined') {
+      console.warn('[Sidebar] useSidebar called outside of SidebarProvider. Using no-op defaults.');
+    }
+    return {
+      state: 'collapsed' as const,
+      open: false,
+      setOpen: () => {},
+      openMobile: false,
+      setOpenMobile: () => {},
+      isMobile,
+      toggleSidebar: () => {},
+    } as SidebarContextProps;
   }
 
   return context;

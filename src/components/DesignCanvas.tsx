@@ -5,7 +5,7 @@ import { toPng } from 'html-to-image';
 import { useKeyboardShortcuts } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
 import { Challenge, DesignComponent, Connection, DesignData } from '../App';
-import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
+import { ExtendedChallenge, challengeManager, ArchitectureTemplate } from '../lib/challenge-config';
 import { ArrowLeft, Save, Download, Image, Lightbulb, Zap, Component } from 'lucide-react';
 import { SmartTooltip } from './ui/SmartTooltip';
 import { useUXTracker } from '../hooks/useUXTracker';
@@ -17,9 +17,14 @@ import {
   useStableReference, 
   useOptimizedMemo 
 } from '../lib/performance/PerformanceOptimizer';
+import { DiagramAPI, type DiagramElement as TauriElement, type Connection as TauriConnection } from '../services/tauri';
+import { useAutoSave } from '../hooks/useAutoSave';
+import { isTauriEnvironment, FEATURES } from '../lib/environment';
 
 // Eagerly load core canvas to avoid Suspense fallback hanging
 import { CanvasArea } from './CanvasArea';
+import { VerticalSidebar } from './VerticalSidebar';
+import { SidebarProvider } from './ui/sidebar';
 // Keep hints lazy as an optional panel
 const LazySolutionHints = React.lazy(() => import('./SolutionHints').then(module => ({ default: module.SolutionHints })));
 
@@ -87,6 +92,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [performanceLevel, setPerformanceLevel] = useState<'off' | 'basic' | 'full'>('off');
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [hasLoadedFromPersistence, setHasLoadedFromPersistence] = useState(false);
+  const [showTemplatePrompt, setShowTemplatePrompt] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const performanceMonitorRef = useRef<any | null>(null);
   // LRU cache implementation for export caching
@@ -203,7 +210,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     if (performanceModeEnabled || performanceLevel !== 'off') {
       initializePerformanceMonitor(performanceLevel === 'full' ? 'full' : 'basic');
     }
-    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitorRef.current
+      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
+      : ((name: string, fn: () => any) => fn());
     const nextTotalComponents = components.length + 1;
     return measureFn('component-drop', () => {
       try {
@@ -276,7 +285,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
   const handleComponentMove = useOptimizedCallback((id: string, x: number, y: number) => {
     trackInteractionPattern('move');
-    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitorRef.current
+      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
+      : ((name: string, fn: () => any) => fn());
     return measureFn('component-move', () => {
       const component = components.find(c => c.id === id);
       if (component) {
@@ -333,7 +344,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       console.log('💡 Tip: Performance mode recommended for designs with many connections');
     }
     
-    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitorRef.current
+      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
+      : ((name: string, fn: () => any) => fn());
     return measureFn('connection-create', () => {
       try {
         const fromComponent = components.find(c => c.id === fromId);
@@ -412,7 +425,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, []);
 
   const handleDeleteComponent = useOptimizedCallback((id: string) => {
-    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitorRef.current
+      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
+      : ((name: string, fn: () => any) => fn());
     return measureFn('component-delete', () => {
       const component = components.find(c => c.id === id);
       const affectedConnections = connections.filter(conn => conn.from === id || conn.to === id);
@@ -447,7 +462,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, [components, connections, trackCanvasAction, trackPerformance, designMetrics]);
 
   const handleSave = useOptimizedCallback(() => {
-    const measureFn = performanceMonitorRef.current?.measureAsync || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitorRef.current
+      ? performanceMonitorRef.current.measureAsync.bind(performanceMonitorRef.current)
+      : ((name: string, fn: () => any) => fn());
     return measureFn('save-design', async () => {
       try {
         const designData = { 
@@ -527,7 +544,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const handleExportImage = useOptimizedCallback(async () => {
     if (!canvasRef.current) return;
     
-    const measureFn = performanceMonitorRef.current?.measureAsync || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitorRef.current
+      ? performanceMonitorRef.current.measureAsync.bind(performanceMonitorRef.current)
+      : ((name: string, fn: () => any) => fn());
     return measureFn('export-image', async () => {
       const startTime = Date.now();
       setIsExporting(true);
@@ -649,7 +668,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, [challenge.id, components.length, connections.length, trackCanvasAction, trackPerformance, trackError, designMetrics]);
 
   const handleContinue = useOptimizedCallback(() => {
-    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    const measureFn = performanceMonitorRef.current
+      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
+      : ((name: string, fn: () => any) => fn());
     return measureFn('design-complete', () => {
       const designData: DesignData = {
         components,
@@ -726,6 +747,147 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     };
   }, [designMetrics, performanceModeEnabled, performanceLevel, challenge.id, components.length, connections.length, trackPerformance]);
 
+  // Persistence mapping helpers
+  const toTauriElements = useCallback((comps: DesignComponent[]): TauriElement[] => {
+    return comps.map(c => ({
+      id: c.id,
+      element_type: c.type,
+      position: { x: c.x, y: c.y },
+      properties: {
+        label: c.label || '',
+        description: c.description || '',
+        ...(c.properties || {}),
+      },
+    }));
+  }, []);
+
+  const fromTauriElements = useCallback((els: TauriElement[]): DesignComponent[] => {
+    return els.map(e => ({
+      id: e.id,
+      type: e.element_type,
+      x: e.position?.x ?? 0,
+      y: e.position?.y ?? 0,
+      label: (e.properties as any)?.label || e.element_type,
+      description: (e.properties as any)?.description || undefined,
+      properties: e.properties || {},
+    }));
+  }, []);
+
+  const toTauriConnections = useCallback((conns: Connection[]): TauriConnection[] => {
+    return conns.map(c => ({
+      id: c.id,
+      source_id: c.from,
+      target_id: c.to,
+      connection_type: c.type,
+      properties: {
+        label: c.label || '',
+        protocol: c.protocol || '',
+        direction: c.direction || 'none',
+      },
+    }));
+  }, []);
+
+  const fromTauriConnections = useCallback((conns: TauriConnection[]): Connection[] => {
+    return conns.map(c => ({
+      id: c.id,
+      from: c.source_id,
+      to: c.target_id,
+      type: (c.connection_type as any) || 'data',
+      label: (c.properties as any)?.label || '',
+      protocol: (c.properties as any)?.protocol || undefined,
+      direction: (c.properties as any)?.direction || 'none',
+    }));
+  }, []);
+
+  // Load persisted diagram on mount (keyed by challenge.id)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!isTauriEnvironment()) return;
+        const [els, conns] = await Promise.all([
+          DiagramAPI.loadDiagram(challenge.id),
+          DiagramAPI.loadConnections(challenge.id),
+        ]);
+        if (cancelled) return;
+        if ((els && els.length) || (conns && conns.length)) {
+          setComponents(fromTauriElements(els || []));
+          setConnections(fromTauriConnections(conns || []));
+        }
+      } catch (e) {
+        console.warn('Failed to load persisted diagram:', e);
+      } finally {
+        if (!cancelled) setHasLoadedFromPersistence(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [challenge.id, fromTauriConnections, fromTauriElements]);
+
+  // Show template prompt if applicable
+  useEffect(() => {
+    if (!hasLoadedFromPersistence) return;
+    if (components.length === 0 && (extendedChallenge as any).architectureTemplate) {
+      setShowTemplatePrompt(true);
+    }
+  }, [hasLoadedFromPersistence, components.length, extendedChallenge]);
+
+  // Auto-save to backend (debounced)
+  const saveDesignToBackend = useCallback(async (payload: { components: DesignComponent[]; connections: Connection[] }) => {
+    if (!isTauriEnvironment()) return;
+    await DiagramAPI.saveDiagram(challenge.id, toTauriElements(payload.components));
+    await DiagramAPI.saveConnections(challenge.id, toTauriConnections(payload.connections));
+  }, [challenge.id, toTauriConnections, toTauriElements]);
+
+  const { isSaving, forceSave } = useAutoSave(
+    { components, connections },
+    saveDesignToBackend,
+    { delay: 2000, enabled: FEATURES.AUTO_SAVE }
+  );
+
+  // Apply architecture template to the canvas
+  const applyTemplate = useCallback((template: ArchitectureTemplate) => {
+    try {
+      const now = Date.now();
+      // Map template components to design components
+      const compMap = new Map<string, string>(); // label -> id
+      const newComponents: DesignComponent[] = template.components.map((c, idx) => {
+        const id = `${c.type}-${now}-${idx}`;
+        compMap.set(c.label, id);
+        return {
+          id,
+          type: c.type as string,
+          x: c.position?.x ?? 100 + idx * 40,
+          y: c.position?.y ?? 100 + idx * 30,
+          label: c.label,
+          description: c.description,
+          properties: c.properties || {},
+        };
+      });
+
+      const newConnections: Connection[] = template.connections.map((conn, idx) => {
+        const fromId = compMap.get(conn.from) || '';
+        const toId = compMap.get(conn.to) || '';
+        return {
+          id: `conn-${now}-${idx}`,
+          from: fromId,
+          to: toId,
+          label: conn.label,
+          type: (conn.type as any) || 'data',
+          protocol: conn.protocol,
+          direction: 'end',
+        };
+      }).filter(c => c.from && c.to);
+
+      setComponents(prev => [...prev, ...newComponents]);
+      setConnections(prev => [...prev, ...newConnections]);
+      setShowTemplatePrompt(false);
+      // Fire a manual save soon after applying template
+      setTimeout(() => { try { forceSave(); } catch {} }, 100);
+    } catch (e) {
+      console.warn('Failed to apply template:', e);
+    }
+  }, [forceSave]);
+
   // Progressive canvas initialization
   useEffect(() => {
     if (isCanvasActive) {
@@ -745,6 +907,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
   return (
     <DndProvider backend={dndBackendFactory}>
+      <SidebarProvider defaultOpen>
       <div className="h-screen flex flex-col">
         {/* Main Toolbar */}
         <div className="border-b bg-card p-4" data-testid="canvas-toolbar">
@@ -773,6 +936,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                 </p>
                 <div className="text-xs text-muted-foreground mt-1" aria-live="polite">
                   Components: {components.length} • Connections: {connections.length}
+                  {isSaving && (<span className="ml-2 text-blue-600">• Saving…</span>)}
                   {designMetrics.isLargeDesign && (
                     <span className="ml-2 text-amber-600">
                       • Large design (consider performance mode)
@@ -846,6 +1010,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   variant="outline" 
                   size="icon" 
                   onClick={() => {
+                    try { forceSave(); } catch {}
                     handleSave();
                     workflowTracker.trackAction('manual_save', 300, true, 'design-canvas');
                   }}
@@ -929,10 +1094,33 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             </div>
           </div>
         </div>
+        {showTemplatePrompt && (extendedChallenge as any).architectureTemplate && (
+          <div className="border-b bg-amber-50 text-amber-900 px-4 py-2 flex items-center justify-between">
+            <div className="text-sm">
+              This challenge includes an architecture template. Load it to jump-start your design?
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowTemplatePrompt(false)}>Start Blank</Button>
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={() => applyTemplate((extendedChallenge as any).architectureTemplate as ArchitectureTemplate)}
+              >Load Template</Button>
+            </div>
+          </div>
+        )}
 
         {/* Main Canvas Area */}
         <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
-          <div className="flex-1" role="region" aria-label="Design canvas">
+        {/* Left Sidebar with component palette and properties */}
+        <div className="w-72 shrink-0 border-r bg-card/50">
+          <VerticalSidebar
+            components={components}
+            selectedComponent={selectedComponent}
+            onLabelChange={handleComponentLabelChange}
+            onDelete={handleDeleteComponent}
+          />
+        </div>
+
+        <div className="flex-1" role="region" aria-label="Design canvas">
             <CanvasArea
               ref={canvasRef}
               components={components}
@@ -965,6 +1153,10 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   onHintViewed={(hintId) => {
                     trackCanvasAction('hint-viewed', { hintId }, true);
                   }}
+                  onTemplateRequest={() => {
+                    const t = (extendedChallenge as any).architectureTemplate as ArchitectureTemplate | undefined;
+                    if (t) applyTemplate(t);
+                  }}
                   onClose={() => setShowHints(false)}
                 />
               </Suspense>
@@ -973,6 +1165,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         </div>
 
       </div>
+      </SidebarProvider>
     </DndProvider>
   );
 }
