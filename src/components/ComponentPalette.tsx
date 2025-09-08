@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useDrag } from 'react-dnd';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { CardContent, CardHeader, CardTitle } from './ui/card';
+import { EnhancedCard } from './ui/enhanced-card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
-import { DesignComponent } from '../App';
+import type { DesignComponent } from '../App';
 import { 
   Server, Database, Zap, Globe, Monitor, HardDrive, Cloud, Container, 
   Layers, Activity, Shield, Key, Lock, Code, Smartphone, MessageSquare,
@@ -539,7 +540,7 @@ export function ComponentPalette() {
   });
 
   return (
-    <Card className="h-full flex flex-col bg-card/50 backdrop-blur-sm border-border/30">
+    <EnhancedCard elevation={2} glass className="h-full flex flex-col" gradientBorder>
       <CardHeader className="pb-3 bg-gradient-to-r from-muted/30 via-card to-muted/20 border-b border-border/20">
         <CardTitle className="flex items-center justify-between text-sm">
           <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
@@ -553,7 +554,7 @@ export function ComponentPalette() {
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="text-sm bg-background/50 backdrop-blur-sm border-border/30 focus:bg-background/80 transition-all duration-200 pl-10"
+              className="text-sm bg-background/60 backdrop-blur border-border/30 focus:bg-background/80 transition-all duration-200 pl-10 rounded-lg"
             />
           </div>
            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
@@ -563,7 +564,7 @@ export function ComponentPalette() {
       </CardHeader>
       <CardContent className="flex-1 flex flex-col p-0">
         <Tabs value={activeCategory} onValueChange={setActiveCategory} className="flex-1 flex flex-col">
-          <div className="px-3 py-2 border-b border-border/20">
+          <div className="px-3 py-2 border-b border-border/20 bg-[var(--glass-bg)] backdrop-blur-sm">
             <ScrollArea className="w-full">
               <div className="flex flex-wrap gap-1">
                 {categories.slice(0, 4).map((category) => (
@@ -572,12 +573,12 @@ export function ComponentPalette() {
                     variant={activeCategory === category.id ? "default" : "ghost"}
                     size="sm"
                     onClick={() => setActiveCategory(category.id)}
-                    className="text-xs h-7 px-2 flex items-center gap-1"
+                    className="text-xs h-7 px-2 flex items-center gap-1 rounded-full"
                   >
                     {category.label}
                     <Badge 
                       variant={activeCategory === category.id ? "secondary" : "outline"} 
-                      className="text-xs h-4 px-1 ml-1"
+                      className="text-[10px] h-4 px-1 ml-1"
                     >
                       {category.count}
                     </Badge>
@@ -592,12 +593,12 @@ export function ComponentPalette() {
                       variant={activeCategory === category.id ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setActiveCategory(category.id)}
-                      className="text-xs h-7 px-2 flex items-center gap-1"
+                    className="text-xs h-7 px-2 flex items-center gap-1 rounded-full"
                     >
                       {category.label}
                       <Badge 
                         variant={activeCategory === category.id ? "secondary" : "outline"} 
-                        className="text-xs h-4 px-1 ml-1"
+                        className="text-[10px] h-4 px-1 ml-1"
                       >
                         {category.count}
                       </Badge>
@@ -652,6 +653,6 @@ export function ComponentPalette() {
           </p>
         </div>
       </CardContent>
-    </Card>
+    </EnhancedCard>
   );
 }

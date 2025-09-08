@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Challenge, DesignData, AudioData } from '../App';
+import type { Challenge, DesignData, AudioData } from '../App';
 import { ArrowLeft, Mic, Square, Play, Pause, FileText } from 'lucide-react';
 
 const getErrorMessage = (error: unknown): string => {

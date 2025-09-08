@@ -11,7 +11,7 @@
 
 // Only canonical modifiers; 'cmd' is normalized to 'meta'
 export type KeyModifier = 'ctrl' | 'meta' | 'alt' | 'shift';
-export type ShortcutCategory = 'general' | 'canvas' | 'components' | 'navigation' | 'project' | 'system';
+export type ShortcutCategory = 'general' | 'canvas' | 'components' | 'navigation' | 'project' | 'system' | 'tools';
 
 export interface ShortcutConfig {
   key: string;
@@ -484,6 +484,91 @@ export class KeyboardShortcutManager {
       description: 'Move right',
       category: 'canvas',
       action: () => { void window.dispatchEvent(new CustomEvent('shortcut:move-right')); }
+    });
+
+    // Tool selection shortcuts
+    this.register({
+      key: 'v',
+      description: 'Select tool',
+      category: 'tools',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-select')); }
+    });
+
+    this.register({
+      key: 'h',
+      description: 'Pan tool',
+      category: 'tools',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-pan')); }
+    });
+
+    this.register({
+      key: 'z',
+      description: 'Zoom tool',
+      category: 'tools',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-zoom')); }
+    });
+
+    this.register({
+      key: 'a',
+      description: 'Annotate tool',
+      category: 'tools',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-annotate')); }
+    });
+
+    // Context menu shortcuts
+    this.register({
+      key: 'F2',
+      description: 'Edit properties',
+      category: 'components',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:edit-properties')); }
+    });
+
+    this.register({
+      key: 'd',
+      modifiers: ['ctrl'],
+      description: 'Duplicate',
+      category: 'components',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:duplicate')); }
+    });
+
+    this.register({
+      key: 'c',
+      modifiers: ['ctrl'],
+      description: 'Copy',
+      category: 'components',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:copy')); }
+    });
+
+    this.register({
+      key: 'v',
+      modifiers: ['ctrl'],
+      description: 'Paste',
+      category: 'components',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:paste')); }
+    });
+
+    this.register({
+      key: ']',
+      modifiers: ['ctrl', 'shift'],
+      description: 'Bring to front',
+      category: 'components',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:bring-to-front')); }
+    });
+
+    this.register({
+      key: '[',
+      modifiers: ['ctrl', 'shift'],
+      description: 'Send to back',
+      category: 'components',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:send-to-back')); }
+    });
+
+    this.register({
+      key: 'F10',
+      modifiers: ['shift'],
+      description: 'Show context menu',
+      category: 'general',
+      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:show-context-menu')); }
     });
   }
 

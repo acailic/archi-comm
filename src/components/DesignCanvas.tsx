@@ -4,9 +4,15 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toPng } from 'html-to-image';
 import { useKeyboardShortcuts } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
-import { Challenge, DesignComponent, Connection, DesignData } from '../App';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Checkbox } from './ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Minimap } from './Minimap';
+import { TopBar } from './TopBar';
+import type { Challenge, DesignComponent, Connection, DesignData, Layer, GridConfig, ToolType } from '../App';
+import { ViewportInfo } from './Minimap';
 import { ExtendedChallenge, challengeManager, ArchitectureTemplate } from '../lib/challenge-config';
-import { ArrowLeft, Save, Download, Image, Lightbulb, Zap, Component } from 'lucide-react';
+import { ArrowLeft, Save, Download, Image, Lightbulb, Zap, Component, Grid3x3, Navigation } from 'lucide-react';
 import { SmartTooltip } from './ui/SmartTooltip';
 import { useUXTracker } from '../hooks/useUXTracker';
 import { useOnboarding } from '../lib/onboarding/OnboardingManager';
@@ -84,16 +90,36 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, []);
   const [components, setComponents] = useState<DesignComponent[]>(initialData.components);
   const [connections, setConnections] = useState<Connection[]>(initialData.connections);
+  const [layers, setLayers] = useState<Layer[]>(initialData.layers?.length ? initialData.layers : [
+    { id: 'default', name: 'Default Layer', visible: true, order: 0 }
+  ]);
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(initialData.layers?.length ? initialData.layers[0].id : 'default');
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+  const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
   const [commentMode, setCommentMode] = useState<string | null>(null);
   const [performanceModeEnabled, setPerformanceModeEnabled] = useState(false);
   const [performanceLevel, setPerformanceLevel] = useState<'off' | 'basic' | 'full'>('off');
+  const [showMinimap, setShowMinimap] = useState(false);
+  const [viewportInfo, setViewportInfo] = useState<ViewportInfo | null>(null);
+  const [canvasExtents, setCanvasExtents] = useState({ width: 1000, height: 800 });
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [hasLoadedFromPersistence, setHasLoadedFromPersistence] = useState(false);
   const [showTemplatePrompt, setShowTemplatePrompt] = useState(false);
+  
+  // Tool selection state
+  const [activeTool, setActiveTool] = useState<ToolType>(initialData.activeTool || 'select');
+  
+  // Grid configuration state
+  const [gridConfig, setGridConfig] = useState<GridConfig>({
+    visible: false,
+    spacing: 20,
+    snapToGrid: false,
+    color: 'hsl(var(--border))'
+  });
   const canvasRef = useRef<HTMLDivElement>(null);
   const performanceMonitorRef = useRef<any | null>(null);
   // LRU cache implementation for export caching
@@ -101,7 +127,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     cache: Map<string, { value: string; lastUsed: number }>;
     maxSize: number;
   }>({
-    cache: new Map(),
+    cache: new globalThis.Map(),
     maxSize: 10
   });
   
@@ -125,30 +151,24 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const { trackCanvasAction, trackKeyboardShortcut, trackPerformance, trackError } = useUXTracker();
 
   // Progressive performance enhancement hook
-  const useProgressivePerformance = useCallback(() => {
-    const interactionPatterns = useRef({ componentAdds: 0, moves: 0, connections: 0 });
-    
-    const trackInteractionPattern = useCallback((type: 'add' | 'move' | 'connect') => {
-      interactionPatterns.current[type === 'add' ? 'componentAdds' : type === 'move' ? 'moves' : 'connections']++;
-      
-      const totalInteractions = Object.values(interactionPatterns.current).reduce((sum, count) => sum + count, 0);
-      
-      // Auto-suggest performance mode when design complexity increases
-      if (totalInteractions > 15 && components.length > 20 && performanceLevel === 'off') {
-        // Non-intrusive suggestion for performance mode
-        console.log('Consider enabling performance mode for better experience with complex designs');
-        trackPerformance('performance-suggestion-triggered', {
-          totalInteractions,
-          componentCount: components.length,
-          connectionCount: connections.length
-        });
-      }
-    }, []);
-    
-    return { trackInteractionPattern };
-  }, [components.length, connections.length, performanceLevel, trackPerformance]);
+  const interactionPatternsRef = useRef({ componentAdds: 0, moves: 0, connections: 0 });
   
-  const { trackInteractionPattern } = useProgressivePerformance();
+  const trackInteractionPattern = useCallback((type: 'add' | 'move' | 'connect') => {
+    interactionPatternsRef.current[type === 'add' ? 'componentAdds' : type === 'move' ? 'moves' : 'connections']++;
+    
+    const totalInteractions = Object.values(interactionPatternsRef.current).reduce((sum, count) => sum + count, 0);
+    
+    // Auto-suggest performance mode when design complexity increases
+    if (totalInteractions > 15 && components.length > 20 && performanceLevel === 'off') {
+      // Non-intrusive suggestion for performance mode
+      console.log('Consider enabling performance mode for better experience with complex designs');
+      trackPerformance('performance-suggestion-triggered', {
+        totalInteractions,
+        componentCount: components.length,
+        connectionCount: connections.length
+      });
+    }
+  }, [components.length, connections.length, performanceLevel, trackPerformance]);
   const [canvasReady, setCanvasReady] = useState(false);
   const [hintsReady, setHintsReady] = useState(false);
   
@@ -210,10 +230,12 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     if (performanceModeEnabled || performanceLevel !== 'off') {
       initializePerformanceMonitor(performanceLevel === 'full' ? 'full' : 'basic');
     }
+    
     const measureFn = performanceMonitorRef.current
       ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
       : ((name: string, fn: () => any) => fn());
     const nextTotalComponents = components.length + 1;
+    
     return measureFn('component-drop', () => {
       try {
         // Create new component (pooling will be added when MemoryOptimizer loads)
@@ -283,31 +305,106 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     });
   }, [performanceModeEnabled, performanceLevel, userHasInteracted, initializePerformanceMonitor, trackCanvasAction, trackPerformance, trackError, designMetrics.complexity, isCanvasActive, workflowTracker, trackInteractionPattern]);
 
+  // Group operation handlers (declare before usage to avoid TDZ)
+  const handleGroupMove = useOptimizedCallback((componentIds: string[], deltaX: number, deltaY: number) => {
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measure === 'function') {
+      return perf.measure('group-move', () => {
+        setComponents(prev => prev.map(comp => 
+          componentIds.includes(comp.id) 
+            ? { ...comp, x: comp.x + deltaX, y: comp.y + deltaY }
+            : comp
+        ));
+        
+        trackCanvasAction('group-move', {
+          componentCount: componentIds.length,
+          deltaX,
+          deltaY,
+          designComplexity: designMetrics.complexity
+        }, true);
+      });
+    }
+    // Fallback if monitor not ready
+    setComponents(prev => prev.map(comp => 
+      componentIds.includes(comp.id) 
+        ? { ...comp, x: comp.x + deltaX, y: comp.y + deltaY }
+        : comp
+    ));
+    trackCanvasAction('group-move', {
+      componentCount: componentIds.length,
+      deltaX,
+      deltaY,
+      designComplexity: designMetrics.complexity
+    }, true);
+    return;
+  }, [trackCanvasAction, designMetrics]);
+
   const handleComponentMove = useOptimizedCallback((id: string, x: number, y: number) => {
     trackInteractionPattern('move');
-    const measureFn = performanceMonitorRef.current
-      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
-      : ((name: string, fn: () => any) => fn());
-    return measureFn('component-move', () => {
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measure === 'function') {
+      return perf.measure('component-move', () => {
+        const component = components.find(c => c.id === id);
+        if (component) {
+          const distance = Math.sqrt(Math.pow(x - component.x, 2) + Math.pow(y - component.y, 2));
+          
+          // If component is part of multi-selection, move all selected components
+          if (selectedComponents.length > 1 && selectedComponents.includes(id)) {
+            const deltaX = x - component.x;
+            const deltaY = y - component.y;
+            handleGroupMove(selectedComponents, deltaX, deltaY);
+          } else {
+            setComponents(prev => prev.map(comp => 
+              comp.id === id ? { ...comp, x, y } : comp
+            ));
+          }
+          
+          // Track component movement with performance context
+          trackCanvasAction('component-move', {
+            componentId: id,
+            componentType: component.type,
+            distance: Math.round(distance),
+            newPosition: { x, y },
+            designComplexity: designMetrics.complexity,
+            isLargeDesign: designMetrics.isLargeDesign,
+            isGroupMove: selectedComponents.length > 1 && selectedComponents.includes(id)
+          }, true);
+
+          // Track performance for large designs
+          if (designMetrics.isLargeDesign) {
+            trackPerformance('component-move-large', {
+              componentCount: components.length,
+              distance,
+              renderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0
+            });
+          }
+        }
+      });
+    }
+    // Fallback if monitor not ready
+    {
       const component = components.find(c => c.id === id);
       if (component) {
         const distance = Math.sqrt(Math.pow(x - component.x, 2) + Math.pow(y - component.y, 2));
         
-        setComponents(prev => prev.map(comp => 
-          comp.id === id ? { ...comp, x, y } : comp
-        ));
-        
-        // Track component movement with performance context
+        if (selectedComponents.length > 1 && selectedComponents.includes(id)) {
+          const deltaX = x - component.x;
+          const deltaY = y - component.y;
+          handleGroupMove(selectedComponents, deltaX, deltaY);
+        } else {
+          setComponents(prev => prev.map(comp => 
+            comp.id === id ? { ...comp, x, y } : comp
+          ));
+        }
         trackCanvasAction('component-move', {
           componentId: id,
           componentType: component.type,
           distance: Math.round(distance),
           newPosition: { x, y },
           designComplexity: designMetrics.complexity,
-          isLargeDesign: designMetrics.isLargeDesign
+          isLargeDesign: designMetrics.isLargeDesign,
+          isGroupMove: selectedComponents.length > 1 && selectedComponents.includes(id)
         }, true);
-
-        // Track performance for large designs
         if (designMetrics.isLargeDesign) {
           trackPerformance('component-move-large', {
             componentCount: components.length,
@@ -316,8 +413,78 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           });
         }
       }
-    });
-  }, [components, trackCanvasAction, trackPerformance, designMetrics]);
+    }
+    return;
+  }, [components, selectedComponents, handleGroupMove, trackCanvasAction, trackPerformance, designMetrics]);
+
+  
+
+  const handleGroupDelete = useOptimizedCallback((componentIds: string[]) => {
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measure === 'function') {
+      return perf.measure('group-delete', () => {
+        // Remove components
+        setComponents(prev => prev.filter(comp => !componentIds.includes(comp.id)));
+        
+        // Remove related connections
+        setConnections(prev => prev.filter(conn => 
+          !componentIds.includes(conn.from) && !componentIds.includes(conn.to)
+        ));
+        
+        // Clear selection
+        setSelectedComponents([]);
+        setSelectedComponent(null);
+        
+        trackCanvasAction('group-delete', {
+          componentCount: componentIds.length,
+          designComplexity: designMetrics.complexity
+        }, true);
+      });
+    }
+    // Fallback if monitor not ready
+    setComponents(prev => prev.filter(comp => !componentIds.includes(comp.id)));
+    setConnections(prev => prev.filter(conn => 
+      !componentIds.includes(conn.from) && !componentIds.includes(conn.to)
+    ));
+    setSelectedComponents([]);
+    setSelectedComponent(null);
+    trackCanvasAction('group-delete', {
+      componentCount: componentIds.length,
+      designComplexity: designMetrics.complexity
+    }, true);
+    return;
+  }, [trackCanvasAction, designMetrics]);
+
+  const handleGroupStyle = useOptimizedCallback((componentIds: string[], styleChanges: Partial<DesignComponent>) => {
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measure === 'function') {
+      return perf.measure('group-style', () => {
+        setComponents(prev => prev.map(comp => 
+          componentIds.includes(comp.id) 
+            ? { ...comp, ...styleChanges }
+            : comp
+        ));
+        
+        trackCanvasAction('group-style', {
+          componentCount: componentIds.length,
+          styleChanges,
+          designComplexity: designMetrics.complexity
+        }, true);
+      });
+    }
+    // Fallback if monitor not ready
+    setComponents(prev => prev.map(comp => 
+      componentIds.includes(comp.id) 
+        ? { ...comp, ...styleChanges }
+        : comp
+    ));
+    trackCanvasAction('group-style', {
+      componentCount: componentIds.length,
+      styleChanges,
+      designComplexity: designMetrics.complexity
+    }, true);
+    return;
+  }, [trackCanvasAction, designMetrics]);
 
   const handleComponentSelect = useCallback((id: string) => {
     const component = components.find(c => c.id === id);
@@ -329,6 +496,38 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       componentType: component?.type || 'unknown'
     }, true);
   }, [components, trackCanvasAction]);
+
+  // Multi-component selection handlers
+  const handleMultiComponentSelect = useCallback((componentIds: string[]) => {
+    setSelectedComponents(componentIds);
+    // Clear single selection when multi-selecting
+    if (componentIds.length > 1) {
+      setSelectedComponent(null);
+    } else if (componentIds.length === 1) {
+      setSelectedComponent(componentIds[0]);
+    }
+    
+    trackCanvasAction('multi-component-select', {
+      componentCount: componentIds.length,
+      componentIds: componentIds
+    }, true);
+  }, [trackCanvasAction]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedComponents([]);
+    setSelectedComponent(null);
+    
+    trackCanvasAction('clear-selection', {}, true);
+  }, [trackCanvasAction]);
+
+  const handleSelectAll = useCallback((componentIds: string[]) => {
+    setSelectedComponents(componentIds);
+    setSelectedComponent(null); // Clear single selection
+    
+    trackCanvasAction('select-all', {
+      componentCount: componentIds.length
+    }, true);
+  }, [trackCanvasAction]);
 
   const handleStartConnection = useCallback((id: string) => {
     setConnectionStart(id);
@@ -344,56 +543,90 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       console.log('💡 Tip: Performance mode recommended for designs with many connections');
     }
     
-    const measureFn = performanceMonitorRef.current
-      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
-      : ((name: string, fn: () => any) => fn());
-    return measureFn('connection-create', () => {
-      try {
-        const fromComponent = components.find(c => c.id === fromId);
-        const toComponent = components.find(c => c.id === toId);
-        
-        // Create new connection (pooling will be added when MemoryOptimizer loads)
-        const newConnection: Connection = {
-          id: `connection-${Date.now()}`,
-          from: fromId,
-          to: toId,
-          label: 'Connection',
-          type: 'data',
-          direction: 'end'
-        };
-
-        setConnections(prev => {
-          const newConnections = [...prev, newConnection];
-          const totalConnections = newConnections.length;
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measure === 'function') {
+      return perf.measure('connection-create', () => {
+        try {
+          const fromComponent = components.find(c => c.id === fromId);
+          const toComponent = components.find(c => c.id === toId);
           
-          // Track successful connection creation with performance metrics
-          trackCanvasAction('connection-create', {
-            fromType: fromComponent?.type || 'unknown',
-            toType: toComponent?.type || 'unknown',
-            connectionType: 'data',
-            totalConnections,
-            designComplexity: designMetrics.complexity
-          }, true);
+          // Create new connection (pooling will be added when MemoryOptimizer loads)
+          const newConnection: Connection = {
+            id: `connection-${Date.now()}`,
+            from: fromId,
+            to: toId,
+            label: 'Connection',
+            type: 'data',
+            direction: 'end'
+          };
 
-          // Track performance for connection operations
-          trackPerformance('connection-create', {
-            connectionCount: totalConnections,
-            renderTime: performanceMonitorRef.current?.getAverageMetric('connection-create') || 0
+          setConnections(prev => {
+            const newConnections = [...prev, newConnection];
+            const totalConnections = newConnections.length;
+            
+            // Track successful connection creation with performance metrics
+            trackCanvasAction('connection-create', {
+              fromType: fromComponent?.type || 'unknown',
+              toType: toComponent?.type || 'unknown',
+              connectionType: 'data',
+              totalConnections,
+              designComplexity: designMetrics.complexity
+            }, true);
+
+            // Track performance for connection operations
+            trackPerformance('connection-create', {
+              connectionCount: totalConnections,
+              renderTime: performanceMonitorRef.current?.getAverageMetric('connection-create') || 0
+            });
+            
+            return newConnections;
           });
-          
-          return newConnections;
-        });
-        setConnectionStart(null);
+          setConnectionStart(null);
 
-      } catch (error) {
+        } catch (error) {
+          trackCanvasAction('connection-create', {
+            fromId,
+            toId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }, false);
+          trackError(error instanceof Error ? error : new Error('Connection creation failed'));
+        }
+      });
+    }
+    // Fallback if monitor not ready
+    try {
+      const fromComponent = components.find(c => c.id === fromId);
+      const toComponent = components.find(c => c.id === toId);
+      const newConnection: Connection = {
+        id: `connection-${Date.now()}`,
+        from: fromId,
+        to: toId,
+        label: 'Connection',
+        type: 'data',
+        direction: 'end'
+      };
+      setConnections(prev => {
+        const newConnections = [...prev, newConnection];
+        const totalConnections = newConnections.length;
         trackCanvasAction('connection-create', {
-          fromId,
-          toId,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }, false);
-        trackError(error instanceof Error ? error : new Error('Connection creation failed'));
-      }
-    });
+          fromType: fromComponent?.type || 'unknown',
+          toType: toComponent?.type || 'unknown',
+          connectionType: 'data',
+          totalConnections,
+          designComplexity: designMetrics.complexity
+        }, true);
+        trackPerformance('connection-create', {
+          connectionCount: totalConnections,
+          renderTime: performanceMonitorRef.current?.getAverageMetric('connection-create') || 0
+        });
+        return newConnections;
+      });
+      setConnectionStart(null);
+    } catch (error) {
+      trackCanvasAction('connection-create', { fromId, toId, error: error instanceof Error ? error.message : 'Unknown error' }, false);
+      trackError(error instanceof Error ? error : new Error('Connection creation failed'));
+    }
+    return;
   }, [components, trackCanvasAction, trackPerformance, trackError, designMetrics, trackInteractionPattern, connections.length, performanceLevel]);
 
   const handleComponentLabelChange = useCallback((id: string, label: string) => {
@@ -424,21 +657,168 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     ));
   }, []);
 
+  // Grid management handlers
+  const handleToggleGrid = useCallback(() => {
+    setGridConfig(prev => ({ ...prev, visible: !prev.visible }));
+    trackCanvasAction('toggle-grid', { visible: !gridConfig.visible }, true);
+  }, [gridConfig.visible, trackCanvasAction]);
+
+  const handleToggleSnapToGrid = useCallback(() => {
+    setGridConfig(prev => ({ ...prev, snapToGrid: !prev.snapToGrid }));
+    trackCanvasAction('toggle-snap-to-grid', { snapToGrid: !gridConfig.snapToGrid }, true);
+  }, [gridConfig.snapToGrid, trackCanvasAction]);
+
+  const handleGridSpacingChange = useCallback((spacing: string) => {
+    const spacingValue = parseInt(spacing, 10);
+    setGridConfig(prev => ({ ...prev, spacing: spacingValue }));
+    trackCanvasAction('change-grid-spacing', { spacing: spacingValue }, true);
+  }, [trackCanvasAction]);
+
+  // Tool management handler
+  const handleToolChange = useCallback((tool: ToolType) => {
+    setActiveTool(tool);
+    trackCanvasAction('tool-change', { tool }, true);
+    
+    // Update performance monitoring based on tool
+    if (tool === 'zoom' || tool === 'pan') {
+      initializePerformanceMonitor('full');
+    }
+  }, [trackCanvasAction, initializePerformanceMonitor]);
+
+  // Layer management handlers
+  const handleCreateLayer = useCallback((name: string) => {
+    const newLayer: Layer = {
+      id: `layer-${Date.now()}`,
+      name,
+      visible: true,
+      order: layers.length
+    };
+    setLayers(prev => [...prev, newLayer]);
+    setActiveLayerId(newLayer.id);
+  }, [layers.length]);
+
+  const handleRenameLayer = useCallback((id: string, name: string) => {
+    setLayers(prev => prev.map(layer => 
+      layer.id === id ? { ...layer, name } : layer
+    ));
+  }, []);
+
+  const handleDeleteLayer = useCallback((id: string) => {
+    if (id === 'default') return; // Cannot delete default layer
+    
+    // Move all components from deleted layer to default layer
+    setComponents(prev => prev.map(comp =>
+      comp.layerId === id ? { ...comp, layerId: 'default' } : comp
+    ));
+    
+    setLayers(prev => prev.filter(layer => layer.id !== id));
+    
+    if (activeLayerId === id) {
+      setActiveLayerId('default');
+    }
+  }, [activeLayerId]);
+
+  const handleToggleLayerVisibility = useCallback((id: string) => {
+    setLayers(prev => prev.map(layer =>
+      layer.id === id ? { ...layer, visible: !layer.visible } : layer
+    ));
+  }, []);
+
+  const handleReorderLayer = useCallback((id: string, newOrder: number) => {
+    setLayers(prev => prev.map(layer =>
+      layer.id === id ? { ...layer, order: newOrder } : layer
+    ));
+  }, []);
+
+  const handleActiveLayerChange = useCallback((id: string | null) => {
+    setActiveLayerId(id);
+  }, []);
+
+  // Minimap handlers
+  const handleToggleMinimap = useCallback(() => {
+    setShowMinimap(prev => !prev);
+  }, []);
+
+  const handleMinimapPan = useCallback((x: number, y: number) => {
+    if (canvasRef.current) {
+      (canvasRef.current as any).scrollTo?.(x, y);
+    }
+  }, []);
+
+  const handleMinimapZoom = useCallback((zoom: number, centerX?: number, centerY?: number) => {
+    if (canvasRef.current) {
+      (canvasRef.current as any).setZoom?.(zoom, centerX, centerY);
+    }
+  }, []);
+
+  const handleViewportChange = useCallback((viewport: ViewportInfo) => {
+    setViewportInfo(viewport);
+    setCanvasExtents({ width: viewport.worldWidth, height: viewport.worldHeight });
+    
+    // Update cursor position from canvas
+    if (canvasRef.current) {
+      const currentPos = (canvasRef.current as any).getCurrentCursorPosition?.();
+      setCursorPosition(currentPos);
+    }
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'M' || event.key === 'm') {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault();
+          handleToggleMinimap();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleMinimap]);
+
   const handleDeleteComponent = useOptimizedCallback((id: string) => {
-    const measureFn = performanceMonitorRef.current
-      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
-      : ((name: string, fn: () => any) => fn());
-    return measureFn('component-delete', () => {
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measure === 'function') {
+      return perf.measure('component-delete', () => {
+        const component = components.find(c => c.id === id);
+        const affectedConnections = connections.filter(conn => conn.from === id || conn.to === id);
+        
+        // Memory cleanup will be handled by lazy-loaded MemoryOptimizer when available
+
+        setComponents(prev => {
+          const newComponents = prev.filter(comp => comp.id !== id);
+          const remainingComponents = newComponents.length;
+          
+          // Track component deletion with performance context
+          trackCanvasAction('component-delete', {
+            componentId: id,
+            componentType: component?.type || 'unknown',
+            affectedConnections: affectedConnections.length,
+            remainingComponents,
+            designComplexity: designMetrics.complexity
+          }, true);
+
+          // Track performance for deletion operations
+          trackPerformance('component-delete', {
+            deletedConnections: affectedConnections.length,
+            remainingComponents,
+            renderTime: performanceMonitorRef.current?.getAverageMetric('component-delete') || 0
+          });
+          
+          return newComponents;
+        });
+        setConnections(prev => prev.filter(conn => conn.from !== id && conn.to !== id));
+        setSelectedComponent(null);
+      });
+    }
+    // Fallback if monitor not ready
+    {
       const component = components.find(c => c.id === id);
       const affectedConnections = connections.filter(conn => conn.from === id || conn.to === id);
-      
-      // Memory cleanup will be handled by lazy-loaded MemoryOptimizer when available
-
       setComponents(prev => {
         const newComponents = prev.filter(comp => comp.id !== id);
         const remainingComponents = newComponents.length;
-        
-        // Track component deletion with performance context
         trackCanvasAction('component-delete', {
           componentId: id,
           componentType: component?.type || 'unknown',
@@ -446,70 +826,103 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           remainingComponents,
           designComplexity: designMetrics.complexity
         }, true);
-
-        // Track performance for deletion operations
         trackPerformance('component-delete', {
           deletedConnections: affectedConnections.length,
           remainingComponents,
           renderTime: performanceMonitorRef.current?.getAverageMetric('component-delete') || 0
         });
-        
         return newComponents;
       });
       setConnections(prev => prev.filter(conn => conn.from !== id && conn.to !== id));
       setSelectedComponent(null);
-    });
+    }
+    return;
   }, [components, connections, trackCanvasAction, trackPerformance, designMetrics]);
 
   const handleSave = useOptimizedCallback(() => {
-    const measureFn = performanceMonitorRef.current
-      ? performanceMonitorRef.current.measureAsync.bind(performanceMonitorRef.current)
-      : ((name: string, fn: () => any) => fn());
-    return measureFn('save-design', async () => {
-      try {
-        const designData = { 
-          components, 
-          connections,
-          metadata: {
-            ...initialData.metadata,
-            lastModified: new Date().toISOString(),
-            performanceMetrics: {
-              componentCount: components.length,
-              connectionCount: connections.length,
-              complexity: designMetrics.complexity,
-              avgRenderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0,
-              fps: performanceMonitorRef.current?.getCurrentFPS() || 60
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measureAsync === 'function') {
+      return perf.measureAsync('save-design', async () => {
+        try {
+          const designData = { 
+            components, 
+            connections,
+            layers,
+            gridConfig,
+            metadata: {
+              ...initialData.metadata,
+              lastModified: new Date().toISOString(),
+              performanceMetrics: {
+                componentCount: components.length,
+                connectionCount: connections.length,
+                complexity: designMetrics.complexity,
+                avgRenderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0,
+                fps: performanceMonitorRef.current?.getCurrentFPS() || 60
+              }
             }
+          };
+          
+          localStorage.setItem('archicomm-design', JSON.stringify(designData));
+          
+          // Track successful save with performance metrics
+          trackCanvasAction('save', {
+            componentCount: components.length,
+            connectionCount: connections.length,
+            challengeId: challenge.id,
+            saveMethod: 'localStorage',
+            designComplexity: designMetrics.complexity,
+          }, true);
+        } catch (error) {
+          // Track save error
+          trackCanvasAction('save', {
+            componentCount: components.length,
+            connectionCount: connections.length,
+            challengeId: challenge.id,
+            saveMethod: 'localStorage',
+            format: 'json',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }, false);
+        }
+      });
+    }
+    // Fallback if monitor not ready
+    try {
+      const designData = { 
+        components, 
+        connections,
+        layers,
+        gridConfig,
+        metadata: {
+          ...initialData.metadata,
+          lastModified: new Date().toISOString(),
+          performanceMetrics: {
+            componentCount: components.length,
+            connectionCount: connections.length,
+            complexity: designMetrics.complexity,
+            avgRenderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0,
+            fps: performanceMonitorRef.current?.getCurrentFPS() || 60
           }
-        };
-        
-        localStorage.setItem('archicomm-design', JSON.stringify(designData));
-        
-        // Track successful save with performance metrics
-        trackCanvasAction('save', {
-          componentCount: components.length,
-          connectionCount: connections.length,
-          challengeId: challenge.id,
-          saveMethod: 'localStorage',
-          designComplexity: designMetrics.complexity,
-          performanceMetrics: designData.metadata.performanceMetrics
-        }, true);
-
-        trackPerformance('save-design', {
-          dataSize: JSON.stringify(designData).length,
-          componentCount: components.length,
-          connectionCount: connections.length
-        });
-
-      } catch (error) {
-        trackCanvasAction('save', {
-          componentCount: components.length,
-          connectionCount: connections.length,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }, false);
-        trackError(error instanceof Error ? error : new Error('Save failed'));
-      }
-    });
+        }
+      };
+      localStorage.setItem('archicomm-design', JSON.stringify(designData));
+      trackCanvasAction('save', {
+        componentCount: components.length,
+        connectionCount: connections.length,
+        challengeId: challenge.id,
+        saveMethod: 'localStorage',
+        designComplexity: designMetrics.complexity,
+      }, true);
+    } catch (error) {
+      trackCanvasAction('save', {
+        componentCount: components.length,
+        connectionCount: connections.length,
+        challengeId: challenge.id,
+        saveMethod: 'localStorage',
+        format: 'json',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, false);
+    }
+    return;
   }, [components, connections, challenge.id, trackCanvasAction, trackPerformance, trackError, designMetrics, initialData.metadata]);
 
   const handleExport = useCallback(() => {
@@ -544,137 +957,187 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const handleExportImage = useOptimizedCallback(async () => {
     if (!canvasRef.current) return;
     
-    const measureFn = performanceMonitorRef.current
-      ? performanceMonitorRef.current.measureAsync.bind(performanceMonitorRef.current)
-      : ((name: string, fn: () => any) => fn());
-    return measureFn('export-image', async () => {
-      const startTime = Date.now();
-      setIsExporting(true);
-      
-      try {
-        // Check cache for repeated exports with LRU access tracking
-        const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
-        const cacheEntry = exportCacheRef.current.cache.get(cacheKey);
-        if (cacheEntry) {
-          // Update last used timestamp for LRU
-          cacheEntry.lastUsed = Date.now();
-          exportCacheRef.current.cache.set(cacheKey, cacheEntry);
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measureAsync === 'function') {
+      return perf.measureAsync('export-image', async () => {
+        const startTime = Date.now();
+        setIsExporting(true);
+        
+        try {
+          // Check cache for repeated exports with LRU access tracking
+          const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
+          const cacheEntry = exportCacheRef.current.cache.get(cacheKey);
+          if (cacheEntry) {
+            // Update last used timestamp for LRU
+            cacheEntry.lastUsed = Date.now();
+            exportCacheRef.current.cache.set(cacheKey, cacheEntry);
+            
+            const link = document.createElement('a');
+            link.href = cacheEntry.value;
+            link.download = `${challenge?.id || 'design'}-design.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            trackCanvasAction('export-image-cached', {
+              format: 'png',
+              componentCount: components.length,
+              connectionCount: connections.length,
+              exportTime: Date.now() - startTime,
+            }, true);
+            
+            // Track performance including cache hits for visibility
+            trackPerformance('export-image', {
+              cached: true,
+              duration: Date.now() - startTime,
+              cacheSize: exportCacheRef.current.cache.size
+            });
+            
+            setIsExporting(false);
+            return;
+          }
+
+          // Generate image
+          const dataUrl = await toPng(canvasRef.current!);
+          
+          // Update cache with LRU
+          exportCacheRef.current.cache.set(cacheKey, {
+            value: dataUrl,
+            lastUsed: Date.now()
+          });
+          // Evict least recently used if over max size
+          if (exportCacheRef.current.cache.size > exportCacheRef.current.maxSize) {
+            let oldestKey: string | null = null;
+            let oldestTime = Infinity;
+            for (const [key, entry] of exportCacheRef.current.cache.entries()) {
+              if (entry.lastUsed < oldestTime) {
+                oldestTime = entry.lastUsed;
+                oldestKey = key;
+              }
+            }
+            if (oldestKey) exportCacheRef.current.cache.delete(oldestKey);
+          }
           
           const link = document.createElement('a');
-          link.href = cacheEntry.value;
+          link.href = dataUrl;
           link.download = `${challenge?.id || 'design'}-design.png`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
           
-          trackCanvasAction('export-image-cached', {
+          trackCanvasAction('export-image', {
             format: 'png',
             componentCount: components.length,
             connectionCount: connections.length,
             exportTime: Date.now() - startTime,
-            challengeId: challenge.id
           }, true);
-          return;
-        }
-
-        // Temporarily hide UI overlays for clean export
-        if (canvasRef.current) {
-          canvasRef.current.classList.add('export-mode');
-        }
-        
-        // Progressive rendering for large designs
-        const exportOptions = designMetrics.isLargeDesign ? {
-          quality: 0.8,
-          pixelRatio: 1.5,
-          backgroundColor: '#ffffff'
-        } : {
-          quality: 1.0,
-          pixelRatio: 2,
-          backgroundColor: '#ffffff'
-        };
-        
-        // Capture the canvas as PNG with optimized settings
-        const dataUrl = await toPng(canvasRef.current, exportOptions);
-        
-        // Cache the result with LRU eviction strategy
-        const cache = exportCacheRef.current.cache;
-        const maxSize = exportCacheRef.current.maxSize;
-        
-        // If cache is at capacity, remove least recently used entry
-        if (cache.size >= maxSize) {
-          let lruKey: string | undefined;
-          let oldestTime = Date.now();
           
-          for (const [key, entry] of cache.entries()) {
-            if (entry.lastUsed < oldestTime) {
-              oldestTime = entry.lastUsed;
-              lruKey = key;
-            }
-          }
+          // Track performance metrics
+          trackPerformance('export-image', {
+            cached: false,
+            duration: Date.now() - startTime,
+            avgRenderTime: performanceMonitorRef.current?.getAverageMetric('export-image') || 0,
+          });
+        } catch (error) {
+          console.error('Export failed:', error);
+          trackCanvasAction('export-image', {
+            format: 'png',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }, false);
           
-          if (lruKey) {
-            cache.delete(lruKey);
+          trackError(error instanceof Error ? error : new Error('Export failed'));
+        } finally {
+          if (canvasRef.current) {
+            canvasRef.current.classList.remove('export-mode');
           }
+          setIsExporting(false);
         }
-        
-        // Add new entry with current timestamp
-        cache.set(cacheKey, { value: dataUrl, lastUsed: Date.now() });
-        
-        // Create download link
+      });
+    }
+    // Fallback if monitor not ready
+    {
+      const startTime = Date.now();
+      setIsExporting(true);
+      try {
+        const dataUrl = await toPng(canvasRef.current!);
+        const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
+        exportCacheRef.current.cache.set(cacheKey, { value: dataUrl, lastUsed: Date.now() });
         const link = document.createElement('a');
         link.href = dataUrl;
-        link.download = `${challenge.id}-design.png`;
+        link.download = `${challenge?.id || 'design'}-design.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
-        // Track successful image export with performance metrics
         trackCanvasAction('export-image', {
           format: 'png',
           componentCount: components.length,
           connectionCount: connections.length,
           exportTime: Date.now() - startTime,
-          challengeId: challenge.id,
-          designComplexity: designMetrics.complexity,
-          isLargeDesign: designMetrics.isLargeDesign,
-          quality: exportOptions.quality,
-          pixelRatio: exportOptions.pixelRatio
         }, true);
-
-        trackPerformance('export-image', {
-          exportTime: Date.now() - startTime,
-          componentCount: components.length,
-          connectionCount: connections.length,
-          imageSize: dataUrl.length,
-          quality: exportOptions.quality
-        });
-        
       } catch (error) {
-        console.error('Failed to export image:', error);
+        console.error('Export failed:', error);
         trackCanvasAction('export-image', {
           format: 'png',
-          error: error instanceof Error ? error.message : 'Unknown error',
-          exportTime: Date.now() - startTime
+          error: error instanceof Error ? error.message : 'Unknown error'
         }, false);
-        trackError(error instanceof Error ? error : new Error('Image export failed'));
+        trackError(error instanceof Error ? error : new Error('Export failed'));
       } finally {
-        // Restore UI overlays
         if (canvasRef.current) {
           canvasRef.current.classList.remove('export-mode');
         }
         setIsExporting(false);
       }
-    });
+    }
+    return;
   }, [challenge.id, components.length, connections.length, trackCanvasAction, trackPerformance, trackError, designMetrics]);
 
   const handleContinue = useOptimizedCallback(() => {
-    const measureFn = performanceMonitorRef.current
-      ? performanceMonitorRef.current.measure.bind(performanceMonitorRef.current)
-      : ((name: string, fn: () => any) => fn());
-    return measureFn('design-complete', () => {
+    const perf = performanceMonitorRef.current;
+    if (perf && typeof perf.measure === 'function') {
+      return perf.measure('design-complete', () => {
+        const designData: DesignData = {
+          components,
+          connections,
+          layers,
+          gridConfig,
+          activeTool,
+          metadata: {
+            created: initialData.metadata.created,
+            lastModified: new Date().toISOString(),
+            version: '1.0',
+            performanceMetrics: {
+              componentCount: components.length,
+              connectionCount: connections.length,
+              complexity: designMetrics.complexity,
+              avgRenderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0,
+              fps: performanceMonitorRef.current?.getCurrentFPS() || 60,
+              totalInteractions: (performanceMonitorRef.current?.getMetrics('component-drop')?.length || 0) +
+                               (performanceMonitorRef.current?.getMetrics('component-move')?.length || 0) +
+                               (performanceMonitorRef.current?.getMetrics('connection-create')?.length || 0)
+            }
+          }
+        };
+        
+        try {
+          localStorage.setItem('archicomm-design-complete', JSON.stringify(designData));
+        } catch {}
+        
+        trackCanvasAction('design-complete', {
+          componentCount: components.length,
+          connectionCount: connections.length,
+          challengeId: challenge.id,
+          designComplexity: designMetrics.complexity
+        }, true);
+      });
+    }
+    // Fallback if monitor not ready
+    {
       const designData: DesignData = {
         components,
         connections,
+        layers,
+        gridConfig,
+        activeTool,
         metadata: {
           created: initialData.metadata.created,
           lastModified: new Date().toISOString(),
@@ -691,20 +1154,15 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           }
         }
       };
-
-      // Track design completion with comprehensive metrics
+      try { localStorage.setItem('archicomm-design-complete', JSON.stringify(designData)); } catch {}
       trackCanvasAction('design-complete', {
         componentCount: components.length,
         connectionCount: connections.length,
-        designComplexity: designMetrics.complexity,
         challengeId: challenge.id,
-        performanceMetrics: designData.metadata.performanceMetrics
+        designComplexity: designMetrics.complexity
       }, true);
-
-      trackPerformance('design-complete', designData.metadata.performanceMetrics);
-      
-      onComplete(designData);
-    });
+    }
+    return;
   }, [components, connections, initialData.metadata.created, onComplete, designMetrics, challenge.id, trackCanvasAction, trackPerformance]);
 
   // Performance monitoring and cleanup
@@ -756,6 +1214,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       properties: {
         label: c.label || '',
         description: c.description || '',
+        layerId: c.layerId || 'default',
         ...(c.properties || {}),
       },
     }));
@@ -769,6 +1228,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       y: e.position?.y ?? 0,
       label: (e.properties as any)?.label || e.element_type,
       description: (e.properties as any)?.description || undefined,
+      layerId: (e.properties as any)?.layerId || 'default',
       properties: e.properties || {},
     }));
   }, []);
@@ -823,23 +1283,21 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     return () => { cancelled = true; };
   }, [challenge.id, fromTauriConnections, fromTauriElements]);
 
-  // Show template prompt if applicable
+  // Start blank by default: do not auto-show template prompt
+  // (Users can still load a template explicitly from Solution Hints when available.)
   useEffect(() => {
-    if (!hasLoadedFromPersistence) return;
-    if (components.length === 0 && (extendedChallenge as any).architectureTemplate) {
-      setShowTemplatePrompt(true);
-    }
-  }, [hasLoadedFromPersistence, components.length, extendedChallenge]);
+    // Intentionally left blank to keep default state as blank canvas
+  }, []);
 
   // Auto-save to backend (debounced)
-  const saveDesignToBackend = useCallback(async (payload: { components: DesignComponent[]; connections: Connection[] }) => {
+  const saveDesignToBackend = useCallback(async (payload: { components: DesignComponent[]; connections: Connection[]; layers: Layer[]; gridConfig?: GridConfig }) => {
     if (!isTauriEnvironment()) return;
     await DiagramAPI.saveDiagram(challenge.id, toTauriElements(payload.components));
     await DiagramAPI.saveConnections(challenge.id, toTauriConnections(payload.connections));
   }, [challenge.id, toTauriConnections, toTauriElements]);
 
   const { isSaving, forceSave } = useAutoSave(
-    { components, connections },
+    { components, connections, layers, gridConfig },
     saveDesignToBackend,
     { delay: 2000, enabled: FEATURES.AUTO_SAVE }
   );
@@ -849,7 +1307,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     try {
       const now = Date.now();
       // Map template components to design components
-      const compMap = new Map<string, string>(); // label -> id
+      const compMap = new globalThis.Map<string, string>(); // label -> id
       const newComponents: DesignComponent[] = template.components.map((c, idx) => {
         const id = `${c.type}-${now}-${idx}`;
         compMap.set(c.label, id);
@@ -861,6 +1319,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           label: c.label,
           description: c.description,
           properties: c.properties || {},
+          layerId: activeLayerId || 'default',
         };
       });
 
@@ -903,14 +1362,102 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, [showHints, hintsReady]);
 
   // Initialize keyboard shortcuts hook
-  useKeyboardShortcuts([]);
+  useKeyboardShortcuts([
+    {
+      key: 'g',
+      description: 'Toggle grid visibility',
+      action: handleToggleGrid,
+      category: 'Grid'
+    },
+    {
+      key: 'shift+g',
+      description: 'Toggle snap to grid',
+      action: handleToggleSnapToGrid,
+      category: 'Grid'
+    },
+    {
+      key: 'v',
+      description: 'Select tool',
+      action: () => handleToolChange('select'),
+      category: 'Tools'
+    },
+    {
+      key: 'h',
+      description: 'Pan tool',
+      action: () => handleToolChange('pan'),
+      category: 'Tools'
+    },
+    {
+      key: 'z',
+      description: 'Zoom tool',
+      action: () => handleToolChange('zoom'),
+      category: 'Tools'
+    },
+    {
+      key: 'a',
+      description: 'Annotate tool',
+      action: () => handleToolChange('annotate'),
+      category: 'Tools'
+    }
+  ]);
 
   return (
     <DndProvider backend={dndBackendFactory}>
       <SidebarProvider defaultOpen>
       <div className="h-screen flex flex-col">
         {/* Main Toolbar */}
-        <div className="border-b bg-card p-4" data-testid="canvas-toolbar">
+        <TopBar
+          onBack={onBack}
+          challengeTitle={challenge.title}
+          challengeDescription={challenge.description}
+          componentCount={components.length}
+          connectionCount={connections.length}
+          designComplexity={designMetrics.complexity}
+          isSaving={isSaving}
+          performanceModeEnabled={performanceModeEnabled}
+          onTogglePerformanceMode={() => setPerformanceModeEnabled(!performanceModeEnabled)}
+          showHints={showHints}
+          onToggleHints={() => {
+            const newHintsState = !showHints;
+            workflowTracker.trackAction('toggle_hints', 200, true, 'design-canvas', {
+              enabled: newHintsState,
+              componentCount: components.length
+            });
+            trackCanvasAction('toggle-hints', {
+              showHints: newHintsState,
+              componentCount: components.length,
+              designComplexity: designMetrics.complexity
+            }, true);
+            setShowHints(newHintsState);
+          }}
+          gridConfig={gridConfig}
+          onToggleGrid={handleToggleGrid}
+          onToggleSnapToGrid={handleToggleSnapToGrid}
+          onGridSpacingChange={handleGridSpacingChange}
+          showMinimap={showMinimap}
+          onToggleMinimap={handleToggleMinimap}
+          viewportInfo={viewportInfo}
+          canvasExtents={canvasExtents}
+          onMinimapPan={handleMinimapPan}
+          onMinimapZoom={handleMinimapZoom}
+          components={components as any}
+          connections={connections as any}
+          layers={layers as any}
+          onSave={() => { try { forceSave(); } catch {} handleSave(); workflowTracker.trackAction('manual_save', 300, true, 'design-canvas'); }}
+          onExportJSON={() => { handleExport(); workflowTracker.trackAction('export_json', 500, true, 'design-canvas'); }}
+          onExportPNG={() => { handleExportImage(); workflowTracker.trackAction('export_png', 2000, true, 'design-canvas'); }}
+          isExporting={isExporting}
+          onContinue={() => {
+            handleContinue();
+            workflowTracker.trackAction('continue_to_recording', 1000, true, 'design-canvas', {
+              componentCount: components.length,
+              connectionCount: connections.length,
+              designComplexity: designMetrics.complexity
+            });
+          }}
+          canContinue={components.length > 0 && !isExporting}
+        />
+        <div className="hidden" data-testid="canvas-toolbar">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <SmartTooltip 
@@ -1001,6 +1548,111 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   : 'Solution hints panel is hidden'
                 }
               </div>
+              
+              {/* Grid Controls Section */}
+              <div className="flex items-center gap-2 border-l pl-2 ml-2">
+                <SmartTooltip 
+                  content={gridConfig.visible ? 'Hide grid overlay' : 'Show grid overlay'}
+                  contextualHelp="Grid overlay helps with component alignment and provides visual reference lines for organizing your system design"
+                  shortcut="G"
+                >
+                  <Button 
+                    variant={gridConfig.visible ? "default" : "outline"}
+                    size="sm"
+                    onClick={handleToggleGrid}
+                    data-help-target="design-canvas-grid"
+                    aria-label={gridConfig.visible ? 'Hide grid' : 'Show grid'}
+                    aria-pressed={gridConfig.visible}
+                  >
+                    <Grid3x3 className="w-4 h-4 mr-2" />
+                    Grid
+                  </Button>
+                </SmartTooltip>
+                
+                <div className="flex items-center gap-2">
+                  <SmartTooltip 
+                    content="Enable snap-to-grid for precise component placement"
+                    contextualHelp="When enabled, components automatically align to grid intersections when moved, ensuring consistent spacing and professional layout"
+                    shortcut="Shift+G"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="snap-to-grid"
+                        checked={gridConfig.snapToGrid}
+                        onCheckedChange={handleToggleSnapToGrid}
+                        aria-label="Enable snap to grid"
+                      />
+                      <label 
+                        htmlFor="snap-to-grid"
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        Snap
+                      </label>
+                    </div>
+                  </SmartTooltip>
+                  
+                  <SmartTooltip 
+                    content="Adjust grid spacing for different layout precision"
+                    contextualHelp="Smaller spacing provides finer control, while larger spacing works better for high-level architecture diagrams"
+                  >
+                    <Select value={gridConfig.spacing.toString()} onValueChange={handleGridSpacingChange}>
+                      <SelectTrigger className="w-20 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10px</SelectItem>
+                        <SelectItem value="20">20px</SelectItem>
+                        <SelectItem value="30">30px</SelectItem>
+                        <SelectItem value="50">50px</SelectItem>
+                        <SelectItem value="100">100px</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SmartTooltip>
+                </div>
+              </div>
+              
+              {/* Minimap Toggle */}
+              <div className="flex items-center gap-2 border-l pl-2 ml-2">
+                <SmartTooltip
+                  content={showMinimap ? 'Hide minimap overview' : 'Show minimap overview'}
+                  contextualHelp="Minimap provides a bird's-eye view of your entire canvas with viewport navigation and zoom controls"
+                  shortcut="M"
+                >
+                  <Popover open={showMinimap} onOpenChange={setShowMinimap}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={showMinimap ? "default" : "outline"}
+                        size="sm"
+                        onClick={handleToggleMinimap}
+                        data-help-target="design-canvas-minimap"
+                        aria-label={showMinimap ? 'Hide minimap' : 'Show minimap'}
+                        aria-pressed={showMinimap}
+                      >
+                        <Navigation className="w-4 h-4 mr-2" />
+                        Minimap
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-2" side="bottom" align="end">
+                      {!viewportInfo ? (
+                        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
+                          Preparing minimap...
+                        </div>
+                      ) : (
+                        <Minimap
+                          components={components}
+                          connections={connections}
+                          layers={layers}
+                          viewport={viewportInfo}
+                          canvasExtents={canvasExtents}
+                          onPanTo={handleMinimapPan}
+                          onZoomTo={handleMinimapZoom}
+                        />
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </SmartTooltip>
+              </div>
+              
               <SmartTooltip 
                 content="Save current design progress" 
                 contextualHelp="Saves your design locally. Auto-saves occur every few seconds when you make changes. Use Ctrl+S to manually save anytime."
@@ -1094,29 +1746,28 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             </div>
           </div>
         </div>
-        {showTemplatePrompt && (extendedChallenge as any).architectureTemplate && (
-          <div className="border-b bg-amber-50 text-amber-900 px-4 py-2 flex items-center justify-between">
-            <div className="text-sm">
-              This challenge includes an architecture template. Load it to jump-start your design?
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowTemplatePrompt(false)}>Start Blank</Button>
-              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white"
-                onClick={() => applyTemplate((extendedChallenge as any).architectureTemplate as ArchitectureTemplate)}
-              >Load Template</Button>
-            </div>
-          </div>
-        )}
+        {/* Template prompt removed: default start is blank. Template can still be loaded via Solution Hints when available. */}
 
         {/* Main Canvas Area */}
         <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
         {/* Left Sidebar with component palette and properties */}
-        <div className="w-72 shrink-0 border-r bg-card/50">
+        <div className="w-80 shrink-0 h-full border-r bg-card/50">
           <VerticalSidebar
             components={components}
             selectedComponent={selectedComponent}
             onLabelChange={handleComponentLabelChange}
             onDelete={handleDeleteComponent}
+            challenge={challenge}
+            layers={layers}
+            activeLayerId={activeLayerId}
+            onCreateLayer={handleCreateLayer}
+            onRenameLayer={handleRenameLayer}
+            onDeleteLayer={handleDeleteLayer}
+            onToggleLayerVisibility={handleToggleLayerVisibility}
+            onReorderLayer={handleReorderLayer}
+            onActiveLayerChange={handleActiveLayerChange}
+            activeTool={activeTool}
+            onToolChange={handleToolChange}
           />
         </div>
 
@@ -1125,10 +1776,15 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               ref={canvasRef}
               components={components}
               connections={connections}
+              layers={layers}
+              activeLayerId={activeLayerId}
               selectedComponent={selectedComponent}
+              selectedComponents={selectedComponents}
               connectionStart={connectionStart}
               commentMode={commentMode}
               isCommentModeActive={!!commentMode}
+              gridConfig={gridConfig}
+              activeTool={activeTool}
               onComponentDrop={handleComponentDrop}
               onComponentMove={handleComponentMove}
               onComponentSelect={handleComponentSelect}
@@ -1138,6 +1794,12 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               onConnectionDirectionChange={handleConnectionDirectionChange}
               onStartConnection={handleStartConnection}
               onCompleteConnection={handleCompleteConnection}
+              onMultiComponentSelect={handleMultiComponentSelect}
+              onClearSelection={handleClearSelection}
+              onSelectAll={handleSelectAll}
+              onGroupMove={handleGroupMove}
+              onGroupDelete={handleGroupDelete}
+              onViewportChange={handleViewportChange}
               data-testid="design-canvas"
               aria-describedby="challenge-description"
             />

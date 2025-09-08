@@ -27,7 +27,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { ExtendedChallenge, challengeManager, tauriChallengeAPI } from '../lib/challenge-config';
-import { Challenge } from '../App';
+import type { Challenge } from '../App';
 
 interface ChallengeManagerProps {
   onChallengeUpdate?: (challenges: ExtendedChallenge[]) => void;

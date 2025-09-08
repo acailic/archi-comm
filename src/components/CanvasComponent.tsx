@@ -1,6 +1,16 @@
 import React, { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { DesignComponent } from '../App';
+import type { DesignComponent, ToolType } from '../App';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from './ui/context-menu';
+import { snapToGrid } from './CanvasArea';
+import { designSystem, getComponentGradient, getElevation, animations, cx } from '../lib/design-system';
 import { 
   Server, Database, Zap, Globe, Monitor, HardDrive, Cloud, Container, 
   Layers, Activity, Shield, Key, Lock, Code, Smartphone, MessageSquare,
@@ -13,11 +23,24 @@ import {
 interface CanvasComponentProps {
   component: DesignComponent;
   isSelected: boolean;
+  isMultiSelected?: boolean;
   isConnectionStart: boolean;
+  layerZIndex?: number;
+  isVisible?: boolean;
+  snapToGrid?: boolean;
+  gridSpacing?: number;
+  activeTool?: ToolType;
   onMove: (id: string, x: number, y: number) => void;
   onSelect: (id: string) => void;
   onStartConnection: (id: string, position: 'top' | 'bottom' | 'left' | 'right') => void;
   onCompleteConnection: (fromId: string, toId: string) => void;
+  onGroupMove?: (componentIds: string[], deltaX: number, deltaY: number) => void;
+  onDuplicate?: (componentId: string) => void;
+  onBringToFront?: (componentId: string) => void;
+  onSendToBack?: (componentId: string) => void;
+  onCopy?: (componentId: string) => void;
+  onShowProperties?: (componentId: string) => void;
+  onDelete?: (componentId: string) => void;
 }
 
 const componentIcons: Record<DesignComponent['type'], React.ComponentType<any>> = {
@@ -194,27 +217,42 @@ const ConnectionPoint = ({ position, onStartConnection, componentId }) => {
   return (
     <div
       ref={drag}
-      className={`absolute w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${positionClasses[position]}`}
+      className={`absolute w-3 h-3 rounded-full opacity-0 group-hover:opacity-100 cursor-crosshair ${positionClasses[position]}`}
       onMouseDown={(e) => {
         e.stopPropagation();
         onStartConnection(componentId, position);
       }}
-    />
+    >
+      <div className="w-full h-full rounded-full bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-transform duration-200 group-hover:scale-110" />
+    </div>
   );
 };
 
 export function CanvasComponent({
   component,
   isSelected,
+  isMultiSelected = false,
   isConnectionStart,
+  layerZIndex = 10,
+  isVisible = true,
+  snapToGrid = false,
+  gridSpacing = 20,
+  activeTool,
   onMove,
   onSelect,
   onStartConnection,
   onCompleteConnection,
+  onGroupMove,
+  onDuplicate,
+  onBringToFront,
+  onSendToBack,
+  onCopy,
+  onShowProperties,
+  onDelete,
 }: CanvasComponentProps) {
   const ref = useRef<HTMLDivElement>(null);
   const Icon = componentIcons[component.type] || Server;
-  const bgColor = componentColors[component.type] || 'bg-gray-500';
+  const gradient = getComponentGradient(component.type);
 
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'canvas-component',
@@ -226,7 +264,17 @@ export function CanvasComponent({
       if (!monitor.didDrop() && ref.current) {
         const offset = monitor.getDifferenceFromInitialOffset();
         if (offset) {
-          onMove(component.id, component.x + offset.x, component.y + offset.y);
+          let newX = component.x + offset.x;
+          let newY = component.y + offset.y;
+          
+          // Apply snap-to-grid if enabled
+          if (snapToGrid) {
+            const snapped = snapToGrid(newX, newY, gridSpacing);
+            newX = snapped.x;
+            newY = snapped.y;
+          }
+          
+          onMove(component.id, newX, newY);
         }
       }
     },
@@ -246,45 +294,92 @@ export function CanvasComponent({
 
   drag(drop(ref));
 
-  return (
-    <div
-      ref={ref}
-      style={{
-        position: 'absolute',
-        left: component.x,
-        top: component.y,
-        transform: isDragging ? 'rotate(5deg)' : 'none',
-      }}
-      className={`
-        w-32 h-20 cursor-move transition-all duration-200 group
-        ${isDragging ? 'opacity-75 z-50 scale-105' : 'z-10'}
-        ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}
-        ${isConnectionStart ? 'ring-2 ring-yellow-500 ring-offset-2 animate-pulse' : ''}
-        ${isOver ? 'ring-2 ring-green-500' : ''}
-      `}
-      onClick={() => onSelect(component.id)}
-    >
-      <div className={`
-        w-full h-full rounded-lg shadow-lg border-2
-        ${isSelected ? 'border-primary' : 'border-border'}
-        ${isConnectionStart ? 'border-yellow-500' : ''}
-        ${isOver ? 'border-green-500' : ''}
-        bg-background hover:shadow-xl transition-shadow
-      `}>
-        <div className={`w-full h-8 ${bgColor} rounded-t-md flex items-center justify-center`}>
-          <Icon className="w-4 h-4 text-white" />
-        </div>
-        <div className="px-2 py-1 text-center">
-          <div className="text-xs font-medium truncate" title={component.label}>
-            {component.label}
-          </div>
-        </div>
-      </div>
+  // Hide component if not visible
+  if (!isVisible) {
+    return null;
+  }
 
-      <ConnectionPoint position="top" onStartConnection={onStartConnection} componentId={component.id} />
-      <ConnectionPoint position="bottom" onStartConnection={onStartConnection} componentId={component.id} />
-      <ConnectionPoint position="left" onStartConnection={onStartConnection} componentId={component.id} />
-      <ConnectionPoint position="right" onStartConnection={onStartConnection} componentId={component.id} />
-    </div>
+  const baseZIndex = layerZIndex || 10;
+  const draggingZIndex = baseZIndex + 100; // Maintain dragging behavior with layer offset
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={ref}
+          style={{
+            position: 'absolute',
+            left: component.x,
+            top: component.y,
+            transform: isDragging ? 'rotate(5deg)' : 'none',
+            zIndex: isDragging ? draggingZIndex : baseZIndex,
+          }}
+          className={cx(
+            'w-44 h-28 cursor-move group transition-all',
+            isDragging && 'opacity-80 scale-[1.03] rotate-[1deg]',
+            isSelected && 'ring-2 ring-primary/80 ring-offset-2 ring-offset-background',
+            isMultiSelected && 'ring-2 ring-blue-500/70 ring-offset-2',
+            isConnectionStart && 'ring-2 ring-amber-500/80 ring-offset-2 animate-pulse',
+            isOver && 'ring-2 ring-emerald-500/80',
+            getElevation(isSelected ? 4 : 2),
+            animations.hoverRaise,
+            animations.pulseGlow
+          )}
+          onClick={() => onSelect(component.id)}
+        >
+          <div className={cx('w-full h-full rounded-xl border', designSystem.glass.surface, 'bg-[var(--component-bg)]') }>
+            <div className={cx('w-full h-9 rounded-t-xl flex items-center justify-center text-white shadow-sm', 'border-b border-white/10', 'bg-gradient-to-br', gradient)}>
+              <Icon className="w-4 h-4" />
+            </div>
+            <div className="px-2.5 py-1.5 text-center relative">
+              <div className="text-[12px] font-medium truncate tracking-[var(--letter-spacing-tight)]" title={component.label}>
+                {component.label}
+              </div>
+              {isMultiSelected && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500/90 shadow ring-1 ring-white/30 flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <ConnectionPoint position="top" onStartConnection={onStartConnection} componentId={component.id} />
+          <ConnectionPoint position="bottom" onStartConnection={onStartConnection} componentId={component.id} />
+          <ConnectionPoint position="left" onStartConnection={onStartConnection} componentId={component.id} />
+          <ConnectionPoint position="right" onStartConnection={onStartConnection} componentId={component.id} />
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem onClick={() => onShowProperties?.(component.id)}>
+          Edit Properties
+          <ContextMenuShortcut>F2</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onDuplicate?.(component.id)}>
+          Duplicate
+          <ContextMenuShortcut>Ctrl+D</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onCopy?.(component.id)}>
+          Copy
+          <ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => onBringToFront?.(component.id)}>
+          Bring to Front
+          <ContextMenuShortcut>Ctrl+Shift+]</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onSendToBack?.(component.id)}>
+          Send to Back
+          <ContextMenuShortcut>Ctrl+Shift+[</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem 
+          onClick={() => onDelete?.(component.id)}
+          className="text-destructive focus:text-destructive"
+        >
+          Delete
+          <ContextMenuShortcut>Del</ContextMenuShortcut>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

@@ -20,6 +20,10 @@ interface StatusBarProps {
   currentScreen: string;
   sessionStartTime: Date | null;
   selectedChallenge: any;
+  cursorPosition?: { x: number; y: number } | null;
+  selectedCount?: number;
+  totalComponents?: number;
+  canvasExtents?: { width: number; height: number };
 }
 
 interface PerformanceMetrics {
@@ -36,7 +40,7 @@ interface UXMetrics {
   skillLevel: 'beginner' | 'intermediate' | 'advanced';
 }
 
-export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge }: StatusBarProps) {
+export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, cursorPosition, selectedCount, totalComponents, canvasExtents }: StatusBarProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -325,7 +329,7 @@ Health: ${performanceMetrics.performanceHealth}`;
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="h-8 bg-card/80 backdrop-blur-sm border-t border-border/30 flex items-center justify-between px-4 text-xs"
+      className="h-8 border-t border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] flex items-center justify-between px-4 text-xs shadow-[var(--elevation-1)]"
     >
       {/* Left Section - Status & Challenge */}
       <div className="flex items-center space-x-4">
@@ -487,6 +491,55 @@ Health: ${performanceMetrics.performanceHealth}`;
               )}
             </motion.div>
             <div className="w-px h-4 bg-border" />
+          </>
+        )}
+
+        {/* Canvas Information - Only show on design canvas screen */}
+        {currentScreen === 'design-canvas' && (
+          <>
+            {/* Cursor Position */}
+            {cursorPosition && (
+              <>
+                <div 
+                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help font-mono text-xs"
+                  title={`Current cursor position in canvas coordinates`}
+                >
+                  <span>X: {Math.round(cursorPosition.x)}, Y: {Math.round(cursorPosition.y)}</span>
+                </div>
+                <div className="w-px h-4 bg-border" />
+              </>
+            )}
+            
+            {/* Selection Count */}
+            {(selectedCount !== undefined && totalComponents !== undefined) && (
+              <>
+                <div 
+                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                  title={`${selectedCount} of ${totalComponents} components selected`}
+                >
+                  <Target className="w-3 h-3" />
+                  <span className={`text-xs ${
+                    selectedCount > 0 ? 'text-green-600 font-medium' : 'text-muted-foreground'
+                  }`}>
+                    Selected: {selectedCount}/{totalComponents}
+                  </span>
+                </div>
+                <div className="w-px h-4 bg-border" />
+              </>
+            )}
+            
+            {/* Canvas Extents - Only in development mode */}
+            {process.env.NODE_ENV === 'development' && canvasExtents && (
+              <>
+                <div 
+                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help font-mono text-xs"
+                  title={`Canvas size: ${canvasExtents.width} x ${canvasExtents.height} pixels`}
+                >
+                  <span>{Math.round(canvasExtents.width)} × {Math.round(canvasExtents.height)}</span>
+                </div>
+                <div className="w-px h-4 bg-border" />
+              </>
+            )}
           </>
         )}
 

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, Suspense } from 'react';
+import designSystem from './lib/design-system';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Core components (eagerly loaded)
@@ -103,6 +104,17 @@ export interface Challenge {
   category: 'system-design' | 'architecture' | 'scaling';
 }
 
+export type ToolType = 'select' | 'pan' | 'zoom' | 'annotate';
+
+export interface ToolConfig {
+  id: ToolType;
+  name: string;
+  icon: React.ComponentType;
+  description: string;
+  shortcut?: string;
+  cursor?: string;
+}
+
 export interface DesignComponent {
   id: string;
   type: string;
@@ -111,6 +123,14 @@ export interface DesignComponent {
   label: string;
   description?: string;
   properties?: Record<string, any>;
+  layerId?: string;
+}
+
+export interface GridConfig {
+  visible: boolean;
+  spacing: number;
+  snapToGrid: boolean;
+  color?: string;
 }
 
 export interface Connection {
@@ -123,9 +143,19 @@ export interface Connection {
   direction?: 'none' | 'end' | 'both';
 }
 
+export interface Layer {
+  id: string;
+  name: string;
+  visible: boolean;
+  order: number;
+}
+
 export interface DesignData {
   components: DesignComponent[];
   connections: Connection[];
+  layers: Layer[];
+  gridConfig?: GridConfig;
+  activeTool?: ToolType;
   metadata: {
     created: string;
     lastModified: string;
@@ -182,6 +212,7 @@ export default function App() {
   const [designData, setDesignData] = useState<DesignData>({
     components: [],
     connections: [],
+    layers: [],
     metadata: {
       created: new Date().toISOString(),
       lastModified: new Date().toISOString(),
@@ -288,6 +319,7 @@ export default function App() {
       const initialDesignData = {
         components: [],
         connections: [],
+        layers: [],
         metadata: {
           created: new Date().toISOString(),
           lastModified: new Date().toISOString(),
@@ -386,6 +418,7 @@ export default function App() {
       setDesignData({
         components: [],
         connections: [],
+        layers: [],
         metadata: {
           created: new Date().toISOString(),
           lastModified: new Date().toISOString(),
@@ -442,7 +475,7 @@ export default function App() {
   }, [currentScreen]);
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/10 overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)]">
       {/* Window Controls */}
       <Suspense fallback={<div className="h-12 bg-card border-b" />}>
         <WindowControls 
@@ -468,7 +501,7 @@ export default function App() {
         <motion.div
           initial={{ opacity: 0, scaleX: 0 }}
           animate={{ opacity: 1, scaleX: 1 }}
-          className="px-4 py-2 bg-card/50 backdrop-blur-sm border-b border-border/30"
+          className="px-4 py-2 border-b border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] shadow-[var(--elevation-1)]"
         >
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
             <span>Session Progress</span>

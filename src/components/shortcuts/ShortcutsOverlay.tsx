@@ -13,10 +13,12 @@ import {
   type ShortcutConfig, 
   type ShortcutCategory 
 } from '../../lib/shortcuts/KeyboardShortcuts';
+import { ToolType } from '../../App';
 
 interface ShortcutsOverlayProps {
   isOpen: boolean;
   onClose: () => void;
+  activeTool?: ToolType;
 }
 
 const categoryIcons: Record<ShortcutCategory, React.ReactNode> = {
@@ -42,6 +44,9 @@ const categoryIcons: Record<ShortcutCategory, React.ReactNode> = {
   system: <svg width={20} height={20} viewBox="0 0 24 24" fill="none" className="text-red-500">
     <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
     <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1" stroke="currentColor" strokeWidth="2"/>
+  </svg>,
+  tools: <svg width={20} height={20} viewBox="0 0 24 24" fill="none" className="text-amber-500">
+    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="currentColor" strokeWidth="2"/>
   </svg>
 };
 
@@ -51,10 +56,11 @@ const categoryLabels: Record<ShortcutCategory, string> = {
   components: 'Components',
   navigation: 'Navigation',
   project: 'Project',
-  system: 'System'
+  system: 'System',
+  tools: 'Tools'
 };
 
-export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({ isOpen, onClose }) => {
+export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({ isOpen, onClose, activeTool }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ShortcutCategory | 'all'>('all');
   const [shortcuts, setShortcuts] = useState<ShortcutConfig[]>([]);
@@ -72,7 +78,14 @@ export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({ isOpen, onCl
     return matchesSearch && matchesCategory;
   });
 
-  const categories: (ShortcutCategory | 'all')[] = ['all', 'general', 'canvas', 'components', 'navigation', 'project', 'system'];
+  // Helper to check if a shortcut is related to the active tool
+  const isActiveToolShortcut = (shortcut: ShortcutConfig) => {
+    if (!activeTool) return false;
+    return shortcut.category === 'tools' && 
+           shortcut.description.toLowerCase().includes(activeTool.toLowerCase());
+  };
+
+  const categories: (ShortcutCategory | 'all')[] = ['all', 'general', 'canvas', 'components', 'tools', 'navigation', 'project', 'system'];
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -172,35 +185,47 @@ export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({ isOpen, onCl
             <div className="flex-1 overflow-y-auto p-6">
               {filteredShortcuts.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {filteredShortcuts.map((shortcut, index) => (
-                    <motion.div
-                      key={`${shortcut.key}-${shortcut.modifiers?.join('-')}`}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="group flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                  {filteredShortcuts.map((shortcut, index) => {
+                    const isHighlighted = isActiveToolShortcut(shortcut);
+                    return (
+                      <motion.div
+                        key={`${shortcut.key}-${shortcut.modifiers?.join('-')}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.02 }}
+                        className={`group flex items-center justify-between p-4 rounded-xl border transition-all duration-200 ${
+                          isHighlighted 
+                            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-600 ring-2 ring-amber-200 dark:ring-amber-600/50' 
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="flex-shrink-0">
+                            {categoryIcons[shortcut.category]}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900 dark:text-white truncate">
+                              {shortcut.description}
+                              {isHighlighted && (
+                                <span className="ml-2 text-xs bg-amber-200 dark:bg-amber-700 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full">
+                                  Active Tool
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                              {categoryLabels[shortcut.category]}
+                            </div>
+                          </div>
+                        </div>
+                        
                         <div className="flex-shrink-0">
-                          {categoryIcons[shortcut.category]}
+                          <kbd className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-mono text-sm border border-gray-300 dark:border-gray-600 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
+                            {formatShortcutKey(shortcut.key, shortcut.modifiers)}
+                          </kbd>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-gray-900 dark:text-white truncate">
-                            {shortcut.description}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-                            {categoryLabels[shortcut.category]}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex-shrink-0">
-                        <kbd className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-mono text-sm border border-gray-300 dark:border-gray-600 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
-                          {formatShortcutKey(shortcut.key, shortcut.modifiers)}
-                        </kbd>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12">

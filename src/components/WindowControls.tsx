@@ -54,7 +54,7 @@ export function WindowControls({ title = "ArchiComm", showMenu = false, onMenuCl
 
   if (!isTauriApp()) {
     return (
-      <div className="h-8 bg-gradient-to-r from-background via-background to-muted/20 border-b border-border/50 flex items-center justify-center px-4">
+      <div className="h-8 border-b border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] flex items-center justify-center px-4 shadow-[var(--elevation-1)]">
         <div className="flex items-center space-x-2">
           <div className="w-2 h-2 rounded-full bg-gradient-to-r from-red-400 to-red-500" />
           <div className="w-2 h-2 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-500" />
@@ -72,7 +72,7 @@ export function WindowControls({ title = "ArchiComm", showMenu = false, onMenuCl
 
   return (
     <motion.div 
-      className="h-8 bg-gradient-to-r from-background via-card to-muted/10 border-b border-border/30 flex items-center justify-between px-4 backdrop-blur-xl"
+      className="h-8 border-b border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] flex items-center justify-between px-4 shadow-[var(--elevation-2)]"
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}

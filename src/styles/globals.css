@@ -43,6 +43,47 @@
   --purple-500: 262 100% 50%;
   --green-500: 120 100% 40%;
   --orange-500: 25 100% 50%;
+
+  /* Elevation system */
+  --elevation-1: 0 1px 2px rgba(0,0,0,0.06);
+  --elevation-2: 0 4px 8px rgba(0,0,0,0.07), 0 1px 0 rgba(255,255,255,0.04) inset;
+  --elevation-3: 0 8px 16px rgba(0,0,0,0.08), 0 2px 0 rgba(255,255,255,0.04) inset;
+  --elevation-4: 0 12px 24px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.06) inset;
+  --elevation-5: 0 16px 32px rgba(0,0,0,0.12), 0 2px 0 rgba(255,255,255,0.06) inset;
+  --elevation-6: 0 24px 48px rgba(0,0,0,0.14), 0 2px 0 rgba(255,255,255,0.08) inset;
+
+  /* Glassmorphism */
+  --glass-bg: color-mix(in oklab, var(--card) 70%, transparent);
+  --glass-border: color-mix(in oklab, var(--border) 70%, transparent);
+  --glass-blur: 12px;
+
+  /* Component surface */
+  --component-bg: color-mix(in oklab, var(--card) 85%, transparent);
+  --component-border: color-mix(in oklab, var(--border) 80%, transparent);
+  --component-shadow: var(--elevation-2);
+
+  /* Transitions */
+  --transition-fast: 120ms;
+  --transition-medium: 220ms;
+  --transition-slow: 380ms;
+
+  /* Spacing scale */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.25rem;
+  --space-2xl: 1.5rem;
+  --space-3xl: 2rem;
+
+  /* Typography extras */
+  --text-shadow-subtle: 0 1px 0 rgba(0,0,0,0.06);
+  --letter-spacing-tight: -0.01em;
+
+  /* Interaction overlays */
+  --hover-overlay: rgba(0,0,0,0.04);
+  --focus-overlay: rgba(59,130,246,0.25);
+  --active-overlay: rgba(0,0,0,0.06);
 }
 
 .dark {
@@ -84,6 +125,47 @@
   --purple-500: 262 100% 60%;
   --green-500: 120 100% 50%;
   --orange-500: 25 100% 60%;
+
+  /* Elevation system - tuned for dark */
+  --elevation-1: 0 1px 1.5px rgba(0,0,0,0.35);
+  --elevation-2: 0 2px 6px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.02) inset;
+  --elevation-3: 0 6px 12px rgba(0,0,0,0.50), 0 1px 0 rgba(255,255,255,0.02) inset;
+  --elevation-4: 0 10px 20px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.03) inset;
+  --elevation-5: 0 14px 28px rgba(0,0,0,0.60), 0 1px 0 rgba(255,255,255,0.03) inset;
+  --elevation-6: 0 20px 44px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.04) inset;
+
+  /* Glassmorphism */
+  --glass-bg: color-mix(in oklab, var(--card) 65%, transparent);
+  --glass-border: color-mix(in oklab, var(--border) 70%, transparent);
+  --glass-blur: 14px;
+
+  /* Component surface */
+  --component-bg: color-mix(in oklab, var(--card) 70%, transparent);
+  --component-border: color-mix(in oklab, var(--border) 80%, transparent);
+  --component-shadow: var(--elevation-2);
+
+  /* Transitions */
+  --transition-fast: 120ms;
+  --transition-medium: 220ms;
+  --transition-slow: 380ms;
+
+  /* Spacing scale */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.25rem;
+  --space-2xl: 1.5rem;
+  --space-3xl: 2rem;
+
+  /* Typography extras */
+  --text-shadow-subtle: 0 1px 0 rgba(0,0,0,0.5);
+  --letter-spacing-tight: -0.01em;
+
+  /* Interaction overlays */
+  --hover-overlay: rgba(255,255,255,0.04);
+  --focus-overlay: rgba(59,130,246,0.35);
+  --active-overlay: rgba(255,255,255,0.06);
 }
 
 @theme inline {

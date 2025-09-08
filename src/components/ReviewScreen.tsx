@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { SidebarProvider, SidebarInset } from './ui/sidebar';
 import { VerticalSidebar } from './VerticalSidebar';
-import { Challenge, DesignData, AudioData } from '../App';
+import type { Challenge, DesignData, AudioData } from '../App';
 import { 
   ArrowLeft, 
   RotateCcw, 

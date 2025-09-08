@@ -1,11 +1,22 @@
 import { z } from 'zod';
 
 export const Position = z.object({ x: z.number(), y: z.number() });
+// DiagramElement schema for persistence
+// Layer information is stored in the properties field as 'layerId' for backward compatibility
+// with existing Tauri backend implementations. This approach ensures existing schemas
+// continue to work without modification while supporting the new layer functionality.
+//
+// Example properties object with layer information:
+// {
+//   "label": "API Server",
+//   "description": "Main API endpoint",
+//   "layerId": "layer-backend-services"
+// }
 export const DiagramElement = z.object({
   id: z.string(),
   element_type: z.string(),
   position: Position,
-  properties: z.record(z.string()).default({}),
+  properties: z.record(z.string()).default({}), // layerId stored here for backward compatibility
 });
 
 export const Connection = z.object({
