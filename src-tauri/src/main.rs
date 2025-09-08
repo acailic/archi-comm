@@ -296,11 +296,11 @@ fn get_audio_session_dir() -> Result<PathBuf, ApiError> {
     {
         use std::fs::Permissions;
         fs::set_permissions(&audio_dir, Permissions::from_mode(0o700))
-            .map_err(|e| ApiError::FileSystemError { source: None,
+            .map_err(|e| ApiError::FileSystemError {
                 operation: OperationNames::DIRECTORY_CREATE.to_string(),
                 details: format!("Failed to set secure directory permissions: {}", e),
-                source: None,
-    })?;
+                source: Some(Box::new(e)),
+            })?;
     }
     
     *session_dir_guard = Some(audio_dir.clone());
@@ -316,21 +316,21 @@ fn create_audio_session_dir_with_base(base_dir: &Path) -> Result<PathBuf, ApiErr
     
     // Create the directory with secure permissions (0o700 on Unix)
     fs::create_dir_all(&audio_dir)
-        .map_err(|e| ApiError::FileSystemError { source: None,
+        .map_err(|e| ApiError::FileSystemError {
             operation: OperationNames::DIRECTORY_CREATE.to_string(),
             details: format!("Failed to create audio test directory: {}", e),
-            source: None,
-    })?;
+            source: Some(Box::new(e)),
+        })?;
     
     #[cfg(unix)]
     {
         use std::fs::Permissions;
         fs::set_permissions(&audio_dir, Permissions::from_mode(0o700))
-            .map_err(|e| ApiError::FileSystemError { source: None,
+            .map_err(|e| ApiError::FileSystemError {
                 operation: OperationNames::DIRECTORY_CREATE.to_string(),
                 details: format!("Failed to set secure directory permissions: {}", e),
-                source: None,
-    })?;
+                source: Some(Box::new(e)),
+            })?;
     }
     
     Ok(audio_dir)
@@ -345,14 +345,14 @@ async fn create_project(
 ) -> Result<Project, ApiError> {
     // Validate project data
     if name.trim().is_empty() {
-        return Err(ApiError::InvalidProjectData { source: None,
+        return Err(ApiError::InvalidProjectData {
             details: "Project name cannot be empty".to_string(),
             source: None,
         });
     }
 
     if name.len() > 255 {
-        return Err(ApiError::InvalidProjectData { source: None,
+        return Err(ApiError::InvalidProjectData {
             details: format!("Project name too long: {} characters (max 255)", name.len()),
             source: None,
         });
@@ -368,7 +368,7 @@ async fn create_project(
         components: Vec::new(),
     };
 
-    let mut store = projects.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -382,7 +382,7 @@ async fn create_project(
 
 #[tauri::command]
 async fn get_projects(projects: State<'_, ProjectStore>) -> Result<Vec<Project>, ApiError> {
-    let store = projects.read().map_err(|_| ApiError::StateLockError { source: None,
+    let store = projects.read().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -397,7 +397,7 @@ async fn get_project(
     project_id: String,
     projects: State<'_, ProjectStore>,
 ) -> Result<Option<Project>, ApiError> {
-    let store = projects.read().map_err(|_| ApiError::StateLockError { source: None,
+    let store = projects.read().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -419,7 +419,7 @@ async fn update_project(
     status: Option<ProjectStatus>,
     projects: State<'_, ProjectStore>,
 ) -> Result<Option<Project>, ApiError> {
-    let mut store = projects.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -427,13 +427,13 @@ async fn update_project(
     if let Some(project) = store.get_mut(&project_id) {
         if let Some(new_name) = name {
             if new_name.trim().is_empty() {
-                return Err(ApiError::InvalidProjectData { source: None,
+                return Err(ApiError::InvalidProjectData {
                     details: "Project name cannot be empty".to_string(),
                     source: None,
                 });
             }
             if new_name.len() > 255 {
-                return Err(ApiError::InvalidProjectData { source: None,
+                return Err(ApiError::InvalidProjectData {
                     details: format!("Project name too long: {} characters (max 255)", new_name.len()),
                     source: None,
                 });
@@ -461,7 +461,7 @@ async fn delete_project(
     project_id: String,
     projects: State<'_, ProjectStore>,
 ) -> Result<bool, ApiError> {
-    let mut store = projects.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -489,20 +489,20 @@ async fn add_component(
 ) -> Result<Option<Component>, ApiError> {
     // Validate component data
     if name.trim().is_empty() {
-        return Err(ApiError::InvalidComponentData { source: None,
+        return Err(ApiError::InvalidComponentData {
             details: "Component name cannot be empty".to_string(),
             source: None,
         });
     }
     
     if name.len() > 255 {
-        return Err(ApiError::InvalidComponentData { source: None,
+        return Err(ApiError::InvalidComponentData {
             details: format!("Component name too long: {} characters (max 255)", name.len()),
             source: None,
         });
     }
 
-    let mut store = projects.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -539,7 +539,7 @@ async fn update_component(
     dependencies: Option<Vec<String>>,
     projects: State<'_, ProjectStore>,
 ) -> Result<Option<Component>, ApiError> {
-    let mut store = projects.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -548,13 +548,13 @@ async fn update_component(
         if let Some(component) = project.components.iter_mut().find(|c| c.id == component_id) {
             if let Some(new_name) = name {
                 if new_name.trim().is_empty() {
-                    return Err(ApiError::InvalidComponentData { source: None,
+                    return Err(ApiError::InvalidComponentData {
                         details: "Component name cannot be empty".to_string(),
                         source: None,
                     });
                 }
                 if new_name.len() > 255 {
-                    return Err(ApiError::InvalidComponentData { source: None,
+                    return Err(ApiError::InvalidComponentData {
                         details: format!("Component name too long: {} characters (max 255)", new_name.len()),
                         source: None,
                     });
@@ -590,7 +590,7 @@ async fn remove_component(
     component_id: String,
     projects: State<'_, ProjectStore>,
 ) -> Result<bool, ApiError> {
-    let mut store = projects.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -621,7 +621,7 @@ async fn save_diagram(
     elements: Vec<DiagramElement>,
     diagrams: State<'_, DiagramStore>,
 ) -> Result<(), ApiError> {
-    let mut store = diagrams.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = diagrams.write().map_err(|_| ApiError::StateLockError {
         resource: "DiagramStore".to_string(),
         source: None,
     })?;
@@ -636,7 +636,7 @@ async fn load_diagram(
     project_id: String,
     diagrams: State<'_, DiagramStore>,
 ) -> Result<Vec<DiagramElement>, ApiError> {
-    let store = diagrams.read().map_err(|_| ApiError::StateLockError { source: None,
+    let store = diagrams.read().map_err(|_| ApiError::StateLockError {
         resource: "DiagramStore".to_string(),
         source: None,
     })?;
@@ -652,7 +652,7 @@ async fn save_connections(
     connections: Vec<Connection>,
     connection_store: State<'_, ConnectionStore>,
 ) -> Result<(), ApiError> {
-    let mut store = connection_store.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = connection_store.write().map_err(|_| ApiError::StateLockError {
         resource: "ConnectionStore".to_string(),
         source: None,
     })?;
@@ -667,7 +667,7 @@ async fn load_connections(
     project_id: String,
     connection_store: State<'_, ConnectionStore>,
 ) -> Result<Vec<Connection>, ApiError> {
-    let store = connection_store.read().map_err(|_| ApiError::StateLockError { source: None,
+    let store = connection_store.read().map_err(|_| ApiError::StateLockError {
         resource: "ConnectionStore".to_string(),
         source: None,
     })?;
@@ -790,46 +790,46 @@ async fn save_audio_file(file_name: String, data: Vec<u8>, base_dir: Option<Stri
     
     // Create a temporary file in the same directory as the target
     let mut temp_file = NamedTempFile::new_in(&audio_dir)
-        .map_err(|e| ApiError::FileSystemError { source: None,
+        .map_err(|e| ApiError::FileSystemError {
             operation: OperationNames::FILE_WRITE.to_string(),
             details: format!("Failed to create temporary file: {}", e),
-            source: None,
-    })?;
+            source: Some(Box::new(e)),
+        })?;
     
     // Write the audio data to the temporary file
     temp_file.write_all(&data)
-        .map_err(|e| ApiError::FileSystemError { source: None,
+        .map_err(|e| ApiError::FileSystemError {
             operation: OperationNames::FILE_WRITE.to_string(),
             details: format!("Failed to write audio data to file: {}", e),
-            source: None,
-    })?;
+            source: Some(Box::new(e)),
+        })?;
     
     // Ensure all data is written to disk
     temp_file.flush()
-        .map_err(|e| ApiError::FileSystemError { source: None,
+        .map_err(|e| ApiError::FileSystemError {
             operation: OperationNames::FILE_WRITE.to_string(),
             details: format!("Failed to flush file data to disk: {}", e),
-            source: None,
-    })?;
+            source: Some(Box::new(e)),
+        })?;
     
     // Atomically move the temporary file to the final location
     temp_file.persist(&final_file_path)
-        .map_err(|e| ApiError::FileSystemError { source: None,
+        .map_err(|e| ApiError::FileSystemError {
             operation: OperationNames::FILE_PERSIST.to_string(),
             details: format!("Failed to persist temporary file to final location: {}", e),
-            source: None,
-    })?;
+            source: Some(Box::new(e)),
+        })?;
     
     // Set file permissions to owner-only (0o600) on Unix systems for security
     #[cfg(unix)]
     {
         use std::fs::Permissions;
         fs::set_permissions(&final_file_path, Permissions::from_mode(0o600))
-            .map_err(|e| ApiError::FileSystemError { source: None,
+            .map_err(|e| ApiError::FileSystemError {
                 operation: OperationNames::FILE_PERSIST.to_string(),
                 details: format!("Failed to set secure file permissions: {}", e),
-                source: None,
-    })?;
+                source: Some(Box::new(e)),
+            })?;
     }
     
     // Canonicalize the path to get the absolute, resolved path with fallback
@@ -840,7 +840,7 @@ async fn save_audio_file(file_name: String, data: Vec<u8>, base_dir: Option<Stri
                 final_file_path.clone()
             } else {
                 env::current_dir()
-                    .map_err(|e| ApiError::FileSystemError { source: None,
+                    .map_err(|e| ApiError::FileSystemError {
                         operation: OperationNames::PATH_CANONICALIZE.to_string(),
                         details: format!("Cannot determine current directory: {}", e),
                         source: Some(Box::new(e)),
@@ -853,11 +853,11 @@ async fn save_audio_file(file_name: String, data: Vec<u8>, base_dir: Option<Stri
     
     // Convert to string, ensuring it's valid UTF-8
     let path_str = canonical_path.to_str()
-        .ok_or_else(|| ApiError::Internal { source: None,
+        .ok_or_else(|| ApiError::Internal {
             details: format!("Path contains invalid UTF-8 sequences: '{}'", 
                            canonical_path.to_string_lossy()),
             source: None,
-    })?;
+        })?;
     
     log::info!("Audio file saved successfully: {}", path_str);
     Ok(path_str.to_string())
@@ -884,11 +884,11 @@ async fn show_in_folder(path: String) -> Result<(), ApiError> {
         std::process::Command::new("explorer")
             .args(["/select,", &path])
             .spawn()
-            .map_err(|e| ApiError::ProcessError { source: None,
+            .map_err(|e| ApiError::ProcessError {
                 command: "explorer".to_string(),
                 details: format!("Failed to open file explorer: {}", e),
-                source: None,
-    })?;
+                source: Some(Box::new(e)),
+            })?;
     }
 
     #[cfg(target_os = "macos")]
@@ -896,11 +896,11 @@ async fn show_in_folder(path: String) -> Result<(), ApiError> {
         std::process::Command::new("open")
             .args(["-R", &path])
             .spawn()
-            .map_err(|e| ApiError::ProcessError { source: None,
+            .map_err(|e| ApiError::ProcessError {
                 command: "open".to_string(),
                 details: format!("Failed to open Finder: {}", e),
-                source: None,
-    })?;
+                source: Some(Box::new(e)),
+            })?;
     }
 
     #[cfg(target_os = "linux")]
@@ -908,11 +908,11 @@ async fn show_in_folder(path: String) -> Result<(), ApiError> {
         std::process::Command::new("xdg-open")
             .arg(path_buf.parent().unwrap_or_else(|| std::path::Path::new("/")))
             .spawn()
-            .map_err(|e| ApiError::ProcessError { source: None,
+            .map_err(|e| ApiError::ProcessError {
                 command: "xdg-open".to_string(),
                 details: format!("Failed to open file manager: {}", e),
-                source: None,
-    })?;
+                source: Some(Box::new(e)),
+            })?;
     }
 
     log::info!("Successfully opened folder for path: {}", path);
@@ -926,15 +926,15 @@ async fn export_project_data(
     diagrams: State<'_, DiagramStore>,
     connections: State<'_, ConnectionStore>,
 ) -> Result<String, ApiError> {
-    let project_store = projects.read().map_err(|_| ApiError::StateLockError { source: None,
+    let project_store = projects.read().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
-    let diagram_store = diagrams.read().map_err(|_| ApiError::StateLockError { source: None,
+    let diagram_store = diagrams.read().map_err(|_| ApiError::StateLockError {
         resource: "DiagramStore".to_string(),
         source: None,
     })?;
-    let connection_store = connections.read().map_err(|_| ApiError::StateLockError { source: None,
+    let connection_store = connections.read().map_err(|_| ApiError::StateLockError {
         resource: "ConnectionStore".to_string(),
         source: None,
     })?;
@@ -952,11 +952,11 @@ async fn export_project_data(
     });
 
     let json_string = serde_json::to_string_pretty(&export_data)
-        .map_err(|e| ApiError::SerializationError { source: None,
+        .map_err(|e| ApiError::SerializationError {
             operation: "export project data".to_string(),
             details: e.to_string(),
-            source: None,
-    })?;
+            source: Some(Box::new(e)),
+        })?;
 
     log::info!("Project data exported successfully: {}", project_id);
     Ok(json_string)
@@ -968,7 +968,7 @@ async fn populate_sample_data(
     projects: State<'_, ProjectStore>,
 ) -> Result<Vec<Project>, ApiError> {
     let sample_projects = dev_utils::create_sample_projects();
-    let mut store = projects.write().map_err(|_| ApiError::StateLockError { source: None,
+    let mut store = projects.write().map_err(|_| ApiError::StateLockError {
         resource: "ProjectStore".to_string(),
         source: None,
     })?;
@@ -1318,18 +1318,21 @@ mod tests {
     #[test]
     fn test_api_error_display() {
         let error = ApiError::ProjectNotFound { 
-            project_id: "test_id".to_string() 
+            project_id: "test_id".to_string(),
+            source: None,
         };
         assert_eq!(error.to_string(), "Project not found: test_id");
         
         let error = ApiError::ComponentNotFound { 
             component_id: "comp_id".to_string(),
-            project_id: "proj_id".to_string()
+            project_id: "proj_id".to_string(),
+            source: None,
         };
         assert_eq!(error.to_string(), "Component not found: comp_id in project proj_id");
         
         let error = ApiError::InvalidProjectData { 
-            details: "Name too long".to_string() 
+            details: "Name too long".to_string(),
+            source: None,
         };
         assert_eq!(error.to_string(), "Invalid project data: Name too long");
     }
@@ -1342,7 +1345,7 @@ mod tests {
         let io_error = std::io::Error::new(ErrorKind::PermissionDenied, "access denied");
         let api_error: ApiError = io_error.into();
         match api_error {
-            ApiError::FileSystemError { operation, details } => {
+            ApiError::FileSystemError { operation, details, .. } => {
                 assert_eq!(operation, OperationNames::FILE_SYSTEM);
                 assert!(details.contains("A file system operation failed"));
                 assert!(details.contains("access denied"));
@@ -1354,16 +1357,17 @@ mod tests {
         let json_error = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
         let api_error: ApiError = json_error.into();
         match api_error {
-            ApiError::SerializationError { operation, details } => {
+            ApiError::SerializationError { operation, details, .. } => {
                 assert_eq!(operation, OperationNames::SERIALIZATION);
-                assert_eq!(details, "Data serialization or deserialization failed. The data format may be invalid.");
+                assert!(details.starts_with("Data serialization or deserialization failed:"));
             }
             _ => panic!("Expected SerializationError variant"),
         }
         
         // Test From<ApiError> for String
         let api_error = ApiError::Internal { 
-            details: "test error".to_string() 
+            details: "test error".to_string(),
+            source: None,
         };
         let error_string: String = api_error.into();
         assert_eq!(error_string, "Internal error: test error");

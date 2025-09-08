@@ -47,7 +47,7 @@ const useLightweightCanvas = () => {
       const { PerformanceMonitor, MemoryOptimizer, OptimizedEventSystem } = await import('../lib/performance/PerformanceOptimizer');
       setPerformanceMonitor(PerformanceMonitor.getInstance());
       setMemoryOptimizer(MemoryOptimizer);
-      setOptimizedEventSystem(new OptimizedEventSystem());
+      setOptimizedEventSystem(OptimizedEventSystem.getInstance());
       setIsFullyInitialized(true);
     }
   }, [performanceMonitor]);

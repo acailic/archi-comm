@@ -394,21 +394,35 @@ export const useOptimizedCallback = <T extends (...args: any[]) => any>(
 ): T => {
   const memoizedCallback = useCallback(callback, deps);
   
-  // Wrap with performance monitoring
+  // Wrap with performance monitoring (with fallback)
   return useCallback((...args: Parameters<T>) => {
-    const monitor = PerformanceMonitor.getInstance();
-    return monitor.measure('callback-execution', () => {
-      return memoizedCallback(...args);
-    });
+    try {
+      const monitor = PerformanceMonitor.isReady() ? PerformanceMonitor.getInstance() : null;
+      if (monitor && monitor.measure) {
+        return monitor.measure('callback-execution', () => {
+          return memoizedCallback(...args);
+        });
+      }
+    } catch (error) {
+      // Fallback to direct execution if monitoring fails
+    }
+    return memoizedCallback(...args);
   }, [memoizedCallback]) as T;
 };
 
 export const useStableReference = <T>(value: T): T => {
   const ref = useRef<T>(value);
   
-  // Only update if deep equality check fails
-  if (!deepEqual(ref.current, value)) {
-    ref.current = value;
+  // Only update if deep equality check fails (with fallback)
+  try {
+    if (!deepEqual(ref.current, value)) {
+      ref.current = value;
+    }
+  } catch (error) {
+    // Fallback to reference equality if deep check fails
+    if (ref.current !== value) {
+      ref.current = value;
+    }
   }
   
   return ref.current;
@@ -420,8 +434,15 @@ export const useOptimizedMemo = <T>(
   deps: React.DependencyList
 ): T => {
   return useMemo(() => {
-    const monitor = PerformanceMonitor.getInstance();
-    return monitor.measure('memo-computation', factory);
+    try {
+      const monitor = PerformanceMonitor.isReady() ? PerformanceMonitor.getInstance() : null;
+      if (monitor && monitor.measure) {
+        return monitor.measure('memo-computation', factory);
+      }
+    } catch (error) {
+      // Fallback to direct execution if monitoring fails
+    }
+    return factory();
   }, deps);
 };
 
@@ -505,21 +526,29 @@ class MemoryOptimizer {
   }
 }
 
-// Fast deep equality check
+// Fast deep equality check with safety guards
 function deepEqual(a: any, b: any): boolean {
   if (a === b) return true;
+  
+  // Handle null/undefined cases
+  if (a == null || b == null) return a === b;
   
   if (a && b && typeof a === 'object' && typeof b === 'object') {
     if (Array.isArray(a) !== Array.isArray(b)) return false;
     
-    const keys = Object.keys(a);
-    if (keys.length !== Object.keys(b).length) return false;
-    
-    for (const key of keys) {
-      if (!deepEqual(a[key], b[key])) return false;
+    try {
+      const keys = Object.keys(a);
+      if (keys.length !== Object.keys(b).length) return false;
+      
+      for (const key of keys) {
+        if (!(key in b) || !deepEqual(a[key], b[key])) return false;
+      }
+      
+      return true;
+    } catch (error) {
+      // Fallback to reference equality if deep check fails
+      return false;
     }
-    
-    return true;
   }
   
   return false;

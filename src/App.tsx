@@ -179,7 +179,7 @@ export default function App() {
   }, [trackPerformance, trackError, workflowOptimizer, shortcutLearning]);
 
   // Performance optimization: prevent unnecessary re-renders of availableChallenges
-  const memoizedChallenges = useMemo(() => availableChallenges, [availableChallenges.length]);
+  const memoizedChallenges = useMemo(() => availableChallenges, [availableChallenges]);
 
   const isFirstVisit = checkFirstVisit();
   const [currentScreen, setCurrentScreen] = useState<Screen>(isFirstVisit ? 'welcome' : 'challenge-selection');
