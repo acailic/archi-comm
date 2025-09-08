@@ -171,6 +171,11 @@ export default function App() {
       console.error('Failed to initialize UX systems:', error);
       trackError(error as Error, { context: 'ux-system-init' });
     }
+    
+    return () => {
+      // Cleanup global tracking function
+      delete (window as any).trackWorkflowAction;
+    };
   }, [trackPerformance, trackError, workflowOptimizer, shortcutLearning]);
 
   // Performance optimization: prevent unnecessary re-renders of availableChallenges
@@ -243,7 +248,11 @@ export default function App() {
       }
     };
 
-    setTimeout(loadExternalChallenges, 1000);
+    const timeoutId = setTimeout(loadExternalChallenges, 1000);
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   // Session progress calculation
@@ -318,7 +327,21 @@ export default function App() {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [sessionDataToSave, autoSave, designData.components.length, audioData.transcript]);
+  }, [sessionDataToSave, autoSave]);
+
+  // Helper function for registering keyboard shortcuts
+  const registerShortcut = useCallback((
+    key: string,
+    modifiers: string[],
+    description: string,
+    category: string,
+    action: () => void
+  ) => {
+    const manager = getGlobalShortcutManager();
+    if (manager) {
+      manager.register({ key, modifiers, description, category, action });
+    }
+  }, []);
 
   // Global keyboard shortcuts integration
   useEffect(() => {
@@ -326,118 +349,58 @@ export default function App() {
     if (!manager) return;
 
     // Register App-specific shortcuts
-    manager.register({
-      key: 'k',
-      modifiers: ['ctrl'],
-      description: 'Open command palette',
-      category: 'general',
-      action: () => {
-        trackKeyboardShortcut('Ctrl+K', 'command-palette', true);
-        window.dispatchEvent(new CustomEvent('shortcut:command-palette'));
-      }
+    registerShortcut('k', ['ctrl'], 'Open command palette', 'general', () => {
+      trackKeyboardShortcut('Ctrl+K', 'command-palette', true);
+      window.dispatchEvent(new CustomEvent('shortcut:command-palette'));
     });
 
-    manager.register({
-      key: 'k',
-      modifiers: ['meta'],
-      description: 'Open command palette',
-      category: 'general', 
-      action: () => {
-        trackKeyboardShortcut('Cmd+K', 'command-palette', true);
-        window.dispatchEvent(new CustomEvent('shortcut:command-palette'));
-      }
+    registerShortcut('k', ['meta'], 'Open command palette', 'general', () => {
+      trackKeyboardShortcut('Cmd+K', 'command-palette', true);
+      window.dispatchEvent(new CustomEvent('shortcut:command-palette'));
     });
 
-    manager.register({
-      key: 'c',
-      modifiers: ['ctrl', 'shift'],
-      description: 'Open challenge manager',
-      category: 'general',
-      action: () => {
-        trackKeyboardShortcut('Ctrl+Shift+C', 'challenge-manager', true);
-        shortcutLearning.trackShortcutUsage('challenge-manager', true, 500, 'navigation');
-        window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
-      }
+    registerShortcut('c', ['ctrl', 'shift'], 'Open challenge manager', 'general', () => {
+      trackKeyboardShortcut('Ctrl+Shift+C', 'challenge-manager', true);
+      shortcutLearning.trackShortcutUsage('challenge-manager', true, 500, 'navigation');
+      window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
     });
 
-    manager.register({
-      key: 'h',
-      modifiers: ['ctrl', 'shift'],
-      description: 'Open shortcut customization',
-      category: 'general',
-      action: () => {
-        trackKeyboardShortcut('Ctrl+Shift+H', 'shortcut-customization', true);
-        shortcutLearning.trackShortcutUsage('shortcut-customization', true, 300, 'settings');
-        setShowShortcutCustomization(true);
-      }
+    registerShortcut('h', ['ctrl', 'shift'], 'Open shortcut customization', 'general', () => {
+      trackKeyboardShortcut('Ctrl+Shift+H', 'shortcut-customization', true);
+      shortcutLearning.trackShortcutUsage('shortcut-customization', true, 300, 'settings');
+      setShowShortcutCustomization(true);
     });
 
-    manager.register({
-      key: 'c',
-      modifiers: ['meta', 'shift'],
-      description: 'Open challenge manager',
-      category: 'general',
-      action: () => {
-        trackKeyboardShortcut('Cmd+Shift+C', 'challenge-manager', true);
-        shortcutLearning.trackShortcutUsage('challenge-manager', true, 500, 'navigation');
-        window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
-      }
+    registerShortcut('c', ['meta', 'shift'], 'Open challenge manager', 'general', () => {
+      trackKeyboardShortcut('Cmd+Shift+C', 'challenge-manager', true);
+      shortcutLearning.trackShortcutUsage('challenge-manager', true, 500, 'navigation');
+      window.dispatchEvent(new CustomEvent('shortcut:challenge-manager'));
     });
 
-    manager.register({
-      key: 'h',
-      modifiers: ['meta', 'shift'],
-      description: 'Open shortcut customization',
-      category: 'general',
-      action: () => {
-        trackKeyboardShortcut('Cmd+Shift+H', 'shortcut-customization', true);
-        shortcutLearning.trackShortcutUsage('shortcut-customization', true, 300, 'settings');
-        setShowShortcutCustomization(true);
-      }
+    registerShortcut('h', ['meta', 'shift'], 'Open shortcut customization', 'general', () => {
+      trackKeyboardShortcut('Cmd+Shift+H', 'shortcut-customization', true);
+      shortcutLearning.trackShortcutUsage('shortcut-customization', true, 300, 'settings');
+      setShowShortcutCustomization(true);
     });
 
-    manager.register({
-      key: '1',
-      modifiers: ['alt'],
-      description: 'Navigate to challenge selection',
-      category: 'navigation',
-      action: () => {
-        trackKeyboardShortcut('Alt+1', 'navigate-challenge-selection', true);
-        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'challenge-selection' } }));
-      }
+    registerShortcut('1', ['alt'], 'Navigate to challenge selection', 'navigation', () => {
+      trackKeyboardShortcut('Alt+1', 'navigate-challenge-selection', true);
+      window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'challenge-selection' } }));
     });
 
-    manager.register({
-      key: '2',
-      modifiers: ['alt'],
-      description: 'Navigate to design canvas',
-      category: 'navigation',
-      action: () => {
-        trackKeyboardShortcut('Alt+2', 'navigate-design-canvas', true);
-        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'design-canvas' } }));
-      }
+    registerShortcut('2', ['alt'], 'Navigate to design canvas', 'navigation', () => {
+      trackKeyboardShortcut('Alt+2', 'navigate-design-canvas', true);
+      window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'design-canvas' } }));
     });
 
-    manager.register({
-      key: '3',
-      modifiers: ['alt'],
-      description: 'Navigate to audio recording',
-      category: 'navigation',
-      action: () => {
-        trackKeyboardShortcut('Alt+3', 'navigate-audio-recording', true);
-        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'audio-recording' } }));
-      }
+    registerShortcut('3', ['alt'], 'Navigate to audio recording', 'navigation', () => {
+      trackKeyboardShortcut('Alt+3', 'navigate-audio-recording', true);
+      window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'audio-recording' } }));
     });
 
-    manager.register({
-      key: '4',
-      modifiers: ['alt'],
-      description: 'Navigate to review',
-      category: 'navigation',
-      action: () => {
-        trackKeyboardShortcut('Alt+4', 'navigate-review', true);
-        window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'review' } }));
-      }
+    registerShortcut('4', ['alt'], 'Navigate to review', 'navigation', () => {
+      trackKeyboardShortcut('Alt+4', 'navigate-review', true);
+      window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'review' } }));
     });
 
     // Event listeners for shortcut actions
@@ -516,7 +479,7 @@ export default function App() {
       window.removeEventListener('shortcut:navigate-to-screen', handleNavigateToScreen);
       window.removeEventListener('shortcut:ai-settings', handleAISettings);
     };
-  }, [selectedChallenge, trackKeyboardShortcut, trackNavigation, currentScreen, workflowOptimizer, shortcutLearning]);
+  }, [selectedChallenge, currentScreen, trackKeyboardShortcut, trackNavigation, workflowOptimizer, shortcutLearning, registerShortcut]);
 
   // Memoized window title
   const windowTitle = useMemo(() => {

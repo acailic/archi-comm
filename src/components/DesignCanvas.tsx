@@ -1,26 +1,62 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo, Suspense } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toPng } from 'html-to-image';
 import { useKeyboardShortcuts } from '../lib/shortcuts/KeyboardShortcuts';
 import { Button } from './ui/button';
-import { CanvasArea } from './CanvasArea';
-import { SolutionHints } from './SolutionHints';
 import { Challenge, DesignComponent, Connection, DesignData } from '../App';
 import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
-import { ArrowLeft, Save, Download, Image, Lightbulb, Zap } from 'lucide-react';
+import { ArrowLeft, Save, Download, Image, Lightbulb, Zap, Component } from 'lucide-react';
 import { SmartTooltip } from './ui/SmartTooltip';
 import { useUXTracker } from '../hooks/useUXTracker';
 import { useOnboarding } from '../lib/onboarding/OnboardingManager';
 import { WorkflowOptimizer } from '../lib/user-experience/WorkflowOptimizer';
 import { ShortcutLearningSystem } from '../lib/shortcuts/ShortcutLearningSystem';
 import { 
-  PerformanceMonitor, 
-  MemoryOptimizer, 
   useOptimizedCallback, 
   useStableReference, 
   useOptimizedMemo 
 } from '../lib/performance/PerformanceOptimizer';
+
+// Lazy load heavy components
+const LazyCanvasArea = React.lazy(() => import('./CanvasArea').then(module => ({ default: module.CanvasArea })));
+const LazySolutionHints = React.lazy(() => import('./SolutionHints').then(module => ({ default: module.SolutionHints })));
+
+// Loading components
+const CanvasLoadingState = () => (
+  <div className="w-full h-full flex items-center justify-center bg-muted/5">
+    <div className="flex flex-col items-center gap-4 p-8">
+      <div className="grid grid-cols-3 gap-2 opacity-30">
+        {[...Array(9)].map((_, i) => (
+          <div key={i} className={`w-16 h-12 bg-gradient-to-br from-muted to-muted/60 rounded-lg animate-pulse`} style={{animationDelay: `${i * 100}ms`}} />
+        ))}
+      </div>
+      <div className="text-sm text-muted-foreground animate-pulse">Preparing canvas...</div>
+    </div>
+  </div>
+);
+
+const HintsLoadingState = () => (
+  <div className="h-full bg-card/50 backdrop-blur-sm border-l border-border/30 flex flex-col">
+    <div className="p-4 border-b border-border/30">
+      <div className="flex items-center space-x-3">
+        <div className="w-8 h-8 bg-gradient-to-r from-amber-200 to-orange-200 rounded-lg animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-24 h-4 bg-muted rounded animate-pulse" />
+          <div className="w-32 h-3 bg-muted/60 rounded animate-pulse" />
+        </div>
+      </div>
+    </div>
+    <div className="p-4 space-y-3">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="p-3 bg-muted/30 rounded-lg animate-pulse" style={{animationDelay: `${i * 150}ms`}}>
+          <div className="w-3/4 h-4 bg-muted rounded mb-2" />
+          <div className="w-1/2 h-3 bg-muted/60 rounded" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 interface DesignCanvasProps {
   challenge: Challenge;
@@ -30,12 +66,6 @@ interface DesignCanvasProps {
 }
 
 export function DesignCanvas({ challenge, initialData, onComplete, onBack }: DesignCanvasProps) {
-  // Memoized optimized components for performance mode
-    const optimizedComponents = useMemo(() => {
-      return performanceMode ? 
-        components.filter(c => isInViewport(c)) : 
-        components;
-    }, [components, performanceMode]);
   const [components, setComponents] = useState<DesignComponent[]>(initialData.components);
   const [connections, setConnections] = useState<Connection[]>(initialData.connections);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
@@ -45,8 +75,29 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [performanceMode, setPerformanceMode] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const performanceMonitor = useRef(PerformanceMonitor.getInstance());
-  const exportCacheRef = useRef<Map<string, string>>(new Map());
+  const performanceMonitorRef = useRef<any | null>(null);
+  // LRU cache implementation for export caching
+  const exportCacheRef = useRef<{
+    cache: Map<string, { value: string; lastUsed: number }>;
+    maxSize: number;
+  }>({
+    cache: new Map(),
+    maxSize: 10
+  });
+  
+  // Deferred performance monitor initialization
+  const initializePerformanceMonitor = useCallback(() => {
+    if (!performanceMonitorRef.current) {
+      import('../lib/performance/PerformanceOptimizer').then(({ PerformanceMonitor }) => {
+        performanceMonitorRef.current = PerformanceMonitor.getInstance();
+      });
+    }
+  }, []);
+  
+  // Progressive enhancement states
+  const [isCanvasActive, setIsCanvasActive] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [hintsReady, setHintsReady] = useState(false);
   
   // UX Tracking integration
   const { trackCanvasAction, trackKeyboardShortcut, trackPerformance, trackError } = useUXTracker();
@@ -79,39 +130,51 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, [components.length, connections.length]);
 
   const handleComponentDrop = useOptimizedCallback((componentType: DesignComponent['type'], x: number, y: number) => {
-    return performanceMonitor.current.measure('component-drop', () => {
+    if (performanceMode) initializePerformanceMonitor();
+    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    return measureFn('component-drop', () => {
       try {
-        // Use object pooling for component creation
-        const newComponent: DesignComponent = MemoryOptimizer.poolObject('component', () => ({
+        // Create new component (pooling will be added when MemoryOptimizer loads)
+        const newComponent: DesignComponent = {
           id: `${componentType}-${Date.now()}`,
           type: componentType,
           x,
           y,
           label: componentType.charAt(0).toUpperCase() + componentType.slice(1).replace('-', ' ')
-        }));
+        };
 
-        setComponents(prev => [...prev, newComponent]);
-        
-              // Track successful component drop with performance metrics
-        trackCanvasAction('component-drop', {
-          componentType,
-          position: { x, y },
-          totalComponents: components.length + 1,
-          designComplexity: designMetrics.complexity
-        }, true);
-        
-        // Track with workflow optimizer
-        workflowOptimizer.trackAction('component_added', 500, true, 'design-canvas', {
-          componentType,
-          totalComponents: components.length + 1,
-          position: { x, y }
-        });
+        setComponents(prev => {
+          const newComponents = [...prev, newComponent];
+          const totalComponents = newComponents.length;
+          
+          // Track successful component drop with performance metrics
+          trackCanvasAction('component-drop', {
+            componentType,
+            position: { x, y },
+            totalComponents,
+            designComplexity: designMetrics.complexity
+          }, true);
+          
+          // Track with workflow optimizer
+          workflowOptimizer.trackAction('component_added', 500, true, 'design-canvas', {
+            componentType,
+            totalComponents,
+            position: { x, y }
+          });
 
-        // Track performance metrics
-        trackPerformance('component-drop', {
-          componentCount: components.length + 1,
-          renderTime: performanceMonitor.current.getAverageMetric('component-drop')
+          // Track performance metrics
+          trackPerformance('component-drop', {
+            componentCount: totalComponents,
+            renderTime: performanceMonitorRef.current?.getAverageMetric('component-drop') || 0
+          });
+          
+          return newComponents;
         });
+        
+        // Mark canvas as active on first interaction
+        if (!isCanvasActive) {
+          setIsCanvasActive(true);
+        }
 
       } catch (error) {
         trackCanvasAction('component-drop', {
@@ -128,10 +191,11 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         trackError(error instanceof Error ? error : new Error('Component drop failed'));
       }
     });
-  }, [components.length, trackCanvasAction, trackPerformance, trackError, designMetrics.complexity]);
+  }, [performanceMode, initializePerformanceMonitor, trackCanvasAction, trackPerformance, trackError, designMetrics.complexity, isCanvasActive, workflowOptimizer]);
 
   const handleComponentMove = useOptimizedCallback((id: string, x: number, y: number) => {
-    return performanceMonitor.current.measure('component-move', () => {
+    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    return measureFn('component-move', () => {
       const component = components.find(c => c.id === id);
       if (component) {
         const distance = Math.sqrt(Math.pow(x - component.x, 2) + Math.pow(y - component.y, 2));
@@ -155,7 +219,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           trackPerformance('component-move-large', {
             componentCount: components.length,
             distance,
-            renderTime: performanceMonitor.current.getAverageMetric('component-move')
+            renderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0
           });
         }
       }
@@ -180,38 +244,44 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const handleCompleteConnection = useOptimizedCallback((fromId: string, toId: string) => {
     if (fromId === toId) return;
     
-    return performanceMonitor.current.measure('connection-create', () => {
+    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    return measureFn('connection-create', () => {
       try {
         const fromComponent = components.find(c => c.id === fromId);
         const toComponent = components.find(c => c.id === toId);
         
-        // Use object pooling for connection creation
-        const newConnection: Connection = MemoryOptimizer.poolObject('connection', () => ({
+        // Create new connection (pooling will be added when MemoryOptimizer loads)
+        const newConnection: Connection = {
           id: `connection-${Date.now()}`,
           from: fromId,
           to: toId,
           label: 'Connection',
           type: 'data',
           direction: 'end'
-        }));
+        };
 
-        setConnections(prev => [...prev, newConnection]);
-        setConnectionStart(null);
-        
-        // Track successful connection creation with performance metrics
-        trackCanvasAction('connection-create', {
-          fromType: fromComponent?.type || 'unknown',
-          toType: toComponent?.type || 'unknown',
-          connectionType: 'data',
-          totalConnections: connections.length + 1,
-          designComplexity: designMetrics.complexity
-        }, true);
+        setConnections(prev => {
+          const newConnections = [...prev, newConnection];
+          const totalConnections = newConnections.length;
+          
+          // Track successful connection creation with performance metrics
+          trackCanvasAction('connection-create', {
+            fromType: fromComponent?.type || 'unknown',
+            toType: toComponent?.type || 'unknown',
+            connectionType: 'data',
+            totalConnections,
+            designComplexity: designMetrics.complexity
+          }, true);
 
-        // Track performance for connection operations
-        trackPerformance('connection-create', {
-          connectionCount: connections.length + 1,
-          renderTime: performanceMonitor.current.getAverageMetric('connection-create')
+          // Track performance for connection operations
+          trackPerformance('connection-create', {
+            connectionCount: totalConnections,
+            renderTime: performanceMonitorRef.current?.getAverageMetric('connection-create') || 0
+          });
+          
+          return newConnections;
         });
+        setConnectionStart(null);
 
       } catch (error) {
         trackCanvasAction('connection-create', {
@@ -222,7 +292,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         trackError(error instanceof Error ? error : new Error('Connection creation failed'));
       }
     });
-  }, [components, connections.length, trackCanvasAction, trackPerformance, trackError, designMetrics]);
+  }, [components, trackCanvasAction, trackPerformance, trackError, designMetrics]);
 
   const handleComponentLabelChange = useCallback((id: string, label: string) => {
     setComponents(prev => prev.map(comp => 
@@ -253,42 +323,43 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, []);
 
   const handleDeleteComponent = useOptimizedCallback((id: string) => {
-    return performanceMonitor.current.measure('component-delete', () => {
+    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    return measureFn('component-delete', () => {
       const component = components.find(c => c.id === id);
       const affectedConnections = connections.filter(conn => conn.from === id || conn.to === id);
       
-      // Release pooled objects for memory management
-      if (component) {
-        MemoryOptimizer.releaseObject('component', component);
-      }
-      affectedConnections.forEach(conn => {
-        MemoryOptimizer.releaseObject('connection', conn);
-      });
+      // Memory cleanup will be handled by lazy-loaded MemoryOptimizer when available
 
-      setComponents(prev => prev.filter(comp => comp.id !== id));
+      setComponents(prev => {
+        const newComponents = prev.filter(comp => comp.id !== id);
+        const remainingComponents = newComponents.length;
+        
+        // Track component deletion with performance context
+        trackCanvasAction('component-delete', {
+          componentId: id,
+          componentType: component?.type || 'unknown',
+          affectedConnections: affectedConnections.length,
+          remainingComponents,
+          designComplexity: designMetrics.complexity
+        }, true);
+
+        // Track performance for deletion operations
+        trackPerformance('component-delete', {
+          deletedConnections: affectedConnections.length,
+          remainingComponents,
+          renderTime: performanceMonitorRef.current?.getAverageMetric('component-delete') || 0
+        });
+        
+        return newComponents;
+      });
       setConnections(prev => prev.filter(conn => conn.from !== id && conn.to !== id));
       setSelectedComponent(null);
-      
-      // Track component deletion with performance context
-      trackCanvasAction('component-delete', {
-        componentId: id,
-        componentType: component?.type || 'unknown',
-        affectedConnections: affectedConnections.length,
-        remainingComponents: components.length - 1,
-        designComplexity: designMetrics.complexity
-      }, true);
-
-      // Track performance for deletion operations
-      trackPerformance('component-delete', {
-        deletedConnections: affectedConnections.length,
-        remainingComponents: components.length - 1,
-        renderTime: performanceMonitor.current.getAverageMetric('component-delete')
-      });
     });
-  }, [components, connections, trackCanvasAction, trackPerformance, designMetrics.complexity]);
+  }, [components, connections, trackCanvasAction, trackPerformance, designMetrics]);
 
   const handleSave = useOptimizedCallback(() => {
-    return performanceMonitor.current.measureAsync('save-design', async () => {
+    const measureFn = performanceMonitorRef.current?.measureAsync || ((name: string, fn: () => any) => fn());
+    return measureFn('save-design', async () => {
       try {
         const designData = { 
           components, 
@@ -300,8 +371,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               componentCount: components.length,
               connectionCount: connections.length,
               complexity: designMetrics.complexity,
-              avgRenderTime: performanceMonitor.current.getAverageMetric('component-move'),
-              fps: performanceMonitor.current.getCurrentFPS()
+              avgRenderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0,
+              fps: performanceMonitorRef.current?.getCurrentFPS() || 60
             }
           }
         };
@@ -344,7 +415,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       const link = document.createElement('a');
       link.href = url;
       link.download = `${challenge.id}-design.json`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
       // Track successful export
@@ -365,19 +438,26 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const handleExportImage = useOptimizedCallback(async () => {
     if (!canvasRef.current) return;
     
-    return performanceMonitor.current.measureAsync('export-image', async () => {
+    const measureFn = performanceMonitorRef.current?.measureAsync || ((name: string, fn: () => any) => fn());
+    return measureFn('export-image', async () => {
       const startTime = Date.now();
       setIsExporting(true);
       
       try {
-        // Check cache for repeated exports
+        // Check cache for repeated exports with LRU access tracking
         const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
-        if (exportCacheRef.current.has(cacheKey)) {
-          const cachedDataUrl = exportCacheRef.current.get(cacheKey)!;
+        const cacheEntry = exportCacheRef.current.cache.get(cacheKey);
+        if (cacheEntry) {
+          // Update last used timestamp for LRU
+          cacheEntry.lastUsed = Date.now();
+          exportCacheRef.current.cache.set(cacheKey, cacheEntry);
+          
           const link = document.createElement('a');
-          link.href = cachedDataUrl;
+          link.href = cacheEntry.value;
           link.download = `${challenge.id}-design.png`;
+          document.body.appendChild(link);
           link.click();
+          document.body.removeChild(link);
           
           trackCanvasAction('export-image-cached', {
             format: 'png',
@@ -406,14 +486,37 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         // Capture the canvas as PNG with optimized settings
         const dataUrl = await toPng(canvasRef.current, exportOptions);
         
-        // Cache the result for repeated exports
-        exportCacheRef.current.set(cacheKey, dataUrl);
+        // Cache the result with LRU eviction strategy
+        const cache = exportCacheRef.current.cache;
+        const maxSize = exportCacheRef.current.maxSize;
+        
+        // If cache is at capacity, remove least recently used entry
+        if (cache.size >= maxSize) {
+          let lruKey: string | undefined;
+          let oldestTime = Date.now();
+          
+          for (const [key, entry] of cache.entries()) {
+            if (entry.lastUsed < oldestTime) {
+              oldestTime = entry.lastUsed;
+              lruKey = key;
+            }
+          }
+          
+          if (lruKey) {
+            cache.delete(lruKey);
+          }
+        }
+        
+        // Add new entry with current timestamp
+        cache.set(cacheKey, { value: dataUrl, lastUsed: Date.now() });
         
         // Create download link
         const link = document.createElement('a');
         link.href = dataUrl;
         link.download = `${challenge.id}-design.png`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
         
         // Track successful image export with performance metrics
         trackCanvasAction('export-image', {
@@ -455,7 +558,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, [challenge.id, components.length, connections.length, trackCanvasAction, trackPerformance, trackError, designMetrics]);
 
   const handleContinue = useOptimizedCallback(() => {
-    return performanceMonitor.current.measure('design-complete', () => {
+    const measureFn = performanceMonitorRef.current?.measure || ((name: string, fn: () => any) => fn());
+    return measureFn('design-complete', () => {
       const designData: DesignData = {
         components,
         connections,
@@ -467,11 +571,11 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             componentCount: components.length,
             connectionCount: connections.length,
             complexity: designMetrics.complexity,
-            avgRenderTime: performanceMonitor.current.getAverageMetric('component-move'),
-            fps: performanceMonitor.current.getCurrentFPS(),
-            totalInteractions: performanceMonitor.current.getMetrics('component-drop').length +
-                             performanceMonitor.current.getMetrics('component-move').length +
-                             performanceMonitor.current.getMetrics('connection-create').length
+            avgRenderTime: performanceMonitorRef.current?.getAverageMetric('component-move') || 0,
+            fps: performanceMonitorRef.current?.getCurrentFPS() || 60,
+            totalInteractions: (performanceMonitorRef.current?.getMetrics('component-drop')?.length || 0) +
+                             (performanceMonitorRef.current?.getMetrics('component-move')?.length || 0) +
+                             (performanceMonitorRef.current?.getMetrics('connection-create')?.length || 0)
           }
         }
       };
@@ -505,207 +609,34 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
     // Cleanup export cache when design changes significantly
     const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
-    const currentCacheKeys = Array.from(exportCacheRef.current.keys());
+    const currentCacheKeys = Array.from(exportCacheRef.current.cache.keys());
     currentCacheKeys.forEach(key => {
       if (key !== cacheKey) {
-        exportCacheRef.current.delete(key);
+        exportCacheRef.current.cache.delete(key);
       }
     });
 
     return () => {
       // Cleanup performance monitoring on unmount
-      if (exportCacheRef.current.size > 10) {
-        exportCacheRef.current.clear();
+      if (exportCacheRef.current.cache.size > exportCacheRef.current.maxSize) {
+        exportCacheRef.current.cache.clear();
       }
     };
   }, [designMetrics, performanceMode, challenge.id, components.length, connections.length, trackPerformance]);
 
-  // Register contextual help content
+  // Progressive canvas initialization
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).contextualHelpSystem) {
-      const helpSystem = (window as any).contextualHelpSystem;
-      
-      // Register help content for key UI elements
-      helpSystem.registerHelpContent('design-canvas-back', {
-        id: 'canvas-back-help',
-        content: 'Return to challenge selection to pick a different challenge',
-        type: 'tooltip',
-        priority: 1,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-save', {
-        id: 'canvas-save-help',
-        content: 'Save your current design progress. Auto-saves every few seconds.',
-        type: 'tooltip',
-        priority: 2,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-hints', {
-        id: 'canvas-hints-help',
-        content: 'Toggle solution hints to get guidance on architectural patterns and best practices',
-        type: 'tooltip',
-        priority: 3,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-performance', {
-        id: 'canvas-performance-help',
-        content: 'Enable performance mode for better experience with large designs (50+ components)',
-        type: 'tooltip',
-        priority: 2,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-export', {
-        id: 'canvas-export-help',
-        content: 'Export your design as JSON or PNG. Perfect for sharing or documentation.',
-        type: 'panel',
-        priority: 2,
-        placement: 'bottom'
-      });
+    if (isCanvasActive) {
+      setCanvasReady(true);
     }
-    
-    // Register onboarding targets
-    if (typeof window !== 'undefined') {
-      // Add data attributes for onboarding system
-      const canvasElement = document.querySelector('[data-testid="design-canvas"]');
-      if (canvasElement) {
-        canvasElement.setAttribute('data-onboarding-target', 'canvas-overview');
-      }
-      
-      const toolbarElement = document.querySelector('[data-testid="canvas-toolbar"]');
-      if (toolbarElement) {
-        toolbarElement.setAttribute('data-onboarding-target', 'toolbar-features');
-      }
-    }
-  }, []);
+  }, [isCanvasActive]);
   
-  // Keyboard shortcuts integration with performance monitoring
+  // Initialize hints when requested
   useEffect(() => {
-    const handleSaveProject = () => {
-      performanceMonitor.current.measure('keyboard-save', () => {
-        trackKeyboardShortcut('Ctrl+S', 'save-project', true);
-        shortcutLearning.trackShortcutUsage('save-project', true, 300, 'design-canvas');
-        handleSave();
-      });
-    };
-
-    const handleDeleteSelected = () => {
-      performanceMonitor.current.measure('keyboard-delete', () => {
-        if (selectedComponent) {
-          trackKeyboardShortcut('Delete', 'delete-component', true);
-          shortcutLearning.trackShortcutUsage('delete-component', true, 200, 'design-canvas');
-          handleDeleteComponent(selectedComponent);
-        } else {
-          trackKeyboardShortcut('Delete', 'delete-component', false);
-          shortcutLearning.trackManualAction('delete_attempt_no_selection', 100, 'design-canvas');
-        }
-      });
-    };
-
-    const handleAddComponent = () => {
-      // Focus on component palette or show component picker
-      trackKeyboardShortcut('Ctrl+N', 'add-component', true);
-      shortcutLearning.trackShortcutUsage('add-component', true, 150, 'design-canvas');
-      workflowOptimizer.trackAction('add_component_shortcut', 150, true, 'design-canvas');
-      console.log('Add component shortcut triggered');
-    };
-
-    const handleUndo = () => {
-      // Placeholder for undo functionality
-      trackKeyboardShortcut('Ctrl+Z', 'undo', false);
-      console.log('Undo shortcut triggered - not yet implemented');
-    };
-
-    const handleRedo = () => {
-      // Placeholder for redo functionality
-      trackKeyboardShortcut('Ctrl+Y', 'redo', false);
-      console.log('Redo shortcut triggered - not yet implemented');
-    };
-
-    const handleNewProject = () => {
-      performanceMonitor.current.measure('keyboard-new-project', () => {
-        // Release all pooled objects before clearing
-        components.forEach(comp => MemoryOptimizer.releaseObject('component', comp));
-        connections.forEach(conn => MemoryOptimizer.releaseObject('connection', conn));
-        
-        // Reset canvas state
-        trackKeyboardShortcut('Ctrl+Shift+N', 'new-project', true);
-        setComponents([]);
-        setConnections([]);
-        setSelectedComponent(null);
-        setConnectionStart(null);
-        
-        // Clear export cache
-        exportCacheRef.current.clear();
-        
-        trackPerformance('new-project', {
-          clearedComponents: components.length,
-          clearedConnections: connections.length
-        });
-      });
-    };
-
-    // Comment-related event handlers
-    const handleAddComment = () => {
-      trackKeyboardShortcut('C', 'add-comment', true);
-      setCommentMode('comment');
-    };
-
-    const handleAddNote = () => {
-      trackKeyboardShortcut('N', 'add-note', true);
-      setCommentMode('note');
-    };
-
-    const handleAddLabel = () => {
-      trackKeyboardShortcut('L', 'add-label', true);
-      setCommentMode('label');
-    };
-
-    const handleAddArrow = () => {
-      trackKeyboardShortcut('A', 'add-arrow', true);
-      setCommentMode('arrow');
-    };
-
-    const handleAddHighlight = () => {
-      trackKeyboardShortcut('H', 'add-highlight', true);
-      setCommentMode('highlight');
-    };
-
-    // Add event listeners for canvas-specific shortcuts
-    window.addEventListener('shortcut:save-project', handleSaveProject);
-    window.addEventListener('shortcut:delete-selected', handleDeleteSelected);
-    window.addEventListener('shortcut:add-component', handleAddComponent);
-    window.addEventListener('shortcut:undo', handleUndo);
-    window.addEventListener('shortcut:redo', handleRedo);
-    window.addEventListener('shortcut:new-project', handleNewProject);
-    
-    // Add event listeners for comment-related shortcuts
-    window.addEventListener('shortcut:add-comment', handleAddComment);
-    window.addEventListener('shortcut:add-note', handleAddNote);
-    window.addEventListener('shortcut:add-label', handleAddLabel);
-    window.addEventListener('shortcut:add-arrow', handleAddArrow);
-    window.addEventListener('shortcut:add-highlight', handleAddHighlight);
-
-    return () => {
-      // Cleanup event listeners
-      window.removeEventListener('shortcut:save-project', handleSaveProject);
-      window.removeEventListener('shortcut:delete-selected', handleDeleteSelected);
-      window.removeEventListener('shortcut:add-component', handleAddComponent);
-      window.removeEventListener('shortcut:undo', handleUndo);
-      window.removeEventListener('shortcut:redo', handleRedo);
-      window.removeEventListener('shortcut:new-project', handleNewProject);
-      
-      // Cleanup comment-related event listeners
-      window.removeEventListener('shortcut:add-comment', handleAddComment);
-      window.removeEventListener('shortcut:add-note', handleAddNote);
-      window.removeEventListener('shortcut:add-label', handleAddLabel);
-      window.removeEventListener('shortcut:add-arrow', handleAddArrow);
-      window.removeEventListener('shortcut:add-highlight', handleAddHighlight);
-    };
-  }, [selectedComponent, handleSave, handleDeleteComponent, setComponents, setConnections, setSelectedComponent, setConnectionStart, trackKeyboardShortcut]);
+    if (showHints && !hintsReady) {
+      setHintsReady(true);
+    }
+  }, [showHints, hintsReady]);
 
   // Initialize keyboard shortcuts hook
   useKeyboardShortcuts([]);
@@ -761,495 +692,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   <Zap className="mr-2 h-4 w-4" />
                   {performanceMode ? 'Performance Mode: ON' : 'Performance Mode: OFF'}
                 </Button>
-                
-                </SmartTooltip>
-                <div id="performance-mode-desc" className="sr-only">
-                {performanceMode 
-                  ? 'Performance optimizations are currently enabled' 
-                  : 'Performance optimizations are disabled'
-                }
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <SmartTooltip 
-                content="View available components"
-                contextualHelp="Drag components from the palette to the canvas to build your design"
-              >
-                <Button variant="ghost" size="sm" onClick={() => setShowHints(!showHints)}>
-                  <Component className="mr-2 h-4 w-4" />
-                  Palette
-                </Button>
-              </SmartTooltip>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Canvas Area */}
-        <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
-          <div className="flex-1" role="region" aria-label="Design canvas">
-            <CanvasArea
-              ref={canvasRef}
-              components={optimizedComponents}
-              connections={stableConnections}
-              connections={connections}
-              selectedComponent={selectedComponent}
-              connectionStart={connectionStart}
-              commentMode={commentMode}
-              isCommentModeActive={!!commentMode}
-              onComponentDrop={handleComponentDrop}
-              onComponentMove={handleComponentMove}
-              onComponentSelect={handleComponentSelect}
-              onConnectionLabelChange={handleConnectionLabelChange}
-              onConnectionDelete={handleConnectionDelete}
-              onConnectionTypeChange={handleConnectionTypeChange}
-              onConnectionDirectionChange={handleConnectionDirectionChange}
-              onStartConnection={handleStartConnection}
-              onCompleteConnection={handleCompleteConnection}
-              data-testid="design-canvas"
-              aria-describedby="challenge-description"
-            />
-          </div>
-          
-          // Changes:
-          // ...
-          const objectPools = useRef<{
-            components: Map<string, DesignComponent>;
-            connections: Map<string, Connection>;
-          } | null>(null);
-          
-          const getObjectPool = useCallback(() => {
-            if (!objectPools.current) {
-              objectPools.current = {
-                components: new Map(),
-                connections: new Map()
-              };
-            }
-            return objectPools.current;
-          }, []);
-          
-          // ...
-        </div>
-
-      </div>
-    </DndProvider>
-  );
-}
-
-const [performanceMode, setPerformanceMode] = useState(false);
-const performanceMonitor = useRef<PerformanceMonitor | null>(null);
-
-// Initialize only when needed
-const initPerformanceMonitor = useCallback(() => {
-  if (!performanceMonitor.current) {
-    performanceMonitor.current = PerformanceMonitor.getInstance();
-  }
-}, []);
-
-// Call this in interaction handlers
-const handleComponentDrop = useOptimizedCallback((...) => {
-  if (performanceMode) initPerformanceMonitor();
-  return performanceMonitor.current.measureAsync('export-image', async () => {
-    const startTime = Date.now();
-    setIsExporting(true);
-    
-    try {
-      // Check cache for repeated exports
-      const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
-      if (exportCacheRef.current.has(cacheKey)) {
-        const cachedDataUrl = exportCacheRef.current.get(cacheKey)!;
-        const link = document.createElement('a');
-        link.href = cachedDataUrl;
-        link.download = `${challenge.id}-design.png`;
-        link.click();
-        
-        trackCanvasAction('export-image-cached', {
-          format: 'png',
-          componentCount: components.length,
-          connectionCount: connections.length,
-          exportTime: Date.now() - startTime,
-          challengeId: challenge.id
-        }, true);
-        return;
-      }
-  
-      // Temporarily hide UI overlays for clean export
-      canvasRef.current.classList.add('export-mode');
-  
-      // Progressive rendering for large designs
-      const exportOptions = designMetrics.isLargeDesign ? {
-        quality: 0.8,
-        pixelRatio: 1.5,
-        backgroundColor: '#ffffff'
-      } : {
-        quality: 1.0,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff'
-      };
-  
-      // Capture the canvas as PNG with optimized settings
-      const dataUrl = await toPng(canvasRef.current, exportOptions);
-  
-      // Cache the result for repeated exports
-      exportCacheRef.current.set(cacheKey, dataUrl);
-  
-      // Create download link
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `${challenge.id}-design.png`;
-      link.click();
-  
-      // Track successful image export with performance metrics
-      trackCanvasAction('export-image', {
-        format: 'png',
-        componentCount: components.length,
-        connectionCount: connections.length,
-        exportTime: Date.now() - startTime,
-        challengeId: challenge.id,
-        designComplexity: designMetrics.complexity,
-        isLargeDesign: designMetrics.isLargeDesign,
-        quality: exportOptions.quality,
-        pixelRatio: exportOptions.pixelRatio
-      }, true);
-  
-      trackPerformance('export-image', {
-        exportTime: Date.now() - startTime,
-        componentCount: components.length,
-        connectionCount: connections.length,
-        imageSize: dataUrl.length,
-        quality: exportOptions.quality
-      });
-      
-    } catch (error) {
-      console.error('Failed to export image:', error);
-      trackCanvasAction('export-image', {
-        format: 'png',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        exportTime: Date.now() - startTime
-      }, false);
-      trackError(error instanceof Error ? error : new Error('Image export failed'));
-    } finally {
-      // Restore UI overlays
-      if (canvasRef.current) {
-        canvasRef.current.classList.remove('export-mode');
-      }
-      setIsExporting(false);
-    }
-  });
-}, [performanceMode, initPerformanceMonitor]);
-  
-  const handleContinue = useOptimizedCallback(() => {
-    return performanceMonitor.current.measure('design-complete', () => {
-      const designData: DesignData = {
-        components,
-        connections,
-        metadata: {
-          created: initialData.metadata.created,
-          lastModified: new Date().toISOString(),
-          version: '1.0',
-          performanceMetrics: {
-            componentCount: components.length,
-            connectionCount: connections.length,
-            complexity: designMetrics.complexity,
-            avgRenderTime: performanceMonitor.current.getAverageMetric('component-move'),
-            fps: performanceMonitor.current.getCurrentFPS(),
-            totalInteractions: performanceMonitor.current.getMetrics('component-drop').length +
-                             performanceMonitor.current.getMetrics('component-move').length +
-                             performanceMonitor.current.getMetrics('connection-create').length
-          }
-        }
-      };
-
-      // Track design completion with comprehensive metrics
-      trackCanvasAction('design-complete', {
-        componentCount: components.length,
-        connectionCount: connections.length,
-        designComplexity: designMetrics.complexity,
-        challengeId: challenge.id,
-        performanceMetrics: designData.metadata.performanceMetrics
-      }, true);
-
-      trackPerformance('design-complete', designData.metadata.performanceMetrics);
-      
-      onComplete(designData);
-    });
-  }, [components, connections, initialData.metadata.created, onComplete, designMetrics, challenge.id, trackCanvasAction, trackPerformance]);
-
-  // Performance monitoring and cleanup
-  useEffect(() => {
-    // Monitor design complexity and provide warnings
-    if (designMetrics.isLargeDesign && !performanceMode) {
-      console.warn('Large design detected. Consider enabling performance mode for better experience.');
-      trackPerformance('large-design-warning', {
-        componentCount: designMetrics.componentCount,
-        connectionCount: designMetrics.connectionCount,
-        complexity: designMetrics.complexity
-      });
-    }
-
-    // Cleanup export cache when design changes significantly
-    const cacheKey = `${challenge.id}-${components.length}-${connections.length}`;
-    const currentCacheKeys = Array.from(exportCacheRef.current.keys());
-    currentCacheKeys.forEach(key => {
-      if (key !== cacheKey) {
-        exportCacheRef.current.delete(key);
-      }
-    });
-
-    return () => {
-      // Cleanup performance monitoring on unmount
-      if (exportCacheRef.current.size > 10) {
-        exportCacheRef.current.clear();
-      }
-    };
-  }, [designMetrics, performanceMode, challenge.id, components.length, connections.length, trackPerformance]);
-
-  // Register contextual help content
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).contextualHelpSystem) {
-      const helpSystem = (window as any).contextualHelpSystem;
-      
-      // Register help content for key UI elements
-      helpSystem.registerHelpContent('design-canvas-back', {
-        id: 'canvas-back-help',
-        content: 'Return to challenge selection to pick a different challenge',
-        type: 'tooltip',
-        priority: 1,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-save', {
-        id: 'canvas-save-help',
-        content: 'Save your current design progress. Auto-saves every few seconds.',
-        type: 'tooltip',
-        priority: 2,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-hints', {
-        id: 'canvas-hints-help',
-        content: 'Toggle solution hints to get guidance on architectural patterns and best practices',
-        type: 'tooltip',
-        priority: 3,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-performance', {
-        id: 'canvas-performance-help',
-        content: 'Enable performance mode for better experience with large designs (50+ components)',
-        type: 'tooltip',
-        priority: 2,
-        placement: 'bottom'
-      });
-      
-      helpSystem.registerHelpContent('design-canvas-export', {
-        id: 'canvas-export-help',
-        content: 'Export your design as JSON or PNG. Perfect for sharing or documentation.',
-        type: 'panel',
-        priority: 2,
-        placement: 'bottom'
-      });
-    }
-    
-    // Register onboarding targets
-    if (typeof window !== 'undefined') {
-      // Add data attributes for onboarding system
-      const canvasElement = document.querySelector('[data-testid="design-canvas"]');
-      if (canvasElement) {
-        canvasElement.setAttribute('data-onboarding-target', 'canvas-overview');
-      }
-      
-      const toolbarElement = document.querySelector('[data-testid="canvas-toolbar"]');
-      if (toolbarElement) {
-        toolbarElement.setAttribute('data-onboarding-target', 'toolbar-features');
-      }
-    }
-  }, []);
-  
-  // Keyboard shortcuts integration with performance monitoring
-  useEffect(() => {
-    const handleSaveProject = () => {
-      performanceMonitor.current.measure('keyboard-save', () => {
-        trackKeyboardShortcut('Ctrl+S', 'save-project', true);
-        shortcutLearning.trackShortcutUsage('save-project', true, 300, 'design-canvas');
-        handleSave();
-      });
-    };
-
-    const handleDeleteSelected = () => {
-      performanceMonitor.current.measure('keyboard-delete', () => {
-        if (selectedComponent) {
-          trackKeyboardShortcut('Delete', 'delete-component', true);
-          shortcutLearning.trackShortcutUsage('delete-component', true, 200, 'design-canvas');
-          handleDeleteComponent(selectedComponent);
-        } else {
-          trackKeyboardShortcut('Delete', 'delete-component', false);
-          shortcutLearning.trackManualAction('delete_attempt_no_selection', 100, 'design-canvas');
-        }
-      });
-    };
-
-    const handleAddComponent = () => {
-      // Focus on component palette or show component picker
-      trackKeyboardShortcut('Ctrl+N', 'add-component', true);
-      shortcutLearning.trackShortcutUsage('add-component', true, 150, 'design-canvas');
-      workflowOptimizer.trackAction('add_component_shortcut', 150, true, 'design-canvas');
-      console.log('Add component shortcut triggered');
-    };
-
-    const handleUndo = () => {
-      // Placeholder for undo functionality
-      trackKeyboardShortcut('Ctrl+Z', 'undo', false);
-      console.log('Undo shortcut triggered - not yet implemented');
-    };
-
-    const handleRedo = () => {
-      // Placeholder for redo functionality
-      trackKeyboardShortcut('Ctrl+Y', 'redo', false);
-      console.log('Redo shortcut triggered - not yet implemented');
-    };
-
-    const handleNewProject = () => {
-      performanceMonitor.current.measure('keyboard-new-project', () => {
-        // Release all pooled objects before clearing
-        components.forEach(comp => MemoryOptimizer.releaseObject('component', comp));
-        connections.forEach(conn => MemoryOptimizer.releaseObject('connection', conn));
-        
-        // Reset canvas state
-        trackKeyboardShortcut('Ctrl+Shift+N', 'new-project', true);
-        setComponents([]);
-        setConnections([]);
-        setSelectedComponent(null);
-        setConnectionStart(null);
-        
-        // Clear export cache
-        exportCacheRef.current.clear();
-        
-        trackPerformance('new-project', {
-          clearedComponents: components.length,
-          clearedConnections: connections.length
-        });
-      });
-    };
-
-    // Comment-related event handlers
-    const handleAddComment = () => {
-      trackKeyboardShortcut('C', 'add-comment', true);
-      setCommentMode('comment');
-    };
-
-    const handleAddNote = () => {
-      trackKeyboardShortcut('N', 'add-note', true);
-      setCommentMode('note');
-    };
-
-    const handleAddLabel = () => {
-      trackKeyboardShortcut('L', 'add-label', true);
-      setCommentMode('label');
-    };
-
-    const handleAddArrow = () => {
-      trackKeyboardShortcut('A', 'add-arrow', true);
-      setCommentMode('arrow');
-    };
-
-    const handleAddHighlight = () => {
-      trackKeyboardShortcut('H', 'add-highlight', true);
-      setCommentMode('highlight');
-    };
-
-    // Add event listeners for canvas-specific shortcuts
-    window.addEventListener('shortcut:save-project', handleSaveProject);
-    window.addEventListener('shortcut:delete-selected', handleDeleteSelected);
-    window.addEventListener('shortcut:add-component', handleAddComponent);
-    window.addEventListener('shortcut:undo', handleUndo);
-    window.addEventListener('shortcut:redo', handleRedo);
-    window.addEventListener('shortcut:new-project', handleNewProject);
-    
-    // Add event listeners for comment-related shortcuts
-    window.addEventListener('shortcut:add-comment', handleAddComment);
-    window.addEventListener('shortcut:add-note', handleAddNote);
-    window.addEventListener('shortcut:add-label', handleAddLabel);
-    window.addEventListener('shortcut:add-arrow', handleAddArrow);
-    window.addEventListener('shortcut:add-highlight', handleAddHighlight);
-
-    return () => {
-      // Cleanup event listeners
-      window.removeEventListener('shortcut:save-project', handleSaveProject);
-      window.removeEventListener('shortcut:delete-selected', handleDeleteSelected);
-      window.removeEventListener('shortcut:add-component', handleAddComponent);
-      window.removeEventListener('shortcut:undo', handleUndo);
-      window.removeEventListener('shortcut:redo', handleRedo);
-      window.removeEventListener('shortcut:new-project', handleNewProject);
-      
-      // Cleanup comment-related event listeners
-      window.removeEventListener('shortcut:add-comment', handleAddComment);
-      window.removeEventListener('shortcut:add-note', handleAddNote);
-      window.removeEventListener('shortcut:add-label', handleAddLabel);
-      window.removeEventListener('shortcut:add-arrow', handleAddArrow);
-      window.removeEventListener('shortcut:add-highlight', handleAddHighlight);
-    };
-  }, [selectedComponent, handleSave, handleDeleteComponent, setComponents, setConnections, setSelectedComponent, setConnectionStart, trackKeyboardShortcut]);
-
-  // Initialize keyboard shortcuts hook
-  useKeyboardShortcuts([]);
-
-  return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="h-screen flex flex-col">
-        {/* Main Toolbar */}
-        <div className="border-b bg-card p-4" data-testid="canvas-toolbar">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <SmartTooltip 
-                content="Return to challenge selection"
-                contextualHelp="Choose a different challenge or modify challenge requirements"
-                shortcut="Alt+1"
-              >
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={onBack}
-                  aria-label="Return to challenge selection"
-                  data-help-target="design-canvas-back"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </Button>
-              </SmartTooltip>
-              <div>
-                <h2 id="challenge-title" className="text-lg font-semibold">{challenge.title}</h2>
-                <p className="text-sm text-muted-foreground" id="challenge-description">
-                  {challenge.description}
-                </p>
-                <div className="text-xs text-muted-foreground mt-1" aria-live="polite">
-                  Components: {components.length} • Connections: {connections.length}
-                  {designMetrics.isLargeDesign && (
-                    <span className="ml-2 text-amber-600">
-                      • Large design (consider performance mode)
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2" role="toolbar" aria-label="Canvas tools">
-              <SmartTooltip 
-                content={performanceMode ? 'Disable performance optimizations' : 'Enable performance mode for large designs'}
-                contextualHelp="Performance mode optimizes rendering for designs with 50+ components by reducing animation quality and enabling object pooling"
-              >
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setPerformanceMode(!performanceMode)}
-                >
-                  <Zap className="mr-2 h-4 w-4" />
-                  {performanceMode ? 'Performance Mode: ON' : 'Performance Mode: OFF'}
-                </Button>
-                
-                const optimizedComponents = useMemo(() => {
-                  return performanceMode ? 
-                    components.filter(c => isInViewport(c)) : 
-                    components;
-                }, [components, performanceMode]);
               </SmartTooltip>
               <div id="performance-mode-desc" className="sr-only">
                 {performanceMode 
@@ -1389,46 +831,45 @@ const handleComponentDrop = useOptimizedCallback((...) => {
         {/* Main Canvas Area */}
         <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
           <div className="flex-1" role="region" aria-label="Design canvas">
-            <CanvasArea
-              ref={canvasRef}
-              components={components}
-              connections={connections}
-              selectedComponent={selectedComponent}
-              connectionStart={connectionStart}
-              commentMode={commentMode}
-              isCommentModeActive={!!commentMode}
-              onComponentDrop={handleComponentDrop}
-              onComponentMove={handleComponentMove}
-              onComponentSelect={handleComponentSelect}
-              onConnectionLabelChange={handleConnectionLabelChange}
-              onConnectionDelete={handleConnectionDelete}
-              onConnectionTypeChange={handleConnectionTypeChange}
-              onConnectionDirectionChange={handleConnectionDirectionChange}
-              onStartConnection={handleStartConnection}
-              onCompleteConnection={handleCompleteConnection}
-              data-testid="design-canvas"
-              aria-describedby="challenge-description"
-            />
+            <Suspense fallback={<CanvasLoadingState />}>
+              <LazyCanvasArea
+                ref={canvasRef}
+                components={components}
+                connections={connections}
+                selectedComponent={selectedComponent}
+                connectionStart={connectionStart}
+                commentMode={commentMode}
+                isCommentModeActive={!!commentMode}
+                onComponentDrop={handleComponentDrop}
+                onComponentMove={handleComponentMove}
+                onComponentSelect={handleComponentSelect}
+                onConnectionLabelChange={handleConnectionLabelChange}
+                onConnectionDelete={handleConnectionDelete}
+                onConnectionTypeChange={handleConnectionTypeChange}
+                onConnectionDirectionChange={handleConnectionDirectionChange}
+                onStartConnection={handleStartConnection}
+                onCompleteConnection={handleCompleteConnection}
+                data-testid="design-canvas"
+                aria-describedby="challenge-description"
+              />
+            </Suspense>
           </div>
           
-          // Changes:
-          // ...
-          const objectPools = useRef<{
-            components: Map<string, DesignComponent>;
-            connections: Map<string, Connection>;
-          } | null>(null);
-          
-          const getObjectPool = useCallback(() => {
-            if (!objectPools.current) {
-              objectPools.current = {
-                components: new Map(),
-                connections: new Map()
-              };
-            }
-            return objectPools.current;
-          }, []);
-          
-          // ...
+          {/* Solution Hints Panel */}
+          {showHints && (
+            <div className="w-80 shrink-0">
+              <Suspense fallback={<HintsLoadingState />}>
+                <LazySolutionHints
+                  challenge={extendedChallenge}
+                  currentComponents={components}
+                  onHintViewed={(hintId) => {
+                    trackCanvasAction('hint-viewed', { hintId }, true);
+                  }}
+                  onClose={() => setShowHints(false)}
+                />
+              </Suspense>
+            </div>
+          )}
         </div>
 
       </div>

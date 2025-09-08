@@ -17,18 +17,49 @@ export class PerformanceMonitor {
   // Changes:
   // 1. Add lazy initialization flag to PerformanceMonitor:
   private static isInitialized = false;
+  private initializationLevel: InitializationLevel = 'basic';
+  private isFullyInitialized = false;
   
-  static getInstance(): PerformanceMonitor {
+  static getInstance(level: InitializationLevel = 'basic'): PerformanceMonitor {
     if (!PerformanceMonitor.instance) {
-      PerformanceMonitor.instance = new PerformanceMonitor();
+      PerformanceMonitor.instance = new PerformanceMonitor(level);
       PerformanceMonitor.isInitialized = true;
     }
     return PerformanceMonitor.instance;
   }
   
-  // 2. Add method to check initialization status:
+  // Deferred initialization for heavy features
+  static async deferredInitialize(level: InitializationLevel = 'full'): Promise<PerformanceMonitor> {
+    const instance = this.getInstance(level);
+    
+    if (level === 'full' && !instance.isFullyInitialized) {
+      await instance.initializeFull();
+    }
+    
+    return instance;
+  }
+  
+  // Check initialization status
   static isReady(): boolean {
     return PerformanceMonitor.isInitialized;
+  }
+  
+  private initializeBasic() {
+    // Only essential monitoring
+    this.startFrameRateMonitoring();
+  }
+  
+  private async initializeFull() {
+    if (this.isFullyInitialized) return;
+    
+    return new Promise<void>((resolve) => {
+      // Defer heavy initialization
+      requestIdleCallback(() => {
+        this.initializePerformanceObserver();
+        this.isFullyInitialized = true;
+        resolve();
+      }, { timeout: 2000 });
+    });
   }
   
   // 3. Modify MemoryOptimizer to lazy initialize pools:
@@ -46,9 +77,12 @@ export class PerformanceMonitor {
     return pool.length > 0 ? pool.pop() : factory();
   }
   
-  constructor() {
-    this.initializePerformanceObserver();
-    this.startFrameRateMonitoring();
+  constructor(level: InitializationLevel = 'basic') {
+    this.initializationLevel = level;
+    
+    if (level !== 'none') {
+      this.initializeBasic();
+    }
   }
 
   private initializePerformanceObserver() {
@@ -491,11 +525,33 @@ function deepEqual(a: any, b: any): boolean {
   return false;
 }
 
-// Performance-optimized event system
+// Performance-optimized event system with pooling and conditional loading
 export class OptimizedEventSystem {
+  private static instance: OptimizedEventSystem;
   private listeners = new Map<string, Set<EventListener>>();
   private throttledEvents = new Set(['scroll', 'resize', 'mousemove']);
   private debouncedEvents = new Set(['input', 'search']);
+  private listenerPool: Function[] = [];
+  private isInitialized = false;
+  
+  static getInstance(): OptimizedEventSystem {
+    if (!OptimizedEventSystem.instance) {
+      OptimizedEventSystem.instance = new OptimizedEventSystem();
+    }
+    return OptimizedEventSystem.instance;
+  }
+  
+  // Defer initialization until first use
+  private initialize() {
+    if (this.isInitialized) return;
+    
+    // Pre-allocate listener function pool
+    for (let i = 0; i < 20; i++) {
+      this.listenerPool.push(() => {});
+    }
+    
+    this.isInitialized = true;
+  }
   
   addEventListener(
     element: EventTarget,
@@ -503,6 +559,8 @@ export class OptimizedEventSystem {
     listener: EventListener,
     options?: AddEventListenerOptions
   ) {
+    this.initialize();
+    
     let optimizedListener = listener;
     
     if (this.throttledEvents.has(event)) {
@@ -522,6 +580,29 @@ export class OptimizedEventSystem {
     return () => {
       element.removeEventListener(event, optimizedListener, options);
       this.listeners.get(event)?.delete(optimizedListener);
+      
+      // Return listener to pool if possible
+      if (this.listenerPool.length < 50) {
+        this.listenerPool.push(optimizedListener);
+      }
+    };
+  }
+  
+  // Batch event registration for better performance
+  addEventListeners(
+    element: EventTarget,
+    events: Array<{
+      event: string;
+      listener: EventListener;
+      options?: AddEventListenerOptions;
+    }>
+  ): () => void {
+    const cleanups = events.map(({ event, listener, options }) =>
+      this.addEventListener(element, event, listener, options)
+    );
+    
+    return () => {
+      cleanups.forEach(cleanup => cleanup());
     };
   }
 
@@ -543,6 +624,13 @@ export class OptimizedEventSystem {
       timeoutId = setTimeout(() => func.apply(this, args), delay);
     };
   }
+  
+  // Cleanup all listeners for memory management
+  cleanup() {
+    this.listeners.clear();
+    this.listenerPool = [];
+    this.isInitialized = false;
+  }
 }
 
 // Types
@@ -559,29 +647,105 @@ interface DirtyRegion {
   height: number;
 }
 
+// Types for initialization levels
+type InitializationLevel = 'none' | 'basic' | 'full';
+
 // Add lightweight performance monitoring for initialization phase
-function usePerformanceMonitor() {
+export function usePerformanceMonitor(level: InitializationLevel = 'basic') {
   const [isReady, setIsReady] = useState(false);
+  const [monitor, setMonitor] = useState<PerformanceMonitor | null>(null);
   
   useEffect(() => {
     const init = async () => {
       if (typeof window !== 'undefined') {
-        // Initialize the performance monitor if needed
-        PerformanceMonitor.getInstance();
+        if (level === 'none') {
+          setIsReady(true);
+          return;
+        }
+        
+        const instance = PerformanceMonitor.getInstance(level);
+        setMonitor(instance);
+        
+        if (level === 'full') {
+          await PerformanceMonitor.deferredInitialize('full');
+        }
+        
         setIsReady(true);
       }
     };
     
     init();
-  }, []);
+  }, [level]);
   
-  return isReady;
+  return { isReady, monitor };
 }
 
-// Export performance utilities
+// Hook for conditional performance utilities loading
+export function usePerformanceUtils(enabled: boolean = true) {
+  const [utils, setUtils] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  
+  useEffect(() => {
+    if (!enabled || utils) return;
+    
+    setLoading(true);
+    
+    const loadUtils = async () => {
+      try {
+        // Initialize core components
+        const monitor = PerformanceMonitor.getInstance('basic');
+        MemoryOptimizer.initialize();
+        
+        setUtils({
+          monitor,
+          MemoryOptimizer,
+          OptimizedEventSystem: OptimizedEventSystem.getInstance(),
+          CanvasOptimizer
+        });
+      } catch (error) {
+        console.warn('Failed to load performance utils:', error);
+        setUtils({}); // Provide empty object as fallback
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Defer loading to next frame
+    requestAnimationFrame(() => {
+      requestAnimationFrame(loadUtils);
+    });
+  }, [enabled, utils]);
+  
+  return { utils, loading };
+}
+
+// Factory function for lazy performance utilities initialization
+export async function createPerformanceUtils(level: InitializationLevel = 'basic') {
+  const monitor = PerformanceMonitor.getInstance(level);
+  
+  if (level === 'full') {
+    await PerformanceMonitor.deferredInitialize('full');
+  }
+  
+  MemoryOptimizer.initialize();
+  
+  return {
+    monitor,
+    MemoryOptimizer,
+    OptimizedEventSystem: OptimizedEventSystem.getInstance(),
+    CanvasOptimizer
+  };
+}
+
+// Lightweight export for basic usage (no immediate initialization)
 export const performanceUtils = {
-  monitor: PerformanceMonitor.getInstance(),
+  get monitor() {
+    return PerformanceMonitor.getInstance('basic');
+  },
   CanvasOptimizer,
   MemoryOptimizer,
-  OptimizedEventSystem
+  OptimizedEventSystem: OptimizedEventSystem.getInstance(),
+  createPerformanceUtils,
+  usePerformanceMonitor,
+  usePerformanceUtils
 };
