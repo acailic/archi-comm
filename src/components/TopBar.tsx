@@ -1,17 +1,8 @@
 import * as React from 'react';
 import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { SmartTooltip } from './ui/SmartTooltip';
-import { Minimap, ViewportInfo } from './Minimap';
 import { cx, designSystem, getElevation } from '../lib/design-system';
 import { ArrowLeft, Zap, Image, Download, Save } from 'lucide-react';
-
-interface GridConfigTopBar {
-  visible: boolean;
-  spacing: number;
-  snapToGrid: boolean;
-}
 
 export interface TopBarProps {
   // Navigation
@@ -32,24 +23,6 @@ export interface TopBarProps {
   // Hints
   showHints: boolean;
   onToggleHints: () => void;
-
-  // Grid
-  gridConfig: GridConfigTopBar;
-  onToggleGrid: () => void;
-  onToggleSnapToGrid: () => void;
-  onGridSpacingChange: (value: string) => void;
-
-  // Minimap
-  showMinimap: boolean;
-  onToggleMinimap: () => void;
-  viewportInfo: ViewportInfo | null;
-  canvasExtents: { width: number; height: number } | null;
-  onMinimapPan: (x: number, y: number) => void;
-  onMinimapZoom: (zoom: number, centerX?: number, centerY?: number) => void;
-  // Data for minimap rendering
-  components: any[];
-  connections: any[];
-  layers: any[];
 
   // Actions
   onSave: () => void;
@@ -73,19 +46,6 @@ export function TopBar(props: TopBarProps) {
     onTogglePerformanceMode,
     showHints,
     onToggleHints,
-    gridConfig,
-    onToggleGrid,
-    onToggleSnapToGrid,
-    onGridSpacingChange,
-    showMinimap,
-    onToggleMinimap,
-    viewportInfo,
-    canvasExtents,
-    onMinimapPan,
-    onMinimapZoom,
-    components,
-    connections,
-    layers,
     onSave,
     onExportJSON,
     onExportPNG,
@@ -155,61 +115,6 @@ export function TopBar(props: TopBarProps) {
               {showHints ? 'Hide Hints' : 'Show Hints'}
             </Button>
           </SmartTooltip>
-
-          {/* Grid controls */}
-          <div className="hidden md:flex items-center gap-2 pl-2 ml-2 border-l border-border/30">
-            <SmartTooltip content={gridConfig.visible ? 'Hide grid overlay' : 'Show grid overlay'}>
-              <Button variant={gridConfig.visible ? 'default' : 'outline'} size="sm" onClick={onToggleGrid} aria-pressed={gridConfig.visible}>
-                Grid
-              </Button>
-            </SmartTooltip>
-            <SmartTooltip content="Enable snap-to-grid for precise placement">
-              <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                <input type="checkbox" className="accent-primary" checked={gridConfig.snapToGrid} onChange={onToggleSnapToGrid} />
-                Snap
-              </label>
-            </SmartTooltip>
-            <SmartTooltip content="Adjust grid spacing for different layout precision">
-              <Select value={gridConfig.spacing.toString()} onValueChange={onGridSpacingChange}>
-                <SelectTrigger className="h-8 w-[90px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="40">40</SelectItem>
-                </SelectContent>
-              </Select>
-            </SmartTooltip>
-          </div>
-
-          {/* Minimap */}
-          <div className="pl-2 ml-2 border-l border-border/30">
-            <SmartTooltip content={showMinimap ? 'Hide minimap overview' : 'Show minimap overview'} contextualHelp="Minimap provides a bird's-eye view of your entire canvas with viewport navigation and zoom controls">
-              <Popover open={showMinimap} onOpenChange={() => onToggleMinimap()}>
-                <PopoverTrigger asChild>
-                  <Button variant={showMinimap ? 'default' : 'outline'} size="sm" aria-pressed={showMinimap}>
-                    Minimap
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-[300px]">
-                  {!viewportInfo ? (
-                    <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">Preparing minimap...</div>
-                  ) : (
-                    <Minimap
-                      components={components as any}
-                      connections={connections as any}
-                      layers={layers as any}
-                      viewport={viewportInfo}
-                      canvasExtents={canvasExtents || { width: 0, height: 0 }}
-                      onPanTo={onMinimapPan}
-                      onZoomTo={onMinimapZoom}
-                    />
-                  )}
-                </PopoverContent>
-              </Popover>
-            </SmartTooltip>
-          </div>
 
           {/* Save/Export */}
           <div className="pl-2 ml-2 border-l border-border/30 flex items-center gap-2">

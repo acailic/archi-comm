@@ -141,12 +141,14 @@ export class KeyboardShortcutManager {
     if (!this.isEnabled || this.temporarilyDisabled) return;
     if (event.isComposing) return; // Prevent shortcut execution during IME composition
 
-    // Skip if user is typing in input fields
     const target = event.target as HTMLElement;
-    if (this.isInputElement(target)) return;
-
     const shortcutKey = this.generateShortcutKeyFromEvent(event);
     const shortcut = this.shortcuts.get(shortcutKey);
+
+    // Allow shortcuts marked as global to fire even inside inputs
+    if (this.isInputElement(target) && !(shortcut && (shortcut as any).global)) {
+      return;
+    }
 
     if (shortcut) {
       if (this.debugMode) {

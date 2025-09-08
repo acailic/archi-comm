@@ -45,6 +45,14 @@ export const SmartTooltip: React.FC<SmartTooltipProps> = ({
   role = 'tooltip',
   'aria-live': ariaLive = 'polite'
 }) => {
+  // Global kill-switch for all tooltips (temporary UX request)
+  // Temporarily disable tooltips globally (can be toggled later)
+  const isGloballyDisabled = true;
+
+  if (disabled || isGloballyDisabled) {
+    // Render children directly with no tooltip behavior
+    return <>{children}</>;
+  }
   const [internalVisible, setInternalVisible] = useState(false);
   const [actualPosition, setActualPosition] = useState<'top' | 'bottom' | 'left' | 'right'>('top');
   const [showAdvanced, setShowAdvanced] = useState(false);

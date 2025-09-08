@@ -3,17 +3,12 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toPng } from 'html-to-image';
 import { useKeyboardShortcuts } from '../lib/shortcuts/KeyboardShortcuts';
-import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Checkbox } from './ui/checkbox';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Minimap } from './Minimap';
 import { TopBar } from './TopBar';
+import { CanvasToolbar } from './CanvasToolbar';
+import { RightSidebar } from './RightSidebar';
 import type { Challenge, DesignComponent, Connection, DesignData, Layer, GridConfig, ToolType } from '../App';
 import { ViewportInfo } from './Minimap';
 import { ExtendedChallenge, challengeManager, ArchitectureTemplate } from '../lib/challenge-config';
-import { ArrowLeft, Save, Download, Image, Lightbulb, Zap, Component, Grid3x3, Navigation } from 'lucide-react';
-import { SmartTooltip } from './ui/SmartTooltip';
 import { useUXTracker } from '../hooks/useUXTracker';
 import { useOnboarding } from '../lib/onboarding/OnboardingManager';
 import { WorkflowOptimizer } from '../lib/user-experience/WorkflowOptimizer';
@@ -1430,19 +1425,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             }, true);
             setShowHints(newHintsState);
           }}
-          gridConfig={gridConfig}
-          onToggleGrid={handleToggleGrid}
-          onToggleSnapToGrid={handleToggleSnapToGrid}
-          onGridSpacingChange={handleGridSpacingChange}
-          showMinimap={showMinimap}
-          onToggleMinimap={handleToggleMinimap}
-          viewportInfo={viewportInfo}
-          canvasExtents={canvasExtents}
-          onMinimapPan={handleMinimapPan}
-          onMinimapZoom={handleMinimapZoom}
-          components={components as any}
-          connections={connections as any}
-          layers={layers as any}
           onSave={() => { try { forceSave(); } catch {} handleSave(); workflowTracker.trackAction('manual_save', 300, true, 'design-canvas'); }}
           onExportJSON={() => { handleExport(); workflowTracker.trackAction('export_json', 500, true, 'design-canvas'); }}
           onExportPNG={() => { handleExportImage(); workflowTracker.trackAction('export_png', 2000, true, 'design-canvas'); }}
@@ -1457,321 +1439,38 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           }}
           canContinue={components.length > 0 && !isExporting}
         />
-        <div className="hidden" data-testid="canvas-toolbar">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <SmartTooltip 
-                content="Return to challenge selection"
-                contextualHelp="Choose a different challenge or modify challenge requirements"
-                shortcut="Alt+1"
-              >
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={onBack}
-                  aria-label="Return to challenge selection"
-                  data-help-target="design-canvas-back"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </Button>
-              </SmartTooltip>
-              <div>
-                <h2 id="challenge-title" className="text-lg font-semibold">{challenge.title}</h2>
-                <p className="text-sm text-muted-foreground" id="challenge-description">
-                  {challenge.description}
-                </p>
-                <div className="text-xs text-muted-foreground mt-1" aria-live="polite">
-                  Components: {components.length} • Connections: {connections.length}
-                  {isSaving && (<span className="ml-2 text-blue-600">• Saving…</span>)}
-                  {designMetrics.isLargeDesign && (
-                    <span className="ml-2 text-amber-600">
-                      • Large design (consider performance mode)
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2" role="toolbar" aria-label="Canvas tools">
-              <SmartTooltip 
-                content={performanceModeEnabled ? 'Disable performance optimizations' : 'Enable performance mode for large designs'}
-                contextualHelp="Performance mode optimizes rendering for designs with 50+ components by reducing animation quality and enabling object pooling"
-              >
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setPerformanceModeEnabled(!performanceModeEnabled)}
-                >
-                  <Zap className="mr-2 h-4 w-4" />
-                  {performanceModeEnabled ? 'Performance Mode: ON' : 'Performance Mode: OFF'}
-                </Button>
-              </SmartTooltip>
-              <div id="performance-mode-desc" className="sr-only">
-                {performanceModeEnabled 
-                  ? 'Performance optimizations are currently enabled' 
-                  : 'Performance optimizations are disabled'
-                }
-              </div>
-              <SmartTooltip 
-                content={showHints ? 'Hide solution hints and guidance' : 'Show architectural guidance and best practices'}
-                contextualHelp="Solution hints provide context-aware suggestions for system architecture patterns, component placement, and design best practices based on your current challenge"
-                shortcut="?"
-              >
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    const newHintsState = !showHints;
-                    workflowTracker.trackAction('toggle_hints', 200, true, 'design-canvas', {
-                      enabled: newHintsState,
-                      componentCount: components.length
-                    });
-                    trackCanvasAction('toggle-hints', {
-                      showHints: newHintsState,
-                      componentCount: components.length,
-                      designComplexity: designMetrics.complexity
-                    }, true);
-                    setShowHints(newHintsState);
-                  }}
-                  className="bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700"
-                  data-help-target="design-canvas-hints"
-                  aria-pressed={showHints}
-                  aria-describedby="hints-desc"
-                >
-                  <Lightbulb className="w-4 h-4 mr-2" />
-                  {showHints ? 'Hide Hints' : 'Show Hints'}
-                </Button>
-              </SmartTooltip>
-              <div id="hints-desc" className="sr-only">
-                {showHints 
-                  ? 'Solution hints panel is currently visible' 
-                  : 'Solution hints panel is hidden'
-                }
-              </div>
-              
-              {/* Grid Controls Section */}
-              <div className="flex items-center gap-2 border-l pl-2 ml-2">
-                <SmartTooltip 
-                  content={gridConfig.visible ? 'Hide grid overlay' : 'Show grid overlay'}
-                  contextualHelp="Grid overlay helps with component alignment and provides visual reference lines for organizing your system design"
-                  shortcut="G"
-                >
-                  <Button 
-                    variant={gridConfig.visible ? "default" : "outline"}
-                    size="sm"
-                    onClick={handleToggleGrid}
-                    data-help-target="design-canvas-grid"
-                    aria-label={gridConfig.visible ? 'Hide grid' : 'Show grid'}
-                    aria-pressed={gridConfig.visible}
-                  >
-                    <Grid3x3 className="w-4 h-4 mr-2" />
-                    Grid
-                  </Button>
-                </SmartTooltip>
-                
-                <div className="flex items-center gap-2">
-                  <SmartTooltip 
-                    content="Enable snap-to-grid for precise component placement"
-                    contextualHelp="When enabled, components automatically align to grid intersections when moved, ensuring consistent spacing and professional layout"
-                    shortcut="Shift+G"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="snap-to-grid"
-                        checked={gridConfig.snapToGrid}
-                        onCheckedChange={handleToggleSnapToGrid}
-                        aria-label="Enable snap to grid"
-                      />
-                      <label 
-                        htmlFor="snap-to-grid"
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        Snap
-                      </label>
-                    </div>
-                  </SmartTooltip>
-                  
-                  <SmartTooltip 
-                    content="Adjust grid spacing for different layout precision"
-                    contextualHelp="Smaller spacing provides finer control, while larger spacing works better for high-level architecture diagrams"
-                  >
-                    <Select value={gridConfig.spacing.toString()} onValueChange={handleGridSpacingChange}>
-                      <SelectTrigger className="w-20 h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10px</SelectItem>
-                        <SelectItem value="20">20px</SelectItem>
-                        <SelectItem value="30">30px</SelectItem>
-                        <SelectItem value="50">50px</SelectItem>
-                        <SelectItem value="100">100px</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </SmartTooltip>
-                </div>
-              </div>
-              
-              {/* Minimap Toggle */}
-              <div className="flex items-center gap-2 border-l pl-2 ml-2">
-                <SmartTooltip
-                  content={showMinimap ? 'Hide minimap overview' : 'Show minimap overview'}
-                  contextualHelp="Minimap provides a bird's-eye view of your entire canvas with viewport navigation and zoom controls"
-                  shortcut="M"
-                >
-                  <Popover open={showMinimap} onOpenChange={setShowMinimap}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={showMinimap ? "default" : "outline"}
-                        size="sm"
-                        onClick={handleToggleMinimap}
-                        data-help-target="design-canvas-minimap"
-                        aria-label={showMinimap ? 'Hide minimap' : 'Show minimap'}
-                        aria-pressed={showMinimap}
-                      >
-                        <Navigation className="w-4 h-4 mr-2" />
-                        Minimap
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 p-2" side="bottom" align="end">
-                      {!viewportInfo ? (
-                        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
-                          Preparing minimap...
-                        </div>
-                      ) : (
-                        <Minimap
-                          components={components}
-                          connections={connections}
-                          layers={layers}
-                          viewport={viewportInfo}
-                          canvasExtents={canvasExtents}
-                          onPanTo={handleMinimapPan}
-                          onZoomTo={handleMinimapZoom}
-                        />
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                </SmartTooltip>
-              </div>
-              
-              <SmartTooltip 
-                content="Save current design progress" 
-                contextualHelp="Saves your design locally. Auto-saves occur every few seconds when you make changes. Use Ctrl+S to manually save anytime."
-                shortcut="Ctrl+S"
-              >
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => {
-                    try { forceSave(); } catch {}
-                    handleSave();
-                    workflowTracker.trackAction('manual_save', 300, true, 'design-canvas');
-                  }}
-                  data-help-target="design-canvas-save"
-                  aria-label="Save design progress"
-                >
-                  <Save className="w-4 h-4" />
-                  <span className="sr-only">Save Design</span>
-                </Button>
-              </SmartTooltip>
-              <SmartTooltip 
-                content="Export design as JSON file" 
-                contextualHelp="Downloads your complete design as a JSON file that can be imported later or shared with others. Includes all components, connections, and metadata."
-                shortcut="Ctrl+E"
-              >
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => {
-                    handleExport();
-                    workflowTracker.trackAction('export_json', 500, true, 'design-canvas');
-                  }}
-                  data-help-target="design-canvas-export"
-                  aria-label="Export design as JSON"
-                >
-                  <Download className="w-4 h-4" />
-                  <span className="sr-only">Export Design as JSON</span>
-                </Button>
-              </SmartTooltip>
-              <SmartTooltip 
-                content="Export design as PNG image" 
-                contextualHelp="Creates a high-quality PNG image of your design perfect for presentations, documentation, or sharing. Large designs are automatically optimized for best quality."
-                shortcut="Ctrl+Shift+E"
-              >
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => {
-                    handleExportImage();
-                    workflowTracker.trackAction('export_png', 2000, true, 'design-canvas');
-                  }}
-                  disabled={isExporting}
-                  data-help-target="design-canvas-export"
-                  aria-label={isExporting ? 'Exporting PNG...' : 'Export design as PNG'}
-                  aria-describedby={isExporting ? 'export-status' : undefined}
-                >
-                  <Image className="w-4 h-4" />
-                  <span className="sr-only">{isExporting ? 'Exporting PNG...' : 'Export as PNG'}</span>
-                </Button>
-              </SmartTooltip>
-              {isExporting && (
-                <div id="export-status" className="sr-only" aria-live="polite">
-                  Exporting design as PNG image, please wait...
-                </div>
-              )}
-              <SmartTooltip 
-                content={components.length === 0 ? 'Add components to continue' : 'Proceed to record your explanation'}
-                contextualHelp="Once you're satisfied with your system design, continue to the recording phase where you'll explain your architectural decisions and thought process."
-              >
-                <Button 
-                  onClick={() => {
-                    handleContinue();
-                    workflowTracker.trackAction('continue_to_recording', 1000, true, 'design-canvas', {
-                      componentCount: components.length,
-                      connectionCount: connections.length,
-                      designComplexity: designMetrics.complexity
-                    });
-                  }}
-                  disabled={components.length === 0 || isExporting}
-                  aria-describedby="continue-help"
-                >
-                  {isExporting ? 'Exporting...' : 'Continue to Recording'}
-                </Button>
-              </SmartTooltip>
-              <div id="continue-help" className="sr-only">
-                {components.length === 0 
-                  ? 'You must add at least one component before continuing' 
-                  : 'Continue to the audio recording phase'
-                }
-              </div>
-            </div>
-          </div>
-        </div>
+
+        {/* Canvas Toolbar */}
+        <CanvasToolbar
+          activeTool={activeTool}
+          onToolChange={handleToolChange}
+          gridConfig={gridConfig}
+          onToggleGrid={handleToggleGrid}
+          onToggleSnapToGrid={handleToggleSnapToGrid}
+          onGridSpacingChange={handleGridSpacingChange}
+          showMinimap={showMinimap}
+          onToggleMinimap={handleToggleMinimap}
+          viewportInfo={viewportInfo}
+          canvasExtents={canvasExtents}
+          onMinimapPan={handleMinimapPan}
+          onMinimapZoom={handleMinimapZoom}
+          components={components}
+          connections={connections}
+          layers={layers}
+        />
         {/* Template prompt removed: default start is blank. Template can still be loaded via Solution Hints when available. */}
 
         {/* Main Canvas Area */}
         <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
-        {/* Left Sidebar with component palette and properties */}
-        <div className="w-80 shrink-0 h-full border-r bg-card/50">
-          <VerticalSidebar
-            components={components}
-            selectedComponent={selectedComponent}
-            onLabelChange={handleComponentLabelChange}
-            onDelete={handleDeleteComponent}
-            challenge={challenge}
-            layers={layers}
-            activeLayerId={activeLayerId}
-            onCreateLayer={handleCreateLayer}
-            onRenameLayer={handleRenameLayer}
-            onDeleteLayer={handleDeleteLayer}
-            onToggleLayerVisibility={handleToggleLayerVisibility}
-            onReorderLayer={handleReorderLayer}
-            onActiveLayerChange={handleActiveLayerChange}
-            activeTool={activeTool}
-            onToolChange={handleToolChange}
-          />
-        </div>
+          {/* Left Sidebar - Component Library Only */}
+          <div className="w-80 shrink-0 h-full border-r bg-card/50 hidden lg:block">
+            <VerticalSidebar
+              challenge={challenge}
+            />
+          </div>
 
-        <div className="flex-1" role="region" aria-label="Design canvas">
+          {/* Center - Canvas Area */}
+          <div className="flex-1" role="region" aria-label="Design canvas">
             <CanvasArea
               ref={canvasRef}
               components={components}
@@ -1805,9 +1504,28 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             />
           </div>
           
-          {/* Solution Hints Panel */}
+          {/* Right Sidebar - Properties, Layers, Assignment */}
+          <div className="w-80 shrink-0 h-full border-l bg-card/50 hidden lg:block">
+            <RightSidebar
+              selectedComponent={selectedComponent}
+              components={components}
+              onLabelChange={handleComponentLabelChange}
+              onDelete={handleDeleteComponent}
+              layers={layers}
+              activeLayerId={activeLayerId}
+              onCreateLayer={handleCreateLayer}
+              onRenameLayer={handleRenameLayer}
+              onDeleteLayer={handleDeleteLayer}
+              onToggleLayerVisibility={handleToggleLayerVisibility}
+              onReorderLayer={handleReorderLayer}
+              onActiveLayerChange={handleActiveLayerChange}
+              challenge={challenge}
+            />
+          </div>
+
+          {/* Solution Hints Panel - Overlays on right when active */}
           {showHints && (
-            <div className="w-80 shrink-0">
+            <div className="absolute right-0 top-0 w-80 h-full bg-background border-l shadow-lg z-10">
               <Suspense fallback={<HintsLoadingState />}>
                 <LazySolutionHints
                   challenge={extendedChallenge}

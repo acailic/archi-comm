@@ -186,6 +186,10 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
             description: 'Open command palette',
             category: 'general',
             action: handlers.onCommandPalette,
+            preventDefault: true,
+            // Allow firing even when focus is inside inputs
+            // (KeyboardShortcutManager respects `global` to bypass input guard)
+            global: true as any,
           })
         );
 
@@ -196,6 +200,8 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
             description: 'Open command palette',
             category: 'general',
             action: handlers.onCommandPalette,
+            preventDefault: true,
+            global: true as any,
           })
         );
       }

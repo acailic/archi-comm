@@ -84,6 +84,27 @@
   --hover-overlay: rgba(0,0,0,0.04);
   --focus-overlay: rgba(59,130,246,0.25);
   --active-overlay: rgba(0,0,0,0.06);
+
+  /* Layout system - Three-column design */
+  --sidebar-width-sm: 280px;
+  --sidebar-width-md: 320px;
+  --sidebar-width-lg: 360px;
+  --toolbar-height: 60px;
+  --topbar-height: 64px;
+  
+  /* Z-index scale */
+  --z-canvas: 1;
+  --z-sidebar: 10;
+  --z-toolbar: 20;
+  --z-topbar: 30;
+  --z-modal: 40;
+  --z-tooltip: 50;
+  
+  /* Responsive breakpoints (matching Tailwind) */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
 }
 
 .dark {
@@ -166,6 +187,21 @@
   --hover-overlay: rgba(255,255,255,0.04);
   --focus-overlay: rgba(59,130,246,0.35);
   --active-overlay: rgba(255,255,255,0.06);
+
+  /* Layout system - Three-column design (dark mode adjustments) */
+  --sidebar-width-sm: 280px;
+  --sidebar-width-md: 320px;
+  --sidebar-width-lg: 360px;
+  --toolbar-height: 60px;
+  --topbar-height: 64px;
+  
+  /* Z-index scale */
+  --z-canvas: 1;
+  --z-sidebar: 10;
+  --z-toolbar: 20;
+  --z-topbar: 30;
+  --z-modal: 40;
+  --z-tooltip: 50;
 }
 
 @theme inline {
@@ -301,4 +337,285 @@ html {
 
 .export-mode .bg-card\\/80 {
   display: none !important;
+}
+
+/* Layout utilities for three-column design */
+@layer utilities {
+  /* Sidebar utilities */
+  .sidebar-width {
+    width: var(--sidebar-width-md);
+  }
+  
+  .sidebar-width-sm {
+    width: var(--sidebar-width-sm);
+  }
+  
+  .sidebar-width-lg {
+    width: var(--sidebar-width-lg);
+  }
+  
+  /* Layout positioning */
+  .layout-topbar {
+    height: var(--topbar-height);
+    z-index: var(--z-topbar);
+  }
+  
+  .layout-toolbar {
+    height: var(--toolbar-height);
+    z-index: var(--z-toolbar);
+    top: var(--topbar-height);
+  }
+  
+  .layout-sidebar {
+    z-index: var(--z-sidebar);
+    top: calc(var(--topbar-height) + var(--toolbar-height));
+    height: calc(100vh - var(--topbar-height) - var(--toolbar-height));
+  }
+  
+  .layout-canvas {
+    z-index: var(--z-canvas);
+    top: calc(var(--topbar-height) + var(--toolbar-height));
+    height: calc(100vh - var(--topbar-height) - var(--toolbar-height));
+  }
+  
+  /* Responsive sidebar behavior */
+  .sidebar-responsive {
+    transition: transform var(--transition-medium) ease-in-out,
+                width var(--transition-medium) ease-in-out,
+                opacity var(--transition-fast) ease-in-out;
+  }
+  
+  .sidebar-collapsed {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: calc(var(--z-sidebar) - 1);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-medium) ease-in-out;
+  }
+  
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  /* Canvas area optimization */
+  .canvas-area {
+    flex: 1;
+    min-width: 0; /* Allows flex item to shrink below content size */
+    overflow: hidden;
+  }
+  
+  /* Toolbar positioning and styling */
+  .canvas-toolbar {
+    position: sticky;
+    top: var(--topbar-height);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: var(--elevation-2);
+    z-index: var(--z-toolbar);
+  }
+  
+  /* Mobile-first responsive design */
+  @media (max-width: 767px) {
+    .sidebar-width {
+      width: 100vw;
+      position: fixed;
+      left: 0;
+      top: calc(var(--topbar-height) + var(--toolbar-height));
+      height: calc(100vh - var(--topbar-height) - var(--toolbar-height));
+      background: var(--background);
+      border-right: none;
+      box-shadow: var(--elevation-4);
+    }
+    
+    .layout-canvas {
+      width: 100%;
+      margin-left: 0;
+    }
+    
+    .canvas-toolbar {
+      padding-left: var(--space-sm);
+      padding-right: var(--space-sm);
+    }
+  }
+  
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .sidebar-width {
+      width: var(--sidebar-width-sm);
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .sidebar-width {
+      width: var(--sidebar-width-md);
+    }
+    
+    .sidebar-responsive {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  
+  @media (min-width: 1280px) {
+    .sidebar-width {
+      width: var(--sidebar-width-lg);
+    }
+  }
+  
+  /* Visual hierarchy improvements */
+  .layout-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  .layout-main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  
+  .layout-content {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+  }
+  
+  /* Smooth animations for layout changes */
+  .layout-transition {
+    transition: all var(--transition-medium) ease-in-out;
+  }
+  
+  /* Focus management for accessibility */
+  .sidebar-focus-trap {
+    position: relative;
+  }
+  
+  .sidebar-focus-trap:focus-within {
+    outline: 2px solid var(--focus-overlay);
+    outline-offset: -2px;
+  }
+  
+  /* Performance optimizations */
+  .layout-gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  .layout-no-gpu {
+    will-change: auto;
+    transform: none;
+  }
+  
+  /* Glassmorphism effects for floating elements */
+  .glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--elevation-3);
+  }
+  
+  /* Toolbar specific styles */
+  .toolbar-button {
+    transition: all var(--transition-fast) ease-in-out;
+    position: relative;
+  }
+  
+  .toolbar-button:hover {
+    background: var(--hover-overlay);
+    transform: translateY(-1px);
+    box-shadow: var(--elevation-2);
+  }
+  
+  .toolbar-button:active {
+    transform: translateY(0);
+    background: var(--active-overlay);
+  }
+  
+  .toolbar-button.active {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: var(--elevation-2);
+  }
+  
+  /* Minimap and floating panels */
+  .floating-panel {
+    position: absolute;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow: var(--elevation-4);
+    z-index: var(--z-modal);
+    animation: fadeInScale 200ms ease-out;
+  }
+  
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  /* Grid overlay improvements */
+  .canvas-grid {
+    pointer-events: none;
+    opacity: 0.3;
+    transition: opacity var(--transition-medium) ease-in-out;
+  }
+  
+  .canvas-grid.visible {
+    opacity: 0.6;
+  }
+  
+  /* Component selection and interaction states */
+  .component-selected {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--focus-overlay);
+  }
+  
+  .component-hover {
+    outline: 1px solid var(--primary);
+    outline-offset: 1px;
+    transition: all var(--transition-fast) ease-in-out;
+  }
+  
+  /* Multi-selection styles */
+  .selection-box {
+    position: absolute;
+    border: 2px dashed var(--primary);
+    background: var(--focus-overlay);
+    pointer-events: none;
+    z-index: calc(var(--z-canvas) + 1);
+  }
+  
+  /* Responsive text scaling */
+  @media (max-width: 767px) {
+    :root {
+      --font-size: 13px;
+    }
+  }
+  
+  @media (min-width: 1280px) {
+    :root {
+      --font-size: 15px;
+    }
+  }
 }
