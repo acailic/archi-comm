@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
 import { getLogger, logger, LogLevel } from './lib/logger';
 import { errorStore, addGlobalError } from './lib/errorStore';
-import { isDevelopment, isTauriEnvironment } from './lib/environment';
+import { isDevelopment, isTauriEnvironment, isProduction } from './lib/environment';
 import './index.css';
 
 // Initialize logger early in the application lifecycle
@@ -97,10 +97,14 @@ const initializeEnvironment = () => {
         userAgent: navigator.userAgent
       });
       
-      // Disable right-click context menu in production
-      document.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-      });
+      // Disable right-click context menu only in production; allow Shift+Right-Click bypass
+      if (isProduction()) {
+        document.addEventListener('contextmenu', (e) => {
+          const mouseEvent = e as MouseEvent;
+          if (mouseEvent.shiftKey) return; // support bypass
+          e.preventDefault();
+        });
+      }
       
       // Handle window styling for macOS
       document.addEventListener('DOMContentLoaded', () => {

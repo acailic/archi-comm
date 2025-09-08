@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PerformanceMonitor, MemoryOptimizer } from '../lib/performance/PerformanceOptimizer';
+import { getLogger } from '../lib/logger';
+import { isDevelopment } from '../lib/environment';
+import { addPerformanceError } from '../lib/errorStore';
 
 // Types
 export interface PerformanceConfig {
@@ -114,7 +117,7 @@ const DEFAULT_CONFIG: Required<PerformanceConfig> = {
   autoTrackLifecycle: true,
   enableMemoryTracking: true,
   maxHistorySize: 100,
-  enableDebugLogging: process.env.NODE_ENV === 'development'
+  enableDebugLogging: isDevelopment()
 };
 
 /**
@@ -124,6 +127,7 @@ const DEFAULT_CONFIG: Required<PerformanceConfig> = {
 export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
   const finalConfig = useMemo(() => ({ ...DEFAULT_CONFIG, ...config }), [config]);
   const monitor = useMemo(() => PerformanceMonitor.getInstance(), []);
+  const log = useMemo(() => getLogger('performance-monitor'), []);
   
   // State management
   const [performanceData, setPerformanceData] = useState<PerformanceData>({
@@ -252,16 +256,42 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
     
     setAlerts(newAlerts);
     
-    // Debug logging
+    // Debug logging via centralized logger
     if (finalConfig.enableDebugLogging) {
-      console.log('Performance Update:', {
+      log.debug('Performance update', {
         fps,
         avgRenderTime,
         memoryUsage,
         poolEfficiency,
         healthScore: newData.healthScore,
-        alerts: newAlerts
+        alerts: newAlerts,
       });
+    }
+
+    // Add performance alerts to error store when thresholds exceeded
+    if (newAlerts.lowFPS) {
+      addPerformanceError('Low FPS detected', {
+        timestamp: Date.now(),
+        renderTime: avgRenderTime,
+        memoryUsage: (performance as any).memory?.usedJSHeapSize,
+      }, { additionalData: { fps } });
+      log.warn('Low FPS detected', { fps });
+    }
+    if (newAlerts.highRenderTime) {
+      addPerformanceError('High render time', {
+        timestamp: Date.now(),
+        renderTime: avgRenderTime,
+        memoryUsage: (performance as any).memory?.usedJSHeapSize,
+      });
+      log.warn('High render time', { avgRenderTime });
+    }
+    if (newAlerts.highMemoryUsage) {
+      addPerformanceError('High memory usage', {
+        timestamp: Date.now(),
+        renderTime: avgRenderTime,
+        memoryUsage: (performance as any).memory?.usedJSHeapSize,
+      }, { additionalData: { reportedMB: memoryUsage } });
+      log.warn('High memory usage', { memoryUsageMB: memoryUsage });
     }
   }, [monitor, calculateMemoryUsage, calculatePoolEfficiency, calculateHealthScore, finalConfig]);
   
@@ -273,7 +303,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
     pollingInterval.current = setInterval(updatePerformanceData, finalConfig.pollingInterval);
     
     if (finalConfig.enableDebugLogging) {
-      console.log('Performance monitoring started with config:', finalConfig);
+      log.info('Performance monitoring started', { config: finalConfig });
     }
   }, [isMonitoring, updatePerformanceData, finalConfig]);
   
@@ -288,7 +318,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
     }
     
     if (finalConfig.enableDebugLogging) {
-      console.log('Performance monitoring stopped');
+      log.info('Performance monitoring stopped');
     }
   }, [isMonitoring, finalConfig.enableDebugLogging]);
   
@@ -306,7 +336,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
       activeMeasurements.current.set(id, measurement);
       
       if (finalConfig.enableDebugLogging) {
-        console.log(`Started measurement: ${name} (${id})`);
+        log.debug(`Started measurement: ${name}`, { id });
       }
       
       return id;
@@ -315,7 +345,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
     endMeasurement: (id: string) => {
       const measurement = activeMeasurements.current.get(id);
       if (!measurement) {
-        console.warn(`Measurement not found: ${id}`);
+        log.warn('Measurement not found', { id });
         return null;
       }
       
@@ -336,7 +366,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
       activeMeasurements.current.delete(id);
       
       if (finalConfig.enableDebugLogging) {
-        console.log(`Ended measurement: ${measurement.name} (${duration.toFixed(2)}ms)`);
+        log.debug('Ended measurement', { name: measurement.name, duration: Number(duration.toFixed(2)) });
       }
       
       return duration;
@@ -371,7 +401,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
       });
       
       if (finalConfig.enableDebugLogging) {
-        console.log(`Recorded metric: ${name} = ${value}`);
+        log.debug('Recorded metric', { name, value });
       }
     },
     
@@ -380,7 +410,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
       customMetrics.current.clear();
       
       if (finalConfig.enableDebugLogging) {
-        console.log('Performance history cleared');
+        log.info('Performance history cleared');
       }
     },
     
@@ -396,7 +426,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
       };
       
       if (finalConfig.enableDebugLogging) {
-        console.log('Performance data exported:', exportData);
+        log.info('Performance data exported', { exportData });
       }
       
       return exportData;
@@ -418,7 +448,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
       setAlerts({});
       
       if (finalConfig.enableDebugLogging) {
-        console.log('Performance monitoring reset');
+        log.info('Performance monitoring reset');
       }
     }
   }), [monitor, performanceData, finalConfig]);
@@ -468,7 +498,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
           lastGCTime.current = now;
           
           if (finalConfig.enableDebugLogging) {
-            console.log('Triggered garbage collection due to memory pressure');
+            log.info('Triggered garbage collection due to memory pressure');
           }
         }
       }
