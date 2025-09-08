@@ -23,7 +23,8 @@ export function safeStringify(value: any, space?: number): string {
     if (val instanceof Error) {
       return { name: val.name, message: val.message, stack: val.stack };
     }
-    if (val === undefined) return '[Undefined]';
+    // Let JSON.stringify handle undefined normally so object keys are omitted
+    if (val === undefined) return undefined as any;
     if (typeof val === 'symbol') return val.toString();
     return val;
   };
@@ -282,13 +283,14 @@ class FileSink implements LogSink {
   private filePath: string;
   private writeQueue: LogEntry[] = [];
   private isWriting = false;
+  private available = true;
 
   constructor(filePath: string = 'archicomm.log') {
     this.filePath = filePath;
   }
 
   async write(entry: LogEntry): Promise<void> {
-    if (!isTauriEnvironment()) {
+    if (!isTauriEnvironment() || !this.available) {
       return; // File logging only available in Tauri
     }
 
@@ -334,12 +336,25 @@ class FileSink implements LogSink {
         return line;
       }).join('\n') + '\n';
 
-      await writeTextFile(this.filePath, logLines, {
-        dir: BaseDirectory.AppLog,
-        append: true
-      });
+      try {
+        await writeTextFile(this.filePath, logLines, {
+          dir: BaseDirectory.AppLog,
+          append: true
+        });
+      } catch (innerErr: any) {
+        const msg = String(innerErr?.message || innerErr || '');
+        // If scope/path not allowed, disable file sink to avoid noisy errors
+        if (msg.includes('path not allowed') || msg.includes('scope')) {
+          this.available = false;
+          console.warn('File logging disabled (insufficient Tauri fs scope for AppLog). Falling back to memory/console only.');
+          // Swallow remaining queue
+          this.writeQueue = [];
+        } else {
+          console.error('Failed to write to log file:', innerErr);
+        }
+      }
     } catch (error) {
-      console.error('Failed to write to log file:', error);
+      console.error('Failed to initialize file logging:', error);
     } finally {
       this.isWriting = false;
       
@@ -470,10 +485,14 @@ export class Logger {
     // Add performance metrics if available
     if (this.config.includePerformanceMetrics && this.performanceMonitor) {
       try {
-        entry.performance = {
-          fps: this.performanceMonitor.getCurrentFPS(),
-          memory: (performance as any).memory?.usedJSHeapSize
-        };
+        const perf: any = {};
+        const fps = this.performanceMonitor.getCurrentFPS();
+        if (typeof fps === 'number') perf.fps = fps;
+        const mem = (performance as any).memory?.usedJSHeapSize;
+        if (typeof mem === 'number') perf.memory = mem;
+        if (Object.keys(perf).length > 0) {
+          entry.performance = perf;
+        }
       } catch (error) {
         // Performance metrics not available
       }
@@ -739,6 +758,6 @@ if (isDevelopment()) {
   });
 }
 
-// Export types and utilities
-export { LogLevel, type LogEntry, type LoggerConfig, type LogSink };
+// Export types and utilities (avoid re-exporting LogLevel to prevent duplicate export)
+export type { LogEntry, LoggerConfig, LogSink };
 export default logger;
