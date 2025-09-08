@@ -136,7 +136,21 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [hintsReady, setHintsReady] = useState(false);
   
   // UX Enhancement Systems
-  const workflowOptimizer = WorkflowOptimizer.getInstance();
+  // Memoize a safe workflow tracker with a no-op fallback to avoid runtime errors
+  const workflowTracker = useMemo(() => {
+    try {
+      const instance = WorkflowOptimizer.getInstance();
+      // Bind to preserve correct `this` and provide a stable reference
+      return { trackAction: instance.trackAction.bind(instance) } as {
+        trackAction: (type: string, duration?: number, success?: boolean, context?: string, metadata?: Record<string, any>) => void;
+      };
+    } catch (e) {
+      // Fallback no-op to ensure safe calls even if instance retrieval fails
+      return { trackAction: () => {} } as {
+        trackAction: (type: string, duration?: number, success?: boolean, context?: string, metadata?: Record<string, any>) => void;
+      };
+    }
+  }, []);
   const shortcutLearning = ShortcutLearningSystem.getInstance();
   const { addEventListener: onboardingAddEventListener } = useOnboarding();
 
@@ -204,8 +218,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             designComplexity: designMetrics.complexity
           }, true);
           
-          // Track with workflow optimizer
-          workflowOptimizer.trackAction('component_added', 500, true, 'design-canvas', {
+          // Track with workflow optimizer (safe wrapper)
+          workflowTracker.trackAction('component_added', 500, true, 'design-canvas', {
             componentType,
             totalComponents,
             position: { x, y }
@@ -240,15 +254,15 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           error: error instanceof Error ? error.message : 'Unknown error'
         }, false);
         
-        // Track failure with workflow optimizer
-        workflowOptimizer.trackAction('component_add_failed', 200, false, 'design-canvas', {
+        // Track failure with workflow optimizer (safe wrapper)
+        workflowTracker.trackAction('component_add_failed', 200, false, 'design-canvas', {
           componentType,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
         trackError(error instanceof Error ? error : new Error('Component drop failed'));
       }
     });
-  }, [performanceModeEnabled, performanceLevel, userHasInteracted, initializePerformanceMonitor, trackCanvasAction, trackPerformance, trackError, designMetrics.complexity, isCanvasActive, workflowOptimizer, trackInteractionPattern]);
+  }, [performanceModeEnabled, performanceLevel, userHasInteracted, initializePerformanceMonitor, trackCanvasAction, trackPerformance, trackError, designMetrics.complexity, isCanvasActive, workflowTracker, trackInteractionPattern]);
 
   const handleComponentMove = useOptimizedCallback((id: string, x: number, y: number) => {
     trackInteractionPattern('move');
@@ -787,7 +801,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   size="sm" 
                   onClick={() => {
                     const newHintsState = !showHints;
-                    workflowOptimizer.trackAction('toggle_hints', 200, true, 'design-canvas', {
+                    workflowTracker.trackAction('toggle_hints', 200, true, 'design-canvas', {
                       enabled: newHintsState,
                       componentCount: components.length
                     });
@@ -823,7 +837,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   size="icon" 
                   onClick={() => {
                     handleSave();
-                    workflowOptimizer.trackAction('manual_save', 300, true, 'design-canvas');
+                    workflowTracker.trackAction('manual_save', 300, true, 'design-canvas');
                   }}
                   data-help-target="design-canvas-save"
                   aria-label="Save design progress"
@@ -842,7 +856,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   size="icon" 
                   onClick={() => {
                     handleExport();
-                    workflowOptimizer.trackAction('export_json', 500, true, 'design-canvas');
+                    workflowTracker.trackAction('export_json', 500, true, 'design-canvas');
                   }}
                   data-help-target="design-canvas-export"
                   aria-label="Export design as JSON"
@@ -861,7 +875,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   size="icon" 
                   onClick={() => {
                     handleExportImage();
-                    workflowOptimizer.trackAction('export_png', 2000, true, 'design-canvas');
+                    workflowTracker.trackAction('export_png', 2000, true, 'design-canvas');
                   }}
                   disabled={isExporting}
                   data-help-target="design-canvas-export"
@@ -884,7 +898,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                 <Button 
                   onClick={() => {
                     handleContinue();
-                    workflowOptimizer.trackAction('continue_to_recording', 1000, true, 'design-canvas', {
+                    workflowTracker.trackAction('continue_to_recording', 1000, true, 'design-canvas', {
                       componentCount: components.length,
                       connectionCount: connections.length,
                       designComplexity: designMetrics.complexity

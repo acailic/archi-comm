@@ -46,6 +46,29 @@ import {
 } from '../lib/environment';
 import { logger, LogLevel } from '../lib/logger';
 
+// Utility: trigger a file download from string/Blob data
+const triggerDownload = (
+  filename: string,
+  data: BlobPart | BlobPart[],
+  mimeType: string = 'application/json'
+) => {
+  try {
+    const blob = new Blob(Array.isArray(data) ? data : [data], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      try { URL.revokeObjectURL(url); } catch {}
+      try { document.body.removeChild(a); } catch {}
+    }, 150);
+  } catch (err) {
+    console.error('Failed to trigger download', err);
+  }
+};
+
 // Types
 interface TabConfig {
   id: string;
@@ -121,8 +144,31 @@ const EnvironmentTab: React.FC = () => {
     },
   }), []);
 
-  const copyToClipboard = useCallback((data: any) => {
-    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+  const copyToClipboard = useCallback(async (data: any) => {
+    const text = JSON.stringify(data, null, 2);
+    try {
+      if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+        window.alert('Copied to clipboard');
+        return;
+      }
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (success) {
+        window.alert('Copied to clipboard');
+      } else {
+        window.alert('Failed to copy');
+      }
+    } catch (err) {
+      console.error('Failed to copy to clipboard', err);
+      window.alert('Failed to copy');
+    }
   }, []);
 
   return (
@@ -227,13 +273,7 @@ const PerformanceTab: React.FC = () => {
 
   const exportData = useCallback(() => {
     const exportData = controls.exportData();
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `performance-data-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerDownload(`performance-data-${Date.now()}.json`, JSON.stringify(exportData, null, 2));
   }, [controls]);
 
   return (
@@ -277,7 +317,7 @@ const PerformanceTab: React.FC = () => {
             <Clock className="w-4 h-4 text-yellow-500" />
             <span className="text-sm font-medium">Render Time</span>
           </div>
-          <div className="text-2xl font-bold">{data.avgRenderTime.toFixed(1)}ms</div>
+          <div className="text-2xl font-bold">{typeof data.avgRenderTime === 'number' && isFinite(data.avgRenderTime) ? `${data.avgRenderTime.toFixed(1)}ms` : '—'}</div>
           <div className="text-xs text-muted-foreground">Average render duration</div>
         </div>
 
@@ -286,7 +326,7 @@ const PerformanceTab: React.FC = () => {
             <MemoryStick className="w-4 h-4 text-red-500" />
             <span className="text-sm font-medium">Memory</span>
           </div>
-          <div className="text-2xl font-bold">{data.memoryUsage.toFixed(1)}MB</div>
+          <div className="text-2xl font-bold">{typeof data.memoryUsage === 'number' && isFinite(data.memoryUsage) ? `${data.memoryUsage.toFixed(1)}MB` : '—'}</div>
           <div className="text-xs text-muted-foreground">Heap memory usage</div>
         </div>
 
@@ -338,14 +378,13 @@ const ErrorLogsTab: React.FC = () => {
   }, []);
 
   const filteredErrors = useMemo(() => {
+    const filterLower = (filter || '').toLowerCase();
     return errors.filter(error => {
-      const matchesSearch = !filter || 
-        error.message.toLowerCase().includes(filter.toLowerCase()) ||
-        error.stack?.toLowerCase().includes(filter.toLowerCase());
-      
+      const message = (error.message ?? '').toLowerCase();
+      const stack = (error.stack ?? '').toLowerCase();
+      const matchesSearch = !filterLower || message.includes(filterLower) || stack.includes(filterLower);
       const matchesCategory = categoryFilter === 'all' || error.category === categoryFilter;
       const matchesSeverity = severityFilter === 'all' || error.severity === severityFilter;
-      
       return matchesSearch && matchesCategory && matchesSeverity;
     });
   }, [errors, filter, categoryFilter, severityFilter]);
@@ -356,13 +395,7 @@ const ErrorLogsTab: React.FC = () => {
 
   const exportErrors = useCallback(() => {
     const data = errorStore.exportErrors();
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `error-logs-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerDownload(`error-logs-${Date.now()}.json`, data);
   }, []);
 
   const resolveError = useCallback((errorId: string) => {
@@ -523,7 +556,7 @@ const ApplicationLogsTab: React.FC = () => {
   const [filter, setFilter] = useState<string>('');
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [scopeFilter, setScopeFilter] = useState<string>('all');
-  const [, forceRefresh] = useState<number>(0);
+  const [refreshTick, setRefreshTick] = useState<number>(0);
 
   const mapLevel = useCallback((val: string): LogLevel | undefined => {
     switch (val) {
@@ -553,7 +586,7 @@ const ApplicationLogsTab: React.FC = () => {
       data: e.data,
       stack: e.stack,
     }));
-  }, [filter, levelFilter, scopeFilter, mapLevel]);
+  }, [filter, levelFilter, scopeFilter, mapLevel, refreshTick]);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -568,18 +601,12 @@ const ApplicationLogsTab: React.FC = () => {
 
   const exportLogs = useCallback(() => {
     const data = logger.exportLogs('json');
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `application-logs-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerDownload(`application-logs-${Date.now()}.json`, data);
   }, []);
 
   const clearLogs = useCallback(() => {
     logger.clearLogs();
-    forceRefresh(x => x + 1);
+    setRefreshTick(x => x + 1);
   }, []);
 
   return (
@@ -723,13 +750,14 @@ const SystemInfoTab: React.FC = () => {
             architecture: navigator.userAgent.includes('x64') ? 'x64' : 'x86',
             cores: navigator.hardwareConcurrency || 1,
           },
-          memory: {
-            total: (performance as any).memory?.totalJSHeapSize || 0,
-            used: (performance as any).memory?.usedJSHeapSize || 0,
-            available: (performance as any).memory?.totalJSHeapSize - (performance as any).memory?.usedJSHeapSize || 0,
-            percentage: (performance as any).memory ? 
-              Math.round(((performance as any).memory.usedJSHeapSize / (performance as any).memory.totalJSHeapSize) * 100) : 0,
-          },
+          memory: (() => {
+            const perfMem = (performance as any).memory;
+            const total = (perfMem?.totalJSHeapSize ?? 0) as number;
+            const used = (perfMem?.usedJSHeapSize ?? 0) as number;
+            const available = Math.max(total - used, 0);
+            const percentage = total > 0 ? Math.round((used / total) * 100) : 0;
+            return { total, used, available, percentage };
+          })(),
           performance: {
             hardwareConcurrency: navigator.hardwareConcurrency || 1,
             deviceMemory: (navigator as any).deviceMemory,

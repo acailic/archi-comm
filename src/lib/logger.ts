@@ -119,7 +119,7 @@ class ConsoleSink implements LogSink {
     
     let message = `${color}${timestamp} ${level}${this.reset} ${scope} ${entry.message}`;
     
-    if (entry.data && Object.keys(entry.data).length > 0) {
+    if (entry.data && typeof entry.data === 'object' && entry.data !== null && Object.keys(entry.data).length > 0) {
       message += `\n  Data: ${safeStringify(entry.data, 2)}`;
     }
     
@@ -191,15 +191,15 @@ class MemoryBufferSink implements LogSink {
         return false;
       }
       
-      if (filter.scope && !entry.scope.includes(filter.scope)) {
+      if (typeof filter.scope === 'string' && filter.scope !== '' && !entry.scope.includes(filter.scope)) {
         return false;
       }
       
-      if (filter.since && entry.timestamp < filter.since) {
+      if (typeof filter.since === 'number' && entry.timestamp < filter.since) {
         return false;
       }
       
-      if (filter.search) {
+      if (typeof filter.search === 'string') {
         const searchLower = filter.search.toLowerCase();
         const messageMatch = entry.message.toLowerCase().includes(searchLower);
         let dataMatch = false;
@@ -625,7 +625,9 @@ export class Logger {
 
   // Memory buffer access
   getMemoryBuffer(): LogEntry[] {
-    const memoryBuffer = this.sinks.find(sink => sink instanceof MemoryBufferSink) as MemoryBufferSink;
+    const memoryBuffer = this.sinks.find(
+      (sink: any) => sink && typeof sink.getBuffer === 'function'
+    ) as any;
     return memoryBuffer ? memoryBuffer.getBuffer() : [];
   }
 
@@ -635,12 +637,16 @@ export class Logger {
     since?: number;
     search?: string;
   }): LogEntry[] {
-    const memoryBuffer = this.sinks.find(sink => sink instanceof MemoryBufferSink) as MemoryBufferSink;
+    const memoryBuffer = this.sinks.find(
+      (sink: any) => sink && typeof sink.getBuffer === 'function'
+    ) as any;
     return memoryBuffer ? memoryBuffer.getFilteredBuffer(filter) : [];
   }
 
   exportLogs(format: 'json' | 'csv' | 'txt' = 'json'): string {
-    const memoryBuffer = this.sinks.find(sink => sink instanceof MemoryBufferSink) as MemoryBufferSink;
+    const memoryBuffer = this.sinks.find(
+      (sink: any) => sink && typeof sink.getBuffer === 'function'
+    ) as any;
     return memoryBuffer ? memoryBuffer.exportLogs(format) : '';
   }
 
@@ -668,7 +674,9 @@ export class Logger {
   }
 
   clearLogs(): void {
-    const memoryBuffer = this.sinks.find(sink => sink instanceof MemoryBufferSink) as MemoryBufferSink;
+    const memoryBuffer = this.sinks.find(
+      (sink: any) => sink && typeof sink.getBuffer === 'function'
+    ) as any;
     if (memoryBuffer) {
       memoryBuffer.clear();
     }

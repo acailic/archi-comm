@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Project, 
   Component, 
@@ -13,6 +13,20 @@ import {
   ComponentStatus
 } from '../services/tauri';
 import { isTauriEnvironment, isWebEnvironment, DEBUG, FEATURES, CONFIG } from '../lib/environment';
+ 
+// Helper to always log durations safely from finally blocks
+const logDuration = (
+  action: string,
+  startTime: number,
+  meta?: Record<string, unknown>
+) => {
+  try {
+    const duration = performance.now() - startTime;
+    DEBUG.logPerformance(action, duration, meta || {});
+  } catch {
+    // Silently ignore logging issues
+  }
+};
 import { webNotificationManager, initializeWebFallbacks, webAutoSave } from '../services/web-fallback';
 
 /**
@@ -25,62 +39,61 @@ export const useProjects = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchProjects = useCallback(async () => {
+    const startTime = performance.now();
     try {
       setLoading(true);
       setError(null);
-      
-      const startTime = performance.now();
       const projectList = await ProjectAPI.getProjects();
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('fetchProjects', duration, { count: projectList.length });
-      
-      setProjects(projectList);
+      setProjects(Array.isArray(projectList) ? projectList : []);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch projects';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Project Load Error',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Project Load Error',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
     } finally {
       setLoading(false);
+      // Safe duration logging
+      logDuration('fetchProjects', startTime, {
+        count: Array.isArray(projects) ? projects.length : 0,
+      });
     }
   }, []);
 
   const createProject = useCallback(async (name: string, description: string) => {
+    const startTime = performance.now();
     try {
       setError(null);
-      
-      const startTime = performance.now();
       const newProject = await ProjectAPI.createProject(name, description);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('createProject', duration, { projectId: newProject.id });
-      
       setProjects(prev => [newProject, ...prev]); // Add to beginning for recency
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Project Created',
-          body: `Successfully created project: ${name}`,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Project Created',
+            body: `Successfully created project: ${name}`,
+          })
+          .catch(() => {});
       }
-      
       return newProject;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Project Creation Failed',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Project Creation Failed',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
-      
       return null;
+    } finally {
+      logDuration('createProject', startTime, {});
     }
   }, []);
 
@@ -88,80 +101,77 @@ export const useProjects = () => {
     projectId: string, 
     updates: { name?: string; description?: string; status?: ProjectStatus }
   ) => {
+    const startTime = performance.now();
     try {
       setError(null);
-      
-      const startTime = performance.now();
       const updatedProject = await ProjectAPI.updateProject(projectId, updates);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('updateProject', duration, { projectId, updates });
-      
       if (updatedProject) {
         setProjects(prev => 
-          prev.map(p => p.id === projectId ? updatedProject : p)
+          prev.map(p => (p?.id === projectId ? updatedProject : p))
         );
-        
         if (FEATURES.NOTIFICATIONS && updates.status) {
-          await webNotificationManager.showNotification({
-            title: 'Project Updated',
-            body: `Project status changed to: ${updates.status}`,
-          });
+          webNotificationManager
+            .showNotification({
+              title: 'Project Updated',
+              body: `Project status changed to: ${updates.status}`,
+            })
+            .catch(() => {});
         }
       }
-      
       return updatedProject;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update project';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Project Update Failed',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Project Update Failed',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
-      
       return null;
+    } finally {
+      logDuration('updateProject', startTime, { projectId, updates });
     }
   }, []);
 
   const deleteProject = useCallback(async (projectId: string) => {
+    const startTime = performance.now();
     try {
       setError(null);
       
       // Find project name for notification
-      const project = projects.find(p => p.id === projectId);
+      const project = (projects || []).find(p => p?.id === projectId);
       const projectName = project?.name || 'Unknown Project';
-      
-      const startTime = performance.now();
       const success = await ProjectAPI.deleteProject(projectId);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('deleteProject', duration, { projectId, success });
       
       if (success) {
-        setProjects(prev => prev.filter(p => p.id !== projectId));
-        
+        setProjects(prev => prev.filter(p => p?.id !== projectId));
         if (FEATURES.NOTIFICATIONS) {
-          await webNotificationManager.showNotification({
-            title: 'Project Deleted',
-            body: `Successfully deleted project: ${projectName}`,
-          });
+          webNotificationManager
+            .showNotification({
+              title: 'Project Deleted',
+              body: `Successfully deleted project: ${projectName}`,
+            })
+            .catch(() => {});
         }
       }
-      
       return success;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Project Deletion Failed',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Project Deletion Failed',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
-      
       return false;
+    } finally {
+      logDuration('deleteProject', startTime, { projectId });
     }
   }, [projects]);
 
@@ -198,6 +208,7 @@ export const useProject = (projectId: string | null) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchProject = useCallback(async () => {
+    const startTime = performance.now();
     if (!projectId) {
       setProject(null);
       setLoading(false);
@@ -207,32 +218,31 @@ export const useProject = (projectId: string | null) => {
     try {
       setLoading(true);
       setError(null);
-      
-      const startTime = performance.now();
       const projectData = await ProjectAPI.getProject(projectId);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('fetchProject', duration, { projectId, found: !!projectData });
-      
       setProject(projectData);
       
       if (!projectData && FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Project Not Found',
-          body: `Project with ID ${projectId} was not found`,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Project Not Found',
+            body: `Project with ID ${projectId} was not found`,
+          })
+          .catch(() => {});
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch project';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Project Load Error',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Project Load Error',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
     } finally {
       setLoading(false);
+      logDuration('fetchProject', startTime, { projectId, found: !!project });
     }
   }, [projectId]);
 
@@ -241,44 +251,42 @@ export const useProject = (projectId: string | null) => {
     componentType: ComponentType,
     description: string
   ) => {
+    const startTime = performance.now();
     if (!projectId) return null;
 
     try {
       setError(null);
-      
-      const startTime = performance.now();
       const newComponent = await ComponentAPI.addComponent(projectId, name, componentType, description);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('addComponent', duration, { componentId: newComponent?.id });
-      
       if (newComponent && project) {
         setProject({
           ...project,
-          components: [...project.components, newComponent],
+          components: [...(project.components || []), newComponent],
           updated_at: new Date().toISOString(),
         });
-        
         if (FEATURES.NOTIFICATIONS) {
-          await webNotificationManager.showNotification({
-            title: 'Component Added',
-            body: `Added ${componentType} component: ${name}`,
-          });
+          webNotificationManager
+            .showNotification({
+              title: 'Component Added',
+              body: `Added ${componentType} component: ${name}`,
+            })
+            .catch(() => {});
         }
       }
-      
       return newComponent;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add component';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Component Addition Failed',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Component Addition Failed',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
-      
       return null;
+    } finally {
+      logDuration('addComponent', startTime, { componentType, projectId });
     }
   }, [projectId, project]);
 
@@ -291,76 +299,73 @@ export const useProject = (projectId: string | null) => {
       dependencies?: string[];
     }
   ) => {
+    const startTime = performance.now();
     if (!projectId) return null;
 
     try {
       setError(null);
-      
-      const startTime = performance.now();
       const updatedComponent = await ComponentAPI.updateComponent(projectId, componentId, updates);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('updateComponent', duration, { componentId, updates });
-      
       if (updatedComponent && project) {
         setProject({
           ...project,
-          components: project.components.map(c => 
-            c.id === componentId ? updatedComponent : c
+          components: (project.components || []).map(c => 
+            (c?.id === componentId) ? updatedComponent : c
           ),
           updated_at: new Date().toISOString(),
         });
-        
         if (FEATURES.NOTIFICATIONS && updates.status) {
-          await webNotificationManager.showNotification({
-            title: 'Component Updated',
-            body: `${updatedComponent.name} status: ${updates.status}`,
-          });
+          webNotificationManager
+            .showNotification({
+              title: 'Component Updated',
+              body: `${updatedComponent.name} status: ${updates.status}`,
+            })
+            .catch(() => {});
         }
       }
-      
       return updatedComponent;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update component';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Component Update Failed',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Component Update Failed',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
-      
       return null;
+    } finally {
+      logDuration('updateComponent', startTime, { componentId, projectId });
     }
   }, [projectId, project]);
 
   const removeComponent = useCallback(async (componentId: string) => {
+    const startTime = performance.now();
     if (!projectId) return false;
 
     try {
       setError(null);
       
       // Find component name for notification
-      const component = project?.components.find(c => c.id === componentId);
+      const component = (project?.components || []).find(c => c?.id === componentId);
       const componentName = component?.name || 'Unknown Component';
       
-      const startTime = performance.now();
       const success = await ComponentAPI.removeComponent(projectId, componentId);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('removeComponent', duration, { componentId, success });
       
       if (success && project) {
         setProject({
           ...project,
-          components: project.components.filter(c => c.id !== componentId),
+          components: (project.components || []).filter(c => c?.id !== componentId),
           updated_at: new Date().toISOString(),
         });
-        
         if (FEATURES.NOTIFICATIONS) {
-          await webNotificationManager.showNotification({
-            title: 'Component Removed',
-            body: `Removed component: ${componentName}`,
-          });
+          webNotificationManager
+            .showNotification({
+              title: 'Component Removed',
+              body: `Removed component: ${componentName}`,
+            })
+            .catch(() => {});
         }
       }
       
@@ -370,13 +375,17 @@ export const useProject = (projectId: string | null) => {
       setError(errorMessage);
       
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Component Removal Failed',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Component Removal Failed',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
       
       return false;
+    } finally {
+      logDuration('removeComponent', startTime, { componentId, projectId });
     }
   }, [projectId, project]);
 
@@ -408,9 +417,10 @@ export const useDiagram = (projectId: string | null) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [autoSaveTimer, setAutoSaveTimer] = useState<number | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
 
   const loadDiagram = useCallback(async () => {
+    const startTime = performance.now();
     if (!projectId) {
       setElements([]);
       setConnections([]);
@@ -426,8 +436,8 @@ export const useDiagram = (projectId: string | null) => {
       if (isWebEnvironment()) {
         const autoSavedData = webAutoSave.load();
         if (autoSavedData && autoSavedData.projectId === projectId) {
-          setElements(autoSavedData.elements || []);
-          setConnections(autoSavedData.connections || []);
+          setElements(Array.isArray(autoSavedData.elements) ? autoSavedData.elements : []);
+          setConnections(Array.isArray(autoSavedData.connections) ? autoSavedData.connections : []);
           setIsDirty(false);
           setLoading(false);
           DEBUG.logPerformance('loadDiagram.web.autosave', 0, { success: true });
@@ -435,32 +445,31 @@ export const useDiagram = (projectId: string | null) => {
         }
       }
 
-      const startTime = performance.now();
       const [diagramElements, diagramConnections] = await Promise.all([
         DiagramAPI.loadDiagram(projectId),
         DiagramAPI.loadConnections(projectId),
       ]);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('loadDiagram', duration, { 
-        elementsCount: diagramElements.length, 
-        connectionsCount: diagramConnections.length 
-      });
       
-      setElements(diagramElements);
-      setConnections(diagramConnections);
+      setElements(Array.isArray(diagramElements) ? diagramElements : []);
+      setConnections(Array.isArray(diagramConnections) ? diagramConnections : []);
       setIsDirty(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load diagram';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Diagram Load Error',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Diagram Load Error',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
     } finally {
       setLoading(false);
+      logDuration('loadDiagram', startTime, {
+        elementsCount: Array.isArray(elements) ? elements.length : 0,
+        connectionsCount: Array.isArray(connections) ? connections.length : 0,
+      });
     }
   }, [projectId]);
 
@@ -468,22 +477,15 @@ export const useDiagram = (projectId: string | null) => {
     newElements: DiagramElement[],
     newConnections: Connection[]
   ) => {
+    const startTime = performance.now();
     if (!projectId) return false;
 
     try {
       setError(null);
-      
-      const startTime = performance.now();
       await Promise.all([
         DiagramAPI.saveDiagram(projectId, newElements),
         DiagramAPI.saveConnections(projectId, newConnections),
       ]);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('saveDiagram', duration, { 
-        elementsCount: newElements.length, 
-        connectionsCount: newConnections.length 
-      });
-      
       setElements(newElements);
       setConnections(newConnections);
       setIsDirty(false);
@@ -491,27 +493,33 @@ export const useDiagram = (projectId: string | null) => {
       if (isWebEnvironment()) {
         webAutoSave.stop();
       }
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Diagram Saved',
-          body: 'Your diagram has been saved successfully',
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Diagram Saved',
+            body: 'Your diagram has been saved successfully',
+          })
+          .catch(() => {});
       }
       
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save diagram';
       setError(errorMessage);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Diagram Save Failed',
-          body: errorMessage,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Diagram Save Failed',
+            body: errorMessage,
+          })
+          .catch(() => {});
       }
-      
       return false;
+    } finally {
+      logDuration('saveDiagram', startTime, {
+        elementsCount: Array.isArray(newElements) ? newElements.length : 0,
+        connectionsCount: Array.isArray(newConnections) ? newConnections.length : 0,
+      });
     }
   }, [projectId]);
 
@@ -526,16 +534,16 @@ export const useDiagram = (projectId: string | null) => {
       return;
     }
     
-    if (autoSaveTimer) {
-      clearTimeout(autoSaveTimer);
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
     }
     
     const timer = window.setTimeout(() => {
       saveDiagram(elementsToSave, connectionsToSave);
     }, CONFIG.AUTO_SAVE_INTERVAL);
     
-    setAutoSaveTimer(timer);
-  }, [projectId, autoSaveTimer, saveDiagram]);
+    autoSaveTimerRef.current = timer;
+  }, [projectId, saveDiagram]);
   
   // Update elements with auto-save
   const updateElements = useCallback((newElements: DiagramElement[]) => {
@@ -557,11 +565,11 @@ export const useDiagram = (projectId: string | null) => {
       if (isWebEnvironment()) {
         webAutoSave.stop();
       }
-      if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [loadDiagram, autoSaveTimer]);
+  }, [loadDiagram]);
 
   return {
     elements,
@@ -596,15 +604,14 @@ export const useUtilities = () => {
     const startTime = performance.now();
     try {
       const version = await UtilityAPI.getAppVersion();
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('getAppVersion', duration, { version });
-      
       setAppVersion(version);
       setEnvironment(isTauriEnvironment() ? 'Tauri Desktop' : 'Web Browser');
     } catch (err) {
       console.error('Failed to get app version:', err);
       setAppVersion('Unknown');
       setEnvironment(isTauriEnvironment() ? 'Tauri Desktop (Error)' : 'Web Browser');
+    } finally {
+      logDuration('getAppVersion', startTime, {});
     }
   }, []);
 
@@ -612,17 +619,18 @@ export const useUtilities = () => {
     const startTime = performance.now();
     try {
       await UtilityAPI.showInFolder(path);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('showInFolder', duration, { path });
     } catch (err) {
       console.error('Failed to show in folder:', err);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Show in Folder',
-          body: `Cannot open folder: ${path}`,
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Show in Folder',
+            body: `Cannot open folder: ${path}`,
+          })
+          .catch(() => {});
       }
+    } finally {
+      logDuration('showInFolder', startTime, { path });
     }
   }, []);
 
@@ -630,28 +638,29 @@ export const useUtilities = () => {
     const startTime = performance.now();
     try {
       const result = await UtilityAPI.exportProjectData(projectId);
-      const duration = performance.now() - startTime;
-      DEBUG.logPerformance('exportProject', duration, { projectId, size: result?.length });
-      
       if (result && FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Export Complete',
-          body: 'Project data has been exported successfully',
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Export Complete',
+            body: 'Project data has been exported successfully',
+          })
+          .catch(() => {});
       }
       
       return result;
     } catch (err) {
       console.error('Failed to export project:', err);
-      
       if (FEATURES.NOTIFICATIONS) {
-        await webNotificationManager.showNotification({
-          title: 'Export Failed',
-          body: 'Failed to export project data',
-        });
+        webNotificationManager
+          .showNotification({
+            title: 'Export Failed',
+            body: 'Failed to export project data',
+          })
+          .catch(() => {});
       }
-      
       return null;
+    } finally {
+      logDuration('exportProject', startTime, { projectId });
     }
   }, []);
 
