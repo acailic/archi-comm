@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -6,7 +6,10 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from './ui/sidebar';
-import { ComponentPalette } from './ComponentPalette';
+// Lazy-load and memoize ComponentPalette to improve performance
+const ComponentPalette = React.lazy(() =>
+  import('./ComponentPalette').then((m) => ({ default: React.memo(m.ComponentPalette) }))
+);
 import type { DesignComponent } from '../App';
 import { FileText, Copy, ChevronDown, ChevronRight } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -31,8 +34,14 @@ export function VerticalSidebar({
   };
 
   return (
-    // Use solid sidebar variant so it always renders at fixed width
-    <Sidebar side="left" variant="sidebar" collapsible="none" className="h-full">
+    // Solid sidebar with explicit width so it always renders
+    <Sidebar
+      side="left"
+      variant="sidebar"
+      collapsible="none"
+      className="h-full w-80 shrink-0 border-r bg-card/50"
+      style={{ width: '20rem' }}
+    >
       <SidebarContent className="flex flex-col h-full">
         {/* Assignment summary */}
         {challenge && (
@@ -63,7 +72,7 @@ export function VerticalSidebar({
                     <ScrollArea className="h-28 rounded border bg-card/50">
                       <ul className="p-2 text-xs space-y-1">
                         {challenge.requirements.map((req, i) => (
-                          <li key={i} className="flex gap-2">
+                          <li key={`${req}-${i}`} className="flex gap-2">
                             <span className="mt-[6px] inline-block h-1.5 w-1.5 rounded-full bg-foreground/60" />
                             <span className="leading-snug">{req}</span>
                           </li>
@@ -86,7 +95,9 @@ export function VerticalSidebar({
         <SidebarGroup className="flex-1">
           <SidebarGroupLabel>Component Library</SidebarGroupLabel>
           <div className="flex-1 p-2">
-            <ComponentPalette />
+            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading components…</div>}>
+              <ComponentPalette />
+            </Suspense>
           </div>
         </SidebarGroup>
       </SidebarContent>

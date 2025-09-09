@@ -70,9 +70,10 @@ interface DesignCanvasProps {
   initialData: DesignData;
   onComplete: (data: DesignData) => void;
   onBack: () => void;
+  onOpenCommandPalette: () => void;
 }
 
-export function DesignCanvas({ challenge, initialData, onComplete, onBack }: DesignCanvasProps) {
+export function DesignCanvas({ challenge, initialData, onComplete, onBack, onOpenCommandPalette }: DesignCanvasProps) {
   // Guard for differing react-dnd backend expectations (class vs factory)
   const dndBackendFactory = useMemo(() => {
     try {
@@ -1399,7 +1400,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   return (
     <DndProvider backend={dndBackendFactory}>
       <SidebarProvider defaultOpen>
-      <div className="h-screen flex flex-col">
+      <div className="min-h-svh flex flex-col">
         {/* Main Toolbar */}
         <TopBar
           onBack={onBack}
@@ -1425,6 +1426,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             }, true);
             setShowHints(newHintsState);
           }}
+          onOpenCommandPalette={onOpenCommandPalette}
           onSave={() => { try { forceSave(); } catch {} handleSave(); workflowTracker.trackAction('manual_save', 300, true, 'design-canvas'); }}
           onExportJSON={() => { handleExport(); workflowTracker.trackAction('export_json', 500, true, 'design-canvas'); }}
           onExportPNG={() => { handleExportImage(); workflowTracker.trackAction('export_png', 2000, true, 'design-canvas'); }}
@@ -1437,7 +1439,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               designComplexity: designMetrics.complexity
             });
           }}
-          canContinue={components.length > 0 && !isExporting}
+          canContinue={!isExporting}
         />
 
         {/* Canvas Toolbar */}
@@ -1461,16 +1463,16 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
         {/* Template prompt removed: default start is blank. Template can still be loaded via Solution Hints when available. */}
 
         {/* Main Canvas Area */}
-        <div className="flex-1 flex" role="main" aria-labelledby="challenge-title">
+        <div className="flex-1 min-h-0 flex" role="main" aria-labelledby="challenge-title">
           {/* Left Sidebar - Component Library Only */}
-          <div className="w-80 shrink-0 h-full border-r bg-card/50 hidden lg:block">
+          <div className="w-80 shrink-0 h-full border-r bg-card/50">
             <VerticalSidebar
               challenge={challenge}
             />
           </div>
 
           {/* Center - Canvas Area */}
-          <div className="flex-1" role="region" aria-label="Design canvas">
+          <div className="flex-1 min-w-0 min-h-0" role="region" aria-label="Design canvas">
             <CanvasArea
               ref={canvasRef}
               components={components}
@@ -1505,7 +1507,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           </div>
           
           {/* Right Sidebar - Properties, Layers, Assignment */}
-          <div className="w-80 shrink-0 h-full border-l bg-card/50 hidden lg:block">
+          <div className="w-80 shrink-0 h-full border-l bg-card/50">
             <RightSidebar
               selectedComponent={selectedComponent}
               components={components}

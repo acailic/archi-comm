@@ -698,6 +698,7 @@ function AppContent() {
               initialData={designData}
               onComplete={handleDesignComplete}
               onBack={() => navigateTo('challenge-selection')}
+              onOpenCommandPalette={() => setShowCommandPalette(true)}
             />
           </ScreenWrapper>
           

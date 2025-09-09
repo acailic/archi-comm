@@ -59,7 +59,7 @@ export function RightSidebar({
   };
 
   return (
-    <Sidebar side="right" variant="inset" collapsible="none" className="h-full bg-transparent hidden lg:block">
+    <Sidebar side="right" variant="inset" collapsible="none" className="h-full bg-transparent">
       <SidebarContent className="flex flex-col h-full">
         {/* Properties Panel */}
         <SidebarGroup>

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Button } from './ui/button';
 import { SmartTooltip } from './ui/SmartTooltip';
 import { cx, designSystem, getElevation } from '../lib/design-system';
-import { ArrowLeft, Zap, Image, Download, Save } from 'lucide-react';
+import { ArrowLeft, Zap, Image, Download, Save, Search } from 'lucide-react';
 
 export interface TopBarProps {
   // Navigation
@@ -31,6 +31,9 @@ export interface TopBarProps {
   isExporting?: boolean;
   onContinue: () => void;
   canContinue: boolean;
+
+  // Commands
+  onOpenCommandPalette: () => void;
 }
 
 export function TopBar(props: TopBarProps) {
@@ -52,6 +55,7 @@ export function TopBar(props: TopBarProps) {
     isExporting,
     onContinue,
     canContinue,
+    onOpenCommandPalette,
   } = props;
 
   return (
@@ -83,8 +87,7 @@ export function TopBar(props: TopBarProps) {
               </p>
             )}
             <div className="text-[11px] text-muted-foreground mt-0.5" aria-live="polite">
-              Components: {componentCount} • Connections: {connectionCount}
-              {isSaving && <span className="ml-2 text-blue-600">• Saving…</span>}
+              {isSaving && <span className="text-blue-600">• Saving…</span>}
               {designComplexity !== undefined && designComplexity > 70 && (
                 <span className="ml-2 text-amber-600">• Large design</span>
               )}
@@ -113,6 +116,23 @@ export function TopBar(props: TopBarProps) {
           >
             <Button variant="outline" size="sm" onClick={onToggleHints} aria-pressed={showHints}>
               {showHints ? 'Hide Hints' : 'Show Hints'}
+            </Button>
+          </SmartTooltip>
+
+          {/* Command Palette / Search */}
+          <SmartTooltip 
+            content="Search commands" 
+            contextualHelp="Access all app commands and shortcuts" 
+            shortcut="Ctrl+K"
+          >
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onOpenCommandPalette}
+              aria-label="Open command palette"
+            >
+              <Search className="mr-2 h-4 w-4" />
+              Search
             </Button>
           </SmartTooltip>
 
