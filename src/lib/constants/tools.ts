@@ -1,5 +1,5 @@
 import { MousePointer2, Hand, ZoomIn, MessageSquare } from 'lucide-react';
-import type { ToolType } from '../App';
+import type { ToolType } from '@/shared/contracts';
 
 export interface ToolConfig {
   id: ToolType;
@@ -52,8 +52,11 @@ export const getToolNames = (): string[] => {
 
 // Helper function to get all tool shortcuts
 export const getToolShortcuts = (): Record<string, ToolType> => {
-  return CANVAS_TOOLS.reduce((acc, tool) => {
-    acc[tool.shortcut.toLowerCase()] = tool.id;
-    return acc;
-  }, {} as Record<string, ToolType>);
+  return CANVAS_TOOLS.reduce(
+    (acc, tool) => {
+      acc[tool.shortcut.toLowerCase()] = tool.id;
+      return acc;
+    },
+    {} as Record<string, ToolType>
+  );
 };

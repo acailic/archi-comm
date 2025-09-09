@@ -24,7 +24,7 @@ export function useAutoSave<T>(
   options: UseAutoSaveOptions = {}
 ): UseAutoSaveReturn<T> {
   const { delay = 3000, enabled = true } = options;
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastError, setLastError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function useAutoSave<T>(
 
   const performSave = useCallback(async (dataToSave: T) => {
     if (!dataToSave) return;
-    
+
     setIsSaving(true);
     setStatus('saving');
     setLastError(null);
@@ -61,11 +61,14 @@ export function useAutoSave<T>(
       if (!retryScheduledRef.current) {
         retryScheduledRef.current = true;
         autoSaveTimeoutRef.current && clearTimeout(autoSaveTimeoutRef.current);
-        autoSaveTimeoutRef.current = setTimeout(() => {
-          if (dataToSave) {
-            void performSave(dataToSave);
-          }
-        }, Math.min(delay * 2, 10000));
+        autoSaveTimeoutRef.current = setTimeout(
+          () => {
+            if (dataToSave) {
+              void performSave(dataToSave);
+            }
+          },
+          Math.min(delay * 2, 10000)
+        );
       }
     } finally {
       setIsSaving(false);
@@ -74,13 +77,13 @@ export function useAutoSave<T>(
 
   const forceSave = useCallback(() => {
     if (!data || !enabled) return;
-    
+
     // Clear any pending auto-save
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
       autoSaveTimeoutRef.current = null;
     }
-    
+
     // Perform immediate save
     performSave(data);
     lastSaveDataRef.current = JSON.stringify(data);
@@ -101,14 +104,14 @@ export function useAutoSave<T>(
 
     // Deep comparison using JSON.stringify (same as App.tsx pattern)
     const currentDataString = JSON.stringify(data);
-    
+
     // Only save if data actually changed
     if (currentDataString !== lastSaveDataRef.current) {
       // Clear existing timeout
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
       }
-      
+
       // Set new timeout for debounced save
       autoSaveTimeoutRef.current = setTimeout(() => {
         performSave(data);
@@ -132,6 +135,6 @@ export function useAutoSave<T>(
     cancelAutoSave,
     status,
     lastError,
-    lastSavedAt
+    lastSavedAt,
   };
 }

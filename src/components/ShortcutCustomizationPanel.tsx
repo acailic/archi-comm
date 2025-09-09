@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { getGlobalShortcutManager, ShortcutAction, ShortcutCategory } from '../lib/shortcuts/KeyboardShortcuts';
-import { ShortcutLearningSystem, ShortcutUsageMetrics, LearningRecommendation } from '../lib/shortcuts/ShortcutLearningSystem';
+import {
+  getGlobalShortcutManager,
+  ShortcutAction,
+  ShortcutCategory,
+} from '../lib/shortcuts/KeyboardShortcuts';
+import {
+  ShortcutLearningSystem,
+  ShortcutUsageMetrics,
+  LearningRecommendation,
+} from '../lib/shortcuts/ShortcutLearningSystem';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -28,40 +36,40 @@ const SHORTCUT_SCHEMES: ShortcutScheme[] = [
     id: 'default',
     name: 'ArchiComm Default',
     description: 'Standard ArchiComm shortcuts',
-    shortcuts: {}
+    shortcuts: {},
   },
   {
     id: 'vscode',
     name: 'VS Code Style',
     description: 'Shortcuts similar to Visual Studio Code',
     shortcuts: {
-      'copy': 'Ctrl+C',
-      'paste': 'Ctrl+V',
-      'undo': 'Ctrl+Z',
-      'redo': 'Ctrl+Y',
-      'save': 'Ctrl+S',
-      'find': 'Ctrl+F'
-    }
+      copy: 'Ctrl+C',
+      paste: 'Ctrl+V',
+      undo: 'Ctrl+Z',
+      redo: 'Ctrl+Y',
+      save: 'Ctrl+S',
+      find: 'Ctrl+F',
+    },
   },
   {
     id: 'figma',
     name: 'Figma Style',
     description: 'Shortcuts similar to Figma',
     shortcuts: {
-      'copy': 'Ctrl+C',
-      'paste': 'Ctrl+V',
-      'duplicate': 'Ctrl+D',
-      'group': 'Ctrl+G',
-      'frame': 'F',
-      'text': 'T'
-    }
-  }
+      copy: 'Ctrl+C',
+      paste: 'Ctrl+V',
+      duplicate: 'Ctrl+D',
+      group: 'Ctrl+G',
+      frame: 'F',
+      text: 'T',
+    },
+  },
 ];
 
 export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProps> = ({
   isOpen,
   onClose,
-  className = ''
+  className = '',
 }) => {
   const [shortcuts, setShortcuts] = useState<ShortcutAction[]>([]);
   const [filteredShortcuts, setFilteredShortcuts] = useState<ShortcutAction[]>([]);
@@ -91,7 +99,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
 
   const loadShortcutsData = useCallback(() => {
     if (!shortcutManager) return;
-    
+
     const allShortcuts = shortcutManager.getAllShortcuts();
     const metrics = learningSystem.getShortcutAnalytics();
     const recs = learningSystem.getLearningRecommendations();
@@ -111,10 +119,11 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(shortcut => 
-        shortcut.description.toLowerCase().includes(query) ||
-        shortcut.combination.toLowerCase().includes(query) ||
-        shortcut.id.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        shortcut =>
+          shortcut.description.toLowerCase().includes(query) ||
+          shortcut.combination.toLowerCase().includes(query) ||
+          shortcut.id.toLowerCase().includes(query)
       );
     }
 
@@ -127,7 +136,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
     setRecordingKeys(true);
     setCurrentKeys([]);
     setConflicts([]);
-    
+
     setTimeout(() => {
       recordingInputRef.current?.focus();
     }, 100);
@@ -136,7 +145,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
   const stopRecording = () => {
     setRecordingKeys(false);
     setCurrentKeys([]);
-    
+
     if (recordingInputRef.current) {
       recordingInputRef.current.blur();
     }
@@ -149,29 +158,33 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
     event.stopPropagation();
 
     const keys: string[] = [];
-    
+
     if (event.ctrlKey || event.metaKey) keys.push(event.metaKey ? 'Cmd' : 'Ctrl');
     if (event.altKey) keys.push('Alt');
     if (event.shiftKey) keys.push('Shift');
-    
+
     if (event.key && !['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) {
       keys.push(event.key.toUpperCase());
     }
 
     if (keys.length > 0) {
       setCurrentKeys(keys);
-      
+
       // Check for conflicts
       const combination = keys.join('+');
-      const existingShortcut = shortcuts.find(s => s.combination === combination && s.id !== editingShortcut);
-      
+      const existingShortcut = shortcuts.find(
+        s => s.combination === combination && s.id !== editingShortcut
+      );
+
       if (existingShortcut) {
         const editingShortcutData = shortcuts.find(s => s.id === editingShortcut)!;
-        setConflicts([{
-          existingShortcut,
-          newShortcut: editingShortcutData,
-          combination
-        }]);
+        setConflicts([
+          {
+            existingShortcut,
+            newShortcut: editingShortcutData,
+            combination,
+          },
+        ]);
       } else {
         setConflicts([]);
       }
@@ -182,29 +195,29 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
     if (!editingShortcut || currentKeys.length === 0 || !shortcutManager) return;
 
     const combination = currentKeys.join('+');
-    
+
     // Handle conflicts
     if (conflicts.length > 0) {
       const conflictResolution = window.confirm(
         `The combination "${combination}" is already used by "${conflicts[0].existingShortcut.description}". Do you want to replace it?`
       );
-      
+
       if (!conflictResolution) {
         stopRecording();
         setEditingShortcut(null);
         return;
       }
-      
+
       // Clear the conflicting shortcut
       shortcutManager.updateShortcut(conflicts[0].existingShortcut.id, { combination: '' });
     }
 
     // Update the shortcut
     shortcutManager.updateShortcut(editingShortcut, { combination });
-    
+
     // Update local state
     setShortcuts(shortcutManager.getAllShortcuts());
-    
+
     stopRecording();
     setEditingShortcut(null);
   };
@@ -232,7 +245,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
     const data = {
       shortcuts: shortcuts.map(s => ({ id: s.id, combination: s.combination })),
       scheme: activeScheme,
-      exportedAt: new Date().toISOString()
+      exportedAt: new Date().toISOString(),
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -249,19 +262,19 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        
+
         if (data.shortcuts && Array.isArray(data.shortcuts) && shortcutManager) {
           data.shortcuts.forEach((shortcut: { id: string; combination: string }) => {
             shortcutManager.updateShortcut(shortcut.id, { combination: shortcut.combination });
           });
-          
+
           if (data.scheme) {
             setActiveScheme(data.scheme);
           }
-          
+
           setShortcuts(shortcutManager.getAllShortcuts());
         }
       } catch (error) {
@@ -270,7 +283,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
       }
     };
     reader.readAsText(file);
-    
+
     // Reset the input
     event.target.value = '';
   };
@@ -289,7 +302,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isOpen) return;
-      
+
       if (event.key === 'Escape' && !recordingKeys) {
         onClose();
       }
@@ -305,7 +318,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
       const firstFocusable = panelRef.current.querySelector(
         'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
       ) as HTMLElement;
-      
+
       if (firstFocusable) {
         firstFocusable.focus();
       }
@@ -320,8 +333,8 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-        onClick={(e) => e.target === e.currentTarget && !recordingKeys && onClose()}
+        className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50'
+        onClick={e => e.target === e.currentTarget && !recordingKeys && onClose()}
       >
         <motion.div
           ref={panelRef}
@@ -329,29 +342,25 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           className={`bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${className}`}
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className='flex items-center justify-between p-6 border-b border-gray-200'>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Keyboard Shortcuts</h2>
-              <p className="text-sm text-gray-600 mt-1">Customize and learn keyboard shortcuts</p>
+              <h2 className='text-xl font-semibold text-gray-900'>Keyboard Shortcuts</h2>
+              <p className='text-sm text-gray-600 mt-1'>Customize and learn keyboard shortcuts</p>
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAnalytics(!showAnalytics)}
-              >
+
+            <div className='flex items-center space-x-2'>
+              <Button variant='outline' size='sm' onClick={() => setShowAnalytics(!showAnalytics)}>
                 {showAnalytics ? 'Hide' : 'Show'} Analytics
               </Button>
-              
+
               <Button
-                variant="ghost"
-                size="sm"
+                variant='ghost'
+                size='sm'
                 onClick={onClose}
-                aria-label="Close shortcuts panel"
+                aria-label='Close shortcuts panel'
               >
                 ✕
               </Button>
@@ -359,40 +368,40 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
           </div>
 
           {/* Controls */}
-          <div className="p-6 border-b border-gray-200 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
+          <div className='p-6 border-b border-gray-200 space-y-4'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center space-x-4'>
                 {/* Category filter */}
                 <select
                   value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value as ShortcutCategory | 'all')}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={e => setSelectedCategory(e.target.value as ShortcutCategory | 'all')}
+                  className='px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
                 >
-                  <option value="all">All Categories</option>
-                  <option value="navigation">Navigation</option>
-                  <option value="editing">Editing</option>
-                  <option value="view">View</option>
-                  <option value="tools">Tools</option>
-                  <option value="workflow">Workflow</option>
+                  <option value='all'>All Categories</option>
+                  <option value='navigation'>Navigation</option>
+                  <option value='editing'>Editing</option>
+                  <option value='view'>View</option>
+                  <option value='tools'>Tools</option>
+                  <option value='workflow'>Workflow</option>
                 </select>
 
                 {/* Search */}
                 <input
-                  type="text"
-                  placeholder="Search shortcuts..."
+                  type='text'
+                  placeholder='Search shortcuts...'
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className='px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
                 />
               </div>
 
               {/* Scheme selector */}
-              <div className="flex items-center space-x-2">
-                <label className="text-sm text-gray-600">Scheme:</label>
+              <div className='flex items-center space-x-2'>
+                <label className='text-sm text-gray-600'>Scheme:</label>
                 <select
                   value={activeScheme}
-                  onChange={(e) => applyScheme(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={e => applyScheme(e.target.value)}
+                  className='px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
                 >
                   {SHORTCUT_SCHEMES.map(scheme => (
                     <option key={scheme.id} value={scheme.id}>
@@ -404,26 +413,21 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
             </div>
 
             {/* Import/Export */}
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={exportShortcuts}>
+            <div className='flex items-center space-x-2'>
+              <Button variant='outline' size='sm' onClick={exportShortcuts}>
                 Export
               </Button>
-              
-              <label className="cursor-pointer">
-                <Button variant="outline" size="sm" as="span">
+
+              <label className='cursor-pointer'>
+                <Button variant='outline' size='sm' as='span'>
                   Import
                 </Button>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={importShortcuts}
-                  className="hidden"
-                />
+                <input type='file' accept='.json' onChange={importShortcuts} className='hidden' />
               </label>
 
               <Button
-                variant="outline"
-                size="sm"
+                variant='outline'
+                size='sm'
                 onClick={() => {
                   if (window.confirm('Reset all shortcuts to defaults?') && shortcutManager) {
                     shortcutManager.resetAllShortcuts();
@@ -437,12 +441,12 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
 
             {/* Learning Recommendations */}
             {recommendations.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-blue-900 mb-2">Learning Recommendations</h3>
-                <div className="space-y-2">
+              <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
+                <h3 className='text-sm font-medium text-blue-900 mb-2'>Learning Recommendations</h3>
+                <div className='space-y-2'>
                   {recommendations.slice(0, 3).map((rec, index) => (
-                    <div key={index} className="text-sm text-blue-800">
-                      <span className="font-medium">{rec.title}:</span> {rec.description}
+                    <div key={index} className='text-sm text-blue-800'>
+                      <span className='font-medium'>{rec.title}:</span> {rec.description}
                     </div>
                   ))}
                 </div>
@@ -451,61 +455,78 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-auto max-h-96">
+          <div className='flex-1 overflow-auto max-h-96'>
             {showAnalytics ? (
               // Analytics View
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {usageMetrics.length}
-                    </div>
-                    <div className="text-sm text-gray-600">Shortcuts Used</div>
+              <div className='p-6 space-y-6'>
+                <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+                  <div className='bg-gray-50 rounded-lg p-4'>
+                    <div className='text-2xl font-bold text-gray-900'>{usageMetrics.length}</div>
+                    <div className='text-sm text-gray-600'>Shortcuts Used</div>
                   </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {formatTimeSaved(usageMetrics.reduce((sum, m) => sum + (m.averageTimeSaved * m.successfulUsageCount), 0))}
+
+                  <div className='bg-gray-50 rounded-lg p-4'>
+                    <div className='text-2xl font-bold text-gray-900'>
+                      {formatTimeSaved(
+                        usageMetrics.reduce(
+                          (sum, m) => sum + m.averageTimeSaved * m.successfulUsageCount,
+                          0
+                        )
+                      )}
                     </div>
-                    <div className="text-sm text-gray-600">Time Saved</div>
+                    <div className='text-sm text-gray-600'>Time Saved</div>
                   </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-gray-900">
-                      {usageMetrics.length > 0 ? Math.round(usageMetrics.reduce((sum, m) => sum + m.adoptionRate, 0) / usageMetrics.length * 100) : 0}%
+
+                  <div className='bg-gray-50 rounded-lg p-4'>
+                    <div className='text-2xl font-bold text-gray-900'>
+                      {usageMetrics.length > 0
+                        ? Math.round(
+                            (usageMetrics.reduce((sum, m) => sum + m.adoptionRate, 0) /
+                              usageMetrics.length) *
+                              100
+                          )
+                        : 0}
+                      %
                     </div>
-                    <div className="text-sm text-gray-600">Success Rate</div>
+                    <div className='text-sm text-gray-600'>Success Rate</div>
                   </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-gray-900">
+
+                  <div className='bg-gray-50 rounded-lg p-4'>
+                    <div className='text-2xl font-bold text-gray-900'>
                       {learningSystem.getLearningProgress().skillLevel}
                     </div>
-                    <div className="text-sm text-gray-600">Skill Level</div>
+                    <div className='text-sm text-gray-600'>Skill Level</div>
                   </div>
                 </div>
 
                 {/* Top shortcuts */}
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Most Used Shortcuts</h3>
-                  <div className="space-y-2">
+                  <h3 className='text-lg font-medium text-gray-900 mb-4'>Most Used Shortcuts</h3>
+                  <div className='space-y-2'>
                     {usageMetrics
                       .sort((a, b) => b.totalUsageCount - a.totalUsageCount)
                       .slice(0, 10)
                       .map(metric => {
                         const shortcut = shortcuts.find(s => s.id === metric.shortcutId);
                         if (!shortcut) return null;
-                        
+
                         return (
-                          <div key={metric.shortcutId} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                            <div className="flex items-center space-x-3">
-                              <code className="px-2 py-1 bg-gray-200 rounded text-sm">
+                          <div
+                            key={metric.shortcutId}
+                            className='flex items-center justify-between p-3 bg-gray-50 rounded'
+                          >
+                            <div className='flex items-center space-x-3'>
+                              <code className='px-2 py-1 bg-gray-200 rounded text-sm'>
                                 {shortcut.combination || 'Not set'}
                               </code>
-                              <span className="text-sm">{shortcut.description}</span>
+                              <span className='text-sm'>{shortcut.description}</span>
                             </div>
-                            <div className="text-sm text-gray-600">
-                              {metric.totalUsageCount} uses • {formatTimeSaved(metric.averageTimeSaved * metric.successfulUsageCount)} saved
+                            <div className='text-sm text-gray-600'>
+                              {metric.totalUsageCount} uses •{' '}
+                              {formatTimeSaved(
+                                metric.averageTimeSaved * metric.successfulUsageCount
+                              )}{' '}
+                              saved
                             </div>
                           </div>
                         );
@@ -515,54 +536,58 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
               </div>
             ) : (
               // Shortcuts List
-              <div className="p-6">
-                <div className="space-y-2">
+              <div className='p-6'>
+                <div className='space-y-2'>
                   {filteredShortcuts.map(shortcut => {
                     const metrics = getMetricsForShortcut(shortcut.id);
                     const isEditing = editingShortcut === shortcut.id;
-                    
+
                     return (
                       <div
                         key={shortcut.id}
                         className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                          isEditing ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                          isEditing
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:bg-gray-50'
                         }`}
                       >
-                        <div className="flex items-center space-x-4 flex-1">
+                        <div className='flex items-center space-x-4 flex-1'>
                           {/* Shortcut combination */}
-                          <div className="w-32">
+                          <div className='w-32'>
                             {isEditing && recordingKeys ? (
-                              <div className="space-y-2">
+                              <div className='space-y-2'>
                                 <input
                                   ref={recordingInputRef}
-                                  className="w-full px-2 py-1 border border-blue-500 rounded text-sm focus:outline-none"
-                                  placeholder="Press keys..."
+                                  className='w-full px-2 py-1 border border-blue-500 rounded text-sm focus:outline-none'
+                                  placeholder='Press keys...'
                                   value={currentKeys.join('+')}
                                   onKeyDown={handleKeyDown}
                                   readOnly
                                 />
                                 {conflicts.length > 0 && (
-                                  <div className="text-xs text-red-600">
+                                  <div className='text-xs text-red-600'>
                                     Conflicts with: {conflicts[0].existingShortcut.description}
                                   </div>
                                 )}
                               </div>
                             ) : (
-                              <code className="px-2 py-1 bg-gray-100 rounded text-sm">
+                              <code className='px-2 py-1 bg-gray-100 rounded text-sm'>
                                 {shortcut.combination || 'Not set'}
                               </code>
                             )}
                           </div>
 
                           {/* Description */}
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">{shortcut.description}</div>
-                            <div className="text-xs text-gray-500">{shortcut.category}</div>
+                          <div className='flex-1'>
+                            <div className='text-sm font-medium text-gray-900'>
+                              {shortcut.description}
+                            </div>
+                            <div className='text-xs text-gray-500'>{shortcut.category}</div>
                           </div>
 
                           {/* Analytics */}
                           {metrics && (
-                            <div className="text-xs text-gray-500 text-right">
+                            <div className='text-xs text-gray-500 text-right'>
                               <div>{metrics.totalUsageCount} uses</div>
                               <div>{Math.round(metrics.adoptionRate * 100)}% success</div>
                             </div>
@@ -570,19 +595,19 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center space-x-2 ml-4">
+                        <div className='flex items-center space-x-2 ml-4'>
                           {isEditing && recordingKeys ? (
                             <>
                               <Button
-                                size="sm"
+                                size='sm'
                                 onClick={saveShortcut}
                                 disabled={currentKeys.length === 0}
                               >
                                 Save
                               </Button>
                               <Button
-                                variant="outline"
-                                size="sm"
+                                variant='outline'
+                                size='sm'
                                 onClick={() => {
                                   stopRecording();
                                   setEditingShortcut(null);
@@ -594,19 +619,19 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
                           ) : (
                             <>
                               <Button
-                                variant="outline"
-                                size="sm"
+                                variant='outline'
+                                size='sm'
                                 onClick={() => startRecording(shortcut.id)}
                               >
                                 Edit
                               </Button>
-                              
+
                               {shortcut.combination && (
                                 <Button
-                                  variant="ghost"
-                                  size="sm"
+                                  variant='ghost'
+                                  size='sm'
                                   onClick={() => resetShortcut(shortcut.id)}
-                                  title="Reset to default"
+                                  title='Reset to default'
                                 >
                                   ↻
                                 </Button>
@@ -620,7 +645,7 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
                 </div>
 
                 {filteredShortcuts.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className='text-center py-8 text-gray-500'>
                     No shortcuts found matching your criteria.
                   </div>
                 )}
@@ -630,19 +655,19 @@ export const ShortcutCustomizationPanel: React.FC<ShortcutCustomizationPanelProp
 
           {/* Recording overlay */}
           {recordingKeys && (
-            <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-              <div className="bg-white rounded-lg p-6 shadow-xl">
-                <h3 className="text-lg font-medium mb-2">Recording Key Combination</h3>
-                <p className="text-sm text-gray-600 mb-4">
+            <div className='absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center'>
+              <div className='bg-white rounded-lg p-6 shadow-xl'>
+                <h3 className='text-lg font-medium mb-2'>Recording Key Combination</h3>
+                <p className='text-sm text-gray-600 mb-4'>
                   Press the key combination you want to use for this shortcut.
                 </p>
-                <div className="text-center">
-                  <code className="text-lg px-4 py-2 bg-gray-100 rounded">
+                <div className='text-center'>
+                  <code className='text-lg px-4 py-2 bg-gray-100 rounded'>
                     {currentKeys.length > 0 ? currentKeys.join('+') : 'Press keys...'}
                   </code>
                 </div>
-                <div className="mt-4 text-center">
-                  <Button variant="outline" size="sm" onClick={stopRecording}>
+                <div className='mt-4 text-center'>
+                  <Button variant='outline' size='sm' onClick={stopRecording}>
                     Cancel
                   </Button>
                 </div>

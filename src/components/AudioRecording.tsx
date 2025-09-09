@@ -2,8 +2,8 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import type { Challenge, DesignData, AudioData } from '../App';
-import { ArrowLeft, Mic, Square, Play, Pause, FileText } from 'lucide-react';
+import type { Challenge, DesignData, AudioData } from '@/shared/contracts';
+import { ArrowLeft, Mic, Square, Play, Pause, FileText, AlertTriangle } from 'lucide-react';
 
 const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
@@ -29,7 +29,8 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   const [transcript, setTranscript] = useState('');
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  
+  const [showNoAudioWarning, setShowNoAudioWarning] = useState(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
@@ -40,7 +41,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       mediaRecorderRef.current = mediaRecorder;
 
       const chunks: BlobPart[] = [];
-      mediaRecorder.ondataavailable = (event) => {
+      mediaRecorder.ondataavailable = event => {
         chunks.push(event.data);
       };
 
@@ -80,8 +81,6 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
     }
   }, [isRecording]);
 
-
-
   // Play/pause audio
   const toggleAudioPlayback = useCallback(() => {
     if (!audioBlob) return;
@@ -89,10 +88,16 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
     if (!audioElementRef.current) {
       const audio = new Audio(URL.createObjectURL(audioBlob));
       audioElementRef.current = audio;
-      
-      audio.onended = () => { if (mountedRef.current) setIsPlaying(false); };
-      audio.onpause = () => { if (mountedRef.current) setIsPlaying(false); };
-      audio.onplay = () => { if (mountedRef.current) setIsPlaying(true); };
+
+      audio.onended = () => {
+        if (mountedRef.current) setIsPlaying(false);
+      };
+      audio.onpause = () => {
+        if (mountedRef.current) setIsPlaying(false);
+      };
+      audio.onplay = () => {
+        if (mountedRef.current) setIsPlaying(true);
+      };
     }
 
     if (isPlaying) {
@@ -114,6 +119,11 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   }, []);
 
   const handleContinue = useCallback(() => {
+    // If the user proceeds with neither audio nor transcript, show a small, non-blocking notice
+    if (!audioBlob && !transcript.trim()) {
+      setShowNoAudioWarning(true);
+      window.setTimeout(() => setShowNoAudioWarning(false), 3500);
+    }
     const audioData: AudioData = {
       blob: audioBlob,
       transcript,
@@ -123,8 +133,8 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       analysisMetrics: {
         clarityScore: 75,
         technicalDepth: 80,
-        businessFocus: 60
-      }
+        businessFocus: 60,
+      },
     };
     onComplete(audioData);
   }, [audioBlob, transcript, duration, onComplete]);
@@ -136,139 +146,109 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className='h-full flex flex-col'>
       {/* Header */}
-      <div className="border-b bg-card p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+      <div className='border-b bg-card p-4'>
+        <div className='flex items-center justify-between'>
+          <div className='flex items-center gap-4'>
+            <Button variant='ghost' size='sm' onClick={onBack}>
+              <ArrowLeft className='w-4 h-4 mr-2' />
               Back to Design
             </Button>
             <div>
               <h2>Record Your Explanation</h2>
-              <p className="text-sm text-muted-foreground">
+              <p className='text-sm text-muted-foreground'>
                 Explain your system design for {challenge.title}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              {designData.components.length} Components
-            </Badge>
-            <Badge variant="outline">
-              {designData.connections.length} Connections
-            </Badge>
+          <div className='flex items-center gap-2'>
+            <Badge variant='outline'>{designData.components.length} Components</Badge>
+            <Badge variant='outline'>{designData.connections.length} Connections</Badge>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 p-8">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className='flex-1 p-8'>
+        <div className='max-w-4xl mx-auto space-y-6'>
           {/* Recording Card */}
           <Card>
             <CardHeader>
               <CardTitle>Audio Recording</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center">
-                <div className="text-4xl mb-4">
-                  {formatDuration(duration)}
-                </div>
-                
-                <div className="flex justify-center gap-4">
+            <CardContent className='space-y-4'>
+              <div className='text-center'>
+                <div className='text-4xl mb-4'>{formatDuration(duration)}</div>
+
+                <div className='flex justify-center gap-4'>
                   {!isRecording ? (
                     <Button
                       onClick={startRecording}
-                      size="lg"
-                      className="bg-red-500 hover:bg-red-600"
+                      size='lg'
+                      className='bg-red-500 hover:bg-red-600'
                     >
-                      <Mic className="w-5 h-5 mr-2" />
+                      <Mic className='w-5 h-5 mr-2' />
                       Start Recording
                     </Button>
                   ) : (
-                    <Button
-                      onClick={stopRecording}
-                      size="lg"
-                      variant="outline"
-                    >
-                      <Square className="w-5 h-5 mr-2" />
+                    <Button onClick={stopRecording} size='lg' variant='outline'>
+                      <Square className='w-5 h-5 mr-2' />
                       Stop Recording
                     </Button>
                   )}
-                  
+
                   {audioBlob && (
-                    <Button
-                      onClick={toggleAudioPlayback}
-                      size="lg"
-                      variant="outline"
-                    >
-                      {isPlaying ? <Pause className="w-5 h-5 mr-2" /> : <Play className="w-5 h-5 mr-2" />}
+                    <Button onClick={toggleAudioPlayback} size='lg' variant='outline'>
+                      {isPlaying ? (
+                        <Pause className='w-5 h-5 mr-2' />
+                      ) : (
+                        <Play className='w-5 h-5 mr-2' />
+                      )}
                       {isPlaying ? 'Pause' : 'Play'}
                     </Button>
                   )}
                 </div>
 
                 {isRecording && (
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-muted-foreground">Recording...</span>
+                  <div className='mt-4 flex items-center justify-center gap-2'>
+                    <div className='w-3 h-3 bg-red-500 rounded-full animate-pulse' />
+                    <span className='text-sm text-muted-foreground'>Recording...</span>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Transcript Card with Pro upgrade prompt */}
+          {/* Transcript Card */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
+              <div className='flex items-center justify-between'>
+                <CardTitle className='flex items-center gap-2'>
+                  <FileText className='w-5 h-5' />
                   Transcript
                 </CardTitle>
-                <Button
-                  onClick={() => setTranscript('')}
-                  size="sm"
-                  variant="ghost"
-                >
+                <Button onClick={() => setTranscript('')} size='sm' variant='ghost'>
                   Clear
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Pro Upgrade Banner */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-4 mb-2">
-                <div className="flex-shrink-0">
-                  <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.09 6.26L21 9.27l-5 4.87L17.18 21 12 17.27 6.82 21 8 14.14l-5-4.87 6.91-1.01z" /></svg>
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-yellow-800">Unlock Pro Audio Features</div>
-                  <div className="text-sm text-yellow-700">Automatic transcription, voice analysis, and AI-powered insights are available in <span className="font-semibold">ArchiComm Pro</span>.</div>
-                </div>
-                <Button
-                  size="sm"
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                  onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
-                >
-                  Learn More
-                </Button>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
+            <CardContent className='space-y-4'>
+              <div className='space-y-2'>
+                <label className='text-sm font-medium'>
                   Manual transcript entry (community version)
                 </label>
                 <textarea
-                  className="w-full h-32 p-3 border rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Type your system design explanation here..."
+                  className='w-full h-32 p-3 border rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  placeholder='Type your system design explanation here...'
                   value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
+                  onChange={e => setTranscript(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Manually enter your explanation for the system design. Automatic transcription is not available in the community version.
+                <p className='text-xs text-muted-foreground'>
+                  Manually enter your explanation for the system design. Automatic transcription is
+                  not available in the community version.
                 </p>
               </div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className='flex items-center justify-between text-xs text-muted-foreground'>
                 <span>
                   Word count: {transcript.split(' ').filter(word => word.length > 0).length}
                 </span>
@@ -276,13 +256,15 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
             </CardContent>
           </Card>
 
-          {/* Continue Button */}
-          <div className="flex justify-end">
-            <Button
-              onClick={handleContinue}
-              disabled={!audioBlob && !transcript.trim()}
-              size="lg"
-            >
+          {/* Continue Button (always enabled) with inline warning when skipping */}
+          <div className='flex justify-end items-center gap-3'>
+            {showNoAudioWarning && (
+              <div className='text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded px-2 py-1 flex items-center gap-1'>
+                <AlertTriangle className='w-3 h-3' />
+                Proceeding without audio or transcript
+              </div>
+            )}
+            <Button onClick={handleContinue} size='lg'>
               Continue to Review
             </Button>
           </div>

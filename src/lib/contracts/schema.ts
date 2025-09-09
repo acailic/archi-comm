@@ -30,10 +30,10 @@ export const Connection = z.object({
 export const Component = z.object({
   id: z.string(),
   name: z.string(),
-  component_type: z.enum(['Frontend','Backend','Database','Api','Service','Integration']),
+  component_type: z.enum(['Frontend', 'Backend', 'Database', 'Api', 'Service', 'Integration']),
   description: z.string(),
   dependencies: z.array(z.string()),
-  status: z.enum(['NotStarted','InProgress','Testing','Done']),
+  status: z.enum(['NotStarted', 'InProgress', 'Testing', 'Done']),
   metadata: z.record(z.string()).default({}),
 });
 
@@ -43,7 +43,7 @@ export const Project = z.object({
   description: z.string(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
-  status: z.enum(['Planning','InProgress','Review','Complete']),
+  status: z.enum(['Planning', 'InProgress', 'Review', 'Complete']),
   components: z.array(Component),
 });
 
@@ -59,4 +59,3 @@ export const ReviewResp = z.object({
   score: z.number().int().min(0).max(100).default(0),
 });
 export type ReviewResp = z.infer<typeof ReviewResp>;
-

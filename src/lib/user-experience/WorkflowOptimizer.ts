@@ -61,18 +61,18 @@ export interface UserStrugglePoint {
 
 export class WorkflowOptimizer {
   private static instance: WorkflowOptimizer | null = null;
-  
+
   private actionHistory: WorkflowAction[] = [];
   private detectedPatterns: Map<string, WorkflowPattern> = new Map();
   private optimizations: WorkflowOptimization[] = [];
   private efficiencyMetrics: Map<string, WorkflowEfficiencyMetrics> = new Map();
   private userStrugglePoints: Map<string, UserStrugglePoint> = new Map();
-  
+
   private readonly maxHistorySize = 5000;
   private readonly patternDetectionWindow = 30 * 24 * 60 * 60 * 1000; // 30 days
   private readonly minPatternFrequency = 3;
   private readonly struggleThreshold = 2; // Actions attempted more than twice
-  
+
   private sessionId: string = this.generateSessionId();
   private currentSequence: WorkflowAction[] = [];
   private sequenceTimeout: NodeJS.Timeout | null = null;
@@ -90,7 +90,13 @@ export class WorkflowOptimizer {
   }
 
   // Action tracking
-  public trackAction(type: string, duration: number = 0, success: boolean = true, context: string = '', metadata?: Record<string, any>): void {
+  public trackAction(
+    type: string,
+    duration: number = 0,
+    success: boolean = true,
+    context: string = '',
+    metadata?: Record<string, any>
+  ): void {
     const action: WorkflowAction = {
       type,
       timestamp: Date.now(),
@@ -120,9 +126,12 @@ export class WorkflowOptimizer {
     }
 
     // End sequence after 5 minutes of inactivity
-    this.sequenceTimeout = setTimeout(() => {
-      this.processSequence();
-    }, 5 * 60 * 1000);
+    this.sequenceTimeout = setTimeout(
+      () => {
+        this.processSequence();
+      },
+      5 * 60 * 1000
+    );
 
     // Trigger immediate analysis for certain action types
     if (this.isCompletionAction(type)) {
@@ -157,7 +166,7 @@ export class WorkflowOptimizer {
     if (patternId) {
       return this.optimizations.filter(opt => opt.patternId === patternId);
     }
-    
+
     return [...this.optimizations].sort((a, b) => {
       // Sort by estimated time saving and confidence
       const scoreA = a.estimatedTimeSaving * a.confidence;
@@ -183,8 +192,8 @@ export class WorkflowOptimizer {
           optimizationType: opt.type,
           category: opt.category,
           timeSaving: opt.estimatedTimeSaving,
-          implementation: opt.implementation
-        }
+          implementation: opt.implementation,
+        },
       });
     });
 
@@ -204,8 +213,8 @@ export class WorkflowOptimizer {
         metadata: {
           action: struggle.action,
           context: struggle.context,
-          improvements: struggle.suggestedImprovements
-        }
+          improvements: struggle.suggestedImprovements,
+        },
       });
     });
 
@@ -225,8 +234,8 @@ export class WorkflowOptimizer {
         metadata: {
           patternId: pattern.id,
           currentEfficiency: pattern.successRate,
-          averageDuration: pattern.averageDuration
-        }
+          averageDuration: pattern.averageDuration,
+        },
       });
     });
 
@@ -239,22 +248,21 @@ export class WorkflowOptimizer {
       const metrics = this.efficiencyMetrics.get(patternId);
       return metrics ? [metrics] : [];
     }
-    
+
     return Array.from(this.efficiencyMetrics.values());
   }
 
   public getUserStrugglePoints(): UserStrugglePoint[] {
-    return Array.from(this.userStrugglePoints.values())
-      .sort((a, b) => b.frequency - a.frequency);
+    return Array.from(this.userStrugglePoints.values()).sort((a, b) => b.frequency - a.frequency);
   }
 
   public getWorkflowPatterns(category?: WorkflowPattern['category']): WorkflowPattern[] {
     const patterns = Array.from(this.detectedPatterns.values());
-    
+
     if (category) {
       return patterns.filter(p => p.category === category);
     }
-    
+
     return patterns.sort((a, b) => b.frequency - a.frequency);
   }
 
@@ -267,11 +275,12 @@ export class WorkflowOptimizer {
   } {
     const patterns = Array.from(this.detectedPatterns.values());
     const optimizations = this.getOptimizationSuggestions();
-    
+
     const totalWorkflows = patterns.length;
-    const averageEfficiency = patterns.length > 0 
-      ? patterns.reduce((sum, p) => sum + p.successRate, 0) / patterns.length 
-      : 1;
+    const averageEfficiency =
+      patterns.length > 0
+        ? patterns.reduce((sum, p) => sum + p.successRate, 0) / patterns.length
+        : 1;
 
     const bottleneckMap = new Map<string, number>();
     Array.from(this.efficiencyMetrics.values()).forEach(metrics => {
@@ -285,15 +294,17 @@ export class WorkflowOptimizer {
       .slice(0, 5)
       .map(([step]) => step);
 
-    const timeSavingPotential = optimizations
-      .reduce((sum, opt) => sum + opt.estimatedTimeSaving, 0);
+    const timeSavingPotential = optimizations.reduce(
+      (sum, opt) => sum + opt.estimatedTimeSaving,
+      0
+    );
 
     return {
       totalWorkflows,
       averageEfficiency,
       topBottlenecks,
       improvementOpportunities: optimizations.length,
-      timeSavingPotential
+      timeSavingPotential,
     };
   }
 
@@ -308,12 +319,15 @@ export class WorkflowOptimizer {
     });
 
     // Set up periodic recommendation updates
-    setInterval(() => {
-      const newRecommendations = this.generateRecommendations();
-      newRecommendations.forEach(rec => {
-        uxOptimizer.addRecommendation(rec);
-      });
-    }, 10 * 60 * 1000); // Every 10 minutes
+    setInterval(
+      () => {
+        const newRecommendations = this.generateRecommendations();
+        newRecommendations.forEach(rec => {
+          uxOptimizer.addRecommendation(rec);
+        });
+      },
+      10 * 60 * 1000
+    ); // Every 10 minutes
   }
 
   // Private implementation methods
@@ -333,7 +347,11 @@ export class WorkflowOptimizer {
     patterns.forEach(pattern => {
       const optimizations = this.generateOptimizationsForPattern(pattern);
       optimizations.forEach(opt => {
-        if (!this.optimizations.find(existing => existing.patternId === opt.patternId && existing.type === opt.type)) {
+        if (
+          !this.optimizations.find(
+            existing => existing.patternId === opt.patternId && existing.type === opt.type
+          )
+        ) {
           this.optimizations.push(opt);
         }
       });
@@ -347,7 +365,7 @@ export class WorkflowOptimizer {
 
     // Clear current sequence
     this.currentSequence = [];
-    
+
     // Save data
     this.saveData();
 
@@ -385,22 +403,22 @@ export class WorkflowOptimizer {
 
   private groupSimilarSequences(sequences: WorkflowAction[][]): WorkflowAction[][][] {
     const groups: WorkflowAction[][][] = [];
-    
+
     sequences.forEach(sequence => {
       const sequenceSignature = sequence.map(a => a.type).join('->');
-      
+
       // Find existing group with similar signature
       let foundGroup = false;
       for (const group of groups) {
         const groupSignature = group[0].map(a => a.type).join('->');
-        
+
         if (this.calculateSequenceSimilarity(sequenceSignature, groupSignature) > 0.8) {
           group.push(sequence);
           foundGroup = true;
           break;
         }
       }
-      
+
       // Create new group if no similar one found
       if (!foundGroup) {
         groups.push([sequence]);
@@ -413,36 +431,36 @@ export class WorkflowOptimizer {
   private calculateSequenceSimilarity(seq1: string, seq2: string): number {
     const actions1 = seq1.split('->');
     const actions2 = seq2.split('->');
-    
+
     const longer = actions1.length > actions2.length ? actions1 : actions2;
     const shorter = actions1.length > actions2.length ? actions2 : actions1;
-    
+
     if (longer.length === 0) return 1.0;
-    
+
     let matches = 0;
     shorter.forEach((action, index) => {
       if (longer[index] === action) matches++;
     });
-    
+
     return matches / longer.length;
   }
 
-  private createPatternFromSequences(sequences: WorkflowAction[][], patternId: string): WorkflowPattern {
+  private createPatternFromSequences(
+    sequences: WorkflowAction[][],
+    patternId: string
+  ): WorkflowPattern {
     const firstSequence = sequences[0];
     const actions = firstSequence.map(a => a.type);
-    
-    const totalDuration = sequences.reduce((sum, seq) => 
-      sum + seq.reduce((seqSum, action) => seqSum + action.duration, 0), 0
+
+    const totalDuration = sequences.reduce(
+      (sum, seq) => sum + seq.reduce((seqSum, action) => seqSum + action.duration, 0),
+      0
     );
-    
-    const successfulSequences = sequences.filter(seq => 
-      seq.every(action => action.success)
-    );
-    
-    const contexts = [...new Set(sequences.flatMap(seq => 
-      seq.map(a => a.context).filter(c => c)
-    ))];
-    
+
+    const successfulSequences = sequences.filter(seq => seq.every(action => action.success));
+
+    const contexts = [...new Set(sequences.flatMap(seq => seq.map(a => a.context).filter(c => c)))];
+
     const variations = sequences
       .map(seq => seq.map(a => a.type))
       .filter(variation => !this.arraysEqual(variation, actions));
@@ -458,7 +476,7 @@ export class WorkflowOptimizer {
       contexts,
       lastSeen: Date.now(),
       confidence: Math.min(sequences.length / 10, 1.0), // Max confidence at 10+ occurrences
-      category: this.categorizePattern(actions, contexts)
+      category: this.categorizePattern(actions, contexts),
     };
   }
 
@@ -476,7 +494,7 @@ export class WorkflowOptimizer {
         difficultyLevel: 'medium',
         implementation: ['Create custom keyboard shortcut', 'Train users on new shortcut'],
         confidence: pattern.confidence,
-        category: pattern.category
+        category: pattern.category,
       });
     }
 
@@ -491,7 +509,7 @@ export class WorkflowOptimizer {
         difficultyLevel: 'hard',
         implementation: ['Develop automation script', 'Add automation trigger button'],
         confidence: pattern.confidence * 0.8, // Lower confidence for automation
-        category: pattern.category
+        category: pattern.category,
       });
     }
 
@@ -506,7 +524,7 @@ export class WorkflowOptimizer {
         difficultyLevel: 'easy',
         implementation: ['Analyze successful variations', 'Update UI flow'],
         confidence: pattern.confidence,
-        category: pattern.category
+        category: pattern.category,
       });
     }
 
@@ -514,25 +532,34 @@ export class WorkflowOptimizer {
   }
 
   private calculateEfficiencyMetrics(pattern: WorkflowPattern): WorkflowEfficiencyMetrics {
-    const relevantActions = this.actionHistory.filter(action => 
-      pattern.actions.includes(action.type) &&
-      action.timestamp > Date.now() - this.patternDetectionWindow
+    const relevantActions = this.actionHistory.filter(
+      action =>
+        pattern.actions.includes(action.type) &&
+        action.timestamp > Date.now() - this.patternDetectionWindow
     );
 
-    const completions = this.extractSequences([relevantActions.find(a => pattern.actions.includes(a.type))!])
-      .filter(seq => seq.length >= pattern.actions.length);
+    const completions = this.extractSequences([
+      relevantActions.find(a => pattern.actions.includes(a.type))!,
+    ]).filter(seq => seq.length >= pattern.actions.length);
 
-    const averageCompletionTime = completions.length > 0
-      ? completions.reduce((sum, seq) => sum + seq.reduce((seqSum, a) => seqSum + a.duration, 0), 0) / completions.length
-      : pattern.averageDuration;
+    const averageCompletionTime =
+      completions.length > 0
+        ? completions.reduce(
+            (sum, seq) => sum + seq.reduce((seqSum, a) => seqSum + a.duration, 0),
+            0
+          ) / completions.length
+        : pattern.averageDuration;
 
     const successfulCompletions = completions.filter(seq => seq.every(a => a.success));
-    const successRate = completions.length > 0 ? successfulCompletions.length / completions.length : pattern.successRate;
+    const successRate =
+      completions.length > 0
+        ? successfulCompletions.length / completions.length
+        : pattern.successRate;
 
     // Calculate bottleneck steps (steps with highest failure rate)
     const stepFailures = new Map<string, number>();
     const stepAttempts = new Map<string, number>();
-    
+
     relevantActions.forEach(action => {
       stepAttempts.set(action.type, (stepAttempts.get(action.type) || 0) + 1);
       if (!action.success) {
@@ -543,7 +570,7 @@ export class WorkflowOptimizer {
     const bottleneckSteps = Array.from(stepFailures.entries())
       .map(([step, failures]) => ({
         step,
-        failureRate: failures / (stepAttempts.get(step) || 1)
+        failureRate: failures / (stepAttempts.get(step) || 1),
       }))
       .filter(({ failureRate }) => failureRate > 0.2)
       .sort((a, b) => b.failureRate - a.failureRate)
@@ -557,7 +584,7 @@ export class WorkflowOptimizer {
       retryRate: this.calculateRetryRate(pattern.actions),
       userSatisfactionScore: Math.max(0.1, successRate - 0.1), // Rough estimation
       bottleneckSteps,
-      optimizationOpportunities: this.getOptimizationSuggestions(pattern.id).length
+      optimizationOpportunities: this.getOptimizationSuggestions(pattern.id).length,
     };
   }
 
@@ -573,12 +600,12 @@ export class WorkflowOptimizer {
         averageAttempts: 1,
         commonFailureReasons: [],
         suggestedImprovements: [],
-        priority: 'low'
+        priority: 'low',
       };
     }
 
     struggle.frequency++;
-    
+
     // Update priority based on frequency
     if (struggle.frequency >= 10) {
       struggle.priority = 'high';
@@ -620,22 +647,25 @@ export class WorkflowOptimizer {
 
   private updateOrCreatePattern(newPattern: WorkflowPattern): void {
     const existingPattern = this.detectedPatterns.get(newPattern.id);
-    
+
     if (existingPattern) {
       // Update existing pattern
       existingPattern.frequency += newPattern.frequency;
-      existingPattern.averageDuration = (existingPattern.averageDuration + newPattern.averageDuration) / 2;
+      existingPattern.averageDuration =
+        (existingPattern.averageDuration + newPattern.averageDuration) / 2;
       existingPattern.successRate = (existingPattern.successRate + newPattern.successRate) / 2;
       existingPattern.lastSeen = newPattern.lastSeen;
       existingPattern.confidence = Math.min(existingPattern.confidence + 0.1, 1.0);
-      
+
       // Merge variations and contexts
       existingPattern.commonVariations = [
         ...existingPattern.commonVariations,
-        ...newPattern.commonVariations
+        ...newPattern.commonVariations,
       ].slice(0, 10); // Keep top 10 variations
-      
-      existingPattern.contexts = [...new Set([...existingPattern.contexts, ...newPattern.contexts])];
+
+      existingPattern.contexts = [
+        ...new Set([...existingPattern.contexts, ...newPattern.contexts]),
+      ];
     } else {
       // Create new pattern
       this.detectedPatterns.set(newPattern.id, newPattern);
@@ -674,22 +704,42 @@ export class WorkflowOptimizer {
     const actionStr = actions.join(' ').toLowerCase();
     const contextStr = contexts.join(' ').toLowerCase();
 
-    if (actionStr.includes('design') || actionStr.includes('draw') || actionStr.includes('create')) {
+    if (
+      actionStr.includes('design') ||
+      actionStr.includes('draw') ||
+      actionStr.includes('create')
+    ) {
       return 'design';
     }
-    if (actionStr.includes('annotate') || actionStr.includes('comment') || actionStr.includes('note')) {
+    if (
+      actionStr.includes('annotate') ||
+      actionStr.includes('comment') ||
+      actionStr.includes('note')
+    ) {
       return 'annotation';
     }
-    if (actionStr.includes('review') || actionStr.includes('approve') || actionStr.includes('feedback')) {
+    if (
+      actionStr.includes('review') ||
+      actionStr.includes('approve') ||
+      actionStr.includes('feedback')
+    ) {
       return 'review';
     }
-    if (actionStr.includes('export') || actionStr.includes('save') || actionStr.includes('publish')) {
+    if (
+      actionStr.includes('export') ||
+      actionStr.includes('save') ||
+      actionStr.includes('publish')
+    ) {
       return 'export';
     }
     if (actionStr.includes('navigate') || actionStr.includes('zoom') || actionStr.includes('pan')) {
       return 'navigation';
     }
-    if (contextStr.includes('collaboration') || actionStr.includes('share') || actionStr.includes('invite')) {
+    if (
+      contextStr.includes('collaboration') ||
+      actionStr.includes('share') ||
+      actionStr.includes('invite')
+    ) {
       return 'collaboration';
     }
 
@@ -706,12 +756,15 @@ export class WorkflowOptimizer {
 
   private startPatternDetection(): void {
     // Analyze patterns every 5 minutes
-    setInterval(() => {
-      if (this.actionHistory.length >= 10) {
-        const patterns = this.analyzeWorkflow(this.actionHistory);
-        patterns.forEach(pattern => this.updateOrCreatePattern(pattern));
-      }
-    }, 5 * 60 * 1000);
+    setInterval(
+      () => {
+        if (this.actionHistory.length >= 10) {
+          const patterns = this.analyzeWorkflow(this.actionHistory);
+          patterns.forEach(pattern => this.updateOrCreatePattern(pattern));
+        }
+      },
+      5 * 60 * 1000
+    );
   }
 
   private loadStoredData(): void {
@@ -745,9 +798,15 @@ export class WorkflowOptimizer {
   private saveData(): void {
     try {
       localStorage.setItem('archicomm_workflow_actions', JSON.stringify(this.actionHistory));
-      localStorage.setItem('archicomm_workflow_patterns', JSON.stringify(Array.from(this.detectedPatterns.entries())));
+      localStorage.setItem(
+        'archicomm_workflow_patterns',
+        JSON.stringify(Array.from(this.detectedPatterns.entries()))
+      );
       localStorage.setItem('archicomm_workflow_optimizations', JSON.stringify(this.optimizations));
-      localStorage.setItem('archicomm_workflow_struggles', JSON.stringify(Array.from(this.userStrugglePoints.entries())));
+      localStorage.setItem(
+        'archicomm_workflow_struggles',
+        JSON.stringify(Array.from(this.userStrugglePoints.entries()))
+      );
     } catch (error) {
       console.error('Failed to save workflow data:', error);
     }

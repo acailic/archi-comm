@@ -60,8 +60,8 @@ describe('AIConfigService', () => {
           enabled: true,
           apiKey: 'sk-test123456789',
           selectedModel: 'gpt-4',
-          settings: { temperature: 0.7, maxTokens: 2000 }
-        }
+          settings: { temperature: 0.7, maxTokens: 2000 },
+        },
       };
 
       await service.saveConfig(testConfig);
@@ -82,8 +82,8 @@ describe('AIConfigService', () => {
           enabled: true,
           apiKey: 'sk-web123',
           selectedModel: 'gpt-4',
-          settings: { temperature: 0.7, maxTokens: 2000 }
-        }
+          settings: { temperature: 0.7, maxTokens: 2000 },
+        },
       };
 
       await service.saveConfig(testConfig);
@@ -101,20 +101,20 @@ describe('AIConfigService', () => {
           enabled: true,
           apiKey: 'sk-test123',
           selectedModel: 'gpt-4',
-          settings: { temperature: 0.7, maxTokens: 2000 }
+          settings: { temperature: 0.7, maxTokens: 2000 },
         },
         [AIProvider.GEMINI]: {
           enabled: true,
           apiKey: 'gemini-test',
           selectedModel: '', // Empty model should exclude
-          settings: { temperature: 0.7, maxTokens: 2000 }
+          settings: { temperature: 0.7, maxTokens: 2000 },
         },
         [AIProvider.CLAUDE]: {
           enabled: false, // Disabled should exclude
           apiKey: 'claude-test',
           selectedModel: 'claude-3',
-          settings: { temperature: 0.7, maxTokens: 2000 }
-        }
+          settings: { temperature: 0.7, maxTokens: 2000 },
+        },
       };
 
       mockedIsTauri.mockReturnValue(false);
@@ -134,8 +134,8 @@ describe('AIConfigService', () => {
           enabled: true,
           apiKey: 'sk-test123',
           selectedModel: 'gpt-4',
-          settings: { temperature: 0.7, maxTokens: 2000 }
-        }
+          settings: { temperature: 0.7, maxTokens: 2000 },
+        },
       };
 
       mockedIsTauri.mockReturnValue(false);
@@ -153,8 +153,8 @@ describe('AIConfigService', () => {
           enabled: true,
           apiKey: 'sk-test123',
           selectedModel: 'gpt-4',
-          settings: { temperature: 0.7, maxTokens: 2000 }
-        }
+          settings: { temperature: 0.7, maxTokens: 2000 },
+        },
       };
 
       mockedIsTauri.mockReturnValue(false);
@@ -169,7 +169,10 @@ describe('AIConfigService', () => {
     it('returns web guard error in non-Tauri environment', async () => {
       mockedIsTauri.mockReturnValue(false);
 
-      const result = await service.testConnection(AIProvider.OPENAI, 'sk-test123456789012345678901234567890123456789012345678');
+      const result = await service.testConnection(
+        AIProvider.OPENAI,
+        'sk-test123456789012345678901234567890123456789012345678'
+      );
       expect(result.success).toBe(false);
       expect(result.error).toContain('desktop app');
     });
@@ -193,21 +196,27 @@ describe('AI API functions', () => {
             enabled: true,
             apiKey: 'sk-test123',
             selectedModel: 'gpt-4',
-            settings: { temperature: 0.7, maxTokens: 2000 }
-          }
-        })
+            settings: { temperature: 0.7, maxTokens: 2000 },
+          },
+        }),
       };
 
       vi.doMock('../lib/services/AIConfigService', () => ({
-        aiConfigService: mockService
+        aiConfigService: mockService,
       }));
 
       // Mock fetch for OpenAI call
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: vi.fn().mockResolvedValue({
-          choices: [{ message: { content: '{"summary": "Test", "strengths": [], "risks": [], "score": 85}' } }]
-        })
+          choices: [
+            {
+              message: {
+                content: '{"summary": "Test", "strengths": [], "risks": [], "score": 85}',
+              },
+            },
+          ],
+        }),
       });
 
       const { reviewSolution } = await import('../lib/api/ai');
@@ -227,13 +236,13 @@ describe('AI API functions', () => {
             enabled: true,
             apiKey: 'sk-test123',
             selectedModel: 'gpt-4',
-            settings: { temperature: 0.7, maxTokens: 2000 }
-          }
-        })
+            settings: { temperature: 0.7, maxTokens: 2000 },
+          },
+        }),
       };
 
       vi.doMock('../lib/services/AIConfigService', () => ({
-        aiConfigService: mockService
+        aiConfigService: mockService,
       }));
 
       const { reviewSolution } = await import('../lib/api/ai');

@@ -7,14 +7,50 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
-import type { DesignComponent } from '../App';
-import { 
-  Server, Database, Zap, Globe, Monitor, HardDrive, Cloud, Container, 
-  Layers, Activity, Shield, Key, Lock, Code, Smartphone, MessageSquare,
-  Archive, BarChart3, AlertTriangle, FileText, Search, Workflow,
-  GitBranch, Radio, Wifi, Cpu, Memory, Network, CloudCog,
-  FolderOpen, Box, Boxes, Settings, Users, UserCheck, Webhook,
-  Timer, Gauge, TrendingUp, Brain, Database as DB, HardDriveIcon
+import type { DesignComponent } from '@/shared/contracts';
+import {
+  Server,
+  Database,
+  Zap,
+  Globe,
+  Monitor,
+  HardDrive,
+  Cloud,
+  Container,
+  Layers,
+  Activity,
+  Shield,
+  Key,
+  Lock,
+  Code,
+  Smartphone,
+  MessageSquare,
+  Archive,
+  BarChart3,
+  AlertTriangle,
+  FileText,
+  Search,
+  Workflow,
+  GitBranch,
+  Radio,
+  Wifi,
+  Cpu,
+  Memory,
+  Network,
+  CloudCog,
+  FolderOpen,
+  Box,
+  Boxes,
+  Settings,
+  Users,
+  UserCheck,
+  Webhook,
+  Timer,
+  Gauge,
+  TrendingUp,
+  Brain,
+  Database as DB,
+  HardDriveIcon,
 } from 'lucide-react';
 
 interface ComponentType {
@@ -34,7 +70,7 @@ const componentTypes: ComponentType[] = [
     icon: Server,
     color: 'bg-blue-500',
     category: 'compute',
-    description: 'Physical or virtual server instance'
+    description: 'Physical or virtual server instance',
   },
   {
     type: 'microservice',
@@ -42,7 +78,7 @@ const componentTypes: ComponentType[] = [
     icon: Box,
     color: 'bg-blue-400',
     category: 'compute',
-    description: 'Independent deployable service'
+    description: 'Independent deployable service',
   },
   {
     type: 'serverless',
@@ -50,7 +86,7 @@ const componentTypes: ComponentType[] = [
     icon: CloudCog,
     color: 'bg-sky-500',
     category: 'compute',
-    description: 'Function-as-a-Service execution'
+    description: 'Function-as-a-Service execution',
   },
   {
     type: 'lambda',
@@ -58,7 +94,7 @@ const componentTypes: ComponentType[] = [
     icon: Zap,
     color: 'bg-orange-400',
     category: 'compute',
-    description: 'AWS serverless compute'
+    description: 'AWS serverless compute',
   },
   {
     type: 'cloud-function',
@@ -66,7 +102,7 @@ const componentTypes: ComponentType[] = [
     icon: Cloud,
     color: 'bg-blue-600',
     category: 'compute',
-    description: 'Google/Azure serverless function'
+    description: 'Google/Azure serverless function',
   },
 
   // Containers & Orchestration
@@ -76,7 +112,7 @@ const componentTypes: ComponentType[] = [
     icon: Container,
     color: 'bg-cyan-500',
     category: 'containers',
-    description: 'Containerized application'
+    description: 'Containerized application',
   },
   {
     type: 'docker',
@@ -84,7 +120,7 @@ const componentTypes: ComponentType[] = [
     icon: Container,
     color: 'bg-blue-700',
     category: 'containers',
-    description: 'Docker container runtime'
+    description: 'Docker container runtime',
   },
   {
     type: 'kubernetes',
@@ -92,7 +128,7 @@ const componentTypes: ComponentType[] = [
     icon: Boxes,
     color: 'bg-indigo-600',
     category: 'containers',
-    description: 'Container orchestration platform'
+    description: 'Container orchestration platform',
   },
 
   // Databases & Storage
@@ -102,7 +138,7 @@ const componentTypes: ComponentType[] = [
     icon: Database,
     color: 'bg-green-500',
     category: 'storage',
-    description: 'General database system'
+    description: 'General database system',
   },
   {
     type: 'postgresql',
@@ -110,7 +146,7 @@ const componentTypes: ComponentType[] = [
     icon: DB,
     color: 'bg-blue-800',
     category: 'storage',
-    description: 'PostgreSQL relational database'
+    description: 'PostgreSQL relational database',
   },
   {
     type: 'mysql',
@@ -118,7 +154,7 @@ const componentTypes: ComponentType[] = [
     icon: DB,
     color: 'bg-orange-600',
     category: 'storage',
-    description: 'MySQL relational database'
+    description: 'MySQL relational database',
   },
   {
     type: 'mongodb',
@@ -126,7 +162,7 @@ const componentTypes: ComponentType[] = [
     icon: DB,
     color: 'bg-green-600',
     category: 'storage',
-    description: 'MongoDB document database'
+    description: 'MongoDB document database',
   },
   {
     type: 'redis',
@@ -134,7 +170,7 @@ const componentTypes: ComponentType[] = [
     icon: HardDrive,
     color: 'bg-red-600',
     category: 'storage',
-    description: 'In-memory data structure store'
+    description: 'In-memory data structure store',
   },
   {
     type: 'cache',
@@ -142,7 +178,7 @@ const componentTypes: ComponentType[] = [
     icon: HardDrive,
     color: 'bg-orange-500',
     category: 'storage',
-    description: 'Caching layer'
+    description: 'Caching layer',
   },
   {
     type: 'storage',
@@ -150,7 +186,7 @@ const componentTypes: ComponentType[] = [
     icon: Archive,
     color: 'bg-gray-600',
     category: 'storage',
-    description: 'Generic storage system'
+    description: 'Generic storage system',
   },
   {
     type: 's3',
@@ -158,7 +194,7 @@ const componentTypes: ComponentType[] = [
     icon: Archive,
     color: 'bg-orange-500',
     category: 'storage',
-    description: 'AWS object storage'
+    description: 'AWS object storage',
   },
   {
     type: 'blob-storage',
@@ -166,7 +202,7 @@ const componentTypes: ComponentType[] = [
     icon: Archive,
     color: 'bg-blue-500',
     category: 'storage',
-    description: 'Azure blob storage'
+    description: 'Azure blob storage',
   },
   {
     type: 'file-system',
@@ -174,7 +210,7 @@ const componentTypes: ComponentType[] = [
     icon: FolderOpen,
     color: 'bg-yellow-600',
     category: 'storage',
-    description: 'File system storage'
+    description: 'File system storage',
   },
 
   // Networking & Traffic
@@ -184,7 +220,7 @@ const componentTypes: ComponentType[] = [
     icon: Zap,
     color: 'bg-purple-500',
     category: 'networking',
-    description: 'Traffic distribution system'
+    description: 'Traffic distribution system',
   },
   {
     type: 'api-gateway',
@@ -192,7 +228,7 @@ const componentTypes: ComponentType[] = [
     icon: Globe,
     color: 'bg-red-500',
     category: 'networking',
-    description: 'API request routing and management'
+    description: 'API request routing and management',
   },
   {
     type: 'cdn',
@@ -200,7 +236,7 @@ const componentTypes: ComponentType[] = [
     icon: Cloud,
     color: 'bg-purple-600',
     category: 'networking',
-    description: 'Content delivery network'
+    description: 'Content delivery network',
   },
   {
     type: 'firewall',
@@ -208,7 +244,7 @@ const componentTypes: ComponentType[] = [
     icon: Shield,
     color: 'bg-red-700',
     category: 'networking',
-    description: 'Network security barrier'
+    description: 'Network security barrier',
   },
 
   // Messaging & Communication
@@ -218,7 +254,7 @@ const componentTypes: ComponentType[] = [
     icon: MessageSquare,
     color: 'bg-amber-500',
     category: 'messaging',
-    description: 'Asynchronous message broker'
+    description: 'Asynchronous message broker',
   },
   {
     type: 'websocket',
@@ -226,7 +262,7 @@ const componentTypes: ComponentType[] = [
     icon: Radio,
     color: 'bg-green-400',
     category: 'messaging',
-    description: 'Real-time bidirectional communication'
+    description: 'Real-time bidirectional communication',
   },
   {
     type: 'grpc',
@@ -234,7 +270,7 @@ const componentTypes: ComponentType[] = [
     icon: Network,
     color: 'bg-blue-500',
     category: 'messaging',
-    description: 'High-performance RPC framework'
+    description: 'High-performance RPC framework',
   },
 
   // APIs & Services
@@ -244,7 +280,7 @@ const componentTypes: ComponentType[] = [
     icon: Code,
     color: 'bg-emerald-500',
     category: 'apis',
-    description: 'RESTful web service'
+    description: 'RESTful web service',
   },
   {
     type: 'graphql',
@@ -252,7 +288,7 @@ const componentTypes: ComponentType[] = [
     icon: GitBranch,
     color: 'bg-pink-500',
     category: 'apis',
-    description: 'GraphQL query language API'
+    description: 'GraphQL query language API',
   },
   {
     type: 'webhook',
@@ -260,7 +296,7 @@ const componentTypes: ComponentType[] = [
     icon: Webhook,
     color: 'bg-violet-500',
     category: 'apis',
-    description: 'HTTP callback mechanism'
+    description: 'HTTP callback mechanism',
   },
 
   // Client Applications
@@ -270,7 +306,7 @@ const componentTypes: ComponentType[] = [
     icon: Monitor,
     color: 'bg-gray-500',
     category: 'clients',
-    description: 'Generic client application'
+    description: 'Generic client application',
   },
   {
     type: 'web-app',
@@ -278,7 +314,7 @@ const componentTypes: ComponentType[] = [
     icon: Globe,
     color: 'bg-blue-600',
     category: 'clients',
-    description: 'Web application'
+    description: 'Web application',
   },
   {
     type: 'mobile-app',
@@ -286,7 +322,7 @@ const componentTypes: ComponentType[] = [
     icon: Smartphone,
     color: 'bg-green-600',
     category: 'clients',
-    description: 'Mobile application'
+    description: 'Mobile application',
   },
   {
     type: 'desktop-app',
@@ -294,7 +330,7 @@ const componentTypes: ComponentType[] = [
     icon: Monitor,
     color: 'bg-purple-600',
     category: 'clients',
-    description: 'Desktop application'
+    description: 'Desktop application',
   },
   {
     type: 'iot-device',
@@ -302,7 +338,7 @@ const componentTypes: ComponentType[] = [
     icon: Wifi,
     color: 'bg-teal-500',
     category: 'clients',
-    description: 'Internet of Things device'
+    description: 'Internet of Things device',
   },
 
   // Security & Auth
@@ -312,7 +348,7 @@ const componentTypes: ComponentType[] = [
     icon: Shield,
     color: 'bg-red-600',
     category: 'security',
-    description: 'Security service'
+    description: 'Security service',
   },
   {
     type: 'authentication',
@@ -320,7 +356,7 @@ const componentTypes: ComponentType[] = [
     icon: Key,
     color: 'bg-yellow-600',
     category: 'security',
-    description: 'User authentication service'
+    description: 'User authentication service',
   },
   {
     type: 'authorization',
@@ -328,7 +364,7 @@ const componentTypes: ComponentType[] = [
     icon: Lock,
     color: 'bg-orange-600',
     category: 'security',
-    description: 'Access control service'
+    description: 'Access control service',
   },
   {
     type: 'oauth',
@@ -336,7 +372,7 @@ const componentTypes: ComponentType[] = [
     icon: UserCheck,
     color: 'bg-blue-700',
     category: 'security',
-    description: 'OAuth authorization framework'
+    description: 'OAuth authorization framework',
   },
   {
     type: 'jwt',
@@ -344,7 +380,7 @@ const componentTypes: ComponentType[] = [
     icon: Key,
     color: 'bg-green-700',
     category: 'security',
-    description: 'JSON Web Token system'
+    description: 'JSON Web Token system',
   },
 
   // Monitoring & Observability
@@ -354,7 +390,7 @@ const componentTypes: ComponentType[] = [
     icon: Activity,
     color: 'bg-blue-500',
     category: 'observability',
-    description: 'System monitoring service'
+    description: 'System monitoring service',
   },
   {
     type: 'logging',
@@ -362,7 +398,7 @@ const componentTypes: ComponentType[] = [
     icon: FileText,
     color: 'bg-gray-600',
     category: 'observability',
-    description: 'Log aggregation system'
+    description: 'Log aggregation system',
   },
   {
     type: 'metrics',
@@ -370,7 +406,7 @@ const componentTypes: ComponentType[] = [
     icon: BarChart3,
     color: 'bg-green-500',
     category: 'observability',
-    description: 'Metrics collection and analysis'
+    description: 'Metrics collection and analysis',
   },
   {
     type: 'alerting',
@@ -378,7 +414,7 @@ const componentTypes: ComponentType[] = [
     icon: AlertTriangle,
     color: 'bg-red-500',
     category: 'observability',
-    description: 'Alert and notification system'
+    description: 'Alert and notification system',
   },
   {
     type: 'elasticsearch',
@@ -386,7 +422,7 @@ const componentTypes: ComponentType[] = [
     icon: Search,
     color: 'bg-yellow-500',
     category: 'observability',
-    description: 'Search and analytics engine'
+    description: 'Search and analytics engine',
   },
   {
     type: 'kibana',
@@ -394,7 +430,7 @@ const componentTypes: ComponentType[] = [
     icon: BarChart3,
     color: 'bg-cyan-600',
     category: 'observability',
-    description: 'Data visualization platform'
+    description: 'Data visualization platform',
   },
 
   // Data Processing
@@ -404,7 +440,7 @@ const componentTypes: ComponentType[] = [
     icon: Database,
     color: 'bg-indigo-600',
     category: 'data',
-    description: 'Centralized data repository'
+    description: 'Centralized data repository',
   },
   {
     type: 'data-lake',
@@ -412,7 +448,7 @@ const componentTypes: ComponentType[] = [
     icon: Database,
     color: 'bg-blue-600',
     category: 'data',
-    description: 'Raw data storage system'
+    description: 'Raw data storage system',
   },
   {
     type: 'etl',
@@ -420,7 +456,7 @@ const componentTypes: ComponentType[] = [
     icon: Workflow,
     color: 'bg-purple-500',
     category: 'data',
-    description: 'Extract, Transform, Load pipeline'
+    description: 'Extract, Transform, Load pipeline',
   },
   {
     type: 'stream-processing',
@@ -428,7 +464,7 @@ const componentTypes: ComponentType[] = [
     icon: Activity,
     color: 'bg-orange-500',
     category: 'data',
-    description: 'Real-time data processing'
+    description: 'Real-time data processing',
   },
 
   // Patterns & Architectures
@@ -438,7 +474,7 @@ const componentTypes: ComponentType[] = [
     icon: Timer,
     color: 'bg-emerald-600',
     category: 'patterns',
-    description: 'Event-driven architecture pattern'
+    description: 'Event-driven architecture pattern',
   },
   {
     type: 'cqrs',
@@ -446,7 +482,7 @@ const componentTypes: ComponentType[] = [
     icon: GitBranch,
     color: 'bg-violet-600',
     category: 'patterns',
-    description: 'Command Query Responsibility Segregation'
+    description: 'Command Query Responsibility Segregation',
   },
   {
     type: 'edge-computing',
@@ -454,7 +490,7 @@ const componentTypes: ComponentType[] = [
     icon: Cpu,
     color: 'bg-gray-700',
     category: 'patterns',
-    description: 'Distributed computing at network edge'
+    description: 'Distributed computing at network edge',
   },
 
   // Emerging Technologies
@@ -464,7 +500,7 @@ const componentTypes: ComponentType[] = [
     icon: Layers,
     color: 'bg-yellow-700',
     category: 'emerging',
-    description: 'Distributed ledger technology'
+    description: 'Distributed ledger technology',
   },
   {
     type: 'ai-ml',
@@ -472,33 +508,79 @@ const componentTypes: ComponentType[] = [
     icon: Brain,
     color: 'bg-pink-600',
     category: 'emerging',
-    description: 'Artificial Intelligence/Machine Learning'
-  }
+    description: 'Artificial Intelligence/Machine Learning',
+  },
 ];
 
 const categories = [
   { id: 'all', label: 'All Components', count: componentTypes.length },
-  { id: 'compute', label: 'Compute', count: componentTypes.filter(c => c.category === 'compute').length },
-  { id: 'containers', label: 'Containers', count: componentTypes.filter(c => c.category === 'containers').length },
-  { id: 'storage', label: 'Storage', count: componentTypes.filter(c => c.category === 'storage').length },
-  { id: 'networking', label: 'Networking', count: componentTypes.filter(c => c.category === 'networking').length },
-  { id: 'messaging', label: 'Messaging', count: componentTypes.filter(c => c.category === 'messaging').length },
+  {
+    id: 'compute',
+    label: 'Compute',
+    count: componentTypes.filter(c => c.category === 'compute').length,
+  },
+  {
+    id: 'containers',
+    label: 'Containers',
+    count: componentTypes.filter(c => c.category === 'containers').length,
+  },
+  {
+    id: 'storage',
+    label: 'Storage',
+    count: componentTypes.filter(c => c.category === 'storage').length,
+  },
+  {
+    id: 'networking',
+    label: 'Networking',
+    count: componentTypes.filter(c => c.category === 'networking').length,
+  },
+  {
+    id: 'messaging',
+    label: 'Messaging',
+    count: componentTypes.filter(c => c.category === 'messaging').length,
+  },
   { id: 'apis', label: 'APIs', count: componentTypes.filter(c => c.category === 'apis').length },
-  { id: 'clients', label: 'Clients', count: componentTypes.filter(c => c.category === 'clients').length },
-  { id: 'security', label: 'Security', count: componentTypes.filter(c => c.category === 'security').length },
-  { id: 'observability', label: 'Observability', count: componentTypes.filter(c => c.category === 'observability').length },
+  {
+    id: 'clients',
+    label: 'Clients',
+    count: componentTypes.filter(c => c.category === 'clients').length,
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    count: componentTypes.filter(c => c.category === 'security').length,
+  },
+  {
+    id: 'observability',
+    label: 'Observability',
+    count: componentTypes.filter(c => c.category === 'observability').length,
+  },
   { id: 'data', label: 'Data', count: componentTypes.filter(c => c.category === 'data').length },
-  { id: 'patterns', label: 'Patterns', count: componentTypes.filter(c => c.category === 'patterns').length },
-  { id: 'emerging', label: 'Emerging', count: componentTypes.filter(c => c.category === 'emerging').length }
+  {
+    id: 'patterns',
+    label: 'Patterns',
+    count: componentTypes.filter(c => c.category === 'patterns').length,
+  },
+  {
+    id: 'emerging',
+    label: 'Emerging',
+    count: componentTypes.filter(c => c.category === 'emerging').length,
+  },
 ];
 
 interface DraggableComponentProps extends ComponentType {}
 
-function DraggableComponent({ type, label, icon: Icon, color, description }: DraggableComponentProps) {
+function DraggableComponent({
+  type,
+  label,
+  icon: Icon,
+  color,
+  description,
+}: DraggableComponentProps) {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'component',
     item: { type },
-    collect: (monitor) => ({
+    collect: monitor => ({
       isDragging: monitor.isDragging(),
     }),
   }));
@@ -515,13 +597,17 @@ function DraggableComponent({ type, label, icon: Icon, color, description }: Dra
       `}
       title={description}
     >
-      <div className="flex items-center space-x-2.5">
-        <div className={`w-7 h-7 rounded-md ${color} flex items-center justify-center transition-all duration-200 group-hover:scale-110 shadow-sm`}>
-          <Icon className="w-3.5 h-3.5 text-white" />
+      <div className='flex items-center space-x-2.5'>
+        <div
+          className={`w-7 h-7 rounded-md ${color} flex items-center justify-center transition-all duration-200 group-hover:scale-110 shadow-sm`}
+        >
+          <Icon className='w-3.5 h-3.5 text-white' />
         </div>
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium truncate block leading-tight">{label}</span>
-          <span className="text-xs text-muted-foreground truncate block leading-tight mt-0.5">{description}</span>
+        <div className='flex-1 min-w-0'>
+          <span className='text-sm font-medium truncate block leading-tight'>{label}</span>
+          <span className='text-xs text-muted-foreground truncate block leading-tight mt-0.5'>
+            {description}
+          </span>
         </div>
       </div>
     </div>
@@ -533,52 +619,58 @@ export function ComponentPalette() {
   const [activeCategory, setActiveCategory] = useState('all');
 
   const filteredComponents = componentTypes.filter(component => {
-    const matchesSearch = component.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         component.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch =
+      component.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      component.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'all' || component.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
 
   return (
-    <EnhancedCard elevation={2} glass className="h-full flex flex-col" gradientBorder>
-      <CardHeader className="pb-3 bg-gradient-to-r from-muted/30 via-card to-muted/20 border-b border-border/20">
-        <CardTitle className="flex items-center justify-between text-sm">
-          <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-          </span>
-          
+    <EnhancedCard elevation={2} glass className='h-full flex flex-col' gradientBorder>
+      <CardHeader className='pb-3 bg-gradient-to-r from-muted/30 via-card to-muted/20 border-b border-border/20'>
+        <CardTitle className='flex items-center justify-between text-sm'>
+          <span className='bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent'></span>
         </CardTitle>
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className='space-y-3'>
+          <div className='relative'>
+            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
             <Input
-              placeholder="Search..."
+              placeholder='Search...'
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="text-sm bg-background/60 backdrop-blur border-border/30 focus:bg-background/80 transition-all duration-200 pl-10 rounded-lg"
+              onChange={e => setSearchQuery(e.target.value)}
+              className='text-sm bg-background/60 backdrop-blur border-border/30 focus:bg-background/80 transition-all duration-200 pl-10 rounded-lg'
             />
           </div>
-           <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+          <Badge
+            variant='secondary'
+            className='text-xs bg-primary/10 text-primary border-primary/20'
+          >
             {filteredComponents.length}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col p-0">
-        <Tabs value={activeCategory} onValueChange={setActiveCategory} className="flex-1 flex flex-col">
-          <div className="px-3 py-2 border-b border-border/20 bg-[var(--glass-bg)] backdrop-blur-sm">
-            <ScrollArea className="w-full">
-              <div className="flex flex-wrap gap-1">
-                {categories.slice(0, 4).map((category) => (
+      <CardContent className='flex-1 flex flex-col p-0'>
+        <Tabs
+          value={activeCategory}
+          onValueChange={setActiveCategory}
+          className='flex-1 flex flex-col'
+        >
+          <div className='px-3 py-2 border-b border-border/20 bg-[var(--glass-bg)] backdrop-blur-sm'>
+            <ScrollArea className='w-full'>
+              <div className='flex flex-wrap gap-1'>
+                {categories.slice(0, 4).map(category => (
                   <Button
                     key={category.id}
-                    variant={activeCategory === category.id ? "default" : "ghost"}
-                    size="sm"
+                    variant={activeCategory === category.id ? 'default' : 'ghost'}
+                    size='sm'
                     onClick={() => setActiveCategory(category.id)}
-                    className="text-xs h-7 px-2 flex items-center gap-1 rounded-full"
+                    className='text-xs h-7 px-2 flex items-center gap-1 rounded-full'
                   >
                     {category.label}
-                    <Badge 
-                      variant={activeCategory === category.id ? "secondary" : "outline"} 
-                      className="text-[10px] h-4 px-1 ml-1"
+                    <Badge
+                      variant={activeCategory === category.id ? 'secondary' : 'outline'}
+                      className='text-[10px] h-4 px-1 ml-1'
                     >
                       {category.count}
                     </Badge>
@@ -586,19 +678,19 @@ export function ComponentPalette() {
                 ))}
               </div>
               {categories.length > 4 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {categories.slice(4).map((category) => (
+                <div className='flex flex-wrap gap-1 mt-1'>
+                  {categories.slice(4).map(category => (
                     <Button
                       key={category.id}
-                      variant={activeCategory === category.id ? "default" : "ghost"}
-                      size="sm"
+                      variant={activeCategory === category.id ? 'default' : 'ghost'}
+                      size='sm'
                       onClick={() => setActiveCategory(category.id)}
-                    className="text-xs h-7 px-2 flex items-center gap-1 rounded-full"
+                      className='text-xs h-7 px-2 flex items-center gap-1 rounded-full'
                     >
                       {category.label}
-                      <Badge 
-                        variant={activeCategory === category.id ? "secondary" : "outline"} 
-                        className="text-[10px] h-4 px-1 ml-1"
+                      <Badge
+                        variant={activeCategory === category.id ? 'secondary' : 'outline'}
+                        className='text-[10px] h-4 px-1 ml-1'
                       >
                         {category.count}
                       </Badge>
@@ -609,24 +701,28 @@ export function ComponentPalette() {
             </ScrollArea>
           </div>
 
-          <div className="flex-1 px-3 pb-3 mt-0">
-            <ScrollArea className="h-full">
+          <div className='flex-1 px-3 pb-3 mt-0'>
+            <ScrollArea className='h-full'>
               {activeCategory === 'all' ? (
-                <div className="space-y-4">
-                  {categories.slice(1).map((category) => {
-                    const categoryComponents = filteredComponents.filter(c => c.category === category.id);
+                <div className='space-y-4'>
+                  {categories.slice(1).map(category => {
+                    const categoryComponents = filteredComponents.filter(
+                      c => c.category === category.id
+                    );
                     if (categoryComponents.length === 0) return null;
-                    
+
                     return (
                       <div key={category.id}>
-                        <div className="flex items-center space-x-2 mb-2 sticky top-0 bg-card/90 backdrop-blur-sm py-1 z-10">
-                          <h4 className="text-sm font-medium capitalize text-foreground/90">{category.label}</h4>
-                          <Badge variant="outline" className="text-xs h-4 px-1">
+                        <div className='flex items-center space-x-2 mb-2 sticky top-0 bg-card/90 backdrop-blur-sm py-1 z-10'>
+                          <h4 className='text-sm font-medium capitalize text-foreground/90'>
+                            {category.label}
+                          </h4>
+                          <Badge variant='outline' className='text-xs h-4 px-1'>
                             {categoryComponents.length}
                           </Badge>
                         </div>
-                        <div className="space-y-1">
-                          {categoryComponents.map((component) => (
+                        <div className='space-y-1'>
+                          {categoryComponents.map(component => (
                             <DraggableComponent key={component.type} {...component} />
                           ))}
                         </div>
@@ -635,10 +731,10 @@ export function ComponentPalette() {
                   })}
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div className='space-y-1'>
                   {filteredComponents
                     .filter(c => c.category === activeCategory)
-                    .map((component) => (
+                    .map(component => (
                       <DraggableComponent key={component.type} {...component} />
                     ))}
                 </div>
@@ -646,9 +742,9 @@ export function ComponentPalette() {
             </ScrollArea>
           </div>
         </Tabs>
-        
-        <div className="px-3 py-2 border-t bg-gradient-to-r from-muted/20 via-card to-muted/10 backdrop-blur-sm">
-          <p className="text-xs text-muted-foreground">
+
+        <div className='px-3 py-2 border-t bg-gradient-to-r from-muted/20 via-card to-muted/10 backdrop-blur-sm'>
+          <p className='text-xs text-muted-foreground'>
             💡 Drag components to the canvas to build your system architecture
           </p>
         </div>

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { 
-  Eye, 
-  EyeOff, 
-  TestTube, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Eye,
+  EyeOff,
+  TestTube,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
   Info,
   Settings,
@@ -14,11 +14,19 @@ import {
   RotateCcw,
   Loader2,
   ArrowLeft,
-  X
+  X,
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from './ui/form';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
@@ -27,11 +35,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/t
 import { Slider } from './ui/slider';
 
 import { useAIConfig } from '../hooks/useAIConfig';
-import { 
-  AIConfig, 
+import {
+  AIConfig,
   AIConfigSchema,
   validateApiKeyFormat,
-  DEFAULT_SETTINGS
+  DEFAULT_SETTINGS,
 } from '../lib/types/AIConfig';
 
 const FormSchema = AIConfigSchema;
@@ -57,13 +65,13 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
     resetToDefaults,
     clearError,
     clearTestResult,
-    isAIConfigured
+    isAIConfigured,
   } = useAIConfig();
 
   const form = useForm<AIConfig>({
     resolver: zodResolver(FormSchema),
     defaultValues: config,
-    values: config
+    values: config,
   });
 
   // Update local state when config changes
@@ -97,7 +105,7 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
 
   const handleClose = () => {
     if (!onClose) return;
-    
+
     const isDirty = form.formState.isDirty;
     if (isDirty) {
       const confirmed = window.confirm(
@@ -105,7 +113,7 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
       );
       if (!confirmed) return;
     }
-    
+
     onClose();
   };
 
@@ -131,36 +139,36 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
 
     if (isTesting) {
       return (
-        <div className="flex items-center gap-2 text-blue-600">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="text-sm">Testing...</span>
+        <div className='flex items-center gap-2 text-blue-600'>
+          <Loader2 className='h-4 w-4 animate-spin' />
+          <span className='text-sm'>Testing...</span>
         </div>
       );
     }
 
     if (!test && !configured) {
       return (
-        <div className="flex items-center gap-2 text-gray-500">
-          <Info className="h-4 w-4" />
-          <span className="text-sm">Not configured</span>
+        <div className='flex items-center gap-2 text-gray-500'>
+          <Info className='h-4 w-4' />
+          <span className='text-sm'>Not configured</span>
         </div>
       );
     }
 
     if (test?.success) {
       return (
-        <div className="flex items-center gap-2 text-green-600">
-          <CheckCircle className="h-4 w-4" />
-          <span className="text-sm">Connected ({test.responseTime}ms)</span>
+        <div className='flex items-center gap-2 text-green-600'>
+          <CheckCircle className='h-4 w-4' />
+          <span className='text-sm'>Connected ({test.responseTime}ms)</span>
         </div>
       );
     }
 
     if (test && !test.success) {
       return (
-        <div className="flex items-center gap-2 text-red-600">
-          <XCircle className="h-4 w-4" />
-          <span className="text-sm">Connection failed</span>
+        <div className='flex items-center gap-2 text-red-600'>
+          <XCircle className='h-4 w-4' />
+          <span className='text-sm'>Connection failed</span>
         </div>
       );
     }
@@ -170,100 +178,112 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className='flex items-center justify-center h-64'>
+        <Loader2 className='h-8 w-8 animate-spin' />
       </div>
     );
   }
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto py-6 space-y-6">
+      <div className='container mx-auto py-6 space-y-6'>
         {/* Pro Upgrade Banner */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-4 mb-4">
-          <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.09 6.26L21 9.27l-5 4.87L17.18 21 12 17.27 6.82 21 8 14.14l-5-4.87 6.91-1.01z" /></svg>
-          <div className="flex-1">
-            <div className="font-semibold text-yellow-800">Unlock Advanced AI Features</div>
-            <div className="text-sm text-yellow-700">Multiple AI providers, advanced settings, and detailed feedback are available in <span className="font-semibold">ArchiComm Pro</span>.</div>
+        <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center gap-4 mb-4'>
+          <svg
+            className='w-6 h-6 text-yellow-500'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth='2'
+            viewBox='0 0 24 24'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              d='M12 3l2.09 6.26L21 9.27l-5 4.87L17.18 21 12 17.27 6.82 21 8 14.14l-5-4.87 6.91-1.01z'
+            />
+          </svg>
+          <div className='flex-1'>
+            <div className='font-semibold text-yellow-800'>Unlock Advanced AI Features</div>
+            <div className='text-sm text-yellow-700'>
+              Multiple AI providers, advanced settings, and detailed feedback are available in{' '}
+              <span className='font-semibold'>ArchiComm Pro</span>.
+            </div>
           </div>
           <Button
-            size="sm"
-            className="bg-yellow-500 hover:bg-yellow-600 text-white"
-            onClick={() => window.dispatchEvent(new CustomEvent('shortcut:navigate-to-screen', { detail: { screen: 'pro-version' } }))}
+            size='sm'
+            className='bg-yellow-500 hover:bg-yellow-600 text-white'
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent('shortcut:navigate-to-screen', {
+                  detail: { screen: 'pro-version' },
+                })
+              )
+            }
           >
             Learn More
           </Button>
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className='flex items-center justify-between'>
+          <div className='flex items-center gap-4'>
             {onClose && (
-              <Button 
-                variant="ghost" 
-                size="sm"
+              <Button
+                variant='ghost'
+                size='sm'
                 onClick={handleClose}
-                className="flex items-center gap-2"
+                className='flex items-center gap-2'
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className='h-4 w-4' />
                 Back
               </Button>
             )}
             <div>
-              <h1 className="text-3xl font-bold">AI Configuration</h1>
-              <p className="text-muted-foreground mt-2">
+              <h1 className='text-3xl font-bold'>AI Configuration</h1>
+              <p className='text-muted-foreground mt-2'>
                 Configure your AI provider settings and API keys
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleResetToDefaults}
-              disabled={saving}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
+          <div className='flex gap-2'>
+            <Button variant='outline' onClick={handleResetToDefaults} disabled={saving}>
+              <RotateCcw className='h-4 w-4 mr-2' />
               Reset to Defaults
             </Button>
             {onClose && (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={handleClose}
-                className="h-9 w-9 p-0"
-              >
-                <X className="h-4 w-4" />
+              <Button variant='ghost' size='sm' onClick={handleClose} className='h-9 w-9 p-0'>
+                <X className='h-4 w-4' />
               </Button>
             )}
           </div>
         </div>
 
         {error && (
-          <Alert variant="destructive">
-            <XCircle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
+          <Alert variant='destructive'>
+            <XCircle className='h-4 w-4' />
+            <AlertDescription className='flex items-center justify-between'>
               {error}
-              <Button variant="ghost" size="sm" onClick={clearError}>
+              <Button variant='ghost' size='sm' onClick={clearError}>
                 Dismiss
               </Button>
             </AlertDescription>
           </Alert>
         )}
 
-        <Alert variant="warning">
-          <AlertTriangle className="h-4 w-4" />
+        <Alert variant='warning'>
+          <AlertTriangle className='h-4 w-4' />
           <AlertDescription>
-            <strong>Security Notice:</strong> API keys are encrypted and stored locally on your device. 
-            Never share your API keys or commit them to version control.
+            <strong>Security Notice:</strong> API keys are encrypted and stored locally on your
+            device. Never share your API keys or commit them to version control.
           </AlertDescription>
         </Alert>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className='flex items-center justify-between'>
                   <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Settings className="h-5 w-5" />
+                    <CardTitle className='flex items-center gap-2'>
+                      <Settings className='h-5 w-5' />
                       OpenAI Configuration
                     </CardTitle>
                     <CardDescription>
@@ -273,23 +293,18 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
                   {getConnectionStatus()}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className='space-y-6'>
                 <FormField
                   control={form.control}
-                  name="openai.enabled"
+                  name='openai.enabled'
                   render={({ field }) => (
-                    <FormItem className="flex items-center justify-between">
-                      <div className="space-y-0.5">
+                    <FormItem className='flex items-center justify-between'>
+                      <div className='space-y-0.5'>
                         <FormLabel>Enable AI Features</FormLabel>
-                        <FormDescription>
-                          Enable AI-powered features using OpenAI
-                        </FormDescription>
+                        <FormDescription>Enable AI-powered features using OpenAI</FormDescription>
                       </div>
                       <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -297,21 +312,19 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
 
                 <FormField
                   control={form.control}
-                  name="openai.apiKey"
+                  name='openai.apiKey'
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>OpenAI API Key</FormLabel>
-                      <FormDescription>
-                        Your OpenAI API key (encrypted when saved)
-                      </FormDescription>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
+                      <FormDescription>Your OpenAI API key (encrypted when saved)</FormDescription>
+                      <div className='flex gap-2'>
+                        <div className='relative flex-1'>
                           <FormControl>
                             <Input
                               type={showApiKey ? 'text' : 'password'}
-                              placeholder="Enter your OpenAI API key (sk-...)"
+                              placeholder='Enter your OpenAI API key (sk-...)'
                               {...field}
-                              onChange={(e) => {
+                              onChange={e => {
                                 field.onChange(e);
                                 // Clear test results when API key changes
                                 clearTestResult();
@@ -319,36 +332,34 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
                             />
                           </FormControl>
                           <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                            type='button'
+                            variant='ghost'
+                            size='sm'
+                            className='absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0'
                             onClick={toggleApiKeyVisibility}
                           >
                             {showApiKey ? (
-                              <EyeOff className="h-4 w-4" />
+                              <EyeOff className='h-4 w-4' />
                             ) : (
-                              <Eye className="h-4 w-4" />
+                              <Eye className='h-4 w-4' />
                             )}
                           </Button>
                         </div>
                         <Button
-                          type="button"
-                          variant="outline"
+                          type='button'
+                          variant='outline'
                           onClick={handleTestConnection}
                           disabled={!field.value || testingConnection}
                         >
-                          <TestTube className="h-4 w-4 mr-2" />
+                          <TestTube className='h-4 w-4 mr-2' />
                           Test
                         </Button>
                       </div>
                       <FormMessage />
                       {connectionTest && !connectionTest.success && (
-                        <Alert variant="destructive">
-                          <XCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            {connectionTest.error}
-                          </AlertDescription>
+                        <Alert variant='destructive'>
+                          <XCircle className='h-4 w-4' />
+                          <AlertDescription>{connectionTest.error}</AlertDescription>
                         </Alert>
                       )}
                     </FormItem>
@@ -358,34 +369,33 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
                 {/* Basic Settings */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">AI Settings</CardTitle>
-                    <CardDescription>
-                      Configure basic AI behavior settings
-                    </CardDescription>
+                    <CardTitle className='text-base'>AI Settings</CardTitle>
+                    <CardDescription>Configure basic AI behavior settings</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className='space-y-4'>
                     <div>
-                      <FormLabel className="flex items-center gap-2">
+                      <FormLabel className='flex items-center gap-2'>
                         Temperature
                         <Tooltip>
                           <TooltipTrigger>
-                            <Info className="h-4 w-4" />
+                            <Info className='h-4 w-4' />
                           </TooltipTrigger>
                           <TooltipContent>
-                            Controls randomness. Lower values = more focused, higher values = more creative
+                            Controls randomness. Lower values = more focused, higher values = more
+                            creative
                           </TooltipContent>
                         </Tooltip>
                       </FormLabel>
-                      <div className="space-y-2 mt-2">
+                      <div className='space-y-2 mt-2'>
                         <Slider
                           value={[temperature]}
                           onValueChange={([value]) => setTemperature(value)}
                           max={2}
                           min={0}
                           step={0.1}
-                          className="w-full"
+                          className='w-full'
                         />
-                        <div className="text-center text-sm text-muted-foreground">
+                        <div className='text-center text-sm text-muted-foreground'>
                           {temperature.toFixed(1)}
                         </div>
                       </div>
@@ -397,12 +407,12 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
                         Maximum number of tokens in the response (1-4000)
                       </FormDescription>
                       <Input
-                        type="number"
-                        min="1"
-                        max="4000"
+                        type='number'
+                        min='1'
+                        max='4000'
                         value={maxTokens}
-                        onChange={(e) => setMaxTokens(parseInt(e.target.value) || 1000)}
-                        className="mt-2"
+                        onChange={e => setMaxTokens(parseInt(e.target.value) || 1000)}
+                        className='mt-2'
                       />
                     </div>
                   </CardContent>
@@ -410,26 +420,21 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-2">
+            <div className='flex justify-end gap-2'>
               {onClose && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={handleClose}
-                  disabled={saving}
-                >
+                <Button type='button' variant='outline' onClick={handleClose} disabled={saving}>
                   Cancel
                 </Button>
               )}
-              <Button type="submit" disabled={saving}>
+              <Button type='submit' disabled={saving}>
                 {saving ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className='h-4 w-4 mr-2 animate-spin' />
                     Saving...
                   </>
                 ) : (
                   <>
-                    <Save className="h-4 w-4 mr-2" />
+                    <Save className='h-4 w-4 mr-2' />
                     Save Configuration
                   </>
                 )}

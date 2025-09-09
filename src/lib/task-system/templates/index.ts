@@ -1,9 +1,16 @@
-import { TaskTemplate, ComponentDefinition, TaskConstraint, EvaluationCriteria } from '../TaskPlugin';
-import type { DesignComponent, Connection } from '../../../App';
+import {
+  TaskTemplate,
+  ComponentDefinition,
+  TaskConstraint,
+  EvaluationCriteria,
+} from '../TaskPlugin';
+import type { DesignComponent, Connection } from '@/shared/contracts';
+import urlShortener from '../plugins/url-shortener/task.json';
+import { z } from 'zod';
 
 /**
  * ArchiComm Community Edition - Basic Templates Only
- * 
+ *
  * This file contains basic, educational templates suitable for learning
  * system design fundamentals. Advanced enterprise templates are available
  * in the premium version.
@@ -16,7 +23,8 @@ import type { DesignComponent, Connection } from '../../../App';
 export const microservicesTemplate: TaskTemplate = {
   id: 'microservices-basic',
   name: 'Design a Simple Microservices Blog Platform',
-  description: 'Design a basic blog platform using microservices architecture. Learn fundamental concepts of service separation, API design, and data management.',
+  description:
+    'Design a basic blog platform using microservices architecture. Learn fundamental concepts of service separation, API design, and data management.',
   category: 'Architecture Patterns',
   difficulty: 'beginner',
   estimatedTime: 30,
@@ -25,14 +33,14 @@ export const microservicesTemplate: TaskTemplate = {
     'Understand basic microservices principles',
     'Learn to separate concerns into services',
     'Practice simple API design',
-    'Apply basic data management concepts'
+    'Apply basic data management concepts',
   ],
   prerequisites: [
     'Basic understanding of web applications',
     'Familiarity with REST APIs',
-    'Basic database knowledge'
+    'Basic database knowledge',
   ],
-  
+
   steps: [
     {
       id: 'identify-services',
@@ -43,7 +51,7 @@ export const microservicesTemplate: TaskTemplate = {
       hints: [
         'Think about basic capabilities: user management, blog posts, comments',
         'Each service should handle one main responsibility',
-        'Keep it simple for learning purposes'
+        'Keep it simple for learning purposes',
       ],
       validation: {
         rules: [
@@ -51,11 +59,11 @@ export const microservicesTemplate: TaskTemplate = {
             type: 'component-count',
             condition: '3',
             message: 'You should have at least 3 microservices for a basic blog platform',
-            severity: 'warning'
-          }
+            severity: 'warning',
+          },
         ],
-        autoCheck: true
-      }
+        autoCheck: true,
+      },
     },
     {
       id: 'define-communication',
@@ -66,7 +74,7 @@ export const microservicesTemplate: TaskTemplate = {
       hints: [
         'Use HTTP REST APIs for service communication',
         'Consider an API Gateway for external access',
-        'Keep communication patterns simple'
+        'Keep communication patterns simple',
       ],
       validation: {
         rules: [
@@ -74,11 +82,11 @@ export const microservicesTemplate: TaskTemplate = {
             type: 'connection-exists',
             condition: 'api',
             message: 'Services should be connected through REST APIs',
-            severity: 'error'
-          }
+            severity: 'error',
+          },
         ],
-        autoCheck: true
-      }
+        autoCheck: true,
+      },
     },
     {
       id: 'data-management',
@@ -89,9 +97,9 @@ export const microservicesTemplate: TaskTemplate = {
       hints: [
         'Each service should have its own database',
         'Use simple database choices (PostgreSQL, MongoDB)',
-        'Focus on data separation between services'
-      ]
-    }
+        'Focus on data separation between services',
+      ],
+    },
   ],
 
   components: [
@@ -103,18 +111,26 @@ export const microservicesTemplate: TaskTemplate = {
       icon: 'user-circle',
       color: '#3b82f6',
       properties: [
-        { key: 'database', label: 'Database Type', type: 'select', options: [
-          { value: 'postgresql', label: 'PostgreSQL' },
-          { value: 'mongodb', label: 'MongoDB' }
-        ]},
-        { key: 'auth_method', label: 'Authentication', type: 'select', options: [
-          { value: 'jwt', label: 'JWT' },
-          { value: 'session', label: 'Session-based' }
-        ]}
+        {
+          key: 'database',
+          label: 'Database Type',
+          type: 'select',
+          options: [
+            { value: 'postgresql', label: 'PostgreSQL' },
+            { value: 'mongodb', label: 'MongoDB' },
+          ],
+        },
+        {
+          key: 'auth_method',
+          label: 'Authentication',
+          type: 'select',
+          options: [
+            { value: 'jwt', label: 'JWT' },
+            { value: 'session', label: 'Session-based' },
+          ],
+        },
       ],
-      connectionPoints: [
-        { id: 'api-out', name: 'REST API', type: 'output', protocol: 'HTTP' }
-      ]
+      connectionPoints: [{ id: 'api-out', name: 'REST API', type: 'output', protocol: 'HTTP' }],
     },
     {
       id: 'blog-service',
@@ -124,14 +140,17 @@ export const microservicesTemplate: TaskTemplate = {
       icon: 'document-text',
       color: '#10b981',
       properties: [
-        { key: 'database', label: 'Database Type', type: 'select', options: [
-          { value: 'postgresql', label: 'PostgreSQL' },
-          { value: 'mongodb', label: 'MongoDB' }
-        ]}
+        {
+          key: 'database',
+          label: 'Database Type',
+          type: 'select',
+          options: [
+            { value: 'postgresql', label: 'PostgreSQL' },
+            { value: 'mongodb', label: 'MongoDB' },
+          ],
+        },
       ],
-      connectionPoints: [
-        { id: 'api-out', name: 'Blog API', type: 'output', protocol: 'HTTP' }
-      ]
+      connectionPoints: [{ id: 'api-out', name: 'Blog API', type: 'output', protocol: 'HTTP' }],
     },
     {
       id: 'comment-service',
@@ -141,15 +160,18 @@ export const microservicesTemplate: TaskTemplate = {
       icon: 'chat-bubble-left',
       color: '#f59e0b',
       properties: [
-        { key: 'database', label: 'Database Type', type: 'select', options: [
-          { value: 'postgresql', label: 'PostgreSQL' },
-          { value: 'mongodb', label: 'MongoDB' }
-        ]}
+        {
+          key: 'database',
+          label: 'Database Type',
+          type: 'select',
+          options: [
+            { value: 'postgresql', label: 'PostgreSQL' },
+            { value: 'mongodb', label: 'MongoDB' },
+          ],
+        },
       ],
-      connectionPoints: [
-        { id: 'api-out', name: 'Comment API', type: 'output', protocol: 'HTTP' }
-      ]
-    }
+      connectionPoints: [{ id: 'api-out', name: 'Comment API', type: 'output', protocol: 'HTTP' }],
+    },
   ],
 
   constraints: [
@@ -158,15 +180,15 @@ export const microservicesTemplate: TaskTemplate = {
       type: 'component-limit',
       description: 'Should have 3-5 services to keep it simple for learning',
       rule: '5',
-      enforcement: 'soft'
+      enforcement: 'soft',
     },
     {
       id: 'data-ownership',
       type: 'pattern-required',
       description: 'Each service should have its own database',
       rule: 'database-per-service',
-      enforcement: 'hard'
-    }
+      enforcement: 'hard',
+    },
   ],
 
   evaluation: {
@@ -175,39 +197,35 @@ export const microservicesTemplate: TaskTemplate = {
       criteria: [
         'All required services are present',
         'Data storage is defined for each service',
-        'API connections are established'
-      ]
+        'API connections are established',
+      ],
     },
     correctness: {
       weight: 40,
       criteria: [
         'Service boundaries make sense',
         'Communication patterns are simple and clear',
-        'Data separation is properly implemented'
-      ]
+        'Data separation is properly implemented',
+      ],
     },
     clarity: {
       weight: 20,
       criteria: [
         'Design is easy to understand',
         'Service responsibilities are clear',
-        'Architecture is well-organized'
-      ]
+        'Architecture is well-organized',
+      ],
     },
     bestPractices: {
       weight: 10,
-      criteria: [
-        'Basic security considerations',
-        'Simple monitoring approach',
-        'Clean API design'
-      ]
-    }
+      criteria: ['Basic security considerations', 'Simple monitoring approach', 'Clean API design'],
+    },
   },
 
   author: 'ArchiComm Team',
   version: '1.0.0',
   createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z'
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 /**
@@ -217,7 +235,8 @@ export const microservicesTemplate: TaskTemplate = {
 export const serverlessTemplate: TaskTemplate = {
   id: 'serverless-basic',
   name: 'Design Serverless Image Processing Pipeline',
-  description: 'Design a scalable image processing pipeline using serverless architecture with event triggers, function composition, and managed services.',
+  description:
+    'Design a scalable image processing pipeline using serverless architecture with event triggers, function composition, and managed services.',
   category: 'Cloud Architecture',
   difficulty: 'beginner',
   estimatedTime: 30,
@@ -226,12 +245,12 @@ export const serverlessTemplate: TaskTemplate = {
     'Understand serverless architecture principles',
     'Learn function composition patterns',
     'Master event-driven triggers',
-    'Apply managed cloud services effectively'
+    'Apply managed cloud services effectively',
   ],
   prerequisites: [
     'Basic cloud services knowledge',
     'Understanding of event-driven systems',
-    'Familiarity with image processing concepts'
+    'Familiarity with image processing concepts',
   ],
 
   steps: [
@@ -244,8 +263,8 @@ export const serverlessTemplate: TaskTemplate = {
       hints: [
         'Consider file upload events from storage services',
         'Think about HTTP API triggers for direct processing',
-        'Consider scheduled processing for batch operations'
-      ]
+        'Consider scheduled processing for batch operations',
+      ],
     },
     {
       id: 'processing-functions',
@@ -256,8 +275,8 @@ export const serverlessTemplate: TaskTemplate = {
       hints: [
         'Each function should have a single responsibility',
         'Consider resize, compress, format conversion, metadata extraction',
-        'Think about function chaining and orchestration'
-      ]
+        'Think about function chaining and orchestration',
+      ],
     },
     {
       id: 'storage-strategy',
@@ -268,9 +287,9 @@ export const serverlessTemplate: TaskTemplate = {
       hints: [
         'Separate input and output storage buckets',
         'Consider CDN integration for delivery',
-        'Plan for different storage tiers based on access patterns'
-      ]
-    }
+        'Plan for different storage tiers based on access patterns',
+      ],
+    },
   ],
 
   components: [
@@ -282,18 +301,23 @@ export const serverlessTemplate: TaskTemplate = {
       icon: 'function',
       color: '#ff6b35',
       properties: [
-        { key: 'runtime', label: 'Runtime', type: 'select', options: [
-          { value: 'python3.9', label: 'Python 3.9' },
-          { value: 'nodejs18', label: 'Node.js 18' },
-          { value: 'java11', label: 'Java 11' }
-        ]},
+        {
+          key: 'runtime',
+          label: 'Runtime',
+          type: 'select',
+          options: [
+            { value: 'python3.9', label: 'Python 3.9' },
+            { value: 'nodejs18', label: 'Node.js 18' },
+            { value: 'java11', label: 'Java 11' },
+          ],
+        },
         { key: 'memory', label: 'Memory (MB)', type: 'number', defaultValue: 512 },
-        { key: 'timeout', label: 'Timeout (seconds)', type: 'number', defaultValue: 30 }
+        { key: 'timeout', label: 'Timeout (seconds)', type: 'number', defaultValue: 30 },
       ],
       connectionPoints: [
         { id: 'trigger-in', name: 'Event Trigger', type: 'input', protocol: 'Event' },
-        { id: 'storage-out', name: 'Storage Output', type: 'output', protocol: 'HTTP' }
-      ]
+        { id: 'storage-out', name: 'Storage Output', type: 'output', protocol: 'HTTP' },
+      ],
     },
     {
       id: 'object-storage',
@@ -303,18 +327,23 @@ export const serverlessTemplate: TaskTemplate = {
       icon: 'archive',
       color: '#06b6d4',
       properties: [
-        { key: 'storage_class', label: 'Storage Class', type: 'select', options: [
-          { value: 'standard', label: 'Standard' },
-          { value: 'infrequent', label: 'Infrequent Access' },
-          { value: 'glacier', label: 'Archive' }
-        ]},
-        { key: 'versioning', label: 'Enable Versioning', type: 'boolean', defaultValue: true }
+        {
+          key: 'storage_class',
+          label: 'Storage Class',
+          type: 'select',
+          options: [
+            { value: 'standard', label: 'Standard' },
+            { value: 'infrequent', label: 'Infrequent Access' },
+            { value: 'glacier', label: 'Archive' },
+          ],
+        },
+        { key: 'versioning', label: 'Enable Versioning', type: 'boolean', defaultValue: true },
       ],
       connectionPoints: [
         { id: 'upload-in', name: 'File Upload', type: 'input', protocol: 'HTTP' },
-        { id: 'events-out', name: 'Storage Events', type: 'output', protocol: 'Event' }
-      ]
-    }
+        { id: 'events-out', name: 'Storage Events', type: 'output', protocol: 'Event' },
+      ],
+    },
   ],
 
   constraints: [
@@ -323,38 +352,157 @@ export const serverlessTemplate: TaskTemplate = {
       type: 'custom',
       description: 'Function deployment package should be under size limits',
       rule: 'package-size-limit',
-      enforcement: 'hard'
-    }
+      enforcement: 'hard',
+    },
   ],
 
   evaluation: {
-    completeness: { weight: 25, criteria: ['All processing steps are covered', 'Storage is properly planned'] },
-    correctness: { weight: 25, criteria: ['Event flows are correct', 'Function composition is logical'] },
-    efficiency: { weight: 25, criteria: ['Functions are right-sized', 'Storage costs are optimized'] },
-    scalability: { weight: 15, criteria: ['Auto-scaling is configured', 'Can handle traffic spikes'] },
-    bestPractices: { weight: 10, criteria: ['Error handling is included', 'Monitoring is planned'] }
+    completeness: {
+      weight: 25,
+      criteria: ['All processing steps are covered', 'Storage is properly planned'],
+    },
+    correctness: {
+      weight: 25,
+      criteria: ['Event flows are correct', 'Function composition is logical'],
+    },
+    efficiency: {
+      weight: 25,
+      criteria: ['Functions are right-sized', 'Storage costs are optimized'],
+    },
+    scalability: {
+      weight: 15,
+      criteria: ['Auto-scaling is configured', 'Can handle traffic spikes'],
+    },
+    bestPractices: {
+      weight: 10,
+      criteria: ['Error handling is included', 'Monitoring is planned'],
+    },
   },
 
   author: 'ArchiComm Team',
   version: '1.0.0',
   createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z'
+  updatedAt: '2024-01-01T00:00:00Z',
 };
+
+// Aggregate templates and include plugin-based tasks
+function isValidTemplate(t: any): t is TaskTemplate {
+  return (
+    t &&
+    typeof t.id === 'string' &&
+    typeof t.name === 'string' &&
+    typeof t.description === 'string' &&
+    typeof t.category === 'string' &&
+    Array.isArray(t.steps) &&
+    Array.isArray(t.components)
+  );
+}
+
+// Validate plugin JSON with zod and provide safe defaults
+const PluginTaskSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  prompt: z.string(),
+  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  estimatedTime: z.number().optional(),
+  tags: z.array(z.string()).default([]),
+  acceptanceCriteria: z
+    .object({
+      architecture: z.array(z.string()).optional(),
+      apis: z.array(z.string()).optional(),
+      storage: z.array(z.string()).optional(),
+      scaling: z.array(z.string()).optional(),
+    })
+    .optional(),
+  hints: z.array(z.string()).default([]),
+  assets: z.record(z.string()).default({}).optional(),
+  metadata: z
+    .object({
+      author: z.string().optional(),
+      version: z.string().optional(),
+      createdAt: z.string().optional(),
+      updatedAt: z.string().optional(),
+    })
+    .optional(),
+});
+
+let safePlugin: z.infer<typeof PluginTaskSchema> | null = null;
+try {
+  safePlugin = PluginTaskSchema.parse(urlShortener);
+} catch (e) {
+  console.error('Invalid task plugin JSON for url-shortener:', e);
+  safePlugin = null;
+}
+
+export const allTemplates: TaskTemplate[] = [
+  microservicesTemplate,
+  serverlessTemplate,
+  ...(safePlugin
+    ? [
+        {
+          // Map plugin json to TaskTemplate shape. Category defaults to System Design.
+          id: safePlugin.id,
+          name: safePlugin.title,
+          description: safePlugin.prompt,
+          category: 'System Design',
+          difficulty: (safePlugin.difficulty as any) || 'intermediate',
+          estimatedTime: safePlugin.estimatedTime || 45,
+          tags: safePlugin.tags || [],
+          learningObjectives: safePlugin.acceptanceCriteria?.architecture || [],
+          prerequisites: [],
+          // Populate with safe defaults to avoid empty arrays downstream
+          steps: [
+            {
+              id: 'outline-architecture',
+              title: 'Outline Architecture',
+              description: 'Define core components and data flow',
+              type: 'component',
+              required: true,
+            },
+          ],
+          components: [
+            {
+              id: 'service',
+              name: 'Service',
+              type: 'service',
+              description: 'Core service component',
+              icon: 'box',
+              color: '#3b82f6',
+              properties: [],
+              connectionPoints: [],
+            },
+          ],
+          constraints: [],
+          evaluation: {
+            completeness: { weight: 25, criteria: [] },
+            correctness: { weight: 35, criteria: [] },
+            efficiency: { weight: 15, criteria: [] },
+            scalability: { weight: 15, criteria: [] },
+            bestPractices: { weight: 10, criteria: [] }
+          },
+          author: safePlugin.metadata?.author || 'ArchiComm Team',
+          version: safePlugin.metadata?.version || '1.0.0',
+          createdAt: safePlugin.metadata?.createdAt || new Date().toISOString(),
+          updatedAt: safePlugin.metadata?.updatedAt || new Date().toISOString()
+        }
+      ]
+    : [])
+];
 
 // Export community templates only
 // Advanced templates (event-driven, enterprise patterns) are available in premium version
-export const builtInTemplates = [
-  microservicesTemplate,
-  serverlessTemplate
-];
+export const builtInTemplates = [microservicesTemplate, serverlessTemplate];
 
 export default {
   microservices: microservicesTemplate,
-  serverless: serverlessTemplate
+  serverless: serverlessTemplate,
 };
 
 // Helper: convert a TaskTemplate into canvas components and naive connections
-export function convertTemplateToCanvas(template: TaskTemplate): { components: DesignComponent[]; connections: Connection[] } {
+export function convertTemplateToCanvas(template: TaskTemplate): {
+  components: DesignComponent[];
+  connections: Connection[];
+} {
   const now = Date.now();
   // Place components on a simple grid
   const components: DesignComponent[] = template.components.map((c, idx) => {

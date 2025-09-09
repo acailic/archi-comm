@@ -1,0 +1,15 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & ideas (Discussions)
+    url: https://github.com/acailic/archicomm/discussions
+    about: Ask questions, share ideas, and discuss improvements.
+  - name: Documentation & setup help
+    url: https://github.com/acailic/archicomm#readme
+    about: Read the docs for setup, development, and usage guidance.
+  - name: Security issues
+    url: https://github.com/acailic/archicomm/security/policy
+    about: Please report security vulnerabilities privately via the Security Policy.
+  - name: Search issues
+    url: https://github.com/acailic/archicomm/issues
+    about: Check existing issues before creating a new one.
+

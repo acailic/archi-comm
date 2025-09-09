@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [
     react({
       // Optimize React refresh for development
-      fastRefresh: true,
+      // fastRefresh is deprecated in recent versions
       // Reduce bundle size by excluding development helpers in production
       devTarget: 'esnext',
       // Enable SWC optimizations (use default React JSX runtime)
@@ -85,7 +85,7 @@ export default defineConfig({
     minify: isTauriDebug ? false : 'esbuild',
     sourcemap: isTauriDebug,
     cssCodeSplit: true,
-    treeshake: true,
+    // treeshake: true, // deprecated in newer Vite versions
     // Optimize chunk splitting
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
@@ -116,7 +116,7 @@ export default defineConfig({
         entryFileNames: 'assets/js/[name].[hash].js'
       },
       // Optimize external dependencies
-      external: (id) => {
+      external: () => {
         // Keep critical dependencies bundled for reliability
         return false;
       }

@@ -8,7 +8,7 @@ export { default as OnboardingOverlay } from '../../components/OnboardingOverlay
 export type {
   OnboardingStep,
   OnboardingFlow,
-  OnboardingState
+  OnboardingState,
 } from '../../lib/onboarding/OnboardingManager';
 
 // Basic Flow Utilities
@@ -23,7 +23,7 @@ export const createOnboardingStep = (
   title,
   content,
   targetSelector,
-  placement
+  placement,
 });
 
 export const createOnboardingFlow = (
@@ -33,6 +33,5 @@ export const createOnboardingFlow = (
 ): import('../../lib/onboarding/OnboardingManager').OnboardingFlow => ({
   id,
   name,
-  steps
+  steps,
 });
-

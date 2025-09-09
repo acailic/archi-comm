@@ -3,11 +3,11 @@
  * Specialized performance manager for coordinating canvas operations across different systems
  */
 
-import { 
-  PerformanceMonitor, 
-  CanvasOptimizer, 
-  MemoryOptimizer, 
-  OptimizedEventSystem 
+import {
+  PerformanceMonitor,
+  CanvasOptimizer,
+  MemoryOptimizer,
+  OptimizedEventSystem,
 } from './PerformanceOptimizer';
 
 export interface CanvasPerformanceConfig {
@@ -49,6 +49,8 @@ export class CanvasPerformanceManager {
   private config: CanvasPerformanceConfig;
   private optimizers: Map<string, CanvasOptimizer> = new Map();
   private workers: Map<string, Worker> = new Map();
+  private workerQueue: Array<{ id: string; canvas: HTMLCanvasElement }> = [];
+  private idleWorkers: Worker[] = [];
   private performanceMonitor: PerformanceMonitor;
   private eventSystem: OptimizedEventSystem;
   private systemMetrics: Map<string, CanvasSystemMetrics> = new Map();
@@ -76,24 +78,29 @@ export class CanvasPerformanceManager {
       targetFPS: 60,
       adaptiveQuality: true,
       debugMode: false,
-      ...config
+      ...config,
     };
 
     this.performanceMonitor = PerformanceMonitor.getInstance();
     this.eventSystem = new OptimizedEventSystem();
     this.capabilities = this.detectSystemCapabilities();
-    
+
     this.initializeDefaultBudgets();
     this.startPerformanceMonitoring();
     this.adaptConfigurationToCapabilities();
+  }
+
+  getWorkerCapacity(): number {
+    const hc = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4;
+    return Math.max(1, hc - 1);
   }
 
   /**
    * Register a canvas system for performance management
    */
   registerCanvasSystem(
-    id: string, 
-    canvas: HTMLCanvasElement, 
+    id: string,
+    canvas: HTMLCanvasElement,
     type: 'svg' | 'canvas2d' | 'webgl' = 'canvas2d'
   ): CanvasOptimizer {
     // Create optimizer for this canvas
@@ -108,7 +115,7 @@ export class CanvasPerformanceManager {
       renderTime: 0,
       memoryUsage: 0,
       complexity: 0,
-      workerActive: false
+      workerActive: false,
     });
 
     // Set up performance budget for this system
@@ -139,8 +146,11 @@ export class CanvasPerformanceManager {
     // Cleanup worker
     const worker = this.workers.get(id);
     if (worker) {
-      worker.terminate();
+      try {
+        worker.terminate();
+      } catch {}
       this.workers.delete(id);
+      this.processWorkerQueue();
     }
 
     // Cleanup metrics
@@ -196,7 +206,7 @@ export class CanvasPerformanceManager {
    */
   getAggregatedMetrics(): AggregatedMetrics {
     const metrics = Array.from(this.systemMetrics.values());
-    
+
     if (metrics.length === 0) {
       return {
         averageFPS: 60,
@@ -204,7 +214,7 @@ export class CanvasPerformanceManager {
         totalMemoryUsage: 0,
         totalComplexity: 0,
         activeWorkers: 0,
-        performanceScore: 100
+        performanceScore: 100,
       };
     }
 
@@ -225,7 +235,7 @@ export class CanvasPerformanceManager {
       totalMemoryUsage,
       totalComplexity,
       activeWorkers,
-      performanceScore
+      performanceScore,
     };
   }
 
@@ -253,7 +263,7 @@ export class CanvasPerformanceManager {
   setAdaptiveQuality(enabled: boolean): void {
     this.adaptiveQualityEnabled = enabled;
     this.config.adaptiveQuality = enabled;
-    
+
     if (!enabled) {
       this.currentQualityLevel = 1.0;
       this.applyQualityLevel(1.0);
@@ -322,7 +332,7 @@ export class CanvasPerformanceManager {
       budgets: Object.fromEntries(this.performanceBudgets),
       recommendations: this.recommendations,
       capabilities: this.capabilities,
-      aggregated: this.getAggregatedMetrics()
+      aggregated: this.getAggregatedMetrics(),
     };
   }
 
@@ -337,7 +347,7 @@ export class CanvasPerformanceManager {
       maxTextureSize: this.getMaxTextureSize(),
       devicePixelRatio: window.devicePixelRatio || 1,
       hardwareConcurrency: navigator.hardwareConcurrency || 4,
-      memoryInfo: this.getMemoryInfo()
+      memoryInfo: this.getMemoryInfo(),
     };
   }
 
@@ -369,7 +379,7 @@ export class CanvasPerformanceManager {
     const budgets = {
       svg: { renderTime: 16, memoryUsage: 100, fpsThreshold: 50, complexityThreshold: 1000 },
       canvas2d: { renderTime: 8, memoryUsage: 200, fpsThreshold: 55, complexityThreshold: 500 },
-      webgl: { renderTime: 4, memoryUsage: 300, fpsThreshold: 58, complexityThreshold: 2000 }
+      webgl: { renderTime: 4, memoryUsage: 300, fpsThreshold: 58, complexityThreshold: 2000 },
     };
 
     Object.entries(budgets).forEach(([type, budget]) => {
@@ -378,19 +388,21 @@ export class CanvasPerformanceManager {
   }
 
   private getDefaultBudget(type: 'svg' | 'canvas2d' | 'webgl'): PerformanceBudget {
-    return this.performanceBudgets.get(`default-${type}`) || {
-      renderTime: 16,
-      memoryUsage: 100,
-      fpsThreshold: 50,
-      complexityThreshold: 500
-    };
+    return (
+      this.performanceBudgets.get(`default-${type}`) || {
+        renderTime: 16,
+        memoryUsage: 100,
+        fpsThreshold: 50,
+        complexityThreshold: 500,
+      }
+    );
   }
 
   private startPerformanceMonitoring(): void {
     this.monitoringInterval = setInterval(() => {
       this.updateSystemMetrics();
       this.checkPerformanceBudgets();
-      
+
       if (this.adaptiveQualityEnabled) {
         this.adjustQualityLevel();
       }
@@ -401,7 +413,7 @@ export class CanvasPerformanceManager {
     this.systemMetrics.forEach((metrics, id) => {
       // Update FPS
       metrics.fps = this.performanceMonitor.getCurrentFPS();
-      
+
       // Update render time
       const renderMetrics = this.performanceMonitor.getMetrics(`${id}-render`);
       if (renderMetrics.length > 0) {
@@ -428,7 +440,7 @@ export class CanvasPerformanceManager {
           type: 'warning',
           message: `System ${id} FPS (${metrics.fps}) below threshold (${budget.fpsThreshold})`,
           action: 'Consider reducing visual complexity or enabling performance mode',
-          impact: 'medium'
+          impact: 'medium',
         });
       }
 
@@ -438,7 +450,7 @@ export class CanvasPerformanceManager {
           type: 'warning',
           message: `System ${id} render time (${metrics.renderTime}ms) exceeds budget (${budget.renderTime}ms)`,
           action: 'Enable render batching or reduce draw calls',
-          impact: 'high'
+          impact: 'high',
         });
       }
 
@@ -448,7 +460,7 @@ export class CanvasPerformanceManager {
           type: 'critical',
           message: `System ${id} memory usage (${metrics.memoryUsage}MB) exceeds budget (${budget.memoryUsage}MB)`,
           action: 'Enable object pooling or reduce cached objects',
-          impact: 'high'
+          impact: 'high',
         });
       }
     });
@@ -457,7 +469,7 @@ export class CanvasPerformanceManager {
   private adjustQualityLevel(): void {
     const aggregated = this.getAggregatedMetrics();
     const targetFPS = this.config.targetFPS;
-    
+
     if (aggregated.averageFPS < targetFPS * 0.8) {
       // Performance is poor, reduce quality
       this.currentQualityLevel = Math.max(0.5, this.currentQualityLevel - 0.1);
@@ -481,7 +493,7 @@ export class CanvasPerformanceManager {
     const modeSettings = {
       quality: { qualityLevel: 1.0, enableWorkers: true, enableBatching: false },
       balanced: { qualityLevel: 0.8, enableWorkers: true, enableBatching: true },
-      performance: { qualityLevel: 0.6, enableWorkers: true, enableBatching: true }
+      performance: { qualityLevel: 0.6, enableWorkers: true, enableBatching: true },
     };
 
     const settings = modeSettings[mode];
@@ -511,28 +523,60 @@ export class CanvasPerformanceManager {
   private initializeWorker(id: string, canvas: HTMLCanvasElement): void {
     if (!this.capabilities.supportsWorkers) return;
 
+    // Capacity check
+    const capacity = this.getWorkerCapacity();
+    if (this.workers.size >= capacity) {
+      this.workerQueue.push({ id, canvas });
+      this.performanceMonitor.recordMetric('worker-queue-length', {
+        timestamp: Date.now(),
+        duration: 0,
+        type: 'queue',
+        value: this.workerQueue.length,
+      });
+      return;
+    }
+
     try {
-      const worker = new Worker('/workers/canvas-renderer.js');
-      
-      worker.onmessage = (event) => {
+      const worker = this.idleWorkers.pop() || new Worker(new URL('./canvas-renderer.ts', import.meta.url), { type: 'module' });
+
+      worker.onmessage = event => {
         this.handleWorkerMessage(id, event.data);
       };
 
-      worker.onerror = (error) => {
+      worker.onerror = error => {
         console.warn(`Worker for canvas ${id} failed:`, error);
         this.workers.delete(id);
       };
 
       // Initialize worker with canvas
       if (this.capabilities.supportsOffscreenCanvas) {
-        const offscreen = canvas.transferControlToOffscreen();
-        worker.postMessage({ type: 'init', canvas: offscreen }, [offscreen]);
+        try {
+          const offscreen = canvas.transferControlToOffscreen();
+          worker.postMessage({ type: 'init', canvas: offscreen }, [offscreen]);
+        } catch (error) {
+          console.warn(`Failed to transfer control to offscreen for canvas ${id}:`, error);
+        }
       }
 
       this.workers.set(id, worker);
+      this.processWorkerQueue();
     } catch (error) {
       console.warn(`Failed to create worker for canvas ${id}:`, error);
     }
+  }
+
+  private processWorkerQueue() {
+    const capacity = this.getWorkerCapacity();
+    while (this.workerQueue.length > 0 && this.workers.size < capacity) {
+      const next = this.workerQueue.shift()!;
+      this.initializeWorker(next.id, next.canvas);
+    }
+    this.performanceMonitor.recordMetric('worker-queue-length', {
+      timestamp: Date.now(),
+      duration: 0,
+      type: 'queue',
+      value: this.workerQueue.length,
+    });
   }
 
   private handleWorkerMessage(id: string, message: any): void {
@@ -542,7 +586,7 @@ export class CanvasPerformanceManager {
           timestamp: Date.now(),
           duration: message.duration,
           type: 'worker-render',
-          value: message.duration
+          value: message.duration,
         });
         break;
       case 'error':
@@ -553,14 +597,14 @@ export class CanvasPerformanceManager {
 
   private analyzePerformance(): void {
     const aggregated = this.getAggregatedMetrics();
-    
+
     // Analyze overall performance
     if (aggregated.performanceScore < 70) {
       this.addRecommendation({
         type: 'critical',
         message: `Overall performance score is low (${aggregated.performanceScore.toFixed(1)})`,
         action: 'Consider enabling performance mode or reducing canvas complexity',
-        impact: 'high'
+        impact: 'high',
       });
     }
 
@@ -570,14 +614,14 @@ export class CanvasPerformanceManager {
         type: 'warning',
         message: `Memory usage approaching limit (${aggregated.totalMemoryUsage.toFixed(1)}MB)`,
         action: 'Enable object pooling and cleanup unused resources',
-        impact: 'medium'
+        impact: 'medium',
       });
     }
   }
 
   private applyOptimizations(): void {
     const aggregated = this.getAggregatedMetrics();
-    
+
     // Auto-enable workers if performance is poor
     if (aggregated.averageFPS < this.config.targetFPS * 0.7 && this.capabilities.supportsWorkers) {
       this.systemMetrics.forEach((_, id) => {
@@ -595,20 +639,20 @@ export class CanvasPerformanceManager {
   private updateRecommendations(): void {
     // Clear old recommendations
     this.recommendations = [];
-    
+
     // Generate new recommendations based on current state
     this.analyzePerformance();
-    
+
     // Limit recommendations to prevent overwhelming the user
     this.recommendations = this.recommendations.slice(0, 5);
   }
 
   private addRecommendation(recommendation: PerformanceRecommendation): void {
     // Avoid duplicate recommendations
-    const exists = this.recommendations.some(r => 
-      r.message === recommendation.message && r.type === recommendation.type
+    const exists = this.recommendations.some(
+      r => r.message === recommendation.message && r.type === recommendation.type
     );
-    
+
     if (!exists) {
       this.recommendations.push(recommendation);
     }
@@ -663,15 +707,15 @@ export type PerformanceEventListener = (event: string, data: any) => void;
 
 export const useCanvasPerformanceManager = (config?: Partial<CanvasPerformanceConfig>) => {
   const manager = CanvasPerformanceManager.getInstance(config);
-  
+
   return {
     manager,
-    registerCanvas: (id: string, canvas: HTMLCanvasElement, type?: 'svg' | 'canvas2d' | 'webgl') => 
+    registerCanvas: (id: string, canvas: HTMLCanvasElement, type?: 'svg' | 'canvas2d' | 'webgl') =>
       manager.registerCanvasSystem(id, canvas, type),
     unregisterCanvas: (id: string) => manager.unregisterCanvasSystem(id),
     getMetrics: () => manager.getAggregatedMetrics(),
     getRecommendations: () => manager.getRecommendations(),
-    optimizePerformance: () => manager.optimizePerformance()
+    optimizePerformance: () => manager.optimizePerformance(),
   };
 };
 
@@ -680,11 +724,11 @@ export const createPerformancePolicy = (
   config: Partial<CanvasPerformanceConfig> = {}
 ) => {
   const manager = CanvasPerformanceManager.getInstance(config);
-  
+
   Object.entries(budgets).forEach(([id, budget]) => {
     manager.setPerformanceBudget(id, budget);
   });
-  
+
   return manager;
 };
 

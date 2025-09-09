@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from './ui/badge';
-import { 
-  Clock, 
-  Target, 
-  Wifi, 
-  WifiOff, 
+import {
+  Clock,
+  Target,
+  Wifi,
+  WifiOff,
   CheckCircle,
   Info,
   Activity,
   Zap,
   AlertTriangle,
-  TrendingUp
+  TrendingUp,
 } from 'lucide-react';
 import { PerformanceMonitor } from '../lib/performance/PerformanceOptimizer';
 import { useUXOptimizer } from '../lib/user-experience/UXOptimizer';
@@ -40,7 +40,15 @@ interface UXMetrics {
   skillLevel: 'beginner' | 'intermediate' | 'advanced';
 }
 
-export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, cursorPosition, selectedCount, totalComponents, canvasExtents }: StatusBarProps) {
+export function StatusBar({
+  currentScreen,
+  sessionStartTime,
+  selectedChallenge,
+  cursorPosition,
+  selectedCount,
+  totalComponents,
+  canvasExtents,
+}: StatusBarProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState(0);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -49,23 +57,19 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
     fps: 60,
     avgRenderTime: 0,
     memoryUsage: 0,
-    performanceHealth: 'good'
+    performanceHealth: 'good',
   });
   const [uxMetrics, setUxMetrics] = useState<UXMetrics>({
     userSatisfaction: 85,
     interactionSuccess: 90,
     recommendationsAvailable: 0,
-    skillLevel: 'intermediate'
+    skillLevel: 'intermediate',
   });
   const [showPerformanceDetails, setShowPerformanceDetails] = useState(false);
-  
+
   // UX Optimizer integration (use stable callbacks, not the whole object)
-  const {
-    measureSatisfaction,
-    getSuccessRate,
-    getRecommendations,
-    getSkillLevel,
-  } = useUXOptimizer();
+  const { measureSatisfaction, getSuccessRate, getRecommendations, getSkillLevel } =
+    useUXOptimizer();
 
   // Update current time every second
   useEffect(() => {
@@ -116,7 +120,6 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
 
   // UX metrics monitoring
   useEffect(() => {
-    
     const updateUXMetrics = () => {
       try {
         const satisfaction = measureSatisfaction();
@@ -128,7 +131,7 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
           userSatisfaction: Math.round(satisfaction * 100),
           interactionSuccess: Math.round(successRate * 100),
           recommendationsAvailable: recommendations.length,
-          skillLevel: skillLevel || 'intermediate'
+          skillLevel: skillLevel || 'intermediate',
         });
       } catch (error) {
         // Fallback to default values if UX optimizer fails
@@ -138,7 +141,7 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
 
     // Update UX metrics every 2 seconds
     const uxInterval = setInterval(updateUXMetrics, 2000);
-    
+
     // Initial update
     updateUXMetrics();
 
@@ -150,15 +153,20 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
     if (!shouldShowPerformanceMetrics()) return;
 
     const performanceMonitor = PerformanceMonitor.getInstance();
-    
+
     const updatePerformanceMetrics = () => {
       const fps = performanceMonitor.getCurrentFPS();
       const avgRenderTime = performanceMonitor.getAverageMetric('canvas-render') || 0;
-      
+
       // Estimate memory usage (simplified)
-      const memoryUsage = (performance as any).memory ? 
-        Math.round(((performance as any).memory.usedJSHeapSize / (performance as any).memory.totalJSHeapSize) * 100) : 0;
-      
+      const memoryUsage = (performance as any).memory
+        ? Math.round(
+            ((performance as any).memory.usedJSHeapSize /
+              (performance as any).memory.totalJSHeapSize) *
+              100
+          )
+        : 0;
+
       // Calculate performance health
       let performanceHealth: 'good' | 'warning' | 'critical' = 'good';
       if (fps < 30 || avgRenderTime > 50) {
@@ -171,13 +179,13 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
         fps,
         avgRenderTime,
         memoryUsage,
-        performanceHealth
+        performanceHealth,
       });
     };
 
     // Update metrics every 500ms
     const metricsInterval = setInterval(updatePerformanceMetrics, 500);
-    
+
     // Initial update
     updatePerformanceMetrics();
 
@@ -188,7 +196,7 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
     return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
   };
 
@@ -233,7 +241,7 @@ export function StatusBar({ currentScreen, sessionStartTime, selectedChallenge, 
 
   const getUXTooltip = () => {
     const tips = [];
-    
+
     if (uxMetrics.userSatisfaction < 70) {
       tips.push('Low satisfaction detected - check for usability issues');
     }
@@ -283,7 +291,7 @@ Recommendations: ${uxMetrics.recommendationsAvailable}`;
 
   const getPerformanceTooltip = () => {
     const tips = [];
-    
+
     if (performanceMetrics.fps < 50) {
       tips.push('Low FPS detected - consider reducing canvas complexity');
     }
@@ -293,7 +301,7 @@ Recommendations: ${uxMetrics.recommendationsAvailable}`;
     if (performanceMetrics.memoryUsage > 80) {
       tips.push('High memory usage - consider refreshing the page');
     }
-    
+
     const baseTooltip = `Performance Metrics:
 FPS: ${performanceMetrics.fps}
 Render Time: ${performanceMetrics.avgRenderTime.toFixed(1)}ms
@@ -329,20 +337,24 @@ Health: ${performanceMetrics.performanceHealth}`;
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="h-8 border-t border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] flex items-center justify-between px-4 text-xs shadow-[var(--elevation-1)]"
+      className='h-8 border-t border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] flex items-center justify-between px-4 text-xs shadow-[var(--elevation-1)]'
     >
       {/* Left Section - Status & Challenge */}
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-2">
+      <div className='flex items-center space-x-4'>
+        <div className='flex items-center space-x-2'>
           <div className={`w-2 h-2 rounded-full ${screenStatus.color} animate-pulse`} />
-          <span className="text-muted-foreground">{screenStatus.text}</span>
+          <span className='text-muted-foreground'>{screenStatus.text}</span>
         </div>
 
         {selectedChallenge && (
           <>
-            <div className="w-px h-4 bg-border" />
-            <Badge variant="outline" className="text-xs" title={`Current Challenge: ${selectedChallenge.title}\nDifficulty: ${selectedChallenge.difficulty}`}>
-              <Target className="w-3 h-3 mr-1" />
+            <div className='w-px h-4 bg-border' />
+            <Badge
+              variant='outline'
+              className='text-xs'
+              title={`Current Challenge: ${selectedChallenge.title}\nDifficulty: ${selectedChallenge.difficulty}`}
+            >
+              <Target className='w-3 h-3 mr-1' />
               {selectedChallenge.title}
             </Badge>
           </>
@@ -350,12 +362,12 @@ Health: ${performanceMetrics.performanceHealth}`;
 
         {sessionStartTime && (
           <>
-            <div className="w-px h-4 bg-border" />
-            <div 
-              className="flex items-center space-x-1 text-muted-foreground" 
+            <div className='w-px h-4 bg-border' />
+            <div
+              className='flex items-center space-x-1 text-muted-foreground'
               title={`Session Duration\nStarted: ${formatTime(sessionStartTime)}`}
             >
-              <Clock className="w-3 h-3" />
+              <Clock className='w-3 h-3' />
               <span>{formatDuration(sessionDuration)}</span>
             </div>
           </>
@@ -363,44 +375,44 @@ Health: ${performanceMetrics.performanceHealth}`;
       </div>
 
       {/* Right Section - System Status */}
-      <div className="flex items-center space-x-4">
+      <div className='flex items-center space-x-4'>
         {/* Auto-save Status */}
         {lastSaved && (
           <>
-            <div 
-              className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+            <div
+              className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
               title={`Last saved: ${formatTime(lastSaved)}\nAuto-saves every 30 seconds`}
             >
-              <CheckCircle className="w-3 h-3 text-green-500" />
+              <CheckCircle className='w-3 h-3 text-green-500' />
               <span>Auto-saved</span>
             </div>
-            <div className="w-px h-4 bg-border" />
+            <div className='w-px h-4 bg-border' />
           </>
         )}
 
         {/* UX Metrics */}
         {shouldShowUXMetrics() && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2 }}
-              className="flex items-center space-x-3"
+              className='flex items-center space-x-3'
             >
               {/* User Satisfaction */}
-              <div 
-                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+              <div
+                className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                 title={`User Satisfaction: ${uxMetrics.userSatisfaction}%\n${uxMetrics.userSatisfaction >= 80 ? 'Excellent experience' : uxMetrics.userSatisfaction >= 60 ? 'Good experience' : 'Experience needs improvement'}`}
               >
-                <span className="text-xs">😊</span>
+                <span className='text-xs'>😊</span>
                 <span className={`font-mono text-xs ${getUXSatisfactionColor()}`}>
                   {uxMetrics.userSatisfaction}%
                 </span>
               </div>
 
               {/* Interaction Success Rate */}
-              <div 
-                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+              <div
+                className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                 title={`Interaction Success: ${uxMetrics.interactionSuccess}%\n${uxMetrics.interactionSuccess >= 90 ? 'Excellent interaction success' : uxMetrics.interactionSuccess >= 75 ? 'Good interaction success' : 'Interaction issues detected'}`}
               >
                 <CheckCircle className={`w-3 h-3 ${getInteractionSuccessColor()}`} />
@@ -410,36 +422,36 @@ Health: ${performanceMetrics.performanceHealth}`;
               </div>
 
               {/* Skill Level & Recommendations */}
-              <div 
-                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+              <div
+                className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                 title={getUXTooltip()}
               >
-                <span className="text-xs">{getSkillLevelIcon()}</span>
-                <span className="text-xs capitalize">{uxMetrics.skillLevel}</span>
+                <span className='text-xs'>{getSkillLevelIcon()}</span>
+                <span className='text-xs capitalize'>{uxMetrics.skillLevel}</span>
                 {uxMetrics.recommendationsAvailable > 0 && (
-                  <Badge variant="outline" className="ml-1 px-1 py-0 text-xs h-4">
-                    <TrendingUp className="w-2 h-2 mr-1" />
+                  <Badge variant='outline' className='ml-1 px-1 py-0 text-xs h-4'>
+                    <TrendingUp className='w-2 h-2 mr-1' />
                     {uxMetrics.recommendationsAvailable}
                   </Badge>
                 )}
               </div>
             </motion.div>
-            <div className="w-px h-4 bg-border" />
+            <div className='w-px h-4 bg-border' />
           </>
         )}
 
         {/* Performance Metrics */}
         {shouldShowPerformanceMetrics() && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2 }}
-              className="flex items-center space-x-3"
+              className='flex items-center space-x-3'
             >
               {/* FPS Indicator */}
-              <div 
-                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+              <div
+                className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                 title={`Frame Rate: ${performanceMetrics.fps} FPS\n${performanceMetrics.fps > 50 ? 'Excellent performance' : performanceMetrics.fps > 30 ? 'Good performance' : 'Performance issues detected'}`}
               >
                 <Zap className={`w-3 h-3 ${getPerformanceColor('fps')}`} />
@@ -450,8 +462,8 @@ Health: ${performanceMetrics.performanceHealth}`;
 
               {/* Render Time */}
               {performanceMetrics.avgRenderTime > 0 && (
-                <div 
-                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                <div
+                  className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                   title={`Average Render Time: ${performanceMetrics.avgRenderTime.toFixed(1)}ms\n${performanceMetrics.avgRenderTime < 10 ? 'Fast rendering' : performanceMetrics.avgRenderTime < 20 ? 'Moderate rendering' : 'Slow rendering detected'}`}
                 >
                   <Clock className={`w-3 h-3 ${getPerformanceColor('renderTime')}`} />
@@ -462,13 +474,13 @@ Health: ${performanceMetrics.performanceHealth}`;
               )}
 
               {/* Performance Health */}
-              <div 
-                className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+              <div
+                className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                 title={getPerformanceTooltip()}
                 onClick={() => setShowPerformanceDetails(!showPerformanceDetails)}
               >
-                {React.createElement(getPerformanceIcon(), { 
-                  className: `w-3 h-3 ${getPerformanceColor('health')} ${performanceMetrics.performanceHealth === 'critical' ? 'animate-pulse' : ''}` 
+                {React.createElement(getPerformanceIcon(), {
+                  className: `w-3 h-3 ${getPerformanceColor('health')} ${performanceMetrics.performanceHealth === 'critical' ? 'animate-pulse' : ''}`,
                 })}
                 {process.env.NODE_ENV === 'development' && (
                   <span className={`text-xs ${getPerformanceColor('health')}`}>
@@ -479,18 +491,22 @@ Health: ${performanceMetrics.performanceHealth}`;
 
               {/* Memory Usage (Development only) */}
               {process.env.NODE_ENV === 'development' && performanceMetrics.memoryUsage > 0 && (
-                <div 
-                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                <div
+                  className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                   title={`Memory Usage: ${performanceMetrics.memoryUsage}%\n${performanceMetrics.memoryUsage < 60 ? 'Normal usage' : performanceMetrics.memoryUsage < 80 ? 'High usage' : 'Critical memory usage'}`}
                 >
-                  <TrendingUp className={`w-3 h-3 ${performanceMetrics.memoryUsage > 80 ? 'text-red-500' : performanceMetrics.memoryUsage > 60 ? 'text-yellow-500' : 'text-green-500'}`} />
-                  <span className={`font-mono text-xs ${performanceMetrics.memoryUsage > 80 ? 'text-red-500' : performanceMetrics.memoryUsage > 60 ? 'text-yellow-500' : 'text-green-500'}`}>
+                  <TrendingUp
+                    className={`w-3 h-3 ${performanceMetrics.memoryUsage > 80 ? 'text-red-500' : performanceMetrics.memoryUsage > 60 ? 'text-yellow-500' : 'text-green-500'}`}
+                  />
+                  <span
+                    className={`font-mono text-xs ${performanceMetrics.memoryUsage > 80 ? 'text-red-500' : performanceMetrics.memoryUsage > 60 ? 'text-yellow-500' : 'text-green-500'}`}
+                  >
                     {performanceMetrics.memoryUsage}%
                   </span>
                 </div>
               )}
             </motion.div>
-            <div className="w-px h-4 bg-border" />
+            <div className='w-px h-4 bg-border' />
           </>
         )}
 
@@ -500,73 +516,81 @@ Health: ${performanceMetrics.performanceHealth}`;
             {/* Cursor Position */}
             {cursorPosition && (
               <>
-                <div 
-                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help font-mono text-xs"
+                <div
+                  className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help font-mono text-xs'
                   title={`Current cursor position in canvas coordinates`}
                 >
-                  <span>X: {Math.round(cursorPosition.x)}, Y: {Math.round(cursorPosition.y)}</span>
+                  <span>
+                    X: {Math.round(cursorPosition.x)}, Y: {Math.round(cursorPosition.y)}
+                  </span>
                 </div>
-                <div className="w-px h-4 bg-border" />
+                <div className='w-px h-4 bg-border' />
               </>
             )}
-            
+
             {/* Selection Count */}
-            {(selectedCount !== undefined && totalComponents !== undefined) && (
+            {selectedCount !== undefined && totalComponents !== undefined && (
               <>
-                <div 
-                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+                <div
+                  className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
                   title={`${selectedCount} of ${totalComponents} components selected`}
                 >
-                  <Target className="w-3 h-3" />
-                  <span className={`text-xs ${
-                    selectedCount > 0 ? 'text-green-600 font-medium' : 'text-muted-foreground'
-                  }`}>
+                  <Target className='w-3 h-3' />
+                  <span
+                    className={`text-xs ${
+                      selectedCount > 0 ? 'text-green-600 font-medium' : 'text-muted-foreground'
+                    }`}
+                  >
                     Selected: {selectedCount}/{totalComponents}
                   </span>
                 </div>
-                <div className="w-px h-4 bg-border" />
+                <div className='w-px h-4 bg-border' />
               </>
             )}
-            
+
             {/* Canvas Extents - Only in development mode */}
             {process.env.NODE_ENV === 'development' && canvasExtents && (
               <>
-                <div 
-                  className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help font-mono text-xs"
+                <div
+                  className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help font-mono text-xs'
                   title={`Canvas size: ${canvasExtents.width} x ${canvasExtents.height} pixels`}
                 >
-                  <span>{Math.round(canvasExtents.width)} × {Math.round(canvasExtents.height)}</span>
+                  <span>
+                    {Math.round(canvasExtents.width)} × {Math.round(canvasExtents.height)}
+                  </span>
                 </div>
-                <div className="w-px h-4 bg-border" />
+                <div className='w-px h-4 bg-border' />
               </>
             )}
           </>
         )}
 
         {/* Connection Status */}
-        <div 
-          className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help"
-          title={isOnline ? 'Connected to internet\nAll features available' : 'No internet connection\nSome features may be limited'}
+        <div
+          className='flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors cursor-help'
+          title={
+            isOnline
+              ? 'Connected to internet\nAll features available'
+              : 'No internet connection\nSome features may be limited'
+          }
         >
           {isOnline ? (
             <>
-              <Wifi className="w-3 h-3 text-green-500" />
+              <Wifi className='w-3 h-3 text-green-500' />
               <span>Online</span>
             </>
           ) : (
             <>
-              <WifiOff className="w-3 h-3 text-red-500" />
+              <WifiOff className='w-3 h-3 text-red-500' />
               <span>Offline</span>
             </>
           )}
         </div>
 
-        <div className="w-px h-4 bg-border" />
+        <div className='w-px h-4 bg-border' />
 
         {/* Current Time */}
-        <div className="text-muted-foreground font-mono">
-          {formatTime(currentTime)}
-        </div>
+        <div className='text-muted-foreground font-mono'>{formatTime(currentTime)}</div>
       </div>
     </motion.div>
   );

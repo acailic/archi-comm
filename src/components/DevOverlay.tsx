@@ -10,11 +10,11 @@ import { errorStore, type AppError, type ErrorSeverity } from '../lib/errorStore
 
 // Animation variants for smooth transitions
 const overlayVariants = {
-  hidden: { 
+  hidden: {
     opacity: 0,
     backdropFilter: 'blur(0px)',
   },
-  visible: { 
+  visible: {
     opacity: 1,
     backdropFilter: 'blur(4px)',
     transition: {
@@ -22,7 +22,7 @@ const overlayVariants = {
       ease: 'easeOut',
     },
   },
-  exit: { 
+  exit: {
     opacity: 0,
     backdropFilter: 'blur(0px)',
     transition: {
@@ -33,12 +33,12 @@ const overlayVariants = {
 };
 
 const errorBoxVariants = {
-  hidden: { 
+  hidden: {
     opacity: 0,
     scale: 0.9,
     y: 20,
   },
-  visible: { 
+  visible: {
     opacity: 1,
     scale: 1,
     y: 0,
@@ -49,7 +49,7 @@ const errorBoxVariants = {
       duration: 0.4,
     },
   },
-  exit: { 
+  exit: {
     opacity: 0,
     scale: 0.95,
     y: -10,
@@ -61,18 +61,21 @@ const errorBoxVariants = {
 };
 
 const buttonVariants = {
-  hover: { 
+  hover: {
     scale: 1.05,
     transition: { duration: 0.2 },
   },
-  tap: { 
+  tap: {
     scale: 0.95,
     transition: { duration: 0.1 },
   },
 };
 
 // Severity color mapping
-const severityColors: Record<ErrorSeverity, { bg: string; border: string; text: string; badge: string }> = {
+const severityColors: Record<
+  ErrorSeverity,
+  { bg: string; border: string; text: string; badge: string }
+> = {
   critical: {
     bg: 'bg-red-900/95',
     border: 'border-red-500',
@@ -134,10 +137,10 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
     });
 
     // Subscribe to error store changes to handle resolved errors
-    const unsubscribeStore = errorStore.subscribe((state) => {
+    const unsubscribeStore = errorStore.subscribe(state => {
       const unresolvedErrors = state.errors.filter(e => !e.resolved);
       setErrorQueue(unresolvedErrors);
-      
+
       // If current error is resolved, move to next or hide
       if (currentError && currentError.resolved) {
         handleNextError();
@@ -283,7 +286,11 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
 
   const formatStackTrace = (stack?: string): string[] => {
     if (!stack) return [];
-    return stack.split('\n').slice(1).map(line => line.trim()).filter(Boolean);
+    return stack
+      .split('\n')
+      .slice(1)
+      .map(line => line.trim())
+      .filter(Boolean);
   };
 
   const truncateMessage = (message: string, maxLength: number = 200): string => {
@@ -300,35 +307,32 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
       {isVisible && (
         <motion.div
           ref={overlayRef}
-          className="fixed inset-0 z-[9999] flex items-start justify-center p-4 pt-8"
+          className='fixed inset-0 z-[9999] flex items-start justify-center p-4 pt-8'
           style={{ pointerEvents: 'auto' }}
           variants={overlayVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
+          initial='hidden'
+          animate='visible'
+          exit='exit'
           tabIndex={-1}
-          role="alert"
-          aria-live="assertive"
-          aria-label="Development Error Overlay"
+          role='alert'
+          aria-live='assertive'
+          aria-label='Development Error Overlay'
         >
           {/* Backdrop */}
-          <motion.div
-            className="absolute inset-0 bg-black/50"
-            onClick={handleDismiss}
-          />
+          <motion.div className='absolute inset-0 bg-black/50' onClick={handleDismiss} />
 
           {/* Error Box */}
           <motion.div
             className={`relative w-full max-w-4xl max-h-[80vh] overflow-hidden rounded-lg border-2 shadow-2xl ${colors.bg} ${colors.border} ${colors.text}`}
             variants={errorBoxVariants}
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-current/20">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                  <h2 className="text-lg font-bold">Development Error</h2>
+            <div className='flex items-center justify-between p-4 border-b border-current/20'>
+              <div className='flex items-center gap-3'>
+                <div className='flex items-center gap-2'>
+                  <div className='w-3 h-3 bg-red-500 rounded-full animate-pulse' />
+                  <h2 className='text-lg font-bold'>Development Error</h2>
                 </div>
                 <span className={`px-2 py-1 text-xs font-medium rounded ${colors.badge}`}>
                   {currentError.severity.toUpperCase()}
@@ -337,36 +341,36 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
                   {currentError.category}
                 </span>
                 {currentError.count > 1 && (
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-600 text-white rounded">
+                  <span className='px-2 py-1 text-xs font-medium bg-gray-600 text-white rounded'>
                     {currentError.count}x
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className='flex items-center gap-2'>
                 {/* Error navigation */}
                 {errorQueue.length > 1 && (
-                  <div className="flex items-center gap-1 text-sm">
+                  <div className='flex items-center gap-1 text-sm'>
                     <motion.button
-                      className="p-1 rounded hover:bg-white/10"
+                      className='p-1 rounded hover:bg-white/10'
                       onClick={handlePreviousError}
                       variants={buttonVariants}
-                      whileHover="hover"
-                      whileTap="tap"
-                      title="Previous error (←)"
+                      whileHover='hover'
+                      whileTap='tap'
+                      title='Previous error (←)'
                     >
                       ←
                     </motion.button>
-                    <span className="px-2">
+                    <span className='px-2'>
                       {currentErrorIndex + 1} / {errorQueue.length}
                     </span>
                     <motion.button
-                      className="p-1 rounded hover:bg-white/10"
+                      className='p-1 rounded hover:bg-white/10'
                       onClick={handleNextError}
                       variants={buttonVariants}
-                      whileHover="hover"
-                      whileTap="tap"
-                      title="Next error (→)"
+                      whileHover='hover'
+                      whileTap='tap'
+                      title='Next error (→)'
                     >
                       →
                     </motion.button>
@@ -375,24 +379,24 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
 
                 {/* Minimize/Maximize */}
                 <motion.button
-                  className="p-2 rounded hover:bg-white/10"
+                  className='p-2 rounded hover:bg-white/10'
                   onClick={() => setIsMinimized(!isMinimized)}
                   variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  title={isMinimized ? "Expand" : "Minimize"}
+                  whileHover='hover'
+                  whileTap='tap'
+                  title={isMinimized ? 'Expand' : 'Minimize'}
                 >
                   {isMinimized ? '□' : '−'}
                 </motion.button>
 
                 {/* Close */}
                 <motion.button
-                  className="p-2 rounded hover:bg-white/10"
+                  className='p-2 rounded hover:bg-white/10'
                   onClick={handleDismiss}
                   variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  title="Close (Esc)"
+                  whileHover='hover'
+                  whileTap='tap'
+                  title='Close (Esc)'
                 >
                   ×
                 </motion.button>
@@ -403,17 +407,17 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
             <AnimatePresence>
               {!isMinimized && (
                 <motion.div
-                  className="overflow-y-auto max-h-[60vh]"
+                  className='overflow-y-auto max-h-[60vh]'
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <div className="p-4 space-y-4">
+                  <div className='p-4 space-y-4'>
                     {/* Error Message */}
                     <div>
-                      <h3 className="text-sm font-semibold mb-2 opacity-75">Error Message</h3>
-                      <div className="p-3 bg-black/20 rounded font-mono text-sm break-words">
+                      <h3 className='text-sm font-semibold mb-2 opacity-75'>Error Message</h3>
+                      <div className='p-3 bg-black/20 rounded font-mono text-sm break-words'>
                         {currentError.message}
                       </div>
                     </div>
@@ -421,10 +425,10 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
                     {/* Stack Trace */}
                     {currentError.stack && (
                       <div>
-                        <h3 className="text-sm font-semibold mb-2 opacity-75">Stack Trace</h3>
-                        <div className="p-3 bg-black/20 rounded font-mono text-xs space-y-1 max-h-40 overflow-y-auto">
+                        <h3 className='text-sm font-semibold mb-2 opacity-75'>Stack Trace</h3>
+                        <div className='p-3 bg-black/20 rounded font-mono text-xs space-y-1 max-h-40 overflow-y-auto'>
                           {formatStackTrace(currentError.stack).map((line, index) => (
-                            <div key={index} className="break-all">
+                            <div key={index} className='break-all'>
                               {line}
                             </div>
                           ))}
@@ -435,49 +439,63 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
                     {/* Component Stack */}
                     {currentError.context.componentStack && (
                       <div>
-                        <h3 className="text-sm font-semibold mb-2 opacity-75">Component Stack</h3>
-                        <div className="p-3 bg-black/20 rounded font-mono text-xs">
+                        <h3 className='text-sm font-semibold mb-2 opacity-75'>Component Stack</h3>
+                        <div className='p-3 bg-black/20 rounded font-mono text-xs'>
                           {currentError.context.componentStack}
                         </div>
                       </div>
                     )}
 
                     {/* User Actions */}
-                    {currentError.context.userActions && currentError.context.userActions.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold mb-2 opacity-75">User Actions Leading to Error</h3>
-                        <div className="p-3 bg-black/20 rounded text-sm space-y-1">
-                          {currentError.context.userActions.map((action, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <span className="text-xs opacity-50">{index + 1}.</span>
-                              <span>{action}</span>
-                            </div>
-                          ))}
+                    {currentError.context.userActions &&
+                      currentError.context.userActions.length > 0 && (
+                        <div>
+                          <h3 className='text-sm font-semibold mb-2 opacity-75'>
+                            User Actions Leading to Error
+                          </h3>
+                          <div className='p-3 bg-black/20 rounded text-sm space-y-1'>
+                            {currentError.context.userActions.map((action, index) => (
+                              <div key={index} className='flex items-center gap-2'>
+                                <span className='text-xs opacity-50'>{index + 1}.</span>
+                                <span>{action}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Context Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-sm'>
                       <div>
-                        <h4 className="font-semibold mb-1 opacity-75">Timestamp</h4>
-                        <div className="opacity-90">{formatTimestamp(currentError.timestamp)}</div>
+                        <h4 className='font-semibold mb-1 opacity-75'>Timestamp</h4>
+                        <div className='opacity-90'>{formatTimestamp(currentError.timestamp)}</div>
                       </div>
                       {currentError.context.url && (
                         <div>
-                          <h4 className="font-semibold mb-1 opacity-75">URL</h4>
-                          <div className="opacity-90 break-all">{currentError.context.url}</div>
+                          <h4 className='font-semibold mb-1 opacity-75'>URL</h4>
+                          <div className='opacity-90 break-all'>{currentError.context.url}</div>
                         </div>
                       )}
                       {currentError.context.performanceMetrics && (
-                        <div className="md:col-span-2">
-                          <h4 className="font-semibold mb-1 opacity-75">Performance Metrics</h4>
-                          <div className="grid grid-cols-2 gap-2 text-xs opacity-90">
+                        <div className='md:col-span-2'>
+                          <h4 className='font-semibold mb-1 opacity-75'>Performance Metrics</h4>
+                          <div className='grid grid-cols-2 gap-2 text-xs opacity-90'>
                             {currentError.context.performanceMetrics.memoryUsage && (
-                              <div>Memory: {(currentError.context.performanceMetrics.memoryUsage / 1024 / 1024).toFixed(2)} MB</div>
+                              <div>
+                                Memory:{' '}
+                                {(
+                                  currentError.context.performanceMetrics.memoryUsage /
+                                  1024 /
+                                  1024
+                                ).toFixed(2)}{' '}
+                                MB
+                              </div>
                             )}
                             {currentError.context.performanceMetrics.renderTime && (
-                              <div>Render Time: {currentError.context.performanceMetrics.renderTime.toFixed(2)} ms</div>
+                              <div>
+                                Render Time:{' '}
+                                {currentError.context.performanceMetrics.renderTime.toFixed(2)} ms
+                              </div>
                             )}
                           </div>
                         </div>
@@ -489,57 +507,57 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
             </AnimatePresence>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2 p-4 border-t border-current/20 bg-black/10">
+            <div className='flex flex-wrap gap-2 p-4 border-t border-current/20 bg-black/10'>
               <motion.button
-                className="px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors"
+                className='px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors'
                 onClick={handleResolveError}
                 variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                title="Mark as resolved (Ctrl+R)"
+                whileHover='hover'
+                whileTap='tap'
+                title='Mark as resolved (Ctrl+R)'
               >
                 ✓ Resolve
               </motion.button>
 
               <motion.button
-                className="px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors"
+                className='px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors'
                 onClick={handleCopyError}
                 variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                title="Copy error details (Ctrl+C)"
+                whileHover='hover'
+                whileTap='tap'
+                title='Copy error details (Ctrl+C)'
               >
                 📋 Copy Details
               </motion.button>
 
               {onOpenDiagnostics && (
                 <motion.button
-                  className="px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors"
+                  className='px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors'
                   onClick={handleOpenDiagnostics}
                   variants={buttonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  title="Open diagnostics (Ctrl+D)"
+                  whileHover='hover'
+                  whileTap='tap'
+                  title='Open diagnostics (Ctrl+D)'
                 >
                   🔧 Diagnostics
                 </motion.button>
               )}
 
               <motion.button
-                className="px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors"
+                className='px-3 py-2 text-sm font-medium bg-white/10 hover:bg-white/20 rounded transition-colors'
                 onClick={handleDismiss}
                 variants={buttonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                title="Dismiss (Esc)"
+                whileHover='hover'
+                whileTap='tap'
+                title='Dismiss (Esc)'
               >
                 ✕ Dismiss
               </motion.button>
             </div>
 
             {/* Keyboard shortcuts help */}
-            <div className="px-4 pb-2 text-xs opacity-50">
-              <div className="flex flex-wrap gap-4">
+            <div className='px-4 pb-2 text-xs opacity-50'>
+              <div className='flex flex-wrap gap-4'>
                 <span>Esc: Dismiss</span>
                 <span>Ctrl+C: Copy</span>
                 <span>Ctrl+D: Diagnostics</span>

@@ -1,0 +1,49 @@
+{
+  "id": "url-shortener-basic",
+  "title": "Design a URL Shortener",
+  "difficulty": "intermediate",
+  "tags": ["system-design", "scalability", "database", "caching"],
+  "estimatedTime": 45,
+  "prompt": "Design a production-ready URL shortener service similar to bit.ly. Include API design, data model, redirection flow, rate limiting, observability, and scaling considerations.",
+  "acceptanceCriteria": {
+    "architecture": [
+      "Clearly defined components: API gateway, application/service layer, database, cache",
+      "Redirection flow with minimal latency and high availability",
+      "Strategy for custom aliases and collision handling",
+      "Observability: metrics, logging, tracing"
+    ],
+    "apis": [
+      "POST /shorten with URL validation and optional custom alias",
+      "GET /:alias redirect to target URL",
+      "Rate limiting and abuse prevention",
+      "Consider auth for admin/analytics endpoints"
+    ],
+    "storage": [
+      "Efficient key generation scheme (e.g., base62)",
+      "Data model for URL, alias, TTL/expiration, owner, analytics",
+      "Caching strategy for hot aliases",
+      "Backup/restore considerations"
+    ],
+    "scaling": [
+      "Horizontal scaling plan for reads and writes",
+      "Traffic patterns and CDN considerations",
+      "Hot key mitigation, sharding/partitioning options",
+      "Disaster recovery and multi-region approach"
+    ]
+  },
+  "hints": [
+    "Use base62/base64 to encode unique IDs",
+    "Add a write-through or cache-aside strategy for redirects",
+    "Consider how to handle very popular links (hot keys)",
+    "Evaluate consistency vs availability tradeoffs"
+  ],
+  "assets": {
+    "architectureDiagram": "./assets/architecture-diagram.png"
+  },
+  "metadata": {
+    "author": "ArchiComm Team",
+    "version": "1.0.0",
+    "createdAt": "2024-09-01T00:00:00Z",
+    "updatedAt": "2024-09-01T00:00:00Z"
+  }
+}

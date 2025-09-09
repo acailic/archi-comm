@@ -23,7 +23,7 @@ class ReloadTracker {
 
   private init() {
     if (typeof window === 'undefined') return;
-    
+
     // Only track in development
     if (process.env.NODE_ENV === 'development') {
       this.isTracking = true;
@@ -33,7 +33,7 @@ class ReloadTracker {
 
   private setupListeners() {
     // Track page unload events
-    window.addEventListener('beforeunload', (e) => {
+    window.addEventListener('beforeunload', e => {
       this.logEvent('beforeunload', 'Page is about to unload');
     });
 
@@ -47,7 +47,7 @@ class ReloadTracker {
         this.logEvent('hmr', 'Vite HMR after update');
       });
 
-      import.meta.hot.on('vite:error', (error) => {
+      import.meta.hot.on('vite:error', error => {
         this.logEvent('hmr-error', `HMR Error: ${error.message}`, error.stack);
       });
     }
@@ -78,11 +78,11 @@ class ReloadTracker {
       timestamp: Date.now(),
       source,
       reason,
-      stackTrace
+      stackTrace,
     };
 
     this.events.push(event);
-    
+
     // Keep only last 50 events to prevent memory leaks
     if (this.events.length > 50) {
       this.events = this.events.slice(-50);
@@ -115,9 +115,7 @@ class ReloadTracker {
   // Method to check if too many reloads are happening
   isReloadingTooOften(timeWindowMs = 10000, threshold = 5): boolean {
     const now = Date.now();
-    const recentEvents = this.events.filter(
-      event => now - event.timestamp < timeWindowMs
-    );
+    const recentEvents = this.events.filter(event => now - event.timestamp < timeWindowMs);
     return recentEvents.length >= threshold;
   }
 
@@ -126,15 +124,18 @@ class ReloadTracker {
     const now = Date.now();
     const last5Min = this.events.filter(e => now - e.timestamp < 5 * 60 * 1000);
     const last1Hour = this.events.filter(e => now - e.timestamp < 60 * 60 * 1000);
-    
+
     return {
       total: this.events.length,
       last5Minutes: last5Min.length,
       lastHour: last1Hour.length,
-      bySource: this.events.reduce((acc, event) => {
-        acc[event.source] = (acc[event.source] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>)
+      bySource: this.events.reduce(
+        (acc, event) => {
+          acc[event.source] = (acc[event.source] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      ),
     };
   }
 }
@@ -148,8 +149,8 @@ export const useReloadTracker = () => {
 
   React.useEffect(() => {
     setEvents(reloadTracker.getEvents());
-    
-    const unsubscribe = reloadTracker.onEvent((event) => {
+
+    const unsubscribe = reloadTracker.onEvent(event => {
       setEvents(prev => [...prev, event].slice(-10)); // Keep last 10 events in state
     });
 
@@ -164,7 +165,7 @@ export const useReloadTracker = () => {
     clearEvents: () => {
       reloadTracker.clearEvents();
       setEvents([]);
-    }
+    },
   };
 };
 
@@ -178,16 +179,21 @@ export const preventUnnecessaryReload = (componentName: string) => {
   return () => {
     const now = Date.now();
     renderCount++;
-    
+
     if (now - lastRenderTime < 100 && renderCount > 3) {
-      console.warn(`⚠️ ${componentName} is re-rendering too frequently (${renderCount} times in ${now - lastRenderTime}ms)`);
-      reloadTracker.logEvent('excessive-renders', `${componentName} rendered ${renderCount} times rapidly`);
+      console.warn(
+        `⚠️ ${componentName} is re-rendering too frequently (${renderCount} times in ${now - lastRenderTime}ms)`
+      );
+      reloadTracker.logEvent(
+        'excessive-renders',
+        `${componentName} rendered ${renderCount} times rapidly`
+      );
     }
-    
+
     if (now - lastRenderTime > 1000) {
       renderCount = 1;
     }
-    
+
     lastRenderTime = now;
   };
 };

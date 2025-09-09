@@ -1,0 +1,115 @@
+name: "Bug report"
+description: Report a problem in ArchiComm
+title: "[Bug]: "
+labels:
+  - bug
+  - triage
+assignees:
+  - acailic
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please fill out the information below to help us reproduce and fix the issue quickly.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-checks
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: I have read the CONTRIBUTING guidelines
+          required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: A clear and concise description of what the bug is.
+      placeholder: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Provide step-by-step instructions to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
+      render: bash
+    validations:
+      required: true
+
+  - type: input
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: input
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recordings
+      description: If applicable, add screenshots or screen recordings to help explain your problem.
+      placeholder: Drag and drop images, or paste links.
+
+  - type: dropdown
+    id: env-surface
+    attributes:
+      label: Environment surface
+      description: Which environment(s) are affected?
+      multiple: true
+      options:
+        - Tauri desktop (app)
+        - Web (browser)
+        - Both
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment details
+      description: OS, architecture, Node.js version, package manager + version, browser (if web), and any relevant system info.
+      placeholder: |
+        - OS: macOS 14.5 (Apple Silicon) / Windows 11 / Ubuntu 22.04
+        - Node.js: 20.x
+        - Package manager: pnpm 9.x / npm 10.x / yarn 1.x
+        - Browser: Chrome 126 / Firefox 127 / Safari 17 (if web)
+        - Tauri: app version (if desktop)
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste any relevant console output, stack traces, or logs.
+      render: text
+
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact
+      options:
+        - label: Regression (worked in a previous version)
+        - label: Blocking (prevents development or release)
+        - label: Performance issue
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here.
+

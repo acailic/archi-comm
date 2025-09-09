@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback, useMemo, Suspense, memo } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import type { DesignComponent, ToolType } from '../App';
+import type { DesignComponent, ToolType } from '../shared/contracts';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -9,16 +9,15 @@ import {
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from './ui/context-menu';
-import { snapToGrid } from './CanvasArea';
-import { designSystem, getComponentGradient, getElevation, animations, cx } from '../lib/design-system';
-import { 
-  Server, Database, Zap, Globe, Monitor, HardDrive, Cloud, Container, 
-  Layers, Activity, Shield, Key, Lock, Code, Smartphone, MessageSquare,
-  Archive, BarChart3, AlertTriangle, FileText, Search, Workflow,
-  GitBranch, Radio, Wifi, Cpu, Memory, Network, CloudCog,
-  FolderOpen, Box, Boxes, Settings, Users, UserCheck, Webhook,
-  Timer, Gauge, TrendingUp, Brain, Database as DB, HardDriveIcon
-} from 'lucide-react';
+import { snapToGrid } from '../shared/canvasUtils';
+import {
+  designSystem,
+  getComponentGradient,
+  getElevation,
+  animations,
+  cx,
+} from '../lib/design-system';
+import { getComponentIcon } from './icon-registry';
 
 interface CanvasComponentProps {
   component: DesignComponent;
@@ -30,6 +29,8 @@ interface CanvasComponentProps {
   snapToGrid?: boolean;
   gridSpacing?: number;
   activeTool?: ToolType;
+  connectionCount?: number;
+  healthStatus?: 'healthy' | 'warning' | 'error';
   onMove: (id: string, x: number, y: number) => void;
   onSelect: (id: string) => void;
   onStartConnection: (id: string, position: 'top' | 'bottom' | 'left' | 'right') => void;
@@ -43,163 +44,7 @@ interface CanvasComponentProps {
   onDelete?: (componentId: string) => void;
 }
 
-const componentIcons: Record<DesignComponent['type'], React.ComponentType<any>> = {
-  // Compute & Infrastructure
-  'server': Server,
-  'microservice': Box,
-  'serverless': CloudCog,
-  'lambda': Zap,
-  'cloud-function': Cloud,
-
-  // Containers & Orchestration
-  'container': Container,
-  'docker': Container,
-  'kubernetes': Boxes,
-
-  // Databases & Storage
-  'database': Database,
-  'postgresql': DB,
-  'mysql': DB,
-  'mongodb': DB,
-  'redis': HardDrive,
-  'cache': HardDrive,
-  'storage': Archive,
-  's3': Archive,
-  'blob-storage': Archive,
-  'file-system': FolderOpen,
-
-  // Networking & Traffic
-  'load-balancer': Zap,
-  'api-gateway': Globe,
-  'cdn': Cloud,
-  'firewall': Shield,
-
-  // Messaging & Communication
-  'message-queue': MessageSquare,
-  'websocket': Radio,
-  'grpc': Network,
-
-  // APIs & Services
-  'rest-api': Code,
-  'graphql': GitBranch,
-  'webhook': Webhook,
-
-  // Client Applications
-  'client': Monitor,
-  'web-app': Globe,
-  'mobile-app': Smartphone,
-  'desktop-app': Monitor,
-  'iot-device': Wifi,
-
-  // Security & Auth
-  'security': Shield,
-  'authentication': Key,
-  'authorization': Lock,
-  'oauth': UserCheck,
-  'jwt': Key,
-
-  // Monitoring & Observability
-  'monitoring': Activity,
-  'logging': FileText,
-  'metrics': BarChart3,
-  'alerting': AlertTriangle,
-  'elasticsearch': Search,
-  'kibana': BarChart3,
-
-  // Data Processing
-  'data-warehouse': Database,
-  'data-lake': Database,
-  'etl': Workflow,
-  'stream-processing': Activity,
-
-  // Patterns & Architectures
-  'event-sourcing': Timer,
-  'cqrs': GitBranch,
-  'edge-computing': Cpu,
-
-  // Emerging Technologies
-  'blockchain': Layers,
-  'ai-ml': Brain
-};
-
-const componentColors: Record<DesignComponent['type'], string> = {
-  // Compute & Infrastructure
-  'server': 'bg-blue-500',
-  'microservice': 'bg-blue-400',
-  'serverless': 'bg-sky-500',
-  'lambda': 'bg-orange-400',
-  'cloud-function': 'bg-blue-600',
-
-  // Containers & Orchestration
-  'container': 'bg-cyan-500',
-  'docker': 'bg-blue-700',
-  'kubernetes': 'bg-indigo-600',
-
-  // Databases & Storage
-  'database': 'bg-green-500',
-  'postgresql': 'bg-blue-800',
-  'mysql': 'bg-orange-600',
-  'mongodb': 'bg-green-600',
-  'redis': 'bg-red-600',
-  'cache': 'bg-orange-500',
-  'storage': 'bg-gray-600',
-  's3': 'bg-orange-500',
-  'blob-storage': 'bg-blue-500',
-  'file-system': 'bg-yellow-600',
-
-  // Networking & Traffic
-  'load-balancer': 'bg-purple-500',
-  'api-gateway': 'bg-red-500',
-  'cdn': 'bg-purple-600',
-  'firewall': 'bg-red-700',
-
-  // Messaging & Communication
-  'message-queue': 'bg-amber-500',
-  'websocket': 'bg-green-400',
-  'grpc': 'bg-blue-500',
-
-  // APIs & Services
-  'rest-api': 'bg-emerald-500',
-  'graphql': 'bg-pink-500',
-  'webhook': 'bg-violet-500',
-
-  // Client Applications
-  'client': 'bg-gray-500',
-  'web-app': 'bg-blue-600',
-  'mobile-app': 'bg-green-600',
-  'desktop-app': 'bg-purple-600',
-  'iot-device': 'bg-teal-500',
-
-  // Security & Auth
-  'security': 'bg-red-600',
-  'authentication': 'bg-yellow-600',
-  'authorization': 'bg-orange-600',
-  'oauth': 'bg-blue-700',
-  'jwt': 'bg-green-700',
-
-  // Monitoring & Observability
-  'monitoring': 'bg-blue-500',
-  'logging': 'bg-gray-600',
-  'metrics': 'bg-green-500',
-  'alerting': 'bg-red-500',
-  'elasticsearch': 'bg-yellow-500',
-  'kibana': 'bg-cyan-600',
-
-  // Data Processing
-  'data-warehouse': 'bg-indigo-600',
-  'data-lake': 'bg-blue-600',
-  'etl': 'bg-purple-500',
-  'stream-processing': 'bg-orange-500',
-
-  // Patterns & Architectures
-  'event-sourcing': 'bg-emerald-600',
-  'cqrs': 'bg-violet-600',
-  'edge-computing': 'bg-gray-700',
-
-  // Emerging Technologies
-  'blockchain': 'bg-yellow-700',
-  'ai-ml': 'bg-pink-600'
-};
+// Icons and colors now provided by a lazy icon registry.
 
 const ConnectionPoint = ({ position, onStartConnection, componentId }) => {
   const [, drag] = useDrag(() => ({
@@ -218,17 +63,17 @@ const ConnectionPoint = ({ position, onStartConnection, componentId }) => {
     <div
       ref={drag}
       className={`absolute w-3 h-3 rounded-full opacity-0 group-hover:opacity-100 cursor-crosshair ${positionClasses[position]}`}
-      onMouseDown={(e) => {
+      onMouseDown={e => {
         e.stopPropagation();
         onStartConnection(componentId, position);
       }}
     >
-      <div className="w-full h-full rounded-full bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-transform duration-200 group-hover:scale-110" />
+      <div className='w-full h-full rounded-full bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-transform duration-200 group-hover:scale-110' />
     </div>
   );
 };
 
-export function CanvasComponent({
+function CanvasComponentInner({
   component,
   isSelected,
   isMultiSelected = false,
@@ -238,6 +83,8 @@ export function CanvasComponent({
   snapToGrid = false,
   gridSpacing = 20,
   activeTool,
+  connectionCount = 0,
+  healthStatus: healthStatusProp,
   onMove,
   onSelect,
   onStartConnection,
@@ -250,14 +97,58 @@ export function CanvasComponent({
   onShowProperties,
   onDelete,
 }: CanvasComponentProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isDragPreview, setIsDragPreview] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<'healthy' | 'warning' | 'error'>(
+    healthStatusProp || 'healthy'
+  );
   const ref = useRef<HTMLDivElement>(null);
-  const Icon = componentIcons[component.type] || Server;
+  const Icon = useMemo(() => getComponentIcon(component.type), [component.type]);
   const gradient = getComponentGradient(component.type);
+  
+  // Enhanced visual states based on component type and status
+  const componentVisualState = useMemo(() => {
+    const base = 'transition-all duration-200';
+    const hover = isHovered ? 'scale-[1.02] shadow-lg' : '';
+    const selected = isSelected ? 'ring-2 ring-primary/80 ring-offset-2 ring-offset-background shadow-xl' : '';
+    const multiSel = isMultiSelected ? 'ring-2 ring-blue-500/70 ring-offset-2' : '';
+    const connecting = isConnectionStart ? 'ring-2 ring-amber-500/80 ring-offset-2 animate-pulse' : '';
+    const dragging = isDragPreview ? 'opacity-80 scale-[1.03] rotate-[1deg] z-50' : '';
+    return `${base} ${hover} ${selected} ${multiSel} ${connecting} ${dragging}`;
+  }, [isHovered, isSelected, isMultiSelected, isConnectionStart, isDragPreview]);
+  
+  // Get architectural-specific styling
+  const architecturalStyling = useMemo(() => {
+    const styles: Record<string, { borderColor: string; iconColor: string }> = {
+      'load-balancer': { borderColor: 'border-purple-500', iconColor: 'text-purple-600' },
+      'api-gateway': { borderColor: 'border-blue-500', iconColor: 'text-blue-600' },
+      database: { borderColor: 'border-green-500', iconColor: 'text-green-600' },
+      cache: { borderColor: 'border-orange-500', iconColor: 'text-orange-600' },
+      microservice: { borderColor: 'border-indigo-500', iconColor: 'text-indigo-600' },
+      'message-queue': { borderColor: 'border-yellow-500', iconColor: 'text-yellow-600' },
+    };
+    return styles[component.type] || { borderColor: 'border-gray-300', iconColor: 'text-gray-600' };
+  }, [component.type]);
+  
+  // Health status indicator
+  const getHealthIndicator = useCallback(() => {
+    const indicators = {
+      healthy: '🟢',
+      warning: '🟡', 
+      error: '🔴'
+    };
+    return indicators[healthStatusProp || healthStatus];
+  }, [healthStatus, healthStatusProp]);
+
+  // Stable handlers for memoization effectiveness
+  const handleClick = useCallback(() => onSelect(component.id), [onSelect, component.id]);
+  const handleMouseEnter = useCallback(() => setIsHovered(true), []);
+  const handleMouseLeave = useCallback(() => setIsHovered(false), []);
 
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'canvas-component',
     item: { id: component.id },
-    collect: (monitor) => ({
+    collect: monitor => ({
       isDragging: monitor.isDragging(),
     }),
     end: (item, monitor) => {
@@ -266,14 +157,14 @@ export function CanvasComponent({
         if (offset) {
           let newX = component.x + offset.x;
           let newY = component.y + offset.y;
-          
+
           // Apply snap-to-grid if enabled
           if (snapToGrid) {
             const snapped = snapToGrid(newX, newY, gridSpacing);
             newX = snapped.x;
             newY = snapped.y;
           }
-          
+
           onMove(component.id, newX, newY);
         }
       }
@@ -287,7 +178,7 @@ export function CanvasComponent({
         onCompleteConnection(item.fromId, component.id);
       }
     },
-    collect: (monitor) => ({
+    collect: monitor => ({
       isOver: monitor.isOver(),
     }),
   }));
@@ -315,41 +206,102 @@ export function CanvasComponent({
             zIndex: isDragging ? draggingZIndex : baseZIndex,
           }}
           className={cx(
-            'w-44 h-28 cursor-move group transition-all',
-            isDragging && 'opacity-80 scale-[1.03] rotate-[1deg]',
-            isSelected && 'ring-2 ring-primary/80 ring-offset-2 ring-offset-background',
-            isMultiSelected && 'ring-2 ring-blue-500/70 ring-offset-2',
-            isConnectionStart && 'ring-2 ring-amber-500/80 ring-offset-2 animate-pulse',
+            'w-44 h-28 cursor-move group canvas-component touch-friendly',
+            componentVisualState,
             isOver && 'ring-2 ring-emerald-500/80',
             getElevation(isSelected ? 4 : 2),
             animations.hoverRaise,
-            animations.pulseGlow
+            animations.pulseGlow,
+            architecturalStyling.borderColor
           )}
-          onClick={() => onSelect(component.id)}
+          onClick={handleClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
-          <div className={cx('w-full h-full rounded-xl border', designSystem.glass.surface, 'bg-[var(--component-bg)]') }>
-            <div className={cx('w-full h-9 rounded-t-xl flex items-center justify-center text-white shadow-sm', 'border-b border-white/10', 'bg-gradient-to-br', gradient)}>
-              <Icon className="w-4 h-4" />
+          <div
+            className={cx(
+              'w-full h-full rounded-xl border',
+              designSystem.glass.surface,
+              'bg-[var(--component-bg)]'
+            )}
+          >
+            <div
+              className={cx(
+                'w-full h-9 rounded-t-xl flex items-center justify-between px-2 text-white shadow-sm',
+                'border-b border-white/10',
+                'bg-gradient-to-br',
+                gradient
+              )}
+            >
+              <Suspense fallback={<div className='w-4 h-4 rounded-sm bg-white/40' />}>
+                <Icon className={cx('w-4 h-4', architecturalStyling.iconColor)} />
+              </Suspense>
+              
+              {/* Health status indicator */}
+              <div className="text-xs opacity-90">
+                {getHealthIndicator()}
+              </div>
+              
+              {/* Component type badge */}
+              <div className="absolute -top-1 -right-1 text-[8px] bg-background/90 text-foreground px-1 rounded-full border border-border/50">
+                {component.type.split('-')[0].toUpperCase()}
+              </div>
             </div>
-            <div className="px-2.5 py-1.5 text-center relative">
-              <div className="text-[12px] font-medium truncate tracking-[var(--letter-spacing-tight)]" title={component.label}>
+            <div className='px-2.5 py-1.5 text-center relative'>
+              <div
+                className='text-[12px] font-medium truncate tracking-[var(--letter-spacing-tight)]'
+                title={component.label}
+              >
                 {component.label}
               </div>
+              
+              {/* Enhanced status indicators */}
               {isMultiSelected && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500/90 shadow ring-1 ring-white/30 flex items-center justify-center">
-                  <div className="w-2 h-2 bg-white rounded-full" />
+                <div className='absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500/90 shadow ring-1 ring-white/30 flex items-center justify-center'>
+                  <div className='w-2 h-2 bg-white rounded-full' />
+                </div>
+              )}
+              
+              {/* Architecture-specific metadata */}
+              {component.properties?.version && (
+                <div className="absolute bottom-0 right-1 text-[8px] text-muted-foreground opacity-75">
+                  v{component.properties.version}
+                </div>
+              )}
+              
+              {/* Connection count indicator */}
+              {isHovered && (
+                <div className="absolute bottom-0 left-1 text-[8px] text-muted-foreground flex items-center gap-1">
+                  <div className="w-1 h-1 rounded-full bg-current" />
+                  <span>{connectionCount}</span>
                 </div>
               )}
             </div>
           </div>
 
-          <ConnectionPoint position="top" onStartConnection={onStartConnection} componentId={component.id} />
-          <ConnectionPoint position="bottom" onStartConnection={onStartConnection} componentId={component.id} />
-          <ConnectionPoint position="left" onStartConnection={onStartConnection} componentId={component.id} />
-          <ConnectionPoint position="right" onStartConnection={onStartConnection} componentId={component.id} />
+          <ConnectionPoint
+            position='top'
+            onStartConnection={onStartConnection}
+            componentId={component.id}
+          />
+          <ConnectionPoint
+            position='bottom'
+            onStartConnection={onStartConnection}
+            componentId={component.id}
+          />
+          <ConnectionPoint
+            position='left'
+            onStartConnection={onStartConnection}
+            componentId={component.id}
+          />
+          <ConnectionPoint
+            position='right'
+            onStartConnection={onStartConnection}
+            componentId={component.id}
+          />
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-56">
+      <ContextMenuContent className='w-56'>
         <ContextMenuItem onClick={() => onShowProperties?.(component.id)}>
           Edit Properties
           <ContextMenuShortcut>F2</ContextMenuShortcut>
@@ -372,9 +324,9 @@ export function CanvasComponent({
           <ContextMenuShortcut>Ctrl+Shift+[</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem 
+        <ContextMenuItem
           onClick={() => onDelete?.(component.id)}
-          className="text-destructive focus:text-destructive"
+          className='text-destructive focus:text-destructive'
         >
           Delete
           <ContextMenuShortcut>Del</ContextMenuShortcut>
@@ -383,3 +335,5 @@ export function CanvasComponent({
     </ContextMenu>
   );
 }
+
+export const CanvasComponent = memo(CanvasComponentInner);

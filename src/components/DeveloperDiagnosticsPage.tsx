@@ -34,17 +34,18 @@ import {
 } from 'lucide-react';
 import { usePerformanceMonitoring } from '../hooks/usePerformanceMonitoring';
 import { errorStore } from '../lib/errorStore';
-import { 
-  isDevelopment, 
-  isProduction, 
-  isTauriEnvironment, 
+import {
+  isDevelopment,
+  isProduction,
+  isTauriEnvironment,
   isWebEnvironment,
   RUNTIME_ENV,
   FEATURES,
   CONFIG,
-  DEBUG
+  DEBUG,
 } from '../lib/environment';
 import { logger, LogLevel } from '../lib/logger';
+import { getCanvasPerformanceManager } from '../lib/performance/CanvasPerformanceManager';
 
 // Utility: trigger a file download from string/Blob data
 const triggerDownload = (
@@ -61,8 +62,12 @@ const triggerDownload = (
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
-      try { URL.revokeObjectURL(url); } catch {}
-      try { document.body.removeChild(a); } catch {}
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+      try {
+        document.body.removeChild(a);
+      } catch {}
     }, 150);
   } catch (err) {
     console.error('Failed to trigger download', err);
@@ -125,24 +130,27 @@ interface SystemInfo {
 
 // Environment Info Tab
 const EnvironmentTab: React.FC = () => {
-  const environmentData = useMemo(() => ({
-    runtime: {
-      environment: RUNTIME_ENV,
-      isDevelopment: isDevelopment(),
-      isProduction: isProduction(),
-      isTauri: isTauriEnvironment(),
-      isWeb: isWebEnvironment(),
-    },
-    features: FEATURES,
-    config: CONFIG,
-    buildInfo: {
-      mode: import.meta.env.MODE,
-      dev: import.meta.env.DEV,
-      prod: import.meta.env.PROD,
-      ssr: import.meta.env.SSR,
-      baseUrl: import.meta.env.BASE_URL,
-    },
-  }), []);
+  const environmentData = useMemo(
+    () => ({
+      runtime: {
+        environment: RUNTIME_ENV,
+        isDevelopment: isDevelopment(),
+        isProduction: isProduction(),
+        isTauri: isTauriEnvironment(),
+        isWeb: isWebEnvironment(),
+      },
+      features: FEATURES,
+      config: CONFIG,
+      buildInfo: {
+        mode: import.meta.env.MODE,
+        dev: import.meta.env.DEV,
+        prod: import.meta.env.PROD,
+        ssr: import.meta.env.SSR,
+        baseUrl: import.meta.env.BASE_URL,
+      },
+    }),
+    []
+  );
 
   const copyToClipboard = useCallback(async (data: any) => {
     const text = JSON.stringify(data, null, 2);
@@ -172,29 +180,71 @@ const EnvironmentTab: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Environment Information</h3>
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <h3 className='text-lg font-semibold'>Environment Information</h3>
         <button
           onClick={() => copyToClipboard(environmentData)}
-          className="flex items-center space-x-2 px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          className='flex items-center space-x-2 px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90'
         >
-          <Copy className="w-4 h-4" />
+          <Copy className='w-4 h-4' />
           <span>Copy All</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Runtime Environment */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Monitor className="w-4 h-4 text-blue-500" />
-            <h4 className="font-medium">Runtime Environment</h4>
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+        {/* Canvas Performance */}
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <BarChart3 className='w-4 h-4 text-emerald-600' />
+            <h4 className='font-medium'>Canvas Performance</h4>
           </div>
-          <div className="space-y-2 text-sm">
+          {(() => {
+            try {
+              const mgr = getCanvasPerformanceManager();
+              const agg = mgr.getAggregatedMetrics();
+              return (
+                <div className='space-y-2 text-sm'>
+                  <div className='flex justify-between'><span className='text-muted-foreground'>Avg FPS:</span><span className='font-mono'>{Math.round(agg.averageFPS)}</span></div>
+                  <div className='flex justify-between'><span className='text-muted-foreground'>Perf Score:</span><span className='font-mono'>{Math.round(agg.performanceScore)}</span></div>
+                  <div className='flex justify-between'><span className='text-muted-foreground'>Active Workers:</span><span className='font-mono'>{agg.activeWorkers}</span></div>
+                  <div className='flex justify-between'><span className='text-muted-foreground'>Total Memory (MB):</span><span className='font-mono'>{agg.totalMemoryUsage.toFixed(1)}</span></div>
+                  <div className='pt-2'>
+                    <button
+                      onClick={() => {
+                        const payload = JSON.stringify(mgr.exportPerformanceData(), null, 2);
+                        try {
+                          const blob = new Blob([payload], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `archicomm-diagnostics-${Date.now()}.json`;
+                          document.body.appendChild(a);
+                          a.click();
+                          setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          document.body.removeChild(a);
+                        } catch {}
+                      }}
+                      className='px-3 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700'
+                    >Export Diagnostics</button>
+                  </div>
+                </div>
+              );
+            } catch (e) {
+              return <div className='text-sm text-muted-foreground'>Performance manager not initialized.</div>;
+            }
+          })()}
+        </div>
+        {/* Runtime Environment */}
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <Monitor className='w-4 h-4 text-blue-500' />
+            <h4 className='font-medium'>Runtime Environment</h4>
+          </div>
+          <div className='space-y-2 text-sm'>
             {Object.entries(environmentData.runtime).map(([key, value]) => (
-              <div key={key} className="flex justify-between">
-                <span className="text-muted-foreground">{key}:</span>
+              <div key={key} className='flex justify-between'>
+                <span className='text-muted-foreground'>{key}:</span>
                 <span className={`font-mono ${value ? 'text-green-600' : 'text-red-600'}`}>
                   {String(value)}
                 </span>
@@ -204,34 +254,36 @@ const EnvironmentTab: React.FC = () => {
         </div>
 
         {/* Build Information */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Settings className="w-4 h-4 text-purple-500" />
-            <h4 className="font-medium">Build Information</h4>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <Settings className='w-4 h-4 text-purple-500' />
+            <h4 className='font-medium'>Build Information</h4>
           </div>
-          <div className="space-y-2 text-sm">
+          <div className='space-y-2 text-sm'>
             {Object.entries(environmentData.buildInfo).map(([key, value]) => (
-              <div key={key} className="flex justify-between">
-                <span className="text-muted-foreground">{key}:</span>
-                <span className="font-mono">{String(value)}</span>
+              <div key={key} className='flex justify-between'>
+                <span className='text-muted-foreground'>{key}:</span>
+                <span className='font-mono'>{String(value)}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Feature Flags */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Zap className="w-4 h-4 text-yellow-500" />
-            <h4 className="font-medium">Feature Flags</h4>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <Zap className='w-4 h-4 text-yellow-500' />
+            <h4 className='font-medium'>Feature Flags</h4>
           </div>
-          <div className="space-y-2 text-sm">
+          <div className='space-y-2 text-sm'>
             {Object.entries(environmentData.features).map(([key, value]) => (
-              <div key={key} className="flex justify-between items-center">
-                <span className="text-muted-foreground">{key}:</span>
-                <div className="flex items-center space-x-2">
-                  <span className={`w-2 h-2 rounded-full ${value ? 'bg-green-500' : 'bg-red-500'}`} />
-                  <span className="font-mono">{String(value)}</span>
+              <div key={key} className='flex justify-between items-center'>
+                <span className='text-muted-foreground'>{key}:</span>
+                <div className='flex items-center space-x-2'>
+                  <span
+                    className={`w-2 h-2 rounded-full ${value ? 'bg-green-500' : 'bg-red-500'}`}
+                  />
+                  <span className='font-mono'>{String(value)}</span>
                 </div>
               </div>
             ))}
@@ -239,13 +291,13 @@ const EnvironmentTab: React.FC = () => {
         </div>
 
         {/* Configuration */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Settings className="w-4 h-4 text-gray-500" />
-            <h4 className="font-medium">Configuration</h4>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <Settings className='w-4 h-4 text-gray-500' />
+            <h4 className='font-medium'>Configuration</h4>
           </div>
-          <div className="space-y-2 text-sm max-h-48 overflow-y-auto">
-            <pre className="text-xs bg-muted p-2 rounded font-mono">
+          <div className='space-y-2 text-sm max-h-48 overflow-y-auto'>
+            <pre className='text-xs bg-muted p-2 rounded font-mono'>
               {JSON.stringify(environmentData.config, null, 2)}
             </pre>
           </div>
@@ -277,85 +329,93 @@ const PerformanceTab: React.FC = () => {
   }, [controls]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Performance Metrics</h3>
-        <div className="flex items-center space-x-2">
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <h3 className='text-lg font-semibold'>Performance Metrics</h3>
+        <div className='flex items-center space-x-2'>
           <button
             onClick={createBaseline}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
           >
             Create Baseline
           </button>
           <button
             onClick={exportData}
-            className="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+            className='px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600'
           >
             Export Data
           </button>
           <button
             onClick={controls.clearHistory}
-            className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+            className='px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600'
           >
             Clear History
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <Zap className="w-4 h-4 text-green-500" />
-            <span className="text-sm font-medium">FPS</span>
+      <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-2'>
+            <Zap className='w-4 h-4 text-green-500' />
+            <span className='text-sm font-medium'>FPS</span>
           </div>
-          <div className="text-2xl font-bold">{data.fps}</div>
-          <div className="text-xs text-muted-foreground">Frames per second</div>
+          <div className='text-2xl font-bold'>{data.fps}</div>
+          <div className='text-xs text-muted-foreground'>Frames per second</div>
         </div>
 
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <Clock className="w-4 h-4 text-yellow-500" />
-            <span className="text-sm font-medium">Render Time</span>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-2'>
+            <Clock className='w-4 h-4 text-yellow-500' />
+            <span className='text-sm font-medium'>Render Time</span>
           </div>
-          <div className="text-2xl font-bold">{typeof data.avgRenderTime === 'number' && isFinite(data.avgRenderTime) ? `${data.avgRenderTime.toFixed(1)}ms` : '—'}</div>
-          <div className="text-xs text-muted-foreground">Average render duration</div>
+          <div className='text-2xl font-bold'>
+            {typeof data.avgRenderTime === 'number' && isFinite(data.avgRenderTime)
+              ? `${data.avgRenderTime.toFixed(1)}ms`
+              : '—'}
+          </div>
+          <div className='text-xs text-muted-foreground'>Average render duration</div>
         </div>
 
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <MemoryStick className="w-4 h-4 text-red-500" />
-            <span className="text-sm font-medium">Memory</span>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-2'>
+            <MemoryStick className='w-4 h-4 text-red-500' />
+            <span className='text-sm font-medium'>Memory</span>
           </div>
-          <div className="text-2xl font-bold">{typeof data.memoryUsage === 'number' && isFinite(data.memoryUsage) ? `${data.memoryUsage.toFixed(1)}MB` : '—'}</div>
-          <div className="text-xs text-muted-foreground">Heap memory usage</div>
+          <div className='text-2xl font-bold'>
+            {typeof data.memoryUsage === 'number' && isFinite(data.memoryUsage)
+              ? `${data.memoryUsage.toFixed(1)}MB`
+              : '—'}
+          </div>
+          <div className='text-xs text-muted-foreground'>Heap memory usage</div>
         </div>
 
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-2">
-            <Activity className="w-4 h-4 text-blue-500" />
-            <span className="text-sm font-medium">Health Score</span>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-2'>
+            <Activity className='w-4 h-4 text-blue-500' />
+            <span className='text-sm font-medium'>Health Score</span>
           </div>
-          <div className="text-2xl font-bold">{data.healthScore}</div>
-          <div className="text-xs text-muted-foreground">Overall performance</div>
+          <div className='text-2xl font-bold'>{data.healthScore}</div>
+          <div className='text-xs text-muted-foreground'>Overall performance</div>
         </div>
       </div>
 
       {/* Performance History Chart */}
-      <div className="bg-card border border-border rounded-lg p-4">
-        <h4 className="font-medium mb-4">Performance History</h4>
-        <div className="h-64 flex items-center justify-center text-muted-foreground">
-          <div className="text-center">
-            <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+      <div className='bg-card border border-border rounded-lg p-4'>
+        <h4 className='font-medium mb-4'>Performance History</h4>
+        <div className='h-64 flex items-center justify-center text-muted-foreground'>
+          <div className='text-center'>
+            <BarChart3 className='w-12 h-12 mx-auto mb-2 opacity-50' />
             <p>Performance charts would be rendered here</p>
-            <p className="text-xs">Reusing charts from PerformanceDashboard.tsx</p>
+            <p className='text-xs'>Reusing charts from PerformanceDashboard.tsx</p>
           </div>
         </div>
       </div>
 
       {/* Active Measurements */}
-      <div className="bg-card border border-border rounded-lg p-4">
-        <h4 className="font-medium mb-4">Active Measurements</h4>
-        <div className="text-sm text-muted-foreground">
+      <div className='bg-card border border-border rounded-lg p-4'>
+        <h4 className='font-medium mb-4'>Active Measurements</h4>
+        <div className='text-sm text-muted-foreground'>
           {data.activeMeasurements} active measurements
         </div>
       </div>
@@ -371,7 +431,7 @@ const ErrorLogsTab: React.FC = () => {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
 
   useEffect(() => {
-    const unsubscribe = errorStore.subscribe((state) => {
+    const unsubscribe = errorStore.subscribe(state => {
       setErrors(state.errors);
     });
     return unsubscribe;
@@ -382,7 +442,8 @@ const ErrorLogsTab: React.FC = () => {
     return errors.filter(error => {
       const message = (error.message ?? '').toLowerCase();
       const stack = (error.stack ?? '').toLowerCase();
-      const matchesSearch = !filterLower || message.includes(filterLower) || stack.includes(filterLower);
+      const matchesSearch =
+        !filterLower || message.includes(filterLower) || stack.includes(filterLower);
       const matchesCategory = categoryFilter === 'all' || error.category === categoryFilter;
       const matchesSeverity = severityFilter === 'all' || error.severity === severityFilter;
       return matchesSearch && matchesCategory && matchesSeverity;
@@ -404,28 +465,33 @@ const ErrorLogsTab: React.FC = () => {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'text-red-600 bg-red-50 border-red-200';
-      case 'high': return 'text-orange-600 bg-orange-50 border-orange-200';
-      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'critical':
+        return 'text-red-600 bg-red-50 border-red-200';
+      case 'high':
+        return 'text-orange-600 bg-orange-50 border-orange-200';
+      case 'medium':
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'low':
+        return 'text-blue-600 bg-blue-50 border-blue-200';
+      default:
+        return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Error Logs</h3>
-        <div className="flex items-center space-x-2">
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <h3 className='text-lg font-semibold'>Error Logs</h3>
+        <div className='flex items-center space-x-2'>
           <button
             onClick={exportErrors}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
           >
             Export
           </button>
           <button
             onClick={clearErrors}
-            className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+            className='px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600'
           >
             Clear All
           </button>
@@ -433,112 +499,112 @@ const ErrorLogsTab: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div className="flex-1 min-w-64">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className='flex flex-wrap gap-4'>
+        <div className='flex-1 min-w-64'>
+          <div className='relative'>
+            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground' />
             <input
-              type="text"
-              placeholder="Search errors..."
+              type='text'
+              placeholder='Search errors...'
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-border rounded-md"
+              onChange={e => setFilter(e.target.value)}
+              className='w-full pl-10 pr-4 py-2 border border-border rounded-md'
             />
           </div>
         </div>
-        
+
         <select
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 border border-border rounded-md"
+          onChange={e => setCategoryFilter(e.target.value)}
+          className='px-3 py-2 border border-border rounded-md'
         >
-          <option value="all">All Categories</option>
-          <option value="react">React</option>
-          <option value="global">Global</option>
-          <option value="performance">Performance</option>
-          <option value="network">Network</option>
-          <option value="unknown">Unknown</option>
+          <option value='all'>All Categories</option>
+          <option value='react'>React</option>
+          <option value='global'>Global</option>
+          <option value='performance'>Performance</option>
+          <option value='network'>Network</option>
+          <option value='unknown'>Unknown</option>
         </select>
 
         <select
           value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value)}
-          className="px-3 py-2 border border-border rounded-md"
+          onChange={e => setSeverityFilter(e.target.value)}
+          className='px-3 py-2 border border-border rounded-md'
         >
-          <option value="all">All Severities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
+          <option value='all'>All Severities</option>
+          <option value='critical'>Critical</option>
+          <option value='high'>High</option>
+          <option value='medium'>Medium</option>
+          <option value='low'>Low</option>
         </select>
       </div>
 
       {/* Error List */}
-      <div className="space-y-3">
+      <div className='space-y-3'>
         {filteredErrors.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Bug className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <div className='text-center py-8 text-muted-foreground'>
+            <Bug className='w-12 h-12 mx-auto mb-2 opacity-50' />
             <p>No errors found</p>
           </div>
         ) : (
-          filteredErrors.map((error) => (
+          filteredErrors.map(error => (
             <div
               key={error.id}
               className={`border rounded-lg p-4 ${error.resolved ? 'opacity-50' : ''}`}
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 text-xs rounded border ${getSeverityColor(error.severity)}`}>
+              <div className='flex items-start justify-between mb-2'>
+                <div className='flex items-center space-x-2'>
+                  <span
+                    className={`px-2 py-1 text-xs rounded border ${getSeverityColor(error.severity)}`}
+                  >
                     {error.severity.toUpperCase()}
                   </span>
-                  <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                  <span className='px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded'>
                     {error.category}
                   </span>
                   {error.count > 1 && (
-                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">
+                    <span className='px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded'>
                       {error.count}x
                     </span>
                   )}
-                  {error.resolved && (
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                  )}
+                  {error.resolved && <CheckCircle className='w-4 h-4 text-green-500' />}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-muted-foreground">
+                <div className='flex items-center space-x-2'>
+                  <span className='text-xs text-muted-foreground'>
                     {new Date(error.timestamp).toLocaleTimeString()}
                   </span>
                   {!error.resolved && (
                     <button
                       onClick={() => resolveError(error.id)}
-                      className="text-xs text-green-600 hover:text-green-700"
+                      className='text-xs text-green-600 hover:text-green-700'
                     >
                       Resolve
                     </button>
                   )}
                 </div>
               </div>
-              
-              <div className="mb-2">
-                <p className="font-medium text-sm">{error.message}</p>
+
+              <div className='mb-2'>
+                <p className='font-medium text-sm'>{error.message}</p>
               </div>
-              
+
               {error.stack && (
-                <details className="mt-2">
-                  <summary className="text-xs text-muted-foreground cursor-pointer">
+                <details className='mt-2'>
+                  <summary className='text-xs text-muted-foreground cursor-pointer'>
                     Stack trace
                   </summary>
-                  <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto">
+                  <pre className='text-xs bg-muted p-2 rounded mt-1 overflow-x-auto'>
                     {error.stack}
                   </pre>
                 </details>
               )}
-              
+
               {error.context && Object.keys(error.context).length > 0 && (
-                <details className="mt-2">
-                  <summary className="text-xs text-muted-foreground cursor-pointer">
+                <details className='mt-2'>
+                  <summary className='text-xs text-muted-foreground cursor-pointer'>
                     Context
                   </summary>
-                  <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto">
+                  <pre className='text-xs bg-muted p-2 rounded mt-1 overflow-x-auto'>
                     {JSON.stringify(error.context, null, 2)}
                   </pre>
                 </details>
@@ -560,13 +626,20 @@ const ApplicationLogsTab: React.FC = () => {
 
   const mapLevel = useCallback((val: string): LogLevel | undefined => {
     switch (val) {
-      case 'trace': return LogLevel.TRACE;
-      case 'debug': return LogLevel.DEBUG;
-      case 'info': return LogLevel.INFO;
-      case 'warn': return LogLevel.WARN;
-      case 'error': return LogLevel.ERROR;
-      case 'fatal': return LogLevel.FATAL;
-      default: return undefined;
+      case 'trace':
+        return LogLevel.TRACE;
+      case 'debug':
+        return LogLevel.DEBUG;
+      case 'info':
+        return LogLevel.INFO;
+      case 'warn':
+        return LogLevel.WARN;
+      case 'error':
+        return LogLevel.ERROR;
+      case 'fatal':
+        return LogLevel.FATAL;
+      default:
+        return undefined;
     }
   }, []);
 
@@ -590,12 +663,19 @@ const ApplicationLogsTab: React.FC = () => {
 
   const getLevelColor = (level: string) => {
     switch (level) {
-      case 'error': case 'fatal': return 'text-red-600';
-      case 'warn': return 'text-yellow-600';
-      case 'info': return 'text-blue-600';
-      case 'debug': return 'text-purple-600';
-      case 'trace': return 'text-gray-600';
-      default: return 'text-gray-600';
+      case 'error':
+      case 'fatal':
+        return 'text-red-600';
+      case 'warn':
+        return 'text-yellow-600';
+      case 'info':
+        return 'text-blue-600';
+      case 'debug':
+        return 'text-purple-600';
+      case 'trace':
+        return 'text-gray-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
@@ -610,19 +690,19 @@ const ApplicationLogsTab: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Application Logs</h3>
-        <div className="flex items-center space-x-2">
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <h3 className='text-lg font-semibold'>Application Logs</h3>
+        <div className='flex items-center space-x-2'>
           <button
             onClick={exportLogs}
-            className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
           >
             Export
           </button>
           <button
             onClick={clearLogs}
-            className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+            className='px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600'
           >
             Clear
           </button>
@@ -630,89 +710,89 @@ const ApplicationLogsTab: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div className="flex-1 min-w-64">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className='flex flex-wrap gap-4'>
+        <div className='flex-1 min-w-64'>
+          <div className='relative'>
+            <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground' />
             <input
-              type="text"
-              placeholder="Search logs..."
+              type='text'
+              placeholder='Search logs...'
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-border rounded-md"
+              onChange={e => setFilter(e.target.value)}
+              className='w-full pl-10 pr-4 py-2 border border-border rounded-md'
             />
           </div>
         </div>
-        
+
         <select
           value={levelFilter}
-          onChange={(e) => setLevelFilter(e.target.value)}
-          className="px-3 py-2 border border-border rounded-md"
+          onChange={e => setLevelFilter(e.target.value)}
+          className='px-3 py-2 border border-border rounded-md'
         >
-          <option value="all">All Levels</option>
-          <option value="trace">Trace</option>
-          <option value="debug">Debug</option>
-          <option value="info">Info</option>
-          <option value="warn">Warn</option>
-          <option value="error">Error</option>
-          <option value="fatal">Fatal</option>
+          <option value='all'>All Levels</option>
+          <option value='trace'>Trace</option>
+          <option value='debug'>Debug</option>
+          <option value='info'>Info</option>
+          <option value='warn'>Warn</option>
+          <option value='error'>Error</option>
+          <option value='fatal'>Fatal</option>
         </select>
 
         <select
           value={scopeFilter}
-          onChange={(e) => setScopeFilter(e.target.value)}
-          className="px-3 py-2 border border-border rounded-md"
+          onChange={e => setScopeFilter(e.target.value)}
+          className='px-3 py-2 border border-border rounded-md'
         >
-          <option value="all">All Scopes</option>
-          <option value="app">App</option>
-          <option value="performance">Performance</option>
-          <option value="react">React</option>
-          <option value="network">Network</option>
+          <option value='all'>All Scopes</option>
+          <option value='app'>App</option>
+          <option value='performance'>Performance</option>
+          <option value='react'>React</option>
+          <option value='network'>Network</option>
         </select>
       </div>
 
       {/* Log List */}
-      <div className="bg-card border border-border rounded-lg">
-        <div className="max-h-96 overflow-y-auto">
+      <div className='bg-card border border-border rounded-lg'>
+        <div className='max-h-96 overflow-y-auto'>
           {filteredLogs.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <div className='text-center py-8 text-muted-foreground'>
+              <FileText className='w-12 h-12 mx-auto mb-2 opacity-50' />
               <p>No logs found</p>
             </div>
           ) : (
-            <div className="divide-y divide-border">
-              {filteredLogs.map((log) => (
-                <div key={log.id} className="p-3 hover:bg-muted/50">
-                  <div className="flex items-start space-x-3">
-                    <span className="text-xs text-muted-foreground min-w-20">
+            <div className='divide-y divide-border'>
+              {filteredLogs.map(log => (
+                <div key={log.id} className='p-3 hover:bg-muted/50'>
+                  <div className='flex items-start space-x-3'>
+                    <span className='text-xs text-muted-foreground min-w-20'>
                       {new Date(log.timestamp).toLocaleTimeString()}
                     </span>
                     <span className={`text-xs font-medium min-w-12 ${getLevelColor(log.level)}`}>
                       {log.level.toUpperCase()}
                     </span>
                     {log.scope && (
-                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                      <span className='text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded'>
                         {log.scope}
                       </span>
                     )}
-                    <div className="flex-1">
-                      <p className="text-sm">{log.message}</p>
+                    <div className='flex-1'>
+                      <p className='text-sm'>{log.message}</p>
                       {log.data && (
-                        <details className="mt-1">
-                          <summary className="text-xs text-muted-foreground cursor-pointer">
+                        <details className='mt-1'>
+                          <summary className='text-xs text-muted-foreground cursor-pointer'>
                             Data
                           </summary>
-                          <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto">
+                          <pre className='text-xs bg-muted p-2 rounded mt-1 overflow-x-auto'>
                             {JSON.stringify(log.data, null, 2)}
                           </pre>
                         </details>
                       )}
                       {log.stack && (
-                        <details className="mt-1">
-                          <summary className="text-xs text-muted-foreground cursor-pointer">
+                        <details className='mt-1'>
+                          <summary className='text-xs text-muted-foreground cursor-pointer'>
                             Stack
                           </summary>
-                          <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto">
+                          <pre className='text-xs bg-muted p-2 rounded mt-1 overflow-x-auto'>
                             {log.stack}
                           </pre>
                         </details>
@@ -739,10 +819,15 @@ const SystemInfoTab: React.FC = () => {
       try {
         const info: SystemInfo = {
           browser: {
-            name: navigator.userAgent.includes('Chrome') ? 'Chrome' : 
-                  navigator.userAgent.includes('Firefox') ? 'Firefox' : 
-                  navigator.userAgent.includes('Safari') ? 'Safari' : 'Unknown',
-            version: navigator.userAgent.match(/(?:Chrome|Firefox|Safari)\/(\d+)/)?.[1] || 'Unknown',
+            name: navigator.userAgent.includes('Chrome')
+              ? 'Chrome'
+              : navigator.userAgent.includes('Firefox')
+                ? 'Firefox'
+                : navigator.userAgent.includes('Safari')
+                  ? 'Safari'
+                  : 'Unknown',
+            version:
+              navigator.userAgent.match(/(?:Chrome|Firefox|Safari)\/(\d+)/)?.[1] || 'Unknown',
             userAgent: navigator.userAgent,
           },
           platform: {
@@ -761,11 +846,13 @@ const SystemInfoTab: React.FC = () => {
           performance: {
             hardwareConcurrency: navigator.hardwareConcurrency || 1,
             deviceMemory: (navigator as any).deviceMemory,
-            connection: (navigator as any).connection ? {
-              effectiveType: (navigator as any).connection.effectiveType,
-              downlink: (navigator as any).connection.downlink,
-              rtt: (navigator as any).connection.rtt,
-            } : undefined,
+            connection: (navigator as any).connection
+              ? {
+                  effectiveType: (navigator as any).connection.effectiveType,
+                  downlink: (navigator as any).connection.downlink,
+                  rtt: (navigator as any).connection.rtt,
+                }
+              : undefined,
           },
         };
 
@@ -809,52 +896,52 @@ const SystemInfoTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className='flex items-center justify-center py-12'>
+        <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
       </div>
     );
   }
 
   if (!systemInfo) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        <AlertTriangle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+      <div className='text-center py-12 text-muted-foreground'>
+        <AlertTriangle className='w-12 h-12 mx-auto mb-2 opacity-50' />
         <p>Failed to collect system information</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">System Information</h3>
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <h3 className='text-lg font-semibold'>System Information</h3>
         <button
           onClick={runDiagnostics}
-          className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+          className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'
         >
           Run Diagnostics
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
         {/* Browser Info */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Globe className="w-4 h-4 text-blue-500" />
-            <h4 className="font-medium">Browser</h4>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <Globe className='w-4 h-4 text-blue-500' />
+            <h4 className='font-medium'>Browser</h4>
           </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Name:</span>
+          <div className='space-y-2 text-sm'>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Name:</span>
               <span>{systemInfo.browser.name}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Version:</span>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Version:</span>
               <span>{systemInfo.browser.version}</span>
             </div>
-            <div className="mt-2">
-              <span className="text-muted-foreground text-xs">User Agent:</span>
-              <p className="text-xs font-mono bg-muted p-2 rounded mt-1 break-all">
+            <div className='mt-2'>
+              <span className='text-muted-foreground text-xs'>User Agent:</span>
+              <p className='text-xs font-mono bg-muted p-2 rounded mt-1 break-all'>
                 {systemInfo.browser.userAgent}
               </p>
             </div>
@@ -862,49 +949,51 @@ const SystemInfoTab: React.FC = () => {
         </div>
 
         {/* Platform Info */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Cpu className="w-4 h-4 text-green-500" />
-            <h4 className="font-medium">Platform</h4>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <Cpu className='w-4 h-4 text-green-500' />
+            <h4 className='font-medium'>Platform</h4>
           </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">OS:</span>
+          <div className='space-y-2 text-sm'>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>OS:</span>
               <span>{systemInfo.platform.os}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Architecture:</span>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Architecture:</span>
               <span>{systemInfo.platform.architecture}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">CPU Cores:</span>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>CPU Cores:</span>
               <span>{systemInfo.platform.cores}</span>
             </div>
           </div>
         </div>
 
         {/* Memory Info */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <MemoryStick className="w-4 h-4 text-red-500" />
-            <h4 className="font-medium">Memory</h4>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <MemoryStick className='w-4 h-4 text-red-500' />
+            <h4 className='font-medium'>Memory</h4>
           </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total:</span>
+          <div className='space-y-2 text-sm'>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Total:</span>
               <span>{formatBytes(systemInfo.memory.total)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Used:</span>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Used:</span>
               <span>{formatBytes(systemInfo.memory.used)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Available:</span>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Available:</span>
               <span>{formatBytes(systemInfo.memory.available)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Usage:</span>
-              <span className={systemInfo.memory.percentage > 80 ? 'text-red-600' : 'text-green-600'}>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Usage:</span>
+              <span
+                className={systemInfo.memory.percentage > 80 ? 'text-red-600' : 'text-green-600'}
+              >
                 {systemInfo.memory.percentage}%
               </span>
             </div>
@@ -912,34 +1001,34 @@ const SystemInfoTab: React.FC = () => {
         </div>
 
         {/* Performance Capabilities */}
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Activity className="w-4 h-4 text-purple-500" />
-            <h4 className="font-medium">Performance</h4>
+        <div className='bg-card border border-border rounded-lg p-4'>
+          <div className='flex items-center space-x-2 mb-3'>
+            <Activity className='w-4 h-4 text-purple-500' />
+            <h4 className='font-medium'>Performance</h4>
           </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Hardware Concurrency:</span>
+          <div className='space-y-2 text-sm'>
+            <div className='flex justify-between'>
+              <span className='text-muted-foreground'>Hardware Concurrency:</span>
               <span>{systemInfo.performance.hardwareConcurrency}</span>
             </div>
             {systemInfo.performance.deviceMemory && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Device Memory:</span>
+              <div className='flex justify-between'>
+                <span className='text-muted-foreground'>Device Memory:</span>
                 <span>{systemInfo.performance.deviceMemory} GB</span>
               </div>
             )}
             {systemInfo.performance.connection && (
               <>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Connection Type:</span>
+                <div className='flex justify-between'>
+                  <span className='text-muted-foreground'>Connection Type:</span>
                   <span>{systemInfo.performance.connection.effectiveType}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Downlink:</span>
+                <div className='flex justify-between'>
+                  <span className='text-muted-foreground'>Downlink:</span>
                   <span>{systemInfo.performance.connection.downlink} Mbps</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">RTT:</span>
+                <div className='flex justify-between'>
+                  <span className='text-muted-foreground'>RTT:</span>
                   <span>{systemInfo.performance.connection.rtt} ms</span>
                 </div>
               </>
@@ -949,22 +1038,22 @@ const SystemInfoTab: React.FC = () => {
 
         {/* Tauri Info (if available) */}
         {systemInfo.tauri && (
-          <div className="bg-card border border-border rounded-lg p-4 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-3">
-              <HardDrive className="w-4 h-4 text-orange-500" />
-              <h4 className="font-medium">Tauri Runtime</h4>
+          <div className='bg-card border border-border rounded-lg p-4 md:col-span-2'>
+            <div className='flex items-center space-x-2 mb-3'>
+              <HardDrive className='w-4 h-4 text-orange-500' />
+              <h4 className='font-medium'>Tauri Runtime</h4>
             </div>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Version:</span>
+            <div className='grid grid-cols-3 gap-4 text-sm'>
+              <div className='flex justify-between'>
+                <span className='text-muted-foreground'>Version:</span>
                 <span>{systemInfo.tauri.version}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Platform:</span>
+              <div className='flex justify-between'>
+                <span className='text-muted-foreground'>Platform:</span>
                 <span>{systemInfo.tauri.platform}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Architecture:</span>
+              <div className='flex justify-between'>
+                <span className='text-muted-foreground'>Architecture:</span>
                 <span>{systemInfo.tauri.arch}</span>
               </div>
             </div>
@@ -986,7 +1075,7 @@ export const DeveloperDiagnosticsPage: React.FC<{
 
   // Track error count for badge
   useEffect(() => {
-    const unsubscribe = errorStore.subscribe((state) => {
+    const unsubscribe = errorStore.subscribe(state => {
       setErrorCount(state.errors.filter(e => !e.resolved).length);
     });
     return unsubscribe;
@@ -1072,8 +1161,8 @@ export const DeveloperDiagnosticsPage: React.FC<{
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-        onClick={(e) => e.target === e.currentTarget && onClose()}
+        className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4'
+        onClick={e => e.target === e.currentTarget && onClose()}
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
@@ -1084,39 +1173,41 @@ export const DeveloperDiagnosticsPage: React.FC<{
           }`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border bg-card/50">
-            <div className="flex items-center space-x-3">
-              <Terminal className="w-5 h-5 text-primary" />
-              <h1 className="text-lg font-semibold">Developer Diagnostics</h1>
-              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                DEV MODE
-              </span>
+          <div className='flex items-center justify-between p-4 border-b border-border bg-card/50'>
+            <div className='flex items-center space-x-3'>
+              <Terminal className='w-5 h-5 text-primary' />
+              <h1 className='text-lg font-semibold'>Developer Diagnostics</h1>
+              <span className='px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded'>DEV MODE</span>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className='flex items-center space-x-2'>
               <button
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-2 rounded-md hover:bg-muted transition-colors"
-                title="Toggle fullscreen (Ctrl+F)"
+                className='p-2 rounded-md hover:bg-muted transition-colors'
+                title='Toggle fullscreen (Ctrl+F)'
               >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isFullscreen ? (
+                  <Minimize2 className='w-4 h-4' />
+                ) : (
+                  <Maximize2 className='w-4 h-4' />
+                )}
               </button>
 
               <button
                 onClick={onClose}
-                className="p-2 rounded-md hover:bg-muted transition-colors"
-                title="Close (Esc)"
+                className='p-2 rounded-md hover:bg-muted transition-colors'
+                title='Close (Esc)'
               >
-                <X className="w-4 h-4" />
+                <X className='w-4 h-4' />
               </button>
             </div>
           </div>
 
-          <div className="flex h-full overflow-hidden">
+          <div className='flex h-full overflow-hidden'>
             {/* Sidebar */}
-            <div className="w-64 border-r border-border bg-card/30 p-4">
-              <nav className="space-y-2">
-                {tabs.map((tab) => {
+            <div className='w-64 border-r border-border bg-card/30 p-4'>
+              <nav className='space-y-2'>
+                {tabs.map(tab => {
                   const Icon = tab.icon;
                   return (
                     <button
@@ -1128,12 +1219,12 @@ export const DeveloperDiagnosticsPage: React.FC<{
                           : 'hover:bg-muted'
                       }`}
                     >
-                      <div className="flex items-center space-x-2">
-                        <Icon className="w-4 h-4" />
+                      <div className='flex items-center space-x-2'>
+                        <Icon className='w-4 h-4' />
                         <span>{tab.label}</span>
                       </div>
                       {tab.badge && tab.badge > 0 && (
-                        <span className="px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                        <span className='px-2 py-0.5 text-xs bg-red-500 text-white rounded-full'>
                           {tab.badge}
                         </span>
                       )}
@@ -1142,9 +1233,11 @@ export const DeveloperDiagnosticsPage: React.FC<{
                 })}
               </nav>
 
-              <div className="mt-8 pt-4 border-t border-border">
-                <h4 className="text-xs font-medium text-muted-foreground mb-2">Keyboard Shortcuts</h4>
-                <div className="space-y-1 text-xs text-muted-foreground">
+              <div className='mt-8 pt-4 border-t border-border'>
+                <h4 className='text-xs font-medium text-muted-foreground mb-2'>
+                  Keyboard Shortcuts
+                </h4>
+                <div className='space-y-1 text-xs text-muted-foreground'>
                   <div>Ctrl+1-5 - Switch tabs</div>
                   <div>Ctrl+F - Toggle fullscreen</div>
                   <div>Esc - Close</div>
@@ -1153,8 +1246,8 @@ export const DeveloperDiagnosticsPage: React.FC<{
             </div>
 
             {/* Main content */}
-            <div className="flex-1 overflow-auto">
-              <div className="p-6">
+            <div className='flex-1 overflow-auto'>
+              <div className='p-6'>
                 <ActiveTabComponent />
               </div>
             </div>

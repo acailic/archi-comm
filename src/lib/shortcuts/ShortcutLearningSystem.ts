@@ -59,17 +59,17 @@ export interface WorkflowPattern {
 
 export class ShortcutLearningSystem {
   private static instance: ShortcutLearningSystem | null = null;
-  
+
   private shortcutMetrics: Map<string, ShortcutUsageMetrics> = new Map();
   private actionTracking: ActionTrackingData[] = [];
   private workflowPatterns: Map<string, WorkflowPattern> = new Map();
   private learningProgress: LearningProgress;
-  
+
   private readonly storageKeys = {
     metrics: 'archicomm_shortcut_metrics',
     actions: 'archicomm_action_tracking',
     workflows: 'archicomm_workflow_patterns',
-    progress: 'archicomm_learning_progress'
+    progress: 'archicomm_learning_progress',
   };
 
   private readonly maxActionHistory = 1000;
@@ -77,7 +77,7 @@ export class ShortcutLearningSystem {
     discoveryUsage: 3,
     adoptionRate: 0.6,
     retentionDays: 7,
-    expertUsage: 50
+    expertUsage: 50,
   };
 
   private constructor() {
@@ -94,7 +94,12 @@ export class ShortcutLearningSystem {
   }
 
   // Core tracking methods
-  public trackShortcutUsage(shortcutId: string, success: boolean, timeSaved: number = 0, context: string = ''): void {
+  public trackShortcutUsage(
+    shortcutId: string,
+    success: boolean,
+    timeSaved: number = 0,
+    context: string = ''
+  ): void {
     const now = Date.now();
     let metrics = this.shortcutMetrics.get(shortcutId);
 
@@ -108,7 +113,7 @@ export class ShortcutLearningSystem {
         lastUsedAt: now,
         discoveredAt: now,
         adoptionRate: 0,
-        retentionScore: 0
+        retentionScore: 0,
       };
     }
 
@@ -119,10 +124,9 @@ export class ShortcutLearningSystem {
     if (success) {
       metrics.successfulUsageCount++;
       if (timeSaved > 0) {
-        metrics.averageTimeSaved = (
-          (metrics.averageTimeSaved * (metrics.successfulUsageCount - 1) + timeSaved) / 
-          metrics.successfulUsageCount
-        );
+        metrics.averageTimeSaved =
+          (metrics.averageTimeSaved * (metrics.successfulUsageCount - 1) + timeSaved) /
+          metrics.successfulUsageCount;
       }
     } else {
       metrics.failedUsageCount++;
@@ -146,7 +150,7 @@ export class ShortcutLearningSystem {
       success,
       timeSaved,
       context,
-      adoptionRate: metrics.adoptionRate
+      adoptionRate: metrics.adoptionRate,
     });
 
     // Update learning progress
@@ -157,7 +161,7 @@ export class ShortcutLearningSystem {
   public trackManualAction(actionType: string, executionTime: number, context: string = ''): void {
     const shortcutManager = getGlobalShortcutManager();
     if (!shortcutManager) return;
-    
+
     const availableShortcut = this.findShortcutForAction(actionType);
 
     const trackingData: ActionTrackingData = {
@@ -167,7 +171,7 @@ export class ShortcutLearningSystem {
       hasAvailableShortcut: !!availableShortcut,
       availableShortcutId: availableShortcut?.id,
       executionTime,
-      context
+      context,
     };
 
     this.actionTracking.push(trackingData);
@@ -190,7 +194,7 @@ export class ShortcutLearningSystem {
       actionType,
       executionTime,
       hasShortcut: !!availableShortcut,
-      context
+      context,
     });
 
     this.saveData();
@@ -214,8 +218,10 @@ export class ShortcutLearningSystem {
 
     return recommendations.sort((a, b) => {
       const priorityWeight = { high: 3, medium: 2, low: 1 };
-      return (priorityWeight[b.priority] - priorityWeight[a.priority]) || 
-             (b.potentialTimeSaving - a.potentialTimeSaving);
+      return (
+        priorityWeight[b.priority] - priorityWeight[a.priority] ||
+        b.potentialTimeSaving - a.potentialTimeSaving
+      );
     });
   }
 
@@ -223,13 +229,13 @@ export class ShortcutLearningSystem {
     const recommendations: LearningRecommendation[] = [];
     const shortcutManager = getGlobalShortcutManager();
     if (!shortcutManager) return recommendations;
-    
+
     const allShortcuts = shortcutManager.getAllShortcuts();
 
     // Find frequently performed manual actions with available shortcuts
     const actionFrequency = new Map<string, number>();
     const recentActions = this.actionTracking.filter(
-      action => action.timestamp > Date.now() - (7 * 24 * 60 * 60 * 1000) // Last 7 days
+      action => action.timestamp > Date.now() - 7 * 24 * 60 * 60 * 1000 // Last 7 days
     );
 
     recentActions.forEach(action => {
@@ -239,7 +245,8 @@ export class ShortcutLearningSystem {
     });
 
     actionFrequency.forEach((frequency, actionType) => {
-      if (frequency >= 5) { // Performed at least 5 times manually
+      if (frequency >= 5) {
+        // Performed at least 5 times manually
         const shortcut = allShortcuts.find(s => this.matchesAction(s, actionType));
         if (shortcut && !this.shortcutMetrics.has(shortcut.id)) {
           const avgExecutionTime = this.getAverageExecutionTime(actionType);
@@ -254,7 +261,7 @@ export class ShortcutLearningSystem {
             potentialTimeSaving: potentialSaving * frequency,
             difficulty: 'easy',
             category: shortcut.category,
-            context: `Frequently used action: ${actionType}`
+            context: `Frequently used action: ${actionType}`,
           });
         }
       }
@@ -273,7 +280,10 @@ export class ShortcutLearningSystem {
       if (!shortcut) return;
 
       // Low adoption rate - needs practice
-      if (metrics.adoptionRate < this.learningThresholds.adoptionRate && metrics.totalUsageCount >= 3) {
+      if (
+        metrics.adoptionRate < this.learningThresholds.adoptionRate &&
+        metrics.totalUsageCount >= 3
+      ) {
         recommendations.push({
           type: 'practice',
           shortcutId,
@@ -284,13 +294,16 @@ export class ShortcutLearningSystem {
           difficulty: 'medium',
           category: shortcut.category,
           context: 'Low success rate',
-          actionRequired: 'Complete practice exercises'
+          actionRequired: 'Complete practice exercises',
         });
       }
 
       // Low retention - re-learning needed
       const daysSinceLastUse = (Date.now() - metrics.lastUsedAt) / (1000 * 60 * 60 * 24);
-      if (metrics.retentionScore < 0.3 && daysSinceLastUse > this.learningThresholds.retentionDays) {
+      if (
+        metrics.retentionScore < 0.3 &&
+        daysSinceLastUse > this.learningThresholds.retentionDays
+      ) {
         recommendations.push({
           type: 'practice',
           shortcutId,
@@ -300,7 +313,7 @@ export class ShortcutLearningSystem {
           potentialTimeSaving: metrics.averageTimeSaved * 5,
           difficulty: 'easy',
           category: shortcut.category,
-          context: 'Unused shortcut'
+          context: 'Unused shortcut',
         });
       }
     });
@@ -313,7 +326,11 @@ export class ShortcutLearningSystem {
 
     // Analyze workflow patterns for custom shortcut opportunities
     this.workflowPatterns.forEach((pattern, patternId) => {
-      if (pattern.frequency > 10 && pattern.shortcutOpportunities.length === 0 && pattern.averageExecutionTime > 2000) {
+      if (
+        pattern.frequency > 10 &&
+        pattern.shortcutOpportunities.length === 0 &&
+        pattern.averageExecutionTime > 2000
+      ) {
         recommendations.push({
           type: 'custom',
           title: `Create custom shortcut for "${pattern.name}"`,
@@ -323,7 +340,7 @@ export class ShortcutLearningSystem {
           difficulty: 'medium',
           category: 'workflow' as ShortcutCategory,
           context: `Workflow: ${pattern.name}`,
-          actionRequired: 'Set up custom shortcut'
+          actionRequired: 'Set up custom shortcut',
         });
       }
     });
@@ -350,7 +367,7 @@ export class ShortcutLearningSystem {
           potentialTimeSaving: totalPotentialSaving * pattern.frequency,
           difficulty: 'medium',
           category: 'workflow' as ShortcutCategory,
-          context: `Inefficient workflow: ${pattern.name}`
+          context: `Inefficient workflow: ${pattern.name}`,
         });
       }
     });
@@ -375,9 +392,7 @@ export class ShortcutLearningSystem {
   }
 
   public getWorkflowPatterns(): WorkflowPattern[] {
-    return Array.from(this.workflowPatterns.values()).sort(
-      (a, b) => b.frequency - a.frequency
-    );
+    return Array.from(this.workflowPatterns.values()).sort((a, b) => b.frequency - a.frequency);
   }
 
   public getEfficiencyMetrics(): {
@@ -388,15 +403,20 @@ export class ShortcutLearningSystem {
     learningTrends: any;
   } {
     const metrics = Array.from(this.shortcutMetrics.values());
-    const totalTimeSaved = metrics.reduce((sum, m) => sum + (m.averageTimeSaved * m.successfulUsageCount), 0);
+    const totalTimeSaved = metrics.reduce(
+      (sum, m) => sum + m.averageTimeSaved * m.successfulUsageCount,
+      0
+    );
     const totalShortcutsUsed = metrics.reduce((sum, m) => sum + m.totalUsageCount, 0);
-    const averageAdoptionRate = metrics.length > 0 
-      ? metrics.reduce((sum, m) => sum + m.adoptionRate, 0) / metrics.length 
-      : 0;
+    const averageAdoptionRate =
+      metrics.length > 0 ? metrics.reduce((sum, m) => sum + m.adoptionRate, 0) / metrics.length : 0;
 
     const topPerformingShortcuts = metrics
       .filter(m => m.totalUsageCount >= 5)
-      .sort((a, b) => (b.averageTimeSaved * b.successfulUsageCount) - (a.averageTimeSaved * a.successfulUsageCount))
+      .sort(
+        (a, b) =>
+          b.averageTimeSaved * b.successfulUsageCount - a.averageTimeSaved * a.successfulUsageCount
+      )
       .slice(0, 10);
 
     return {
@@ -404,7 +424,7 @@ export class ShortcutLearningSystem {
       totalShortcutsUsed,
       averageAdoptionRate,
       topPerformingShortcuts,
-      learningTrends: this.calculateLearningTrends()
+      learningTrends: this.calculateLearningTrends(),
     };
   }
 
@@ -419,7 +439,7 @@ export class ShortcutLearningSystem {
       metrics: Array.from(this.shortcutMetrics.entries()),
       progress: this.learningProgress,
       workflows: Array.from(this.workflowPatterns.entries()),
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
   }
 
@@ -447,13 +467,16 @@ export class ShortcutLearningSystem {
     // Hook into KeyboardShortcutManager to track usage automatically
     const shortcutManager = getGlobalShortcutManager();
     if (!shortcutManager) return;
-    
+
     // Override the execute method to track usage
     const originalExecute = shortcutManager.executeShortcut?.bind(shortcutManager);
     if (originalExecute) {
-      (shortcutManager as any).executeShortcut = (shortcut: ShortcutAction, event: KeyboardEvent) => {
+      (shortcutManager as any).executeShortcut = (
+        shortcut: ShortcutAction,
+        event: KeyboardEvent
+      ) => {
         const startTime = performance.now();
-        
+
         try {
           const result = originalExecute(shortcut, event);
           const executionTime = performance.now() - startTime;
@@ -471,36 +494,44 @@ export class ShortcutLearningSystem {
   private findShortcutForAction(actionType: string): ShortcutAction | null {
     const shortcutManager = getGlobalShortcutManager();
     if (!shortcutManager) return null;
-    
-    return shortcutManager.getAllShortcuts().find(shortcut => 
-      this.matchesAction(shortcut, actionType)
-    ) || null;
+
+    return (
+      shortcutManager
+        .getAllShortcuts()
+        .find(shortcut => this.matchesAction(shortcut, actionType)) || null
+    );
   }
 
   private matchesAction(shortcut: ShortcutAction, actionType: string): boolean {
     const normalizedAction = actionType.toLowerCase().replace(/[_\s-]/g, '');
-    const normalizedShortcut = (shortcut.description + ' ' + shortcut.id).toLowerCase().replace(/[_\s-]/g, '');
-    
-    return normalizedShortcut.includes(normalizedAction) || normalizedAction.includes(normalizedShortcut.split(' ')[0]);
+    const normalizedShortcut = (shortcut.description + ' ' + shortcut.id)
+      .toLowerCase()
+      .replace(/[_\s-]/g, '');
+
+    return (
+      normalizedShortcut.includes(normalizedAction) ||
+      normalizedAction.includes(normalizedShortcut.split(' ')[0])
+    );
   }
 
   private getAverageExecutionTime(actionType: string): number {
-    const relevantActions = this.actionTracking.filter(action => 
-      action.actionType === actionType && action.isManual
+    const relevantActions = this.actionTracking.filter(
+      action => action.actionType === actionType && action.isManual
     );
 
     if (relevantActions.length === 0) return 2000; // Default assumption
 
-    return relevantActions.reduce((sum, action) => sum + action.executionTime, 0) / relevantActions.length;
+    return (
+      relevantActions.reduce((sum, action) => sum + action.executionTime, 0) /
+      relevantActions.length
+    );
   }
 
   private checkForLearningOpportunity(actionType: string, shortcutId: string): void {
-    const recentActions = this.actionTracking
-      .filter(action => 
-        action.actionType === actionType && 
-        action.timestamp > Date.now() - (24 * 60 * 60 * 1000) // Last 24 hours
-      )
-      .length;
+    const recentActions = this.actionTracking.filter(
+      action =>
+        action.actionType === actionType && action.timestamp > Date.now() - 24 * 60 * 60 * 1000 // Last 24 hours
+    ).length;
 
     if (recentActions >= 3) {
       // Trigger learning recommendation through UXOptimizer
@@ -508,7 +539,7 @@ export class ShortcutLearningSystem {
         componentId: 'shortcut-learning',
         shortcutId,
         actionType,
-        frequency: recentActions
+        frequency: recentActions,
       });
     }
   }
@@ -516,7 +547,7 @@ export class ShortcutLearningSystem {
   private updateWorkflowPatterns(actionType: string, executionTime: number): void {
     // Simple pattern detection - could be enhanced with more sophisticated analysis
     const recentActions = this.actionTracking
-      .filter(action => action.timestamp > Date.now() - (5 * 60 * 1000)) // Last 5 minutes
+      .filter(action => action.timestamp > Date.now() - 5 * 60 * 1000) // Last 5 minutes
       .map(action => action.actionType);
 
     if (recentActions.length >= 3) {
@@ -531,12 +562,14 @@ export class ShortcutLearningSystem {
           frequency: 0,
           averageExecutionTime: 0,
           shortcutOpportunities: [],
-          efficiencyScore: 1.0
+          efficiencyScore: 1.0,
         };
       }
 
       pattern.frequency++;
-      pattern.averageExecutionTime = (pattern.averageExecutionTime * (pattern.frequency - 1) + executionTime) / pattern.frequency;
+      pattern.averageExecutionTime =
+        (pattern.averageExecutionTime * (pattern.frequency - 1) + executionTime) /
+        pattern.frequency;
 
       // Calculate efficiency score and shortcut opportunities
       pattern.shortcutOpportunities = pattern.actions
@@ -552,18 +585,23 @@ export class ShortcutLearningSystem {
 
   private updateLearningProgress(): void {
     const metrics = Array.from(this.shortcutMetrics.values());
-    
+
     this.learningProgress.totalShortcutsLearned = metrics.filter(
       m => m.totalUsageCount >= this.learningThresholds.discoveryUsage
     ).length;
 
     this.learningProgress.totalTimeSaved = metrics.reduce(
-      (sum, m) => sum + (m.averageTimeSaved * m.successfulUsageCount), 0
+      (sum, m) => sum + m.averageTimeSaved * m.successfulUsageCount,
+      0
     );
 
     // Update skill level based on usage patterns
-    const expertShortcuts = metrics.filter(m => m.totalUsageCount >= this.learningThresholds.expertUsage).length;
-    const adoptedShortcuts = metrics.filter(m => m.adoptionRate >= this.learningThresholds.adoptionRate).length;
+    const expertShortcuts = metrics.filter(
+      m => m.totalUsageCount >= this.learningThresholds.expertUsage
+    ).length;
+    const adoptedShortcuts = metrics.filter(
+      m => m.adoptionRate >= this.learningThresholds.adoptionRate
+    ).length;
 
     if (expertShortcuts >= 10 && adoptedShortcuts >= 15) {
       this.learningProgress.skillLevel = 'advanced';
@@ -576,7 +614,7 @@ export class ShortcutLearningSystem {
     // Update learning streak
     const today = new Date().toDateString();
     const lastLearningDate = new Date(this.learningProgress.lastLearningDate).toDateString();
-    
+
     if (today !== lastLearningDate) {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString();
       if (lastLearningDate === yesterday) {
@@ -590,33 +628,37 @@ export class ShortcutLearningSystem {
 
   private calculateLearningTrends(): any {
     // Simple trend calculation - could be enhanced with more sophisticated analysis
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const recentMetrics = Array.from(this.shortcutMetrics.values()).filter(
       m => m.lastUsedAt > thirtyDaysAgo
     );
 
     return {
       recentlyUsedShortcuts: recentMetrics.length,
-      averageSuccessRate: recentMetrics.length > 0 
-        ? recentMetrics.reduce((sum, m) => sum + m.adoptionRate, 0) / recentMetrics.length 
-        : 0,
-      trendDirection: recentMetrics.length > this.shortcutMetrics.size * 0.7 ? 'increasing' : 'decreasing'
+      averageSuccessRate:
+        recentMetrics.length > 0
+          ? recentMetrics.reduce((sum, m) => sum + m.adoptionRate, 0) / recentMetrics.length
+          : 0,
+      trendDirection:
+        recentMetrics.length > this.shortcutMetrics.size * 0.7 ? 'increasing' : 'decreasing',
     };
   }
 
   private initializeLearningProgress(): void {
     const stored = localStorage.getItem(this.storageKeys.progress);
-    
-    this.learningProgress = stored ? JSON.parse(stored) : {
-      userId: 'anonymous',
-      totalShortcutsLearned: 0,
-      totalTimeSaved: 0,
-      learningStreak: 0,
-      lastLearningDate: Date.now(),
-      skillLevel: 'beginner' as const,
-      preferredLearningStyle: 'contextual' as const,
-      completedChallenges: []
-    };
+
+    this.learningProgress = stored
+      ? JSON.parse(stored)
+      : {
+          userId: 'anonymous',
+          totalShortcutsLearned: 0,
+          totalTimeSaved: 0,
+          learningStreak: 0,
+          lastLearningDate: Date.now(),
+          skillLevel: 'beginner' as const,
+          preferredLearningStyle: 'contextual' as const,
+          completedChallenges: [],
+        };
   }
 
   private loadStoredData(): void {
@@ -648,21 +690,15 @@ export class ShortcutLearningSystem {
   private saveData(): void {
     try {
       localStorage.setItem(
-        this.storageKeys.metrics, 
+        this.storageKeys.metrics,
         JSON.stringify(Array.from(this.shortcutMetrics.entries()))
       );
+      localStorage.setItem(this.storageKeys.actions, JSON.stringify(this.actionTracking));
       localStorage.setItem(
-        this.storageKeys.actions, 
-        JSON.stringify(this.actionTracking)
-      );
-      localStorage.setItem(
-        this.storageKeys.workflows, 
+        this.storageKeys.workflows,
         JSON.stringify(Array.from(this.workflowPatterns.entries()))
       );
-      localStorage.setItem(
-        this.storageKeys.progress, 
-        JSON.stringify(this.learningProgress)
-      );
+      localStorage.setItem(this.storageKeys.progress, JSON.stringify(this.learningProgress));
     } catch (error) {
       console.error('Failed to save shortcut learning data:', error);
     }

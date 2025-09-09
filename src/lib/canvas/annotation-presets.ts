@@ -26,8 +26,8 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       textColor: '#047857',
       fontSize: 14,
       fontWeight: 'normal',
-      opacity: 0.95
-    })
+      opacity: 0.95,
+    }),
   },
   {
     id: 'warning',
@@ -39,8 +39,8 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       textColor: '#92400e',
       fontSize: 14,
       fontWeight: 'normal',
-      opacity: 0.95
-    })
+      opacity: 0.95,
+    }),
   },
   {
     id: 'error',
@@ -52,8 +52,8 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       textColor: '#b91c1c',
       fontSize: 14,
       fontWeight: 'bold',
-      opacity: 0.95
-    })
+      opacity: 0.95,
+    }),
   },
   {
     id: 'info',
@@ -65,8 +65,8 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       textColor: '#1d4ed8',
       fontSize: 14,
       fontWeight: 'normal',
-      opacity: 0.95
-    })
+      opacity: 0.95,
+    }),
   },
   {
     id: 'note',
@@ -78,8 +78,8 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       textColor: '#374151',
       fontSize: 14,
       fontWeight: 'normal',
-      opacity: 0.95
-    })
+      opacity: 0.95,
+    }),
   },
   {
     id: 'highlight',
@@ -91,8 +91,8 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       textColor: '#a16207',
       fontSize: 14,
       fontWeight: 'normal',
-      opacity: 0.8
-    })
+      opacity: 0.8,
+    }),
   },
   {
     id: 'urgent',
@@ -105,8 +105,8 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       fontSize: 15,
       fontWeight: 'bold',
       opacity: 1.0,
-      borderWidth: 2
-    })
+      borderWidth: 2,
+    }),
   },
   {
     id: 'review',
@@ -118,9 +118,9 @@ export const ANNOTATION_PRESETS: AnnotationPreset[] = [
       textColor: '#7c3aed',
       fontSize: 14,
       fontWeight: 'normal',
-      opacity: 0.95
-    })
-  }
+      opacity: 0.95,
+    }),
+  },
 ];
 
 /**
@@ -150,7 +150,7 @@ export const createCustomPreset = (
     id,
     name,
     description,
-    style: createAnnotationStyle(style)
+    style: createAnnotationStyle(style),
   };
 };
 
@@ -178,13 +178,15 @@ export const getDefaultPreset = (): AnnotationPreset => {
 /**
  * Get presets by category/theme
  */
-export const getPresetsByCategory = (category: 'status' | 'priority' | 'general'): AnnotationPreset[] => {
+export const getPresetsByCategory = (
+  category: 'status' | 'priority' | 'general'
+): AnnotationPreset[] => {
   const categories: Record<string, string[]> = {
     status: ['success', 'warning', 'error', 'info'],
     priority: ['urgent', 'highlight', 'note'],
-    general: ['note', 'review', 'info']
+    general: ['note', 'review', 'info'],
   };
-  
+
   const presetIds = categories[category] || [];
   return presetIds.map(id => getPresetById(id)).filter(Boolean) as AnnotationPreset[];
 };

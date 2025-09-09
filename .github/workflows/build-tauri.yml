@@ -1,0 +1,99 @@
+name: Build Tauri App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target universal-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Compute version and tag
+        id: vars
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Extract latest changelog section
+        id: changelog
+        shell: bash
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          if [[ -f CHANGELOG.md ]]; then
+            node -e '
+              const fs = require("fs");
+              const v = process.env.VERSION;
+              const md = fs.readFileSync("CHANGELOG.md", "utf8");
+              const esc = v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+              const re = new RegExp(`(^|\n)##[^\n]*${esc}[^\n]*\n([\s\S]*?)(\n## |$)`, "m");
+              const m = md.match(re);
+              const out = m ? m[2].trim() : "See CHANGELOG.md for details.";
+              fs.writeFileSync(process.env.GITHUB_OUTPUT, `latest<<EOF\n${out}\nEOF\n`, { flag: "a" });
+            ' 
+          else
+            echo "latest=See CHANGELOG.md for details." >> $GITHUB_OUTPUT
+          fi
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ steps.vars.outputs.tag }}
+          releaseName: 'ArchiComm v${{ steps.vars.outputs.version }}'
+          releaseBody: |
+            Changes for v${{ steps.vars.outputs.version }}:
+
+            ${{ steps.changelog.outputs.latest }}
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

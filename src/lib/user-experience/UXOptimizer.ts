@@ -85,7 +85,7 @@ export class UXOptimizer {
   trackAction(action: Omit<UserAction, 'timestamp'>): void {
     const trackedAction: UserAction = {
       ...action,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     if (!this.userBehavior) {
@@ -122,7 +122,7 @@ export class UXOptimizer {
         priority: 'high',
         title: 'Need help with this feature?',
         description: 'We noticed you might be having trouble. Would you like a quick tutorial?',
-        action: () => this.showContextualHelp(errorActions[0].context.component)
+        action: () => this.showContextualHelp(errorActions[0].context.component),
       });
     }
 
@@ -133,18 +133,21 @@ export class UXOptimizer {
         priority: 'medium',
         title: 'Speed up your workflow',
         description: `Use Ctrl+${this.getShortcutForAction(frequentActions[0])} for faster access`,
-        action: () => this.enableShortcuts()
+        action: () => this.enableShortcuts(),
       });
     }
 
     // Advanced features recommendation
-    if (this.userBehavior.skillLevel === 'expert' && !this.userBehavior.preferences.advancedFeatures) {
+    if (
+      this.userBehavior.skillLevel === 'expert' &&
+      !this.userBehavior.preferences.advancedFeatures
+    ) {
       recommendations.push({
         type: 'feature',
         priority: 'low',
         title: 'Unlock advanced features',
         description: 'You seem experienced! Enable advanced mode for more tools.',
-        action: () => this.enableAdvancedFeatures()
+        action: () => this.enableAdvancedFeatures(),
       });
     }
 
@@ -161,7 +164,7 @@ export class UXOptimizer {
 
     // Analyze workflow patterns
     const patterns = this.analyzeWorkflowPatterns();
-    
+
     // Customize toolbar based on usage
     const toolbarAdaptation = this.optimizeToolbar(patterns);
     if (toolbarAdaptation) {
@@ -202,7 +205,7 @@ export class UXOptimizer {
 
     // Calculate satisfaction based on success rate and efficiency
     const efficiencyScore = Math.min(expectedTime / avgCompletionTime, 1);
-    const satisfactionScore = (successRate * 0.6) + (efficiencyScore * 0.4);
+    const satisfactionScore = successRate * 0.6 + efficiencyScore * 0.4;
 
     this.metrics.userSatisfactionScore = satisfactionScore;
     return satisfactionScore;
@@ -251,17 +254,16 @@ export class UXOptimizer {
     const saveActions = this.userBehavior.actions.filter(a => a.type === 'save');
     if (saveActions.length > 10) {
       const avgTimeBetweenSaves = this.calculateAverageTimeBetween(saveActions);
-      if (avgTimeBetweenSaves < 300000) { // Less than 5 minutes
+      if (avgTimeBetweenSaves < 300000) {
+        // Less than 5 minutes
         smartDefaults.autoSave = true;
       }
     }
 
     // Grid snapping based on precision needs
     const moveActions = this.userBehavior.actions.filter(a => a.type === 'move-component');
-    const preciseMovements = moveActions.filter(a => 
-      a.data.deltaX < 5 && a.data.deltaY < 5
-    ).length;
-    
+    const preciseMovements = moveActions.filter(a => a.data.deltaX < 5 && a.data.deltaY < 5).length;
+
     if (preciseMovements > moveActions.length * 0.7) {
       smartDefaults.gridSnapping = true;
     }
@@ -279,7 +281,7 @@ export class UXOptimizer {
       userSatisfactionScore: 0.5,
       featureUsageFrequency: {},
       sessionDuration: 0,
-      interactionDepth: 0
+      interactionDepth: 0,
     };
   }
 
@@ -290,7 +292,7 @@ export class UXOptimizer {
       actions: [],
       preferences: this.getDefaultPreferences(),
       skillLevel: 'intermediate',
-      workflowPatterns: []
+      workflowPatterns: [],
     };
   }
 
@@ -305,8 +307,8 @@ export class UXOptimizer {
           context: {
             page: window.location.pathname,
             component: 'system',
-            userIntent: 'pause'
-          }
+            userIntent: 'pause',
+          },
         });
       } else {
         this.trackAction({
@@ -316,27 +318,27 @@ export class UXOptimizer {
           context: {
             page: window.location.pathname,
             component: 'system',
-            userIntent: 'resume'
-          }
+            userIntent: 'resume',
+          },
         });
       }
     });
 
     // Track errors
-    window.addEventListener('error', (event) => {
+    window.addEventListener('error', event => {
       this.trackAction({
         type: 'error',
         data: {
           message: event.message,
           filename: event.filename,
-          lineno: event.lineno
+          lineno: event.lineno,
         },
         success: false,
         context: {
           page: window.location.pathname,
           component: 'system',
-          userIntent: 'unknown'
-        }
+          userIntent: 'unknown',
+        },
       });
     });
   }
@@ -351,15 +353,14 @@ export class UXOptimizer {
 
     // Update error rate
     if (!this.userBehavior) return;
-    
+
     const recentActions = this.userBehavior.actions.slice(-100);
     const errors = recentActions.filter(a => !a.success).length;
     this.metrics.errorRate = errors / recentActions.length;
 
     // Update task completion time
     if (action.duration) {
-      this.metrics.taskCompletionTime = 
-        (this.metrics.taskCompletionTime + action.duration) / 2;
+      this.metrics.taskCompletionTime = (this.metrics.taskCompletionTime + action.duration) / 2;
     }
   }
 
@@ -381,7 +382,7 @@ export class UXOptimizer {
 
     const recentActions = this.userBehavior.actions.slice(-20);
     const successRate = recentActions.filter(a => a.success).length / recentActions.length;
-    const advancedFeatureUsage = recentActions.filter(a => 
+    const advancedFeatureUsage = recentActions.filter(a =>
       ['group', 'ungroup', 'clone', 'batch-edit'].includes(a.type)
     ).length;
 
@@ -401,9 +402,11 @@ export class UXOptimizer {
 
     const actions = this.userBehavior.actions.slice(-50);
     const patterns = this.findSequentialPatterns(actions);
-    
+
     patterns.forEach(pattern => {
-      const existingPattern = this.userBehavior!.workflowPatterns.find(p => p.name === pattern.name);
+      const existingPattern = this.userBehavior!.workflowPatterns.find(
+        p => p.name === pattern.name
+      );
       if (existingPattern) {
         existingPattern.frequency++;
       } else {
@@ -421,14 +424,14 @@ export class UXOptimizer {
       for (let i = 0; i <= actions.length - length; i++) {
         const sequence = actions.slice(i, i + length);
         const patternName = sequence.map(a => a.type).join('-');
-        
+
         if (this.isValidPattern(sequence)) {
           patterns.push({
             name: patternName,
             frequency: 1,
             steps: sequence.map(a => a.type),
             averageTime: this.calculateSequenceTime(sequence),
-            successRate: sequence.every(a => a.success) ? 1 : 0
+            successRate: sequence.every(a => a.success) ? 1 : 0,
           });
         }
       }
@@ -458,8 +461,8 @@ export class UXOptimizer {
       priority: 'medium',
       description: 'Optimize toolbar based on usage patterns',
       data: {
-        prioritizedActions: mostFrequentActions
-      }
+        prioritizedActions: mostFrequentActions,
+      },
     };
   }
 
@@ -477,8 +480,8 @@ export class UXOptimizer {
         description: 'Reduce animations for better performance',
         data: {
           reduceAnimations: true,
-          animationDuration: 150
-        }
+          animationDuration: 150,
+        },
       };
     }
 
@@ -497,8 +500,8 @@ export class UXOptimizer {
         description: 'Optimize layout for smaller screens',
         data: {
           compactMode: true,
-          collapsePanels: true
-        }
+          collapsePanels: true,
+        },
       };
     }
 
@@ -507,7 +510,7 @@ export class UXOptimizer {
 
   private shouldOptimize(): boolean {
     if (!this.userBehavior) return false;
-    
+
     const actionCount = this.userBehavior.actions.length;
     return actionCount > 0 && actionCount % 50 === 0; // Optimize every 50 actions
   }
@@ -518,7 +521,7 @@ export class UXOptimizer {
 
   private getFrequentActions(actions: UserAction[]): string[] {
     const frequency: Record<string, number> = {};
-    
+
     actions.forEach(action => {
       frequency[action.type] = (frequency[action.type] || 0) + 1;
     });
@@ -531,18 +534,19 @@ export class UXOptimizer {
 
   private calculateAverageCompletionTime(actions: UserAction[]): number {
     const durations = actions.filter(a => a.duration).map(a => a.duration!);
-    return durations.length > 0 ? 
-      durations.reduce((sum, duration) => sum + duration, 0) / durations.length : 0;
+    return durations.length > 0
+      ? durations.reduce((sum, duration) => sum + duration, 0) / durations.length
+      : 0;
   }
 
   private calculateAverageTimeBetween(actions: UserAction[]): number {
     if (actions.length < 2) return 0;
-    
+
     let totalTime = 0;
     for (let i = 1; i < actions.length; i++) {
       totalTime += actions[i].timestamp - actions[i - 1].timestamp;
     }
-    
+
     return totalTime / (actions.length - 1);
   }
 
@@ -567,7 +571,7 @@ export class UXOptimizer {
       autoSave: false,
       gridSnapping: false,
       tooltips: true,
-      advancedFeatures: false
+      advancedFeatures: false,
     };
   }
 
@@ -580,18 +584,21 @@ export class UXOptimizer {
 
   private updateUserPreference(key: string, value: any): void {
     if (!this.userBehavior) return;
-    
+
     this.userBehavior.preferences = { ...this.userBehavior.preferences, [key]: value };
-    localStorage.setItem('archicomm-user-preferences', JSON.stringify(this.userBehavior.preferences));
+    localStorage.setItem(
+      'archicomm-user-preferences',
+      JSON.stringify(this.userBehavior.preferences)
+    );
   }
 
   private getShortcutForAction(action: string): string {
     const shortcuts: Record<string, string> = {
-      'save': 'S',
-      'copy': 'C',
-      'paste': 'V',
-      'delete': 'Del',
-      'undo': 'Z'
+      save: 'S',
+      copy: 'C',
+      paste: 'V',
+      delete: 'Del',
+      undo: 'Z',
     };
     return shortcuts[action] || '?';
   }
@@ -606,9 +613,9 @@ export class UXOptimizer {
 
   private getHelpContent(component: string): string | null {
     const helpTexts: Record<string, string> = {
-      'canvas': 'Double-click to add components. Drag to connect them.',
-      'toolbar': 'Use these tools to enhance your architecture diagram.',
-      'component-palette': 'Drag components from here onto the canvas.'
+      canvas: 'Double-click to add components. Drag to connect them.',
+      toolbar: 'Use these tools to enhance your architecture diagram.',
+      'component-palette': 'Drag components from here onto the canvas.',
     };
     return helpTexts[component] || null;
   }
@@ -654,9 +661,12 @@ import { useEffect, useCallback } from 'react';
 export const useUXOptimizer = () => {
   const uxOptimizer = UXOptimizer.getInstance();
 
-  const trackAction = useCallback((action: Omit<UserAction, 'timestamp'>) => {
-    uxOptimizer.trackAction(action);
-  }, [uxOptimizer]);
+  const trackAction = useCallback(
+    (action: Omit<UserAction, 'timestamp'>) => {
+      uxOptimizer.trackAction(action);
+    },
+    [uxOptimizer]
+  );
 
   const getRecommendations = useCallback(() => {
     return uxOptimizer.getRecommendations();
@@ -685,6 +695,6 @@ export const useUXOptimizer = () => {
     measureSatisfaction,
     getSuccessRate,
     getSkillLevel,
-    optimizer: uxOptimizer
+    optimizer: uxOptimizer,
   };
 };

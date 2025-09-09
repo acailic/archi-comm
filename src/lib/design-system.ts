@@ -12,14 +12,14 @@ export const spacing = {
   lg: 'var(--space-lg)',
   xl: 'var(--space-xl)',
   '2xl': 'var(--space-2xl)',
-  '3xl': 'var(--space-3xl)'
+  '3xl': 'var(--space-3xl)',
 } as const;
 
 export const radii = {
   sm: 'var(--radius-sm)',
   md: 'var(--radius-md)',
   lg: 'var(--radius-lg)',
-  xl: 'var(--radius-xl)'
+  xl: 'var(--radius-xl)',
 } as const;
 
 export const typography = {
@@ -35,7 +35,7 @@ export const typography = {
 export const transitions = {
   fast: 'var(--transition-fast)',
   medium: 'var(--transition-medium)',
-  slow: 'var(--transition-slow)'
+  slow: 'var(--transition-slow)',
 } as const;
 
 export const elevation = {
@@ -49,29 +49,33 @@ export const elevation = {
 } as const satisfies Record<ElevationLevel, string>;
 
 export const glass = {
-  surface: 'backdrop-blur-[var(--glass-blur)] bg-[var(--glass-bg)] border border-[var(--glass-border)]',
-  interactive: 'transition-all duration-200 hover:bg-[color-mix(in_oklab,var(--glass-bg)_85%,#fff)]',
+  surface:
+    'backdrop-blur-[var(--glass-blur)] bg-[var(--glass-bg)] border border-[var(--glass-border)]',
+  interactive:
+    'transition-all duration-200 hover:bg-[color-mix(in_oklab,var(--glass-bg)_85%,#fff)]',
 } as const;
 
-export const componentBg = 'bg-[var(--component-bg)] border-[var(--component-border)] shadow-[var(--component-shadow)]';
+export const componentBg =
+  'bg-[var(--component-bg)] border-[var(--component-border)] shadow-[var(--component-shadow)]';
 
 export const sizeVariants: Record<SizeVariant, string> = {
   sm: 'px-2 py-1 text-xs h-7',
   md: 'px-3 py-2 text-sm h-9',
-  lg: 'px-4 py-3 text-base h-12'
+  lg: 'px-4 py-3 text-base h-12',
 };
 
 export const styleVariants: Record<StyleVariant, string> = {
   solid: 'bg-card border border-border',
   glass: `${glass.surface}`,
-  minimal: 'bg-transparent border border-border/50'
+  minimal: 'bg-transparent border border-border/50',
 };
 
 export const animations = {
   hoverRaise: 'transition-transform duration-200 ease-out hover:-translate-y-0.5',
   pulseGlow: 'transition-shadow duration-200 hover:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]',
-  focusRing: 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-  tap: 'active:scale-[0.98]'
+  focusRing:
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+  tap: 'active:scale-[0.98]',
 } as const;
 
 // Semantic roles used across component types
@@ -81,7 +85,7 @@ export const colorRoles = {
   success: 'from-emerald-500 to-emerald-600',
   warning: 'from-amber-500 to-amber-600',
   danger: 'from-rose-500 to-rose-600',
-  neutral: 'from-slate-500 to-slate-600'
+  neutral: 'from-slate-500 to-slate-600',
 } as const;
 
 export const componentTypeToRole: Record<string, keyof typeof colorRoles> = {
@@ -137,7 +141,7 @@ export const componentTypeToRole: Record<string, keyof typeof colorRoles> = {
   cqrs: 'secondary',
   'edge-computing': 'neutral',
   blockchain: 'warning',
-  'ai-ml': 'secondary'
+  'ai-ml': 'secondary',
 };
 
 // Helpers
@@ -188,4 +192,3 @@ export const designSystem = {
 };
 
 export default designSystem;
-

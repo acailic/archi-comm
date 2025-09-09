@@ -22,6 +22,7 @@ export interface ErrorContext {
   url?: string;
   userAgent?: string;
   sessionId?: string;
+  timestamp?: number;
   additionalData?: Record<string, any>;
 }
 
@@ -82,13 +83,13 @@ class ErrorStoreImpl {
 
     const errorMessage = typeof error === 'string' ? error : error.message;
     const errorStack = typeof error === 'string' ? undefined : error.stack;
-    
+
     // Create error hash for deduplication
     const hash = this.createErrorHash(errorMessage, errorStack, category);
-    
+
     // Check if this error already exists
     const existingError = this.state.errors.find(e => e.hash === hash && !e.resolved);
-    
+
     if (existingError) {
       // Increment count and update timestamp
       existingError.count++;
@@ -177,7 +178,7 @@ class ErrorStoreImpl {
 
     const unresolvedErrors = this.state.errors.filter(e => !e.resolved);
     const removedCount = this.state.errors.length - unresolvedErrors.length;
-    
+
     this.state.errors = unresolvedErrors;
     this.state.resolvedErrors = Math.max(0, this.state.resolvedErrors - removedCount);
     this.notifyListeners();
@@ -244,15 +245,21 @@ class ErrorStoreImpl {
    */
   getStats() {
     const unresolved = this.getUnresolvedErrors();
-    const categories = this.state.errors.reduce((acc, error) => {
-      acc[error.category] = (acc[error.category] || 0) + 1;
-      return acc;
-    }, {} as Record<ErrorCategory, number>);
+    const categories = this.state.errors.reduce(
+      (acc, error) => {
+        acc[error.category] = (acc[error.category] || 0) + 1;
+        return acc;
+      },
+      {} as Record<ErrorCategory, number>
+    );
 
-    const severities = this.state.errors.reduce((acc, error) => {
-      acc[error.severity] = (acc[error.severity] || 0) + 1;
-      return acc;
-    }, {} as Record<ErrorSeverity, number>);
+    const severities = this.state.errors.reduce(
+      (acc, error) => {
+        acc[error.severity] = (acc[error.severity] || 0) + 1;
+        return acc;
+      },
+      {} as Record<ErrorSeverity, number>
+    );
 
     return {
       total: this.state.totalErrors,
@@ -289,34 +296,39 @@ class ErrorStoreImpl {
 
   private createErrorHash(message: string, stack?: string, category?: ErrorCategory): string {
     const hashInput = `${message}|${stack?.split('\n')[0] || ''}|${category}`;
-    return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+    return btoa(hashInput)
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .substring(0, 16);
   }
 
   private determineSeverity(message: string, category: ErrorCategory): ErrorSeverity {
     const lowerMessage = message.toLowerCase();
-    
+
     // Critical errors
-    if (lowerMessage.includes('cannot read property') || 
-        lowerMessage.includes('cannot access before initialization') ||
-        lowerMessage.includes('maximum call stack') ||
-        category === 'react') {
+    if (
+      lowerMessage.includes('cannot read property') ||
+      lowerMessage.includes('cannot access before initialization') ||
+      lowerMessage.includes('maximum call stack') ||
+      category === 'react'
+    ) {
       return 'critical';
     }
-    
+
     // High severity
-    if (lowerMessage.includes('network') || 
-        lowerMessage.includes('fetch') ||
-        lowerMessage.includes('timeout') ||
-        category === 'performance') {
+    if (
+      lowerMessage.includes('network') ||
+      lowerMessage.includes('fetch') ||
+      lowerMessage.includes('timeout') ||
+      category === 'performance'
+    ) {
       return 'high';
     }
-    
+
     // Medium severity
-    if (lowerMessage.includes('warning') || 
-        lowerMessage.includes('deprecated')) {
+    if (lowerMessage.includes('warning') || lowerMessage.includes('deprecated')) {
       return 'medium';
     }
-    
+
     return 'low';
   }
 
@@ -326,7 +338,7 @@ class ErrorStoreImpl {
 
   private getSessionId(): string {
     if (typeof window === 'undefined') return 'server';
-    
+
     let sessionId = sessionStorage.getItem('errorStore_sessionId');
     if (!sessionId) {
       sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -364,7 +376,7 @@ class ErrorStoreImpl {
   private cleanupOldErrors(): void {
     const now = Date.now();
     const initialLength = this.state.errors.length;
-    
+
     this.state.errors = this.state.errors.filter(error => {
       const age = now - error.timestamp;
       return age < this.maxErrorAge || !error.resolved;
@@ -442,12 +454,12 @@ export const addNetworkError = (
 // Hook for React components (simple subscription)
 export const useErrorStore = () => {
   const [state, setState] = useState(errorStore.getState());
-  
+
   useEffect(() => {
     const unsubscribe = errorStore.subscribe(setState);
     return unsubscribe;
   }, []);
-  
+
   return {
     ...state,
     addError: errorStore.addError.bind(errorStore),
@@ -463,7 +475,7 @@ export const useErrorStore = () => {
 if (isDevelopment()) {
   // Make error store available globally for debugging
   (window as any).__ERROR_STORE__ = errorStore;
-  
+
   // Add some helpful debugging functions
   (window as any).__ERROR_STORE_DEBUG__ = {
     addTestError: () => {

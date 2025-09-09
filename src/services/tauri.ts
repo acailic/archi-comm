@@ -1,6 +1,11 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { isTauriEnvironment, DEBUG } from '../lib/environment';
-import { webProjectManager, webFileManager, webNotificationManager, type WebProject } from './web-fallback';
+import {
+  webProjectManager,
+  webFileManager,
+  webNotificationManager,
+  type WebProject,
+} from './web-fallback';
 
 // Types matching the Rust backend
 export interface Project {
@@ -79,7 +84,7 @@ export class ProjectAPI {
   static async createProject(name: string, description: string): Promise<Project> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'createProject');
-      
+
       const webProject: WebProject = {
         id: crypto.randomUUID(),
         name,
@@ -93,12 +98,12 @@ export class ProjectAPI {
         lastModified: Date.now(),
         version: 1,
       };
-      
+
       const saved = await webProjectManager.saveProject(webProject);
       if (!saved) {
         throw new Error('Failed to create project in web environment');
       }
-      
+
       return {
         id: webProject.id,
         name: webProject.name,
@@ -109,7 +114,7 @@ export class ProjectAPI {
         updated_at: webProject.data.updated_at,
       };
     }
-    
+
     return await invoke('create_project', { name, description });
   }
 
@@ -120,7 +125,7 @@ export class ProjectAPI {
   static async getProjects(): Promise<Project[]> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'getProjects');
-      
+
       const webProjects = await webProjectManager.getProjects();
       return webProjects.map(wp => ({
         id: wp.id,
@@ -132,7 +137,7 @@ export class ProjectAPI {
         updated_at: wp.data.updated_at || new Date(wp.lastModified).toISOString(),
       }));
     }
-    
+
     return await invoke('get_projects');
   }
 
@@ -143,10 +148,10 @@ export class ProjectAPI {
   static async getProject(projectId: string): Promise<Project | null> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'getProject');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) return null;
-      
+
       return {
         id: webProject.id,
         name: webProject.name,
@@ -157,7 +162,7 @@ export class ProjectAPI {
         updated_at: webProject.data.updated_at || new Date(webProject.lastModified).toISOString(),
       };
     }
-    
+
     return await invoke('get_project', { project_id: projectId });
   }
 
@@ -175,10 +180,10 @@ export class ProjectAPI {
   ): Promise<Project | null> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'updateProject');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) return null;
-      
+
       const updatedProject: WebProject = {
         ...webProject,
         name: updates.name || webProject.name,
@@ -191,10 +196,10 @@ export class ProjectAPI {
         lastModified: Date.now(),
         version: webProject.version + 1,
       };
-      
+
       const saved = await webProjectManager.saveProject(updatedProject);
       if (!saved) return null;
-      
+
       return {
         id: updatedProject.id,
         name: updatedProject.name,
@@ -205,7 +210,7 @@ export class ProjectAPI {
         updated_at: updatedProject.data.updated_at,
       };
     }
-    
+
     return await invoke('update_project', {
       project_id: projectId,
       name: updates.name,
@@ -223,7 +228,7 @@ export class ProjectAPI {
       DEBUG.checkFeature('FILE_OPERATIONS', 'deleteProject');
       return await webProjectManager.deleteProject(projectId);
     }
-    
+
     return await invoke('delete_project', { project_id: projectId });
   }
 }
@@ -246,10 +251,10 @@ export class ComponentAPI {
   ): Promise<Component | null> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'addComponent');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) return null;
-      
+
       const newComponent: Component = {
         id: crypto.randomUUID(),
         name,
@@ -259,7 +264,7 @@ export class ComponentAPI {
         status: ComponentStatus.NotStarted,
         metadata: {},
       };
-      
+
       const updatedProject: WebProject = {
         ...webProject,
         data: {
@@ -270,11 +275,11 @@ export class ComponentAPI {
         lastModified: Date.now(),
         version: webProject.version + 1,
       };
-      
+
       const saved = await webProjectManager.saveProject(updatedProject);
       return saved ? newComponent : null;
     }
-    
+
     return await invoke('add_component', {
       project_id: projectId,
       name,
@@ -299,14 +304,14 @@ export class ComponentAPI {
   ): Promise<Component | null> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'updateComponent');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) return null;
-      
+
       const components = webProject.data.components || [];
       const componentIndex = components.findIndex(c => c.id === componentId);
       if (componentIndex === -1) return null;
-      
+
       const updatedComponent = {
         ...components[componentIndex],
         name: updates.name || components[componentIndex].name,
@@ -314,10 +319,10 @@ export class ComponentAPI {
         status: updates.status || components[componentIndex].status,
         dependencies: updates.dependencies || components[componentIndex].dependencies,
       };
-      
+
       const updatedComponents = [...components];
       updatedComponents[componentIndex] = updatedComponent;
-      
+
       const updatedProject: WebProject = {
         ...webProject,
         data: {
@@ -328,11 +333,11 @@ export class ComponentAPI {
         lastModified: Date.now(),
         version: webProject.version + 1,
       };
-      
+
       const saved = await webProjectManager.saveProject(updatedProject);
       return saved ? updatedComponent : null;
     }
-    
+
     return await invoke('update_component', {
       project_id: projectId,
       component_id: componentId,
@@ -347,19 +352,16 @@ export class ComponentAPI {
    * Remove component from project
    * @description Tauri: Removes from backend, Web: Updates localStorage
    */
-  static async removeComponent(
-    projectId: string,
-    componentId: string
-  ): Promise<boolean> {
+  static async removeComponent(projectId: string, componentId: string): Promise<boolean> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'removeComponent');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) return false;
-      
+
       const components = webProject.data.components || [];
       const filteredComponents = components.filter(c => c.id !== componentId);
-      
+
       const updatedProject: WebProject = {
         ...webProject,
         data: {
@@ -370,10 +372,10 @@ export class ComponentAPI {
         lastModified: Date.now(),
         version: webProject.version + 1,
       };
-      
+
       return await webProjectManager.saveProject(updatedProject);
     }
-    
+
     return await invoke('remove_component', { project_id: projectId, component_id: componentId });
   }
 }
@@ -388,16 +390,13 @@ export class DiagramAPI {
    * Save diagram elements
    * @description Tauri: Saves to backend, Web: Saves to localStorage
    */
-  static async saveDiagram(
-    projectId: string,
-    elements: DiagramElement[]
-  ): Promise<void> {
+  static async saveDiagram(projectId: string, elements: DiagramElement[]): Promise<void> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'saveDiagram');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) throw new Error('Project not found');
-      
+
       const updatedProject: WebProject = {
         ...webProject,
         data: {
@@ -408,12 +407,12 @@ export class DiagramAPI {
         lastModified: Date.now(),
         version: webProject.version + 1,
       };
-      
+
       const saved = await webProjectManager.saveProject(updatedProject);
       if (!saved) throw new Error('Failed to save diagram');
       return;
     }
-    
+
     return await invoke('save_diagram', { project_id: projectId, elements });
   }
 
@@ -424,11 +423,11 @@ export class DiagramAPI {
   static async loadDiagram(projectId: string): Promise<DiagramElement[]> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'loadDiagram');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       return webProject?.data.diagramElements || [];
     }
-    
+
     return await invoke('load_diagram', { project_id: projectId });
   }
 
@@ -436,16 +435,13 @@ export class DiagramAPI {
    * Save diagram connections
    * @description Tauri: Saves to backend, Web: Saves to localStorage
    */
-  static async saveConnections(
-    projectId: string,
-    connections: Connection[]
-  ): Promise<void> {
+  static async saveConnections(projectId: string, connections: Connection[]): Promise<void> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'saveConnections');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) throw new Error('Project not found');
-      
+
       const updatedProject: WebProject = {
         ...webProject,
         data: {
@@ -456,12 +452,12 @@ export class DiagramAPI {
         lastModified: Date.now(),
         version: webProject.version + 1,
       };
-      
+
       const saved = await webProjectManager.saveProject(updatedProject);
       if (!saved) throw new Error('Failed to save connections');
       return;
     }
-    
+
     return await invoke('save_connections', { project_id: projectId, connections });
   }
 
@@ -472,11 +468,11 @@ export class DiagramAPI {
   static async loadConnections(projectId: string): Promise<Connection[]> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('FILE_OPERATIONS', 'loadConnections');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       return webProject?.data.diagramConnections || [];
     }
-    
+
     return await invoke('load_connections', { project_id: projectId });
   }
 }
@@ -496,7 +492,7 @@ export class UtilityAPI {
       DEBUG.checkFeature('SYSTEM_INTEGRATION', 'getAppVersion');
       return import.meta.env.VITE_APP_VERSION || '1.0.0-web';
     }
-    
+
     return await invoke('get_app_version');
   }
 
@@ -507,16 +503,16 @@ export class UtilityAPI {
   static async showInFolder(path: string): Promise<void> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('SYSTEM_INTEGRATION', 'showInFolder');
-      
+
       await webNotificationManager.showNotification({
         title: 'Show in Folder',
         body: `Cannot open folder in web environment: ${path}`,
       });
-      
+
       console.info('showInFolder called in web environment:', path);
       return;
     }
-    
+
     return await invoke('show_in_folder', { path });
   }
 
@@ -527,10 +523,10 @@ export class UtilityAPI {
   static async exportProjectData(projectId: string): Promise<string> {
     if (!isTauriEnvironment()) {
       DEBUG.checkFeature('NATIVE_EXPORT', 'exportProjectData');
-      
+
       const webProject = await webProjectManager.getProject(projectId);
       if (!webProject) throw new Error('Project not found');
-      
+
       const exportData = {
         id: webProject.id,
         name: webProject.name,
@@ -538,13 +534,13 @@ export class UtilityAPI {
         exportedAt: new Date().toISOString(),
         version: webProject.version,
       };
-      
+
       const exported = await webFileManager.exportJSON(`${webProject.name}-export`, exportData);
       if (!exported) throw new Error('Failed to export project data');
-      
+
       return JSON.stringify(exportData, null, 2);
     }
-    
+
     return await invoke('export_project_data', { project_id: projectId });
   }
 }
@@ -559,15 +555,12 @@ export class TauriAPI {
    * Safely invoke Tauri command with environment awareness
    * @description Only invokes if in Tauri environment, otherwise returns null
    */
-  static async safeInvoke<T>(
-    command: string,
-    args?: Record<string, unknown>
-  ): Promise<T | null> {
+  static async safeInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T | null> {
     if (!isTauriEnvironment()) {
       console.warn(`Tauri command '${command}' called in web environment, returning null`);
       return null;
     }
-    
+
     const startTime = performance.now();
     try {
       const result = await invoke(command, args);
@@ -581,14 +574,14 @@ export class TauriAPI {
       return null;
     }
   }
-  
+
   /**
    * Check if Tauri is available and ready
    */
   static isAvailable(): boolean {
     return isTauriEnvironment();
   }
-  
+
   /**
    * Get environment information for debugging
    */
@@ -611,7 +604,7 @@ export const setupTauriListeners = () => {
     console.info('Skipping Tauri listeners setup (web environment)');
     return;
   }
-  
+
   try {
     const start = performance.now();
     // This can be expanded to listen to Tauri events
@@ -631,10 +624,10 @@ export const initializeTauriServices = async (): Promise<boolean> => {
     console.info('Tauri services not available (web environment)');
     return false;
   }
-  
+
   try {
     setupTauriListeners();
-    
+
     // Test basic Tauri functionality
     const version = await UtilityAPI.getAppVersion();
     console.info('Tauri services initialized successfully, version:', version);

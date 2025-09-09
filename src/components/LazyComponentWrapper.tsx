@@ -42,12 +42,12 @@ export interface LazyWrapperOptions {
 
 // Loading skeleton components
 const DefaultLoadingSkeleton: FC = () => (
-  <div className="lazy-loading-skeleton" role="status" aria-label="Loading component">
-    <div className="skeleton-header"></div>
-    <div className="skeleton-content">
-      <div className="skeleton-line"></div>
-      <div className="skeleton-line short"></div>
-      <div className="skeleton-line"></div>
+  <div className='lazy-loading-skeleton' role='status' aria-label='Loading component'>
+    <div className='skeleton-header'></div>
+    <div className='skeleton-content'>
+      <div className='skeleton-line'></div>
+      <div className='skeleton-line short'></div>
+      <div className='skeleton-line'></div>
     </div>
     <style jsx>{`
       .lazy-loading-skeleton {
@@ -56,54 +56,59 @@ const DefaultLoadingSkeleton: FC = () => (
         border-radius: 0.5rem;
         animation: pulse 1.5s ease-in-out infinite;
       }
-      
+
       .skeleton-header {
         height: 2rem;
         background: #e9ecef;
         border-radius: 0.25rem;
         margin-bottom: 1rem;
       }
-      
+
       .skeleton-content {
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
       }
-      
+
       .skeleton-line {
         height: 1rem;
         background: #e9ecef;
         border-radius: 0.25rem;
       }
-      
+
       .skeleton-line.short {
         width: 60%;
       }
-      
+
       @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
       }
     `}</style>
   </div>
 );
 
-const DefaultErrorFallback: FC<{ error: Error; retry: () => void; componentName?: string }> = ({ 
-  error, 
-  retry, 
-  componentName = 'Component' 
+const DefaultErrorFallback: FC<{ error: Error; retry: () => void; componentName?: string }> = ({
+  error,
+  retry,
+  componentName = 'Component',
 }) => (
-  <div className="lazy-error-fallback" role="alert">
-    <div className="error-icon">⚠️</div>
+  <div className='lazy-error-fallback' role='alert'>
+    <div className='error-icon'>⚠️</div>
     <h3>Failed to load {componentName}</h3>
     <p>Something went wrong while loading this component.</p>
     {DEBUG.checkFeature('PERFORMANCE_MONITORING', 'error-display') && (
-      <details className="error-details">
+      <details className='error-details'>
         <summary>Error Details</summary>
         <pre>{error.message}</pre>
       </details>
     )}
-    <button onClick={retry} className="retry-button">
+    <button onClick={retry} className='retry-button'>
       Try Again
     </button>
     <style jsx>{`
@@ -115,17 +120,17 @@ const DefaultErrorFallback: FC<{ error: Error; retry: () => void; componentName?
         border-radius: 0.5rem;
         color: #742a2a;
       }
-      
+
       .error-icon {
         font-size: 2rem;
         margin-bottom: 1rem;
       }
-      
+
       .error-details {
         margin: 1rem 0;
         text-align: left;
       }
-      
+
       .error-details pre {
         background: #f7fafc;
         padding: 0.5rem;
@@ -133,7 +138,7 @@ const DefaultErrorFallback: FC<{ error: Error; retry: () => void; componentName?
         font-size: 0.875rem;
         overflow-x: auto;
       }
-      
+
       .retry-button {
         background: #e53e3e;
         color: white;
@@ -144,7 +149,7 @@ const DefaultErrorFallback: FC<{ error: Error; retry: () => void; componentName?
         font-size: 0.875rem;
         transition: background-color 0.2s;
       }
-      
+
       .retry-button:hover {
         background: #c53030;
       }
@@ -187,17 +192,21 @@ class LazyErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
-    
+
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
 
     // Log error with debug info
-    DEBUG.logPerformance('lazy-component-error', Math.max(0, performance.now() - this.loadStartTime), {
-      componentName: this.props.componentName,
-      error: error.message,
-      retryCount: this.state.retryCount,
-    });
+    DEBUG.logPerformance(
+      'lazy-component-error',
+      Math.max(0, performance.now() - this.loadStartTime),
+      {
+        componentName: this.props.componentName,
+        error: error.message,
+        retryCount: this.state.retryCount,
+      }
+    );
 
     // Show notification in production
     if (!DEBUG.checkFeature('PERFORMANCE_MONITORING', 'error-boundary')) {
@@ -227,40 +236,47 @@ class LazyErrorBoundary extends Component<
       onRetry(retryCount + 1);
     }
 
-    DEBUG.logPerformance('lazy-component-retry', Math.max(0, performance.now() - this.loadStartTime), {
-      componentName: this.props.componentName,
-      attempt: retryCount + 1,
-    });
+    DEBUG.logPerformance(
+      'lazy-component-retry',
+      Math.max(0, performance.now() - this.loadStartTime),
+      {
+        componentName: this.props.componentName,
+        attempt: retryCount + 1,
+      }
+    );
 
-    this.setState({ 
-      retryCount: retryCount + 1 
+    this.setState({
+      retryCount: retryCount + 1,
     });
 
     // Add delay before retry to prevent rapid retries
-    this.retryTimeoutId = window.setTimeout(() => {
-      this.setState({
-        hasError: false,
-        error: null,
-        errorInfo: null,
-      });
-    }, retryDelay * (retryCount + 1)); // Exponential backoff
+    this.retryTimeoutId = window.setTimeout(
+      () => {
+        this.setState({
+          hasError: false,
+          error: null,
+          errorInfo: null,
+        });
+      },
+      retryDelay * (retryCount + 1)
+    ); // Exponential backoff
   };
 
   render() {
     if (this.state.hasError) {
       const { fallback, componentName } = this.props;
-      
+
       if (typeof fallback === 'function') {
         return fallback(this.state.error!, this.retry);
       }
-      
+
       if (fallback) {
         return fallback;
       }
-      
+
       return (
-        <DefaultErrorFallback 
-          error={this.state.error!} 
+        <DefaultErrorFallback
+          error={this.state.error!}
           retry={this.retry}
           componentName={componentName}
         />
@@ -280,7 +296,7 @@ const TimeoutWrapper: FC<{
 }> = ({ timeout, onTimeout, children, enabled = true }) => {
   useEffect(() => {
     if (!enabled) return;
-    
+
     const timeoutId = window.setTimeout(onTimeout, timeout);
     return () => window.clearTimeout(timeoutId);
   }, [timeout, onTimeout, enabled]);
@@ -351,8 +367,8 @@ export const LazyComponentWrapper: FC<LazyComponentWrapperProps> = ({
         onError={onError}
         onRetry={onRetry}
       >
-        <DefaultErrorFallback 
-          error={timeoutError} 
+        <DefaultErrorFallback
+          error={timeoutError}
           retry={() => setIsTimeout(false)}
           componentName={componentName}
         />
@@ -384,7 +400,7 @@ export function createLazyComponent<P extends {}>(
   options: LazyWrapperOptions & { componentName: string }
 ): React.FC<P> {
   const LazyComponent = lazy(importFunc);
-  
+
   return (props: P) => (
     <LazyComponentWrapper {...options}>
       <LazyComponent {...props} />
@@ -395,9 +411,9 @@ export function createLazyComponent<P extends {}>(
 // Preloader utility
 export class LazyComponentPreloader {
   private static preloadCache = new Map<string, Promise<any>>();
-  
+
   static preload(
-    key: string, 
+    key: string,
     importFunc: () => Promise<any>,
     priority: 'low' | 'medium' | 'high' = 'low'
   ): Promise<any> {
@@ -407,10 +423,10 @@ export class LazyComponentPreloader {
 
     const preloadPromise = this.schedulePreload(importFunc, priority);
     this.preloadCache.set(key, preloadPromise);
-    
+
     return preloadPromise;
   }
-  
+
   private static schedulePreload(
     importFunc: () => Promise<any>,
     priority: 'low' | 'medium' | 'high'
@@ -420,21 +436,23 @@ export class LazyComponentPreloader {
       medium: 100,
       low: 500,
     };
-    
-    return new Promise((resolve) => {
+
+    return new Promise(resolve => {
       setTimeout(() => {
-        importFunc().then(resolve).catch((error) => {
-          console.warn('Preload failed:', error);
-          resolve(null);
-        });
+        importFunc()
+          .then(resolve)
+          .catch(error => {
+            console.warn('Preload failed:', error);
+            resolve(null);
+          });
       }, delays[priority]);
     });
   }
-  
+
   static clearCache(): void {
     this.preloadCache.clear();
   }
-  
+
   static getCacheStatus(): Array<{ key: string; loaded: boolean }> {
     return Array.from(this.preloadCache.entries()).map(([key, promise]) => ({
       key,
@@ -469,15 +487,15 @@ export const useLazyComponent = <P extends {}>(
 
   useEffect(() => {
     let mounted = true;
-    
+
     importFunc()
-      .then((module) => {
+      .then(module => {
         if (mounted) {
           setLoadedComponent(() => module.default);
           setLoading(false);
         }
       })
-      .catch((err) => {
+      .catch(err => {
         if (mounted) {
           setError(err);
           setLoading(false);
@@ -489,33 +507,36 @@ export const useLazyComponent = <P extends {}>(
     };
   }, []);
 
-  const WrappedComponent = useCallback((props: P) => {
-    if (loading) {
-      return <>{options.fallback || <DefaultLoadingSkeleton />}</>;
-    }
-    
-    if (error || !LoadedComponent) {
+  const WrappedComponent = useCallback(
+    (props: P) => {
+      if (loading) {
+        return <>{options.fallback || <DefaultLoadingSkeleton />}</>;
+      }
+
+      if (error || !LoadedComponent) {
+        return (
+          <DefaultErrorFallback
+            error={error || new Error('Component failed to load')}
+            retry={() => window.location.reload()}
+            componentName={options.componentName}
+          />
+        );
+      }
+
       return (
-        <DefaultErrorFallback 
-          error={error || new Error('Component failed to load')} 
-          retry={() => window.location.reload()}
-          componentName={options.componentName}
-        />
+        <LazyComponentWrapper {...options}>
+          <LoadedComponent {...props} />
+        </LazyComponentWrapper>
       );
-    }
+    },
+    [LoadedComponent, loading, error, options]
+  );
 
-    return (
-      <LazyComponentWrapper {...options}>
-        <LoadedComponent {...props} />
-      </LazyComponentWrapper>
-    );
-  }, [LoadedComponent, loading, error, options]);
-
-  return { 
-    Component: WrappedComponent, 
-    loading, 
+  return {
+    Component: WrappedComponent,
+    loading,
     error,
-    preload: () => LazyComponentPreloader.preload(options.componentName, importFunc)
+    preload: () => LazyComponentPreloader.preload(options.componentName, importFunc),
   };
 };
 

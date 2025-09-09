@@ -33,13 +33,13 @@ export interface TaskTemplate {
   tags: string[];
   learningObjectives: string[];
   prerequisites: string[];
-  
+
   // Task Configuration
   steps: TaskStep[];
   components: ComponentDefinition[];
   constraints: TaskConstraint[];
   evaluation: EvaluationCriteria;
-  
+
   // Metadata
   author: string;
   version: string;
@@ -120,12 +120,12 @@ export interface TaskPlugin {
   version: string;
   author: string;
   description: string;
-  
+
   // Plugin capabilities
   providesComponents: ComponentDefinition[];
   providesTemplates: TaskTemplate[];
   providesValidators: CustomValidator[];
-  
+
   // Plugin hooks
   onTaskStart?: (task: TaskTemplate) => void;
   onTaskComplete?: (task: TaskTemplate, result: TaskResult) => void;
@@ -167,11 +167,11 @@ export interface TaskResult {
   startTime: Date;
   endTime: Date;
   duration: number;
-  
+
   design: DesignData;
   evaluation: EvaluationResult;
   feedback: ValidationFeedback[];
-  
+
   metadata: {
     attempts: number;
     hintsUsed: string[];
@@ -208,17 +208,17 @@ export class TaskPluginManager {
    */
   registerPlugin(plugin: TaskPlugin): void {
     this.plugins.set(plugin.id, plugin);
-    
+
     // Register components
     plugin.providesComponents.forEach(component => {
       this.components.set(component.id, component);
     });
-    
+
     // Register templates
     plugin.providesTemplates.forEach(template => {
       this.templates.set(template.id, template);
     });
-    
+
     // Register validators
     plugin.providesValidators.forEach(validator => {
       this.validators.set(validator.id, validator);
@@ -239,9 +239,7 @@ export class TaskPluginManager {
    */
   getTemplatesByCategory(category?: string): TaskTemplate[] {
     const templates = Array.from(this.templates.values());
-    return category 
-      ? templates.filter(t => t.category === category)
-      : templates;
+    return category ? templates.filter(t => t.category === category) : templates;
   }
 
   /**
@@ -261,7 +259,7 @@ export class TaskPluginManager {
         isValid: false,
         score: 0,
         feedback: [{ type: 'error', message: 'Task template not found', severity: 10 }],
-        suggestions: []
+        suggestions: [],
       };
     }
 
@@ -269,12 +267,12 @@ export class TaskPluginManager {
       task: template,
       components: design.components,
       connections: design.connections,
-      userInput: design.properties
+      userInput: design.properties,
     };
 
     // Run built-in validation
     const builtInResult = await this.runBuiltInValidation(template, design, context);
-    
+
     // Run custom validators
     const customResults = await Promise.all(
       template.steps
@@ -287,24 +285,26 @@ export class TaskPluginManager {
   }
 
   private async runBuiltInValidation(
-    template: TaskTemplate, 
-    design: DesignData, 
+    template: TaskTemplate,
+    design: DesignData,
     context: ValidationContext
   ): Promise<ValidationResult> {
     const feedback: ValidationFeedback[] = [];
     let score = 100;
 
     // Check required steps completion
-    template.steps.filter(step => step.required).forEach(step => {
-      if (!this.isStepCompleted(step, design)) {
-        feedback.push({
-          type: 'error',
-          message: `Required step "${step.title}" is not completed`,
-          severity: 8
-        });
-        score -= 20;
-      }
-    });
+    template.steps
+      .filter(step => step.required)
+      .forEach(step => {
+        if (!this.isStepCompleted(step, design)) {
+          feedback.push({
+            type: 'error',
+            message: `Required step "${step.title}" is not completed`,
+            severity: 8,
+          });
+          score -= 20;
+        }
+      });
 
     // Check constraints
     template.constraints.forEach(constraint => {
@@ -313,7 +313,7 @@ export class TaskPluginManager {
         feedback.push({
           type: severity as any,
           message: constraint.description,
-          severity: constraint.enforcement === 'hard' ? 9 : 5
+          severity: constraint.enforcement === 'hard' ? 9 : 5,
         });
         if (constraint.enforcement === 'hard') score -= 15;
       }
@@ -323,13 +323,13 @@ export class TaskPluginManager {
       isValid: feedback.filter(f => f.type === 'error').length === 0,
       score: Math.max(0, score),
       feedback,
-      suggestions: this.generateSuggestions(template, design)
+      suggestions: this.generateSuggestions(template, design),
     };
   }
 
   private async runStepValidation(
-    step: TaskStep, 
-    design: DesignData, 
+    step: TaskStep,
+    design: DesignData,
     context: ValidationContext
   ): Promise<ValidationResult> {
     if (!step.validation) {
@@ -344,7 +344,7 @@ export class TaskPluginManager {
         feedback.push({
           type: rule.severity,
           message: rule.message,
-          severity: rule.severity === 'error' ? 8 : rule.severity === 'warning' ? 5 : 3
+          severity: rule.severity === 'error' ? 8 : rule.severity === 'warning' ? 5 : 3,
         });
         if (rule.severity === 'error') score -= 25;
       }
@@ -354,7 +354,7 @@ export class TaskPluginManager {
       isValid: feedback.filter(f => f.type === 'error').length === 0,
       score: Math.max(0, score),
       feedback,
-      suggestions: []
+      suggestions: [],
     };
   }
 
@@ -368,7 +368,7 @@ export class TaskPluginManager {
       isValid,
       score: averageScore,
       feedback: allFeedback,
-      suggestions: allSuggestions
+      suggestions: allSuggestions,
     };
   }
 
@@ -400,7 +400,11 @@ export class TaskPluginManager {
     }
   }
 
-  private checkValidationRule(rule: ValidationRule, design: DesignData, context: ValidationContext): boolean {
+  private checkValidationRule(
+    rule: ValidationRule,
+    design: DesignData,
+    context: ValidationContext
+  ): boolean {
     switch (rule.type) {
       case 'component-count':
         const expectedCount = parseInt(rule.condition);
@@ -423,14 +427,14 @@ export class TaskPluginManager {
 
   private generateSuggestions(template: TaskTemplate, design: DesignData): string[] {
     const suggestions: string[] = [];
-    
+
     // Generate contextual suggestions based on current design state
     if (design.components.length === 0) {
-      suggestions.push("Start by adding components from the palette");
+      suggestions.push('Start by adding components from the palette');
     }
-    
+
     if (design.connections.length === 0 && design.components.length > 1) {
-      suggestions.push("Connect your components to show data flow");
+      suggestions.push('Connect your components to show data flow');
     }
 
     return suggestions;

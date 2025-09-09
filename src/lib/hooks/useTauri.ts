@@ -34,13 +34,16 @@ export const useWindow = () => {
     }
   }, [isRunningInTauri]);
 
-  const setTitle = useCallback((title: string) => {
-    if (isRunningInTauri) {
-      windowUtils.setTitle(title);
-    } else {
-      document.title = title;
-    }
-  }, [isRunningInTauri]);
+  const setTitle = useCallback(
+    (title: string) => {
+      if (isRunningInTauri) {
+        windowUtils.setTitle(title);
+      } else {
+        document.title = title;
+      }
+    },
+    [isRunningInTauri]
+  );
 
   return {
     minimize,
@@ -84,7 +87,7 @@ export const useTauriState = <T>(initialState: T, eventName?: string) => {
     let unlisten: (() => void) | undefined;
 
     const setupListener = async () => {
-      unlisten = await listen<T>(eventName, (payload) => {
+      unlisten = await listen<T>(eventName, payload => {
         setState(payload);
       });
     };
@@ -104,7 +107,7 @@ export const useTauriState = <T>(initialState: T, eventName?: string) => {
 // Hook for file operations
 export const useFile = () => {
   const { invoke } = useIPC();
-  
+
   const selectFile = useCallback(async (): Promise<string | null> => {
     return invoke<string | null>('select_file');
   }, [invoke]);
@@ -113,13 +116,19 @@ export const useFile = () => {
     return invoke<string | null>('select_directory');
   }, [invoke]);
 
-  const readFile = useCallback(async (path: string): Promise<string> => {
-    return invoke<string>('read_file', { path });
-  }, [invoke]);
+  const readFile = useCallback(
+    async (path: string): Promise<string> => {
+      return invoke<string>('read_file', { path });
+    },
+    [invoke]
+  );
 
-  const writeFile = useCallback(async (path: string, content: string): Promise<void> => {
-    return invoke<void>('write_file', { path, content });
-  }, [invoke]);
+  const writeFile = useCallback(
+    async (path: string, content: string): Promise<void> => {
+      return invoke<void>('write_file', { path, content });
+    },
+    [invoke]
+  );
 
   return {
     selectFile,
@@ -133,21 +142,33 @@ export const useFile = () => {
 export const useProject = () => {
   const { invoke } = useIPC();
 
-  const createProject = useCallback(async (name: string, path: string): Promise<void> => {
-    return invoke<void>('create_project', { name, path });
-  }, [invoke]);
+  const createProject = useCallback(
+    async (name: string, path: string): Promise<void> => {
+      return invoke<void>('create_project', { name, path });
+    },
+    [invoke]
+  );
 
-  const openProject = useCallback(async (path: string): Promise<any> => {
-    return invoke<any>('open_project', { path });
-  }, [invoke]);
+  const openProject = useCallback(
+    async (path: string): Promise<any> => {
+      return invoke<any>('open_project', { path });
+    },
+    [invoke]
+  );
 
-  const saveProject = useCallback(async (projectData: any): Promise<void> => {
-    return invoke<void>('save_project', { data: projectData });
-  }, [invoke]);
+  const saveProject = useCallback(
+    async (projectData: any): Promise<void> => {
+      return invoke<void>('save_project', { data: projectData });
+    },
+    [invoke]
+  );
 
-  const exportProject = useCallback(async (projectData: any, format: string): Promise<void> => {
-    return invoke<void>('export_project', { data: projectData, format });
-  }, [invoke]);
+  const exportProject = useCallback(
+    async (projectData: any, format: string): Promise<void> => {
+      return invoke<void>('export_project', { data: projectData, format });
+    },
+    [invoke]
+  );
 
   return {
     createProject,

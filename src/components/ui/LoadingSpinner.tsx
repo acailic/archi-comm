@@ -19,12 +19,12 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   variant = 'spinner',
   color = 'currentColor',
   message,
-  className = ''
+  className = '',
 }) => {
   const sizeClasses = {
     small: 'w-4 h-4',
     medium: 'w-8 h-8',
-    large: 'w-12 h-12'
+    large: 'w-12 h-12',
   };
 
   const containerClasses = `inline-flex flex-col items-center justify-center ${className}`;
@@ -54,7 +54,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mt-3 text-sm text-gray-600 dark:text-gray-400 text-center"
+          className='mt-3 text-sm text-gray-600 dark:text-gray-400 text-center'
         >
           {message}
         </motion.div>
@@ -72,41 +72,44 @@ const SpinnerVariant: React.FC<{ size: string; color: string }> = ({ size, color
     transition={{
       duration: 1,
       repeat: Infinity,
-      ease: "linear"
+      ease: 'linear',
     }}
   />
 );
 
 // Animated dots
-const DotsVariant: React.FC<{ size: 'small' | 'medium' | 'large'; color: string }> = ({ size, color }) => {
+const DotsVariant: React.FC<{ size: 'small' | 'medium' | 'large'; color: string }> = ({
+  size,
+  color,
+}) => {
   const dotSize = {
     small: 'w-1.5 h-1.5',
     medium: 'w-2 h-2',
-    large: 'w-3 h-3'
+    large: 'w-3 h-3',
   };
 
   const containerSize = {
     small: 'space-x-1',
     medium: 'space-x-1.5',
-    large: 'space-x-2'
+    large: 'space-x-2',
   };
 
   return (
     <div className={`flex items-center ${containerSize[size]}`}>
-      {[0, 1, 2].map((index) => (
+      {[0, 1, 2].map(index => (
         <motion.div
           key={index}
           className={`${dotSize[size]} rounded-full`}
           style={{ backgroundColor: color }}
           animate={{
             scale: [1, 1.2, 1],
-            opacity: [0.7, 1, 0.7]
+            opacity: [0.7, 1, 0.7],
           }}
           transition={{
             duration: 0.6,
             repeat: Infinity,
             delay: index * 0.1,
-            ease: "easeInOut"
+            ease: 'easeInOut',
           }}
         />
       ))}
@@ -121,51 +124,54 @@ const PulseVariant: React.FC<{ size: string; color: string }> = ({ size, color }
     style={{ backgroundColor: color }}
     animate={{
       scale: [1, 1.2, 1],
-      opacity: [0.7, 1, 0.7]
+      opacity: [0.7, 1, 0.7],
     }}
     transition={{
       duration: 1.5,
       repeat: Infinity,
-      ease: "easeInOut"
+      ease: 'easeInOut',
     }}
   />
 );
 
 // Wave animation
-const WaveVariant: React.FC<{ size: 'small' | 'medium' | 'large'; color: string }> = ({ size, color }) => {
+const WaveVariant: React.FC<{ size: 'small' | 'medium' | 'large'; color: string }> = ({
+  size,
+  color,
+}) => {
   const barHeight = {
     small: 'h-6',
     medium: 'h-8',
-    large: 'h-12'
+    large: 'h-12',
   };
 
   const barWidth = {
     small: 'w-1',
     medium: 'w-1.5',
-    large: 'w-2'
+    large: 'w-2',
   };
 
   const spacing = {
     small: 'space-x-1',
     medium: 'space-x-1.5',
-    large: 'space-x-2'
+    large: 'space-x-2',
   };
 
   return (
     <div className={`flex items-end ${spacing[size]}`}>
-      {[0, 1, 2, 3, 4].map((index) => (
+      {[0, 1, 2, 3, 4].map(index => (
         <motion.div
           key={index}
           className={`${barWidth[size]} ${barHeight[size]} rounded-sm`}
           style={{ backgroundColor: color }}
           animate={{
-            scaleY: [0.4, 1, 0.4]
+            scaleY: [0.4, 1, 0.4],
           }}
           transition={{
             duration: 0.8,
             repeat: Infinity,
             delay: index * 0.1,
-            ease: "easeInOut"
+            ease: 'easeInOut',
           }}
         />
       ))}
@@ -178,48 +184,48 @@ const ArchitectureVariant: React.FC<{ size: string; color: string }> = ({ size, 
   <div className={`${size} relative`}>
     {/* Building blocks animation */}
     <motion.div
-      className="absolute inset-0 border-2 border-current rounded-sm"
+      className='absolute inset-0 border-2 border-current rounded-sm'
       style={{ color }}
       animate={{
         borderRadius: ['2px', '8px', '2px'],
-        scale: [1, 1.05, 1]
+        scale: [1, 1.05, 1],
       }}
       transition={{
         duration: 2,
         repeat: Infinity,
-        ease: "easeInOut"
+        ease: 'easeInOut',
       }}
     />
-    
+
     {/* Inner components */}
     <motion.div
-      className="absolute inset-2 border border-current rounded-sm opacity-70"
+      className='absolute inset-2 border border-current rounded-sm opacity-70'
       style={{ color }}
       animate={{
         scale: [0.8, 1, 0.8],
-        opacity: [0.4, 0.8, 0.4]
+        opacity: [0.4, 0.8, 0.4],
       }}
       transition={{
         duration: 1.5,
         repeat: Infinity,
         delay: 0.3,
-        ease: "easeInOut"
+        ease: 'easeInOut',
       }}
     />
-    
+
     {/* Connection lines */}
     <motion.div
-      className="absolute top-1/2 left-1/2 w-1 h-1 bg-current rounded-full transform -translate-x-1/2 -translate-y-1/2"
+      className='absolute top-1/2 left-1/2 w-1 h-1 bg-current rounded-full transform -translate-x-1/2 -translate-y-1/2'
       style={{ backgroundColor: color }}
       animate={{
         scale: [1, 1.5, 1],
-        opacity: [1, 0.5, 1]
+        opacity: [1, 0.5, 1],
       }}
       transition={{
         duration: 1,
         repeat: Infinity,
         delay: 0.5,
-        ease: "easeInOut"
+        ease: 'easeInOut',
       }}
     />
   </div>
@@ -231,19 +237,14 @@ export const LoadingOverlay: React.FC<{
   message?: string;
   variant?: LoadingSpinnerProps['variant'];
   backdrop?: 'blur' | 'dark' | 'light' | 'transparent';
-}> = ({ 
-  isLoading, 
-  message = 'Loading...', 
-  variant = 'architecture',
-  backdrop = 'blur' 
-}) => {
+}> = ({ isLoading, message = 'Loading...', variant = 'architecture', backdrop = 'blur' }) => {
   if (!isLoading) return null;
 
   const backdropClasses = {
     blur: 'backdrop-blur-sm bg-white/80 dark:bg-gray-900/80',
     dark: 'bg-gray-900/90',
     light: 'bg-white/90',
-    transparent: 'bg-transparent'
+    transparent: 'bg-transparent',
   };
 
   return (
@@ -258,14 +259,9 @@ export const LoadingOverlay: React.FC<{
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
         transition={{ delay: 0.1 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-sm mx-4 text-center border border-gray-200 dark:border-gray-700"
+        className='bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-sm mx-4 text-center border border-gray-200 dark:border-gray-700'
       >
-        <LoadingSpinner
-          size="large"
-          variant={variant}
-          message={message}
-          color="#3b82f6"
-        />
+        <LoadingSpinner size='large' variant={variant} message={message} color='#3b82f6' />
       </motion.div>
     </motion.div>
   );
@@ -280,22 +276,22 @@ export const SkeletonLoader: React.FC<{
   return (
     <div className={`animate-pulse ${className}`}>
       {avatar && (
-        <div className="flex items-center space-x-4 mb-4">
-          <div className="w-12 h-12 bg-gray-300 dark:bg-gray-600 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/3" />
-            <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-1/4" />
+        <div className='flex items-center space-x-4 mb-4'>
+          <div className='w-12 h-12 bg-gray-300 dark:bg-gray-600 rounded-full' />
+          <div className='flex-1 space-y-2'>
+            <div className='h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/3' />
+            <div className='h-3 bg-gray-300 dark:bg-gray-600 rounded w-1/4' />
           </div>
         </div>
       )}
-      
-      <div className="space-y-3">
+
+      <div className='space-y-3'>
         {Array.from({ length: lines }).map((_, index) => (
           <div
             key={index}
-            className="h-4 bg-gray-300 dark:bg-gray-600 rounded"
+            className='h-4 bg-gray-300 dark:bg-gray-600 rounded'
             style={{
-              width: `${Math.random() * 40 + 60}%`
+              width: `${Math.random() * 40 + 60}%`,
             }}
           />
         ))}
@@ -312,18 +308,18 @@ export const ProgressBar: React.FC<{
   color?: string;
   height?: 'thin' | 'medium' | 'thick';
   className?: string;
-}> = ({ 
-  progress, 
-  message, 
+}> = ({
+  progress,
+  message,
   showPercentage = false,
   color = '#3b82f6',
   height = 'medium',
-  className = ''
+  className = '',
 }) => {
   const heightClasses = {
     thin: 'h-1',
     medium: 'h-2',
-    thick: 'h-3'
+    thick: 'h-3',
   };
 
   const clampedProgress = Math.min(Math.max(progress, 0), 100);
@@ -331,19 +327,21 @@ export const ProgressBar: React.FC<{
   return (
     <div className={`w-full ${className}`}>
       {(message || showPercentage) && (
-        <div className="flex justify-between items-center mb-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className='flex justify-between items-center mb-2 text-sm text-gray-600 dark:text-gray-400'>
           {message && <span>{message}</span>}
           {showPercentage && <span>{Math.round(clampedProgress)}%</span>}
         </div>
       )}
-      
-      <div className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full ${heightClasses[height]} overflow-hidden`}>
+
+      <div
+        className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full ${heightClasses[height]} overflow-hidden`}
+      >
         <motion.div
-          className="h-full rounded-full"
+          className='h-full rounded-full'
           style={{ backgroundColor: color }}
           initial={{ width: '0%' }}
           animate={{ width: `${clampedProgress}%` }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
         />
       </div>
     </div>
@@ -383,6 +381,6 @@ export const useLoadingState = (initialState = false) => {
     startLoading,
     updateProgress,
     finishLoading,
-    setLoading: setIsLoading
+    setLoading: setIsLoading,
   };
 };

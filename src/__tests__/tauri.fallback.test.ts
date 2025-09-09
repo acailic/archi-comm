@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Ensure no Tauri env
-declare global { interface Window { __TAURI__?: any } }
+declare global {
+  interface Window {
+    __TAURI__?: any;
+  }
+}
 
 beforeEach(() => {
   (window as any).__TAURI__ = undefined;
@@ -37,4 +41,3 @@ describe('tauri.ts fallback (non-Tauri env)', () => {
     warn.mockRestore();
   });
 });
-

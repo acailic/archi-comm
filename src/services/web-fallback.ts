@@ -4,12 +4,13 @@
  */
 
 import { CONFIG } from '../lib/environment';
+import type { DesignData } from '@/shared/contracts';
 
 // Types for web fallback implementations
 export interface WebProject {
   id: string;
   name: string;
-  data: any;
+  data: DesignData;
   lastModified: number;
   version: number;
 }
@@ -42,7 +43,7 @@ export class WebProjectManager {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (!stored) return [];
-      
+
       const projects = JSON.parse(stored) as WebProject[];
       return projects.sort((a, b) => b.lastModified - a.lastModified);
     } catch (error) {
@@ -58,7 +59,7 @@ export class WebProjectManager {
     try {
       const projects = await this.getProjects();
       const existingIndex = projects.findIndex(p => p.id === project.id);
-      
+
       const updatedProject: WebProject = {
         ...project,
         lastModified: Date.now(),
@@ -69,7 +70,7 @@ export class WebProjectManager {
         projects[existingIndex] = updatedProject;
       } else {
         projects.unshift(updatedProject);
-        
+
         // Limit number of stored projects
         if (projects.length > this.MAX_PROJECTS) {
           projects.splice(this.MAX_PROJECTS);
@@ -128,10 +129,14 @@ export class WebFileManager {
   /**
    * Save data as a downloadable file
    */
-  async saveFile(filename: string, data: string | Blob, type: string = 'text/plain'): Promise<boolean> {
+  async saveFile(
+    filename: string,
+    data: string | Blob,
+    type: string = 'text/plain'
+  ): Promise<boolean> {
     try {
       const blob = typeof data === 'string' ? new Blob([data], { type }) : data;
-      
+
       if (blob.size > CONFIG.MAX_FILE_SIZE) {
         throw new Error(`File too large: ${blob.size} bytes (max: ${CONFIG.MAX_FILE_SIZE})`);
       }
@@ -140,11 +145,11 @@ export class WebFileManager {
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
-      
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       URL.revokeObjectURL(url);
       return true;
     } catch (error) {
@@ -162,8 +167,8 @@ export class WebFileManager {
       input.type = 'file';
       if (accept) input.accept = accept;
 
-      return new Promise((resolve) => {
-        input.onchange = async (event) => {
+      return new Promise(resolve => {
+        input.onchange = async event => {
           const file = (event.target as HTMLInputElement).files?.[0];
           if (!file) {
             resolve(null);
@@ -200,7 +205,7 @@ export class WebFileManager {
   /**
    * Export data as JSON file
    */
-  async exportJSON(filename: string, data: any): Promise<boolean> {
+  async exportJSON<T>(filename: string, data: T): Promise<boolean> {
     try {
       const json = JSON.stringify(data, null, 2);
       return await this.saveFile(`${filename}.json`, json, 'application/json');
@@ -213,12 +218,12 @@ export class WebFileManager {
   /**
    * Import JSON file
    */
-  async importJSON(): Promise<any | null> {
+  async importJSON<T = unknown>(): Promise<T | null> {
     try {
       const result = await this.openFile('.json,application/json');
       if (!result) return null;
 
-      return JSON.parse(result.content);
+      return JSON.parse(result.content) as T;
     } catch (error) {
       console.error('Failed to import JSON:', error);
       return null;
@@ -377,7 +382,7 @@ export class WebAutoSave {
       try {
         const data = getData();
         const serialized = JSON.stringify(data);
-        
+
         // Only save if data has changed
         if (serialized !== this.lastSaveData) {
           localStorage.setItem(this.STORAGE_KEY, serialized);

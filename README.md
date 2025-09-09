@@ -1,20 +1,45 @@
 <div align="center">
 
-<img src="src-tauri/icons/128x128@2x.png" width="110" height="110">
+<img src="src-tauri/icons/128x128@2x.png" width="110" height="110" alt="ArchiComm logo">
 
 # ArchiComm Community Edition
 ### A desktop companion for learning and practicing system design
 
-[![Tauri](https://img.shields.io/badge/Desktop-Tauri-FFC131?logo=tauri&logoColor=white)](https://tauri.app)
-[![React](https://img.shields.io/badge/UI-React-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/Lang-TypeScript-2f74c0?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+<!-- Quality & Ecosystem Badges -->
+<a href="https://github.com/acailic/archi-comm/actions/workflows/ci.yml"><img alt="Build" src="https://github.com/acailic/archi-comm/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+<a href="https://github.com/acailic/archi-comm/actions/workflows/coverage.yml"><img alt="Coverage" src="https://github.com/acailic/archi-comm/actions/workflows/coverage.yml/badge.svg?branch=main"></a>
+<a href="https://github.com/acailic/archi-comm/actions/workflows/security.yml"><img alt="Security" src="https://github.com/acailic/archi-comm/actions/workflows/security.yml/badge.svg?branch=main"></a>
+<a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+<img alt="Version" src="https://img.shields.io/badge/version-0.2.1-blue.svg">
+<img alt="Node >=18" src="https://img.shields.io/badge/node-%3E%3D18.0.0-339933?logo=node.js&logoColor=white">
+<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
+<img alt="Prettier" src="https://img.shields.io/badge/code_style-Prettier-ff69b4?logo=prettier&logoColor=white">
+<a href="https://tauri.app"><img alt="Tauri" src="https://img.shields.io/badge/Desktop-Tauri-FFC131?logo=tauri&logoColor=white"></a>
+<a href="https://react.dev"><img alt="React" src="https://img.shields.io/badge/UI-React-61DAFB?logo=react&logoColor=white"></a>
 
 
 Learn, practice, and teach system design fundamentals through guided scenarios, interactive diagrams, and repeatable exercises. This is the Community Edition, focused on core features for learners and interview practice. Upgrade to ArchiComm Pro for advanced features.
 
-[Get Started](#quick-start) • [Why ArchiComm](#why-archicomm) • [Study Flow](#study-flow) • [Modules](#study-modules) • [Pro Version](#archicomm-pro)
-
 </div>
+
+---
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Why ArchiComm Community Edition](#why-archicomm-community-edition)
+- [Study Flow](#study-flow)
+- [Community Edition Features](#community-edition-features)
+- [Audio Features](#audio-features-community-edition)
+- [Study Modules](#study-modules)
+- [Canvas System Overview](#canvas-system-overview)
+- [System Design Practice Workflow](#system-design-practice-workflow)
+- [Tech Stack](#tech-stack)
+- [Architecture Guide](#architecture-guide)
+- [API Reference](#api-reference)
+- [Contributing](#contributing)
+- [ArchiComm Pro](#archicomm-pro)
+- [License](#license)
 
 ---
 
@@ -44,6 +69,13 @@ npm run dev   # or: npm start
 Build binaries: `npm run build` (Tauri bundles for your OS).
 
 ---
+
+## Architecture Guide
+
+For a deeper dive into the system and developer guidance, see the Architecture Guide.
+
+- Architecture overview, canvas internals, and performance: `docs/ARCHITECTURE.md`
+- APIs for components, hooks, and services: `docs/API_REFERENCE.md`
 
 ## Study Flow
 
@@ -118,6 +150,30 @@ ArchiComm Community Edition loads "Tasks" (study modules) that define prompts, a
 
 - Structure and examples: [src/docs/SystemDesignPractice.md](src/docs/SystemDesignPractice.md)
 - Create a task: add a `task.json` under `src/lib/tasks/plugins/<your-task>/` and export it from `src/lib/tasks/index.ts`
+
+---
+
+## Canvas System Overview
+
+- Three-layer architecture: `DesignCanvas` (orchestration), `CanvasArea` (viewport + interactions), `CanvasComponent` (node rendering)
+- Performance manager: `CanvasPerformanceManager` tracks FPS, render time, memory; optimizes via batching and culling
+- Persistence: Tauri-backed JSON files in `$APPDATA/archicomm/projects/<id>.json` with web fallbacks
+
+### Keyboard Shortcuts
+- V: Select, H: Pan, Z: Zoom, A: Annotate
+- Space + Drag: Pan viewport
+- Ctrl/Cmd+A: Select all; Del/Backspace: Delete
+- Arrow keys: Nudge; Ctrl/Cmd+Arrow: Fine nudge
+
+### Task Plugins
+- Plugins live under `src/lib/task-system/plugins/<task-id>`
+- Example: `url-shortener` with `task.json` and `assets/`
+- Loaded via `src/lib/task-system/templates/index.ts`
+
+### Developer Diagnostics
+- `DeveloperDiagnosticsPage` shows live canvas metrics (FPS, score, workers, memory)
+- Export diagnostics as JSON for debugging
+
 - Optional assets: diagrams, seed data, or reference links
 
 Example scenarios included:
@@ -237,7 +293,15 @@ Press `?` in the app for the full list.
 
 - Desktop shell: Tauri (Rust)
 - UI: React + TypeScript, Radix UI, Tailwind
+- Bundler/Dev: Vite
+- Testing: Vitest (unit/integration) + Playwright (E2E)
 - Canvas and interactions: custom canvas engine, Motion/Framer animations
+
+Useful scripts:
+- `npm run dev` — web dev server (Vite)
+- `npm run tauri:dev` — desktop dev shell
+- `npm run test:coverage` — generate coverage report
+- `npm run e2e` — run Playwright tests locally
 
 ---
 
@@ -245,19 +309,16 @@ Press `?` in the app for the full list.
 
 We welcome improvements to modules, patterns, checklists, and study flows for the Community Edition.
 
-```bash
-git clone https://github.com/acailic/archicomm.git
-cd archicomm
-npm install
-npm run dev
-```
+- Start here: `CONTRIBUTING.md` for a quick start checklist, local dev workflow, and PR standards
+- Explore the architecture: `docs/ARCHITECTURE.md`
+- Consult the API reference: `docs/API_REFERENCE.md`
 
 Ideas that help learners most:
 - New study modules with clear acceptance criteria and hints
 - Trade-off explorers (e.g., sharding vs. hashing strategies)
 - Estimation worksheets and rubric improvements
 - Better exports (ADR templates, interview scorecards)
-- Audio and speech-to-text enhancements (see [TODO.md](TODO.md))
+- Audio and speech-to-text enhancements (see `TODO.md`)
 
 
 ---

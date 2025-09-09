@@ -4,7 +4,11 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react';
-import { getGlobalShortcutManager, KeyboardShortcutManager, ShortcutConfig } from '../lib/shortcuts/KeyboardShortcuts';
+import {
+  getGlobalShortcutManager,
+  KeyboardShortcutManager,
+  ShortcutConfig,
+} from '../lib/shortcuts/KeyboardShortcuts';
 import { isTauriEnvironment, DEBUG, FEATURES } from '../lib/environment';
 import { webNotificationManager } from '../services/web-fallback';
 
@@ -26,8 +30,19 @@ export interface GlobalShortcutHandlers {
 
 export interface ShortcutTrackingCallbacks {
   trackKeyboardShortcut?: (shortcut: string, action: string, success: boolean) => void;
-  trackShortcutUsage?: (action: string, success: boolean, duration: number, category: string) => void;
-  trackWorkflowAction?: (action: string, duration: number, success: boolean, context: string, metadata?: any) => void;
+  trackShortcutUsage?: (
+    action: string,
+    success: boolean,
+    duration: number,
+    category: string
+  ) => void;
+  trackWorkflowAction?: (
+    action: string,
+    duration: number,
+    success: boolean,
+    context: string,
+    metadata?: any
+  ) => void;
 }
 
 export interface UseGlobalShortcutsOptions {
@@ -52,14 +67,10 @@ export interface UseGlobalShortcutsReturn {
 /**
  * Hook for managing global keyboard shortcuts with environment awareness
  */
-export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGlobalShortcutsReturn => {
-  const {
-    handlers,
-    tracking,
-    currentScreen = '',
-    selectedChallenge,
-    disabled = false,
-  } = options;
+export const useGlobalShortcuts = (
+  options: UseGlobalShortcutsOptions
+): UseGlobalShortcutsReturn => {
+  const { handlers, tracking, currentScreen = '', selectedChallenge, disabled = false } = options;
 
   const managerRef = useRef<KeyboardShortcutManager | null>(null);
   // Track unregister functions to avoid key reconstruction issues
@@ -73,7 +84,7 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
     }
 
     managerRef.current = getGlobalShortcutManager();
-    
+
     if (managerRef.current) {
       const t0 = performance.now();
       DEBUG.logPerformance('shortcuts-initialized', Math.max(0, performance.now() - t0), {
@@ -84,7 +95,7 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
 
     return () => {
       // Unregister everything exactly once
-      unregisterSetRef.current.forEach((unregister) => {
+      unregisterSetRef.current.forEach(unregister => {
         try {
           unregister();
         } catch (e) {
@@ -96,80 +107,79 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
   }, []);
 
   // Helper function for registering shortcuts with tracking
-  const registerShortcut = useCallback((config: ShortcutConfig): () => boolean => {
-    if (!managerRef.current) {
-      console.warn('Shortcut manager not available');
-      return () => false;
-    }
-
-    const originalAction = config.action;
-    const enhancedAction = async (event?: KeyboardEvent) => {
-      const startTime = performance.now();
-      let success = true;
-      let error: Error | null = null;
-
-      try {
-        await originalAction(event);
-        
-        // Track successful shortcut usage
-        if (tracking?.trackKeyboardShortcut) {
-          const shortcutDisplay = `${config.modifiers?.join('+')}+${config.key}`;
-          tracking.trackKeyboardShortcut(shortcutDisplay, config.description, true);
-        }
-
-        if (tracking?.trackShortcutUsage) {
-          const duration = performance.now() - startTime;
-          tracking.trackShortcutUsage(config.description, true, duration, config.category);
-        }
-
-        if (tracking?.trackWorkflowAction) {
-          const duration = performance.now() - startTime;
-          tracking.trackWorkflowAction(
-            `shortcut_${config.key}`, 
-            duration, 
-            true, 
-            currentScreen,
-            { shortcut: config.description, category: config.category }
-          );
-        }
-
-      } catch (err) {
-        success = false;
-        error = err as Error;
-        console.error(`Shortcut execution failed for ${config.description}:`, err);
-
-        // Track failed shortcut usage
-        if (tracking?.trackKeyboardShortcut) {
-          const shortcutDisplay = `${config.modifiers?.join('+')}+${config.key}`;
-          tracking.trackKeyboardShortcut(shortcutDisplay, config.description, false);
-        }
-
-        // Show error notification if available
-        if (FEATURES.NOTIFICATIONS) {
-          await webNotificationManager.showNotification({
-            title: 'Shortcut Error',
-            body: `Failed to execute: ${config.description}`,
-          });
-        }
+  const registerShortcut = useCallback(
+    (config: ShortcutConfig): (() => boolean) => {
+      if (!managerRef.current) {
+        console.warn('Shortcut manager not available');
+        return () => false;
       }
 
-      DEBUG.logPerformance(`shortcut-${config.key}`, Math.max(0, performance.now() - startTime), { 
-        success, 
-        error: error?.message 
-      });
-    };
+      const originalAction = config.action;
+      const enhancedAction = async (event?: KeyboardEvent) => {
+        const startTime = performance.now();
+        let success = true;
+        let error: Error | null = null;
 
-    const enhancedConfig = { ...config, action: enhancedAction };
-    const unregister = managerRef.current.register(enhancedConfig);
-    
-    // Track unregister for cleanup
-    unregisterSetRef.current.add(unregister);
+        try {
+          await originalAction(event);
 
-    return () => {
-      unregisterSetRef.current.delete(unregister);
-      return unregister();
-    };
-  }, [tracking, currentScreen]);
+          // Track successful shortcut usage
+          if (tracking?.trackKeyboardShortcut) {
+            const shortcutDisplay = `${config.modifiers?.join('+')}+${config.key}`;
+            tracking.trackKeyboardShortcut(shortcutDisplay, config.description, true);
+          }
+
+          if (tracking?.trackShortcutUsage) {
+            const duration = performance.now() - startTime;
+            tracking.trackShortcutUsage(config.description, true, duration, config.category);
+          }
+
+          if (tracking?.trackWorkflowAction) {
+            const duration = performance.now() - startTime;
+            tracking.trackWorkflowAction(`shortcut_${config.key}`, duration, true, currentScreen, {
+              shortcut: config.description,
+              category: config.category,
+            });
+          }
+        } catch (err) {
+          success = false;
+          error = err as Error;
+          console.error(`Shortcut execution failed for ${config.description}:`, err);
+
+          // Track failed shortcut usage
+          if (tracking?.trackKeyboardShortcut) {
+            const shortcutDisplay = `${config.modifiers?.join('+')}+${config.key}`;
+            tracking.trackKeyboardShortcut(shortcutDisplay, config.description, false);
+          }
+
+          // Show error notification if available
+          if (FEATURES.NOTIFICATIONS) {
+            await webNotificationManager.showNotification({
+              title: 'Shortcut Error',
+              body: `Failed to execute: ${config.description}`,
+            });
+          }
+        }
+
+        DEBUG.logPerformance(`shortcut-${config.key}`, Math.max(0, performance.now() - startTime), {
+          success,
+          error: error?.message,
+        });
+      };
+
+      const enhancedConfig = { ...config, action: enhancedAction };
+      const unregister = managerRef.current.register(enhancedConfig);
+
+      // Track unregister for cleanup
+      unregisterSetRef.current.add(unregister);
+
+      return () => {
+        unregisterSetRef.current.delete(unregister);
+        return unregister();
+      };
+    },
+    [tracking, currentScreen]
+  );
 
   // Register application-specific shortcuts
   useEffect(() => {
@@ -179,32 +189,32 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
 
     // Command palette shortcuts
     if (handlers.onCommandPalette) {
-        registrations.push(
-          registerShortcut({
-            key: 'k',
-            modifiers: ['ctrl'],
-            description: 'Open command palette',
-            category: 'general',
-            action: handlers.onCommandPalette,
-            preventDefault: true,
-            // Allow firing even when focus is inside inputs
-            // (KeyboardShortcutManager respects `global` to bypass input guard)
-            global: true as any,
-          })
-        );
+      registrations.push(
+        registerShortcut({
+          key: 'k',
+          modifiers: ['ctrl'],
+          description: 'Open command palette',
+          category: 'general',
+          action: handlers.onCommandPalette,
+          preventDefault: true,
+          // Allow firing even when focus is inside inputs
+          // (KeyboardShortcutManager respects `global` to bypass input guard)
+          global: true as any,
+        })
+      );
 
-        registrations.push(
-          registerShortcut({
-            key: 'k',
-            modifiers: ['meta'],
-            description: 'Open command palette',
-            category: 'general',
-            action: handlers.onCommandPalette,
-            preventDefault: true,
-            global: true as any,
-          })
-        );
-      }
+      registrations.push(
+        registerShortcut({
+          key: 'k',
+          modifiers: ['meta'],
+          description: 'Open command palette',
+          category: 'general',
+          action: handlers.onCommandPalette,
+          preventDefault: true,
+          global: true as any,
+        })
+      );
+    }
 
     // Challenge manager shortcuts
     if (handlers.onChallengeManager) {
@@ -457,13 +467,7 @@ export const useGlobalShortcuts = (options: UseGlobalShortcutsOptions): UseGloba
         }
       });
     };
-  }, [
-    handlers,
-    registerShortcut,
-    disabled,
-    selectedChallenge,
-    currentScreen,
-  ]);
+  }, [handlers, registerShortcut, disabled, selectedChallenge, currentScreen]);
 
   // Control functions
   const toggleShortcuts = useCallback((enabled: boolean) => {

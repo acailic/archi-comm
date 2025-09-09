@@ -1,0 +1,101 @@
+name: "Feature request"
+description: Suggest an enhancement or new capability for ArchiComm
+title: "[Feature]: "
+labels:
+  - enhancement
+  - discussion
+assignees:
+  - acailic
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature! Please provide details below to help us evaluate and plan the work.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-checks
+      options:
+        - label: I have searched existing issues and discussions to avoid duplicates
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear and concise description of the feature.
+      placeholder: What problem does this feature solve at a high level?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: Describe the problem or user need this feature addresses.
+      placeholder: Who is affected and why is this important?
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe your proposed solution in detail, including UX/UI and technical notes.
+      placeholder: Outline the approach, APIs, data flow, and any diagrams.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: List any alternative solutions or features you’ve considered and why they’re not ideal.
+
+  - type: dropdown
+    id: components
+    attributes:
+      label: Affected components/modules
+      description: Select all relevant areas of the codebase.
+      multiple: true
+      options:
+        - Canvas
+        - Components (React)
+        - UI/UX
+        - State management
+        - Data model
+        - Performance
+        - Build tooling
+        - Tauri (desktop)
+        - E2E tests
+        - Unit tests
+        - Documentation
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low
+        - Medium
+        - High
+      default: 1
+
+  - type: textarea
+    id: breaking
+    attributes:
+      label: Potential breaking changes
+      description: Note any backward-incompatible changes and proposed migration path.
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Define clear, testable criteria for completion.
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add any other context, links, or references.
+

@@ -3,7 +3,14 @@
  * Extracted from App.tsx to reduce complexity and improve maintainability
  */
 
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Fallback imports with error handling
@@ -22,17 +29,23 @@ try {
 try {
   const fallbackModule = require('../services/web-fallback');
   webNotificationManager = fallbackModule.webNotificationManager || {
-    showNotification: async () => false
+    showNotification: async () => false,
   };
 } catch (error) {
   console.warn('Web fallback module not available, using stub');
   webNotificationManager = {
-    showNotification: async () => false
+    showNotification: async () => false,
   };
 }
 
 // Screen types and configuration
-export type Screen = 'welcome' | 'challenge-selection' | 'design-canvas' | 'audio-recording' | 'review' | 'pro-version';
+export type Screen =
+  | 'welcome'
+  | 'challenge-selection'
+  | 'design-canvas'
+  | 'audio-recording'
+  | 'review'
+  | 'pro-version';
 
 export interface ScreenConfig {
   title: string;
@@ -93,7 +106,7 @@ export const useRouter = (): RouterContextValue => {
         previousScreen: null,
         navigationHistory: ['challenge-selection'] as Screen[],
         canGoBack: false,
-        canGoForward: false
+        canGoForward: false,
       },
       selectedChallenge: null,
       navigateTo: async () => false,
@@ -117,19 +130,19 @@ const screenTransitions = {
 
 // Navigation validation rules
 const navigationRules: Record<Screen, { requiresChallenge?: boolean; allowedFrom?: Screen[] }> = {
-  'welcome': {},
+  welcome: {},
   'challenge-selection': {},
-  'design-canvas': { 
+  'design-canvas': {
     requiresChallenge: true,
-    allowedFrom: ['challenge-selection', 'audio-recording', 'review']
+    allowedFrom: ['challenge-selection', 'audio-recording', 'review'],
   },
-  'audio-recording': { 
+  'audio-recording': {
     requiresChallenge: true,
-    allowedFrom: ['design-canvas', 'review']
+    allowedFrom: ['design-canvas', 'review'],
   },
-  'review': { 
+  review: {
     requiresChallenge: true,
-    allowedFrom: ['audio-recording', 'design-canvas']
+    allowedFrom: ['audio-recording', 'design-canvas'],
   },
   'pro-version': {},
 };
@@ -158,40 +171,43 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
   });
 
   // Helper function to check if navigation is valid
-  const isValidNavigation = useCallback((targetScreen: Screen): boolean => {
-    try {
-      const t0 = performance.now();
-      const rules = navigationRules[targetScreen];
-      
-      // Check if challenge is required
-      if (rules?.requiresChallenge && !selectedChallenge) {
-        if (DEBUG?.logPerformance) {
-          DEBUG.logPerformance('navigation-blocked', Math.max(0, performance.now() - t0), { 
-            reason: 'no-challenge', 
-            target: targetScreen 
-          });
+  const isValidNavigation = useCallback(
+    (targetScreen: Screen): boolean => {
+      try {
+        const t0 = performance.now();
+        const rules = navigationRules[targetScreen];
+
+        // Check if challenge is required
+        if (rules?.requiresChallenge && !selectedChallenge) {
+          if (DEBUG?.logPerformance) {
+            DEBUG.logPerformance('navigation-blocked', Math.max(0, performance.now() - t0), {
+              reason: 'no-challenge',
+              target: targetScreen,
+            });
+          }
+          return false;
         }
-        return false;
-      }
-      
-      // Check allowed previous screens
-      if (rules?.allowedFrom && !rules.allowedFrom.includes(navigationState.currentScreen)) {
-        if (DEBUG?.logPerformance) {
-          DEBUG.logPerformance('navigation-blocked', Math.max(0, performance.now() - t0), { 
-            reason: 'invalid-flow', 
-            from: navigationState.currentScreen,
-            to: targetScreen 
-          });
+
+        // Check allowed previous screens
+        if (rules?.allowedFrom && !rules.allowedFrom.includes(navigationState.currentScreen)) {
+          if (DEBUG?.logPerformance) {
+            DEBUG.logPerformance('navigation-blocked', Math.max(0, performance.now() - t0), {
+              reason: 'invalid-flow',
+              from: navigationState.currentScreen,
+              to: targetScreen,
+            });
+          }
+          return false;
         }
-        return false;
+
+        return true;
+      } catch (error) {
+        console.warn('Error in navigation validation:', error);
+        return true; // Allow navigation if validation fails
       }
-      
-      return true;
-    } catch (error) {
-      console.warn('Error in navigation validation:', error);
-      return true; // Allow navigation if validation fails
-    }
-  }, [selectedChallenge, navigationState.currentScreen]);
+    },
+    [selectedChallenge, navigationState.currentScreen]
+  );
 
   // Calculate session progress
   const getScreenProgress = useCallback((): number => {
@@ -201,99 +217,99 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
   }, [navigationState.currentScreen]);
 
   // Main navigation function
-  const navigateTo = useCallback(async (
-    screen: Screen, 
-    options: NavigationOptions = {}
-  ): Promise<boolean> => {
-    const navStart = performance.now();
-    const { force = false, skipHistory = false, onBeforeNavigate, onAfterNavigate } = options;
-    
-    try {
-      // Skip if already on target screen
-      if (navigationState.currentScreen === screen && !force) {
-        return true;
-      }
+  const navigateTo = useCallback(
+    async (screen: Screen, options: NavigationOptions = {}): Promise<boolean> => {
+      const navStart = performance.now();
+      const { force = false, skipHistory = false, onBeforeNavigate, onAfterNavigate } = options;
 
-      // Validate navigation
-      if (!force && !isValidNavigation(screen)) {
-        const errorMessage = `Cannot navigate to ${screen} from ${navigationState.currentScreen}`;
-        console.warn(errorMessage);
-        
-        if (onError) {
-          onError(new Error(errorMessage), 'navigation-validation');
+      try {
+        // Skip if already on target screen
+        if (navigationState.currentScreen === screen && !force) {
+          return true;
         }
-        
-        // Show user-friendly notification
-        if (navigationRules[screen]?.requiresChallenge && !selectedChallenge) {
-          try {
-            if (webNotificationManager?.showNotification) {
-              await webNotificationManager.showNotification({
-                title: 'Challenge Required',
-                body: 'Please select a challenge before proceeding to this section.',
-              });
-            }
-          } catch (error) {
-            console.warn('Failed to show notification:', error);
+
+        // Validate navigation
+        if (!force && !isValidNavigation(screen)) {
+          const errorMessage = `Cannot navigate to ${screen} from ${navigationState.currentScreen}`;
+          console.warn(errorMessage);
+
+          if (onError) {
+            onError(new Error(errorMessage), 'navigation-validation');
           }
-        }
-        
-        return false;
-      }
 
-      // Call before navigate hook
-      if (onBeforeNavigate) {
-        const shouldContinue = await onBeforeNavigate();
-        if (!shouldContinue) {
+          // Show user-friendly notification
+          if (navigationRules[screen]?.requiresChallenge && !selectedChallenge) {
+            try {
+              if (webNotificationManager?.showNotification) {
+                await webNotificationManager.showNotification({
+                  title: 'Challenge Required',
+                  body: 'Please select a challenge before proceeding to this section.',
+                });
+              }
+            } catch (error) {
+              console.warn('Failed to show notification:', error);
+            }
+          }
+
           return false;
         }
-      }
 
-      // Unified navigation timing; single measurement
+        // Call before navigate hook
+        if (onBeforeNavigate) {
+          const shouldContinue = await onBeforeNavigate();
+          if (!shouldContinue) {
+            return false;
+          }
+        }
 
-      const previousScreen = navigationState.currentScreen;
+        // Unified navigation timing; single measurement
 
-      // Update navigation state
-      setNavigationState(prev => {
-        const newHistory = skipHistory 
-          ? prev.navigationHistory 
-          : [...prev.navigationHistory, screen];
-        
-        return {
-          currentScreen: screen,
-          previousScreen: prev.currentScreen,
-          navigationHistory: newHistory,
-          canGoBack: newHistory.length > 1,
-          canGoForward: false, // Reset forward navigation
-        };
-      });
+        const previousScreen = navigationState.currentScreen;
 
-      // Call navigation callback
-      if (onNavigate) {
-        onNavigate(screen, previousScreen);
-      }
+        // Update navigation state
+        setNavigationState(prev => {
+          const newHistory = skipHistory
+            ? prev.navigationHistory
+            : [...prev.navigationHistory, screen];
 
-      // Call after navigate hook
-      if (onAfterNavigate) {
-        onAfterNavigate(screen);
-      }
-
-      if (DEBUG?.logPerformance) {
-        DEBUG.logPerformance('navigation', performance.now() - navStart, {
-          from: previousScreen,
-          to: screen,
-          blocked: false,
+          return {
+            currentScreen: screen,
+            previousScreen: prev.currentScreen,
+            navigationHistory: newHistory,
+            canGoBack: newHistory.length > 1,
+            canGoForward: false, // Reset forward navigation
+          };
         });
-      }
 
-      return true;
-    } catch (error) {
-      console.error('Navigation error:', error);
-      if (onError) {
-        onError(error as Error, 'navigation');
+        // Call navigation callback
+        if (onNavigate) {
+          onNavigate(screen, previousScreen);
+        }
+
+        // Call after navigate hook
+        if (onAfterNavigate) {
+          onAfterNavigate(screen);
+        }
+
+        if (DEBUG?.logPerformance) {
+          DEBUG.logPerformance('navigation', performance.now() - navStart, {
+            from: previousScreen,
+            to: screen,
+            blocked: false,
+          });
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Navigation error:', error);
+        if (onError) {
+          onError(error as Error, 'navigation');
+        }
+        return false;
       }
-      return false;
-    }
-  }, [navigationState, isValidNavigation, selectedChallenge, onNavigate, onError]);
+    },
+    [navigationState, isValidNavigation, selectedChallenge, onNavigate, onError]
+  );
 
   // Back navigation
   const goBack = useCallback(async (): Promise<boolean> => {
@@ -319,7 +335,7 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
   const setChallenge = useCallback((challenge: Challenge | null) => {
     const t0 = performance.now();
     setSelectedChallenge(challenge);
-    
+
     if (challenge && DEBUG?.logPerformance) {
       DEBUG.logPerformance('challenge-selected', Math.max(0, performance.now() - t0), {
         challengeId: challenge.id,
@@ -334,14 +350,19 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
       // Alt + Arrow keys for screen navigation
       if (event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
-        
+
         switch (event.key) {
           case 'ArrowLeft':
             goBack();
             break;
           case 'ArrowRight':
             // Navigate to next logical screen
-            const sessionScreens = ['challenge-selection', 'design-canvas', 'audio-recording', 'review'];
+            const sessionScreens = [
+              'challenge-selection',
+              'design-canvas',
+              'audio-recording',
+              'review',
+            ];
             const currentIndex = sessionScreens.indexOf(navigationState.currentScreen);
             if (currentIndex >= 0 && currentIndex < sessionScreens.length - 1) {
               navigateTo(sessionScreens[currentIndex + 1] as Screen);
@@ -368,11 +389,7 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
     isValidNavigation,
   };
 
-  return (
-    <RouterContext.Provider value={contextValue}>
-      {children}
-    </RouterContext.Provider>
-  );
+  return <RouterContext.Provider value={contextValue}>{children}</RouterContext.Provider>;
 };
 
 // Screen wrapper component with transitions
@@ -392,7 +409,7 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
   if (!isActive) return null;
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence mode='wait'>
       <motion.div
         key={screen}
         className={`screen-wrapper ${className}`}
@@ -418,19 +435,19 @@ export const NavigationBreadcrumb: React.FC<NavigationBreadcrumbProps> = ({
   maxItems = 4,
 }) => {
   const { navigationState } = useRouter();
-  
+
   const displayHistory = navigationState.navigationHistory.slice(-maxItems);
-  
+
   return (
-    <nav className={`navigation-breadcrumb ${className}`} aria-label="Navigation breadcrumb">
-      <ol className="breadcrumb-list">
+    <nav className={`navigation-breadcrumb ${className}`} aria-label='Navigation breadcrumb'>
+      <ol className='breadcrumb-list'>
         {displayHistory.map((screen, index) => (
-          <li 
+          <li
             key={`${screen}-${index}`}
             className={`breadcrumb-item ${index === displayHistory.length - 1 ? 'current' : ''}`}
           >
             {screen.replace('-', ' ')}
-            {index < displayHistory.length - 1 && <span className="separator">→</span>}
+            {index < displayHistory.length - 1 && <span className='separator'>→</span>}
           </li>
         ))}
       </ol>
@@ -450,20 +467,18 @@ export const ScreenProgress: React.FC<ScreenProgressProps> = ({
 }) => {
   const { getScreenProgress } = useRouter();
   const progress = getScreenProgress();
-  
+
   return (
     <div className={`screen-progress ${className}`}>
-      <div 
-        className="progress-bar"
+      <div
+        className='progress-bar'
         style={{ width: `${progress}%` }}
-        role="progressbar"
+        role='progressbar'
         aria-valuenow={progress}
         aria-valuemin={0}
         aria-valuemax={100}
       />
-      {showPercentage && (
-        <span className="progress-text">{Math.round(progress)}%</span>
-      )}
+      {showPercentage && <span className='progress-text'>{Math.round(progress)}%</span>}
     </div>
   );
 };

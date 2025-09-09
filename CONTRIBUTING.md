@@ -1,0 +1,120 @@
+# Contributing to ArchiComm
+
+Thank you for your interest in contributing to ArchiComm! This guide helps you get set up, verify your environment, and land high‑quality PRs quickly.
+
+## Quick Start Checklist
+
+Follow these steps to verify your setup and run the app locally:
+
+1) System requirements
+- Node.js >= 18.0.0, npm >= 9.0.0 (see `package.json` engines)
+- Rust toolchain (for Tauri desktop builds)
+
+2) Clone and install
+```bash
+git clone https://github.com/acailic/archi-comm.git
+cd archi-comm
+npm install
+```
+
+3) Sanity checks
+```bash
+npm run type-check
+npm run lint
+npm run format:check
+npm test
+```
+
+4) Run locally
+- Web preview: `npm run dev`
+- Desktop shell: `npm run tauri:dev`
+
+5) Optional checks
+- Coverage report: `npm run test:coverage`
+- E2E tests: `npm run e2e` (or `npm run e2e:ci` in CI)
+- Security audit (CI workflow): `.github/workflows/security.yml`
+
+## Development Workflow
+
+- Branch naming: `feature/…`, `fix/…`, `docs/…`, `chore/…`
+- Keep changes focused and small; update docs where helpful
+- Write/adjust tests close to changed code (Vitest or Playwright)
+- Desktop-specific changes should continue to run in web preview where feasible (use `services/web-fallback`)
+
+## Code Quality Checklist (PRs)
+
+- Types: no `any` unless justified; prefer discriminated unions for actions
+- ESLint/Prettier: clean `npm run lint` and `npm run format:check`
+- Types compile: `npm run type-check`
+- Tests pass locally: `npm test` (and E2E if UI flows changed)
+- Coverage: add/extend tests for new core utilities, hooks, and services
+- Accessibility: basic keyboard navigation and ARIA where applicable
+
+## Testing Guidelines
+
+- Unit/Integration (Vitest)
+  - Place tests under `src/__tests__` or alongside modules
+  - Use `@testing-library/react` for components; avoid implementation coupling
+  - Generate coverage: `npm run test:coverage`
+
+- End-to-End (Playwright)
+  - Scenarios under `e2e/` with clear user flows
+  - Prefer deterministic selectors; avoid brittle timing
+  - CI config: `.github/workflows/e2e.yml`
+
+## Debugging Tips
+
+- Web (Vite): open devtools and check console warnings/errors
+- Tauri: `npm run tauri:dev` to view Rust logs and frontend together
+- Playwright: run `npm run e2e:headed` and use trace viewer when tests fail
+- Performance: open `DeveloperDiagnosticsPage` or `PerformanceDashboard` for live metrics
+
+## Performance Considerations
+
+- Keep props stable; memoize expensive selectors and transforms
+- Batch state updates; avoid unnecessary re-renders on canvas
+- Use virtualization/culling for large diagrams
+- Profile with `CanvasPerformanceManager` and verify improvements
+
+## Project Structure
+
+```
+src/
+├── components/     # React components (Canvas, Toolbars, Panels, etc.)
+├── hooks/          # Custom React hooks
+├── lib/            # Utilities, performance, contracts, plugins
+├── services/       # Tauri and web fallbacks
+├── shared/         # Shared utils and types
+└── styles/         # Global styles
+```
+
+## Tooling
+
+- Formatting: Prettier — `npm run format` / `npm run format:check`
+- Linting: ESLint — `npm run lint` / `npm run lint:fix`
+- Types: TypeScript — `npm run type-check`
+- Tests: Vitest — `npm test`, Playwright — `npm run e2e`
+
+## CI/CD
+
+Workflows under `.github/workflows/`:
+- `ci.yml` — type check, lint, unit/integration tests
+- `coverage.yml` — coverage reporting
+- `e2e.yml` — end-to-end tests
+- `security.yml` — dependency/security checks
+- `build-tauri.yml` — desktop packaging
+
+## Architecture & API Docs
+
+- Architecture overview and canvas internals: `docs/ARCHITECTURE.md`
+- Component, hooks, and services reference: `docs/API_REFERENCE.md`
+- Study practice materials: `src/docs/SystemDesignPractice.md`
+
+## Getting Help
+
+- Issues: https://github.com/acailic/archi-comm/issues
+- Discussions: https://github.com/acailic/archi-comm/discussions
+
+## License
+
+By contributing to ArchiComm, you agree that your contributions will be licensed under the project license (MIT). See `LICENSE`.

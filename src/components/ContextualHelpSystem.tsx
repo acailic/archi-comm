@@ -23,72 +23,79 @@ interface HelpState {
   targetElement: HTMLElement | null;
 }
 
-export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({
-  className
-}) => {
+export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({ className }) => {
   const [helpRegistry, setHelpRegistry] = useState<Map<string, HelpContent>>(new Map());
   const [helpState, setHelpState] = useState<HelpState>({
     isVisible: false,
     content: null,
-    targetElement: null
+    targetElement: null,
   });
   const [activeHelpQueue, setActiveHelpQueue] = useState<HelpContent[]>([]);
-  
+
   const overlayRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // Register help content
-  const registerHelpContent = useCallback((componentId: string, content: Omit<HelpContent, 'componentId'>) => {
-    const helpContent: HelpContent = {
-      ...content,
-      componentId
-    };
-    
-    setHelpRegistry(prev => {
-      const newRegistry = new Map(prev);
-      newRegistry.set(componentId, helpContent);
-      return newRegistry;
-    });
-  }, []);
+  const registerHelpContent = useCallback(
+    (componentId: string, content: Omit<HelpContent, 'componentId'>) => {
+      const helpContent: HelpContent = {
+        ...content,
+        componentId,
+      };
+
+      setHelpRegistry(prev => {
+        const newRegistry = new Map(prev);
+        newRegistry.set(componentId, helpContent);
+        return newRegistry;
+      });
+    },
+    []
+  );
 
   // Show help for a specific component
-  const showHelp = useCallback((componentId: string, targetElement?: HTMLElement) => {
-    const content = helpRegistry.get(componentId);
-    if (!content) return;
+  const showHelp = useCallback(
+    (componentId: string, targetElement?: HTMLElement) => {
+      const content = helpRegistry.get(componentId);
+      if (!content) return;
 
-    const target = targetElement || 
-      (content.targetSelector ? document.querySelector(content.targetSelector) as HTMLElement : null);
+      const target =
+        targetElement ||
+        (content.targetSelector
+          ? (document.querySelector(content.targetSelector) as HTMLElement)
+          : null);
 
-    // Store previous focus for restoration
-    previousFocusRef.current = document.activeElement as HTMLElement;
+      // Store previous focus for restoration
+      previousFocusRef.current = document.activeElement as HTMLElement;
 
-    setHelpState({
-      isVisible: true,
-      content,
-      targetElement: target
-    });
+      setHelpState({
+        isVisible: true,
+        content,
+        targetElement: target,
+      });
 
-    // Track help interaction
-    UXOptimizer.getInstance().trackAction('contextual_help_shown', {
-      componentId,
-      contentType: content.type,
-      priority: content.priority
-    });
-  }, [helpRegistry]);
+      // Track help interaction
+      UXOptimizer.getInstance().trackAction('contextual_help_shown', {
+        componentId,
+        contentType: content.type,
+        priority: content.priority,
+      });
+    },
+    [helpRegistry]
+  );
 
   // Hide help
   const hideHelp = useCallback(() => {
     if (helpState.content) {
       UXOptimizer.getInstance().trackAction('contextual_help_hidden', {
         componentId: helpState.content.componentId,
-        duration: Date.now() - (helpState.content as any).shownAt
+        duration: Date.now() - (helpState.content as any).shownAt,
       });
     }
 
     setHelpState({
       isVisible: false,
       content: null,
-      targetElement: null
+      targetElement: null,
     });
 
     // Restore previous focus
@@ -106,19 +113,22 @@ export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({
   }, [helpState, activeHelpQueue, showHelp]);
 
   // Handle help conflicts by queueing
-  const queueHelp = useCallback((componentId: string) => {
-    const content = helpRegistry.get(componentId);
-    if (!content) return;
+  const queueHelp = useCallback(
+    (componentId: string) => {
+      const content = helpRegistry.get(componentId);
+      if (!content) return;
 
-    if (helpState.isVisible) {
-      // Add to queue if higher priority, otherwise ignore
-      if (content.priority > (helpState.content?.priority || 0)) {
-        setActiveHelpQueue(prev => [content, ...prev].sort((a, b) => b.priority - a.priority));
+      if (helpState.isVisible) {
+        // Add to queue if higher priority, otherwise ignore
+        if (content.priority > (helpState.content?.priority || 0)) {
+          setActiveHelpQueue(prev => [content, ...prev].sort((a, b) => b.priority - a.priority));
+        }
+      } else {
+        showHelp(componentId);
       }
-    } else {
-      showHelp(componentId);
-    }
-  }, [helpRegistry, helpState, showHelp]);
+    },
+    [helpRegistry, helpState, showHelp]
+  );
 
   // Listen for UXOptimizer 'show-help' events
   useEffect(() => {
@@ -153,11 +163,11 @@ export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({
             const focusableElements = overlayRef.current.querySelectorAll(
               'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
             );
-            
+
             if (focusableElements.length > 0) {
               const firstElement = focusableElements[0] as HTMLElement;
               const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
-              
+
               if (event.shiftKey && document.activeElement === firstElement) {
                 event.preventDefault();
                 lastElement.focus();
@@ -183,7 +193,7 @@ export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({
       const firstFocusable = overlayRef.current.querySelector(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       ) as HTMLElement;
-      
+
       if (firstFocusable) {
         firstFocusable.focus();
       }
@@ -202,8 +212,8 @@ export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({
         placement={helpState.content.placement}
         onClose={hideHelp}
         interactive={helpState.content.interactive}
-        role="tooltip"
-        aria-live="polite"
+        role='tooltip'
+        aria-live='polite'
       />
     );
   };
@@ -216,33 +226,32 @@ export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({
       <div
         ref={overlayRef}
         className={`fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 ${className || ''}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="help-title"
-        aria-describedby="help-content"
+        role='dialog'
+        aria-modal='true'
+        aria-labelledby='help-title'
+        aria-describedby='help-content'
       >
-        <div className="max-w-md w-full mx-4 bg-white rounded-lg shadow-xl">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 id="help-title" className="text-lg font-semibold text-gray-900">
+        <div className='max-w-md w-full mx-4 bg-white rounded-lg shadow-xl'>
+          <div className='p-6'>
+            <div className='flex items-center justify-between mb-4'>
+              <h3 id='help-title' className='text-lg font-semibold text-gray-900'>
                 Help
               </h3>
               <button
                 onClick={hideHelp}
-                className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
-                aria-label="Close help"
+                className='text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded'
+                aria-label='Close help'
               >
-                <span className="sr-only">Close</span>
-                ✕
+                <span className='sr-only'>Close</span>✕
               </button>
             </div>
-            <div id="help-content" className="text-gray-700">
+            <div id='help-content' className='text-gray-700'>
               {helpState.content.content}
             </div>
-            <div className="mt-6 flex justify-end">
+            <div className='mt-6 flex justify-end'>
               <button
                 onClick={hideHelp}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className='px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
               >
                 Got it
               </button>
@@ -258,7 +267,7 @@ export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({
     (window as any).contextualHelpSystem = {
       registerHelpContent,
       showHelp,
-      hideHelp
+      hideHelp,
     };
 
     return () => {

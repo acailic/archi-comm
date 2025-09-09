@@ -16,4 +16,3 @@ describe('Rust -> FE contract (sample payload)', () => {
     expect(parsed.name).toBe('Sample');
   });
 });
-

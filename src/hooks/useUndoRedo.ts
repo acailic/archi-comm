@@ -24,7 +24,7 @@ export function useUndoRedo<T>(
   options: UseUndoRedoOptions = {}
 ): UseUndoRedoReturn<T> {
   const { maxHistorySize = 50, enableGlobalShortcuts = false } = options;
-  
+
   const [history, setHistory] = useState<T[]>([initialState]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -32,25 +32,28 @@ export function useUndoRedo<T>(
   const canUndo = currentIndex > 0;
   const canRedo = currentIndex < history.length - 1;
 
-  const pushState = useCallback((newState: T) => {
-    setHistory(prev => {
-      // Remove any future history if we're not at the end
-      const newHistory = prev.slice(0, currentIndex + 1);
-      
-      // Add the new state
-      newHistory.push(newState);
-      
-      // Enforce max history size
-      if (newHistory.length > maxHistorySize) {
-        newHistory.splice(0, newHistory.length - maxHistorySize);
-        setCurrentIndex(maxHistorySize - 1);
+  const pushState = useCallback(
+    (newState: T) => {
+      setHistory(prev => {
+        // Remove any future history if we're not at the end
+        const newHistory = prev.slice(0, currentIndex + 1);
+
+        // Add the new state
+        newHistory.push(newState);
+
+        // Enforce max history size
+        if (newHistory.length > maxHistorySize) {
+          newHistory.splice(0, newHistory.length - maxHistorySize);
+          setCurrentIndex(maxHistorySize - 1);
+          return newHistory;
+        }
+
+        setCurrentIndex(newHistory.length - 1);
         return newHistory;
-      }
-      
-      setCurrentIndex(newHistory.length - 1);
-      return newHistory;
-    });
-  }, [currentIndex, maxHistorySize]);
+      });
+    },
+    [currentIndex, maxHistorySize]
+  );
 
   const undo = useCallback(() => {
     if (canUndo) {
@@ -108,6 +111,6 @@ export function useUndoRedo<T>(
     pushState,
     undo,
     redo,
-    clearHistory
+    clearHistory,
   };
 }

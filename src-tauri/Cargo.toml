@@ -1,10 +1,10 @@
 [package]
 name = "archicomm"
-version = "0.2.0"
-description = "ArchiComm MVP Application - Desktop Architecture Communication Platform"
-authors = ["Your Name <your.email@example.com>"]
+version = "0.2.1"
+description = "ArchiComm - Desktop Architecture Communication Platform"
+authors = ["Aleksandar Ilic"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/your-username/archicomm"
+repository = "https://github.com/acailic/archi-comm.git"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

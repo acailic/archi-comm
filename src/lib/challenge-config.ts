@@ -2,24 +2,12 @@
 export const CACHE_KEYS = {
   CHALLENGES: 'archicomm_cached_challenges',
   CACHE_VERSION: 'archicomm_cache_version',
-  LAST_UPDATE: 'archicomm_last_update'
+  LAST_UPDATE: 'archicomm_last_update',
 };
 
-// Fallback imports with error handling
-let Challenge: any, DesignComponent: any, Connection: any;
-
-try {
-  const appModule = require('../App');
-  Challenge = appModule.Challenge;
-  DesignComponent = appModule.DesignComponent;
-  Connection = appModule.Connection;
-} catch (error) {
-  console.warn('App module not available for types, using fallbacks');
-  // Provide fallback type definitions
-  Challenge = {};
-  DesignComponent = { type: '' };
-  Connection = { type: '' };
-}
+// Remove dynamic require and use strict types
+import type { Challenge } from '@/shared/contracts';
+import type { DesignComponent, Connection } from '@/shared/contracts';
 
 // Tauri integration
 import { isTauriEnvironment } from './environment';
@@ -140,13 +128,14 @@ export const defaultChallengeConfig: ChallengeConfig = {
     {
       id: 'url-shortener',
       title: 'URL Shortener Service',
-      description: 'Design a scalable URL shortening service like bit.ly or tinyurl.com with analytics and custom domains.',
+      description:
+        'Design a scalable URL shortening service like bit.ly or tinyurl.com with analytics and custom domains.',
       requirements: [
         'Handle 100M URLs shortened per day',
         'Support custom aliases and domains',
         'Provide real-time analytics and click tracking',
         'Ensure high availability (99.9% uptime)',
-        'Implement rate limiting and spam protection'
+        'Implement rate limiting and spam protection',
       ],
       difficulty: 'intermediate',
       estimatedTime: 45,
@@ -156,30 +145,33 @@ export const defaultChallengeConfig: ChallengeConfig = {
         'Design scalable web APIs',
         'Implement efficient database schemas',
         'Apply caching strategies',
-        'Handle high-throughput scenarios'
+        'Handle high-throughput scenarios',
       ],
       solutionHints: [
         {
           id: 'url-shortener-hint-1',
           title: 'Database Design',
-          content: 'Consider using a simple key-value store for URL mappings. Think about how to generate unique short codes efficiently.',
+          content:
+            'Consider using a simple key-value store for URL mappings. Think about how to generate unique short codes efficiently.',
           type: 'architecture',
           difficulty: 'beginner',
         },
         {
           id: 'url-shortener-hint-2',
           title: 'Caching Strategy',
-          content: 'Popular URLs should be cached to reduce database load. Consider using Redis or Memcached for frequently accessed mappings.',
+          content:
+            'Popular URLs should be cached to reduce database load. Consider using Redis or Memcached for frequently accessed mappings.',
           type: 'optimization',
           difficulty: 'intermediate',
         },
         {
           id: 'url-shortener-hint-3',
           title: 'Analytics Architecture',
-          content: 'Analytics data can be processed asynchronously. Consider using a message queue to handle click events and batch process analytics.',
+          content:
+            'Analytics data can be processed asynchronously. Consider using a message queue to handle click events and batch process analytics.',
           type: 'architecture',
           difficulty: 'advanced',
-        }
+        },
       ],
       architectureTemplate: {
         name: 'Basic URL Shortener',
@@ -189,26 +181,26 @@ export const defaultChallengeConfig: ChallengeConfig = {
             type: 'api-gateway',
             label: 'API Gateway',
             description: 'Handles rate limiting and routing',
-            position: { x: 100, y: 100 }
+            position: { x: 100, y: 100 },
           },
           {
             type: 'server',
             label: 'URL Service',
             description: 'Core URL shortening logic',
-            position: { x: 300, y: 100 }
+            position: { x: 300, y: 100 },
           },
           {
             type: 'database',
             label: 'Primary DB',
             description: 'Stores URL mappings',
-            position: { x: 500, y: 200 }
+            position: { x: 500, y: 200 },
           },
           {
             type: 'cache',
             label: 'Redis Cache',
             description: 'Caches popular URLs',
-            position: { x: 300, y: 300 }
-          }
+            position: { x: 300, y: 300 },
+          },
         ],
         connections: [
           {
@@ -216,33 +208,32 @@ export const defaultChallengeConfig: ChallengeConfig = {
             to: 'URL Service',
             label: 'HTTP',
             type: 'sync',
-            protocol: 'REST'
+            protocol: 'REST',
           },
           {
             from: 'URL Service',
             to: 'Primary DB',
             label: 'Query',
-            type: 'sync'
+            type: 'sync',
           },
           {
             from: 'URL Service',
             to: 'Redis Cache',
             label: 'Cache',
-            type: 'sync'
-          }
-        ]
+            type: 'sync',
+          },
+        ],
       },
       resources: [
         {
           title: 'System Design: URL Shortener',
           url: 'https://example.com/url-shortener-design',
           type: 'tutorial',
-          description: 'Complete guide to designing a URL shortener'
-        }
+          description: 'Complete guide to designing a URL shortener',
+        },
       ],
-      variants: []
-    }
-    ,
+      variants: [],
+    },
     {
       id: 'chat-system',
       title: 'Simple Real-time Chat System',
@@ -252,7 +243,7 @@ export const defaultChallengeConfig: ChallengeConfig = {
         'Message persistence and history',
         'Online/offline status indicators',
         'Support for multiple chat rooms',
-        'Basic message delivery confirmation'
+        'Basic message delivery confirmation',
       ],
       difficulty: 'beginner',
       estimatedTime: 30,
@@ -262,38 +253,55 @@ export const defaultChallengeConfig: ChallengeConfig = {
         'Understand real-time communication patterns',
         'Learn WebSocket implementation basics',
         'Design simple message storage',
-        'Implement basic presence tracking'
+        'Implement basic presence tracking',
       ],
       solutionHints: [
         {
           id: 'chat-websocket',
           title: 'WebSocket Connection',
-          content: 'Use WebSockets to maintain real-time connections between clients and server for instant message delivery.',
+          content:
+            'Use WebSockets to maintain real-time connections between clients and server for instant message delivery.',
           type: 'architecture',
-          difficulty: 'beginner'
+          difficulty: 'beginner',
         },
         {
           id: 'chat-storage',
           title: 'Message Storage',
-          content: 'Store messages in a database with timestamps and room/user information for message history.',
+          content:
+            'Store messages in a database with timestamps and room/user information for message history.',
           type: 'architecture',
-          difficulty: 'beginner'
-        }
+          difficulty: 'beginner',
+        },
       ],
       architectureTemplate: {
         name: 'Simple Chat System',
         description: 'Basic chat server with WebSocket connections and message storage',
         components: [
-          { type: 'server', label: 'Chat Server', description: 'WebSocket server', position: { x: 200, y: 100 } },
-          { type: 'database', label: 'Message DB', description: 'Store messages and users', position: { x: 200, y: 250 } },
-          { type: 'cache', label: 'Session Store', description: 'Active user sessions', position: { x: 400, y: 100 } }
+          {
+            type: 'server',
+            label: 'Chat Server',
+            description: 'WebSocket server',
+            position: { x: 200, y: 100 },
+          },
+          {
+            type: 'database',
+            label: 'Message DB',
+            description: 'Store messages and users',
+            position: { x: 200, y: 250 },
+          },
+          {
+            type: 'cache',
+            label: 'Session Store',
+            description: 'Active user sessions',
+            position: { x: 400, y: 100 },
+          },
         ],
         connections: [
           { from: 'Chat Server', to: 'Message DB', label: 'Store/Retrieve', type: 'sync' },
-          { from: 'Chat Server', to: 'Session Store', label: 'Sessions', type: 'sync' }
-        ]
-      }
-    }
+          { from: 'Chat Server', to: 'Session Store', label: 'Sessions', type: 'sync' },
+        ],
+      },
+    },
     // Community edition includes these basic educational challenges
     // Additional challenges can be added through the challenge manager
   ],
@@ -301,8 +309,8 @@ export const defaultChallengeConfig: ChallengeConfig = {
     enableHints: true,
     enableTemplates: true,
     autoSave: true,
-    hintDelay: 30 // Show hints after 30 seconds of inactivity
-  }
+    hintDelay: 30, // Show hints after 30 seconds of inactivity
+  },
 };
 
 // Challenge loading and management functions - Community Edition
@@ -326,20 +334,20 @@ export class ChallengeManager {
 
       const cached = localStorage.getItem(CACHE_KEYS.CHALLENGES);
       if (!cached) return [];
-      
+
       const cacheVersion = localStorage.getItem(CACHE_KEYS.CACHE_VERSION);
       if (cacheVersion !== this.config.version) {
         this.clearCache();
         return [];
       }
-      
+
       const parsedChallenges = JSON.parse(cached);
       if (!Array.isArray(parsedChallenges)) {
         console.warn('Invalid cached challenge format, clearing cache');
         this.clearCache();
         return [];
       }
-      
+
       return parsedChallenges.filter(challenge => {
         try {
           return this.validateChallenge(challenge);
@@ -366,19 +374,19 @@ export class ChallengeManager {
       if (typeof localStorage === 'undefined') {
         return false;
       }
-      
+
       const lastUpdate = localStorage.getItem(CACHE_KEYS.LAST_UPDATE);
       if (!lastUpdate) return false;
-      
+
       const cacheTime = new Date(lastUpdate).getTime();
       if (isNaN(cacheTime)) {
         console.warn('Invalid cache timestamp, treating as stale');
         return false;
       }
-      
+
       const now = Date.now();
       const maxAge = 1000 * 60 * 30; // 30 minutes
-      return (now - cacheTime) < maxAge;
+      return now - cacheTime < maxAge;
     } catch (e) {
       console.warn('Cache freshness check failed:', e);
       return false;
@@ -391,12 +399,12 @@ export class ChallengeManager {
       if (typeof localStorage === 'undefined') {
         return { hasCached: false, isFresh: false, size: 0 };
       }
-      
+
       const cached = localStorage.getItem(CACHE_KEYS.CHALLENGES);
       if (!cached) {
         return { hasCached: false, isFresh: false, size: 0 };
       }
-      
+
       let size = 0;
       try {
         const parsedCache = JSON.parse(cached);
@@ -404,11 +412,11 @@ export class ChallengeManager {
       } catch (parseError) {
         console.warn('Failed to parse cached challenges for stats:', parseError);
       }
-      
+
       return {
         hasCached: true,
         isFresh: this.isCacheFresh(),
-        size
+        size,
       };
     } catch (e) {
       console.error('Failed to get cache stats:', e);
@@ -423,12 +431,12 @@ export class ChallengeManager {
         console.warn('localStorage not available, skipping cache save');
         return;
       }
-      
+
       if (!Array.isArray(challenges)) {
         console.warn('Invalid challenges data for caching');
         return;
       }
-      
+
       // Validate challenges before caching
       const validChallenges = challenges.filter(challenge => {
         try {
@@ -438,14 +446,14 @@ export class ChallengeManager {
           return false;
         }
       });
-      
+
       const challengeData = JSON.stringify(validChallenges);
       const timestamp = new Date().toISOString();
-      
+
       localStorage.setItem(CACHE_KEYS.CHALLENGES, challengeData);
       localStorage.setItem(CACHE_KEYS.CACHE_VERSION, this.config.version);
       localStorage.setItem(CACHE_KEYS.LAST_UPDATE, timestamp);
-      
+
       console.log(`Cached ${validChallenges.length} challenges successfully`);
     } catch (e) {
       console.error('Cache save failed:', e);
@@ -461,7 +469,7 @@ export class ChallengeManager {
         console.warn('localStorage not available for cache clearing');
         return;
       }
-      
+
       Object.values(CACHE_KEYS).forEach(key => {
         try {
           localStorage.removeItem(key);
@@ -469,7 +477,7 @@ export class ChallengeManager {
           console.warn(`Failed to remove cache key ${key}:`, e);
         }
       });
-      
+
       console.log('Challenge cache cleared successfully');
     } catch (e) {
       console.error('Failed to clear challenge cache:', e);
@@ -478,14 +486,14 @@ export class ChallengeManager {
 
   // Optimized cache-first loading with performance tracking
   async loadChallengesWithCache(
-    source: 'tauri' | 'api' | 'file', 
+    source: 'tauri' | 'api' | 'file',
     path?: string,
     performanceTracker?: (event: string, duration: number, meta?: any) => void
   ) {
     const startTime = Date.now();
     let cached: ExtendedChallenge[] = [];
     let cacheLoadError: any = null;
-    
+
     try {
       cached = await this.loadCachedChallenges();
     } catch (e) {
@@ -493,12 +501,12 @@ export class ChallengeManager {
       cacheLoadError = e;
       cached = [];
     }
-    
+
     if (performanceTracker) {
       performanceTracker('cache-load', Date.now() - startTime, {
         found: cached.length,
         fresh: this.isCacheFresh(),
-        error: cacheLoadError ? String(cacheLoadError) : null
+        error: cacheLoadError ? String(cacheLoadError) : null,
       });
     }
 
@@ -515,11 +523,11 @@ export class ChallengeManager {
     try {
       const loadStart = Date.now();
       const fresh = await this.loadChallengesFromSource(source, path);
-      
+
       if (performanceTracker) {
         performanceTracker('external-load', Date.now() - loadStart, {
           found: fresh ? fresh.length : 0,
-          source
+          source,
         });
       }
 
@@ -533,18 +541,18 @@ export class ChallengeManager {
     } catch (e) {
       console.error('Fresh load failed:', e);
       if (performanceTracker) {
-        performanceTracker('external-load-error', Date.now() - startTime, { 
+        performanceTracker('external-load-error', Date.now() - startTime, {
           error: String(e),
-          source 
+          source,
         });
       }
     }
-    
+
     // Fallback to cached data (even if stale) or defaults
     if (cached.length > 0) {
       return { challenges: cached, fromCache: true, fresh: false };
     }
-    
+
     // Final fallback to built-in challenges
     const defaults = this.getDefaultChallenges();
     return { challenges: defaults, fromCache: false, fresh: false };
@@ -559,22 +567,24 @@ export class ChallengeManager {
     try {
       const startTime = Date.now();
       const fresh = await this.loadChallengesFromSource(source, path);
-      
+
       if (fresh && fresh.length > 0) {
         await this.cacheChallenges(fresh);
-        
+
         if (performanceTracker) {
           performanceTracker('background-refresh-success', Date.now() - startTime, {
-            found: fresh.length
+            found: fresh.length,
           });
         }
 
         // Emit event for listeners that new challenges are available
         try {
           if (typeof window !== 'undefined' && window.dispatchEvent) {
-            window.dispatchEvent(new CustomEvent('challenges-updated', {
-              detail: { challenges: fresh, source: 'background' }
-            }));
+            window.dispatchEvent(
+              new CustomEvent('challenges-updated', {
+                detail: { challenges: fresh, source: 'background' },
+              })
+            );
           }
         } catch (eventError) {
           console.warn('Failed to dispatch challenges-updated event:', eventError);
@@ -590,24 +600,27 @@ export class ChallengeManager {
   }
 
   // Load challenges from external source (Tauri, API, file)
-  async loadChallengesFromSource(source: 'tauri' | 'api' | 'file', path?: string): Promise<ExtendedChallenge[]> {
+  async loadChallengesFromSource(
+    source: 'tauri' | 'api' | 'file',
+    path?: string
+  ): Promise<ExtendedChallenge[]> {
     const timeout = 10000; // 10 second timeout
-    
+
     try {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Challenge loading timeout')), timeout);
       });
-      
+
       const loadPromise = this.executeLoadFromSource(source, path);
-      
+
       const result = await Promise.race([loadPromise, timeoutPromise]);
-      
+
       // Validate result
       if (!Array.isArray(result)) {
         console.warn('Invalid challenge data received from source:', source);
         return [];
       }
-      
+
       // Filter and validate challenges
       const validChallenges = result.filter(challenge => {
         try {
@@ -617,45 +630,47 @@ export class ChallengeManager {
           return false;
         }
       });
-      
+
       console.log(`Loaded ${validChallenges.length} valid challenges from ${source}`);
       return validChallenges;
-      
     } catch (error) {
       console.error('Failed to load challenges from source:', source, error);
       return [];
     }
   }
-  
-  private async executeLoadFromSource(source: 'tauri' | 'api' | 'file', path?: string): Promise<ExtendedChallenge[]> {
+
+  private async executeLoadFromSource(
+    source: 'tauri' | 'api' | 'file',
+    path?: string
+  ): Promise<ExtendedChallenge[]> {
     switch (source) {
       case 'tauri':
         return tauriChallengeAPI.loadChallengesFromFile(path || 'challenges.json');
-      
+
       case 'api':
         if (typeof fetch === 'undefined') {
           console.warn('fetch not available, cannot load from API');
           return [];
         }
-        
+
         const response = await fetch(path || '/api/challenges', {
           method: 'GET',
           headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
         });
-        
+
         if (!response.ok) {
           throw new Error(`API request failed: ${response.status} ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         return data.challenges || data || [];
-      
+
       case 'file':
         return tauriChallengeAPI.loadChallengesFromFile(path || 'challenges.json');
-      
+
       default:
         throw new Error(`Unsupported source: ${source}`);
     }
@@ -681,7 +696,7 @@ export class ChallengeManager {
     return {
       total: this.config.challenges.length + this.customChallenges.length,
       builtin: this.config.challenges.length,
-      custom: this.customChallenges.length
+      custom: this.customChallenges.length,
     };
   }
 
@@ -703,11 +718,12 @@ export class ChallengeManager {
   // Search challenges
   searchChallenges(query: string): ExtendedChallenge[] {
     const searchTerm = query.toLowerCase();
-    return this.getAllChallenges().filter(challenge =>
-      challenge.title.toLowerCase().includes(searchTerm) ||
-      challenge.description.toLowerCase().includes(searchTerm) ||
-      challenge.tags?.some(tag => tag.toLowerCase().includes(searchTerm)) ||
-      challenge.requirements.some(req => req.toLowerCase().includes(searchTerm))
+    return this.getAllChallenges().filter(
+      challenge =>
+        challenge.title.toLowerCase().includes(searchTerm) ||
+        challenge.description.toLowerCase().includes(searchTerm) ||
+        challenge.tags?.some(tag => tag.toLowerCase().includes(searchTerm)) ||
+        challenge.requirements.some(req => req.toLowerCase().includes(searchTerm))
     );
   }
 
@@ -726,7 +742,7 @@ export class ChallengeManager {
     const exportData = {
       version: this.config.version,
       challenges: this.customChallenges,
-      exportedAt: new Date().toISOString()
+      exportedAt: new Date().toISOString(),
     };
     return JSON.stringify(exportData, null, 2);
   }
@@ -757,37 +773,39 @@ export class ChallengeManager {
       if (!challenge || typeof challenge !== 'object') {
         return false;
       }
-      
+
       // Required fields validation
       const requiredFields = {
         id: 'string',
-        title: 'string', 
+        title: 'string',
         description: 'string',
         difficulty: ['beginner', 'intermediate', 'advanced'],
         estimatedTime: 'number',
-        category: 'string'
+        category: 'string',
       };
-      
+
       for (const [field, expectedType] of Object.entries(requiredFields)) {
         const value = challenge[field];
-        
+
         if (Array.isArray(expectedType)) {
           if (!expectedType.includes(value)) {
             console.warn(`Invalid challenge ${field}: ${value}`);
             return false;
           }
         } else if (typeof value !== expectedType) {
-          console.warn(`Invalid challenge ${field} type: expected ${expectedType}, got ${typeof value}`);
+          console.warn(
+            `Invalid challenge ${field} type: expected ${expectedType}, got ${typeof value}`
+          );
           return false;
         }
       }
-      
+
       // Requirements must be an array
       if (!Array.isArray(challenge.requirements)) {
         console.warn('Challenge requirements must be an array');
         return false;
       }
-      
+
       // Validate optional arrays if present
       const optionalArrays = ['tags', 'prerequisites', 'learningObjectives', 'requirements'];
       for (const field of optionalArrays) {
@@ -796,20 +814,19 @@ export class ChallengeManager {
           return false;
         }
       }
-      
+
       // Basic value validation
       if (challenge.estimatedTime <= 0) {
         console.warn('Challenge estimatedTime must be positive');
         return false;
       }
-      
+
       if (challenge.id.length === 0 || challenge.title.length === 0) {
         console.warn('Challenge id and title cannot be empty');
         return false;
       }
-      
+
       return true;
-      
     } catch (error) {
       console.error('Challenge validation error:', error);
       return false;
@@ -835,7 +852,7 @@ try {
     getCacheStats: () => ({ hasCached: false, isFresh: false, size: 0 }),
     isCacheFresh: () => false,
     getConfig: () => defaultChallengeConfig,
-    getChallengeCount: () => ({ total: 0, builtin: 0, custom: 0 })
+    getChallengeCount: () => ({ total: 0, builtin: 0, custom: 0 }),
   } as any;
 }
 
@@ -851,7 +868,7 @@ export const tauriChallengeAPI = {
         console.warn('Invalid file path provided');
         return [];
       }
-      
+
       if (!isTauriEnvironment()) {
         console.warn('loadChallengesFromFile called outside Tauri, returning []');
         return [];
@@ -865,7 +882,7 @@ export const tauriChallengeAPI = {
     }
   },
 
-  // Save challenges to local file (basic functionality) 
+  // Save challenges to local file (basic functionality)
   async saveChallenges(challenges: ExtendedChallenge[], filePath: string): Promise<void> {
     try {
       if (!Array.isArray(challenges)) {
@@ -889,5 +906,5 @@ export const tauriChallengeAPI = {
       console.error('Failed to save challenges to file:', error);
       throw error;
     }
-  }
+  },
 };

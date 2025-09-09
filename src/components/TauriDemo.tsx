@@ -12,7 +12,7 @@ export const TauriDemo = () => {
   const { sendNotification } = useNotification();
   const { selectFile, selectDirectory, readFile, writeFile } = useFile();
   const { createProject, saveProject } = useProject();
-  
+
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedDirectory, setSelectedDirectory] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
@@ -87,12 +87,15 @@ export const TauriDemo = () => {
           <CardTitle>Tauri Integration Demo</CardTitle>
           <CardDescription>
             This component demonstrates Tauri features, but you're running in a web browser.
-            <Badge variant="secondary" className="ml-2">Web Mode</Badge>
+            <Badge variant='secondary' className='ml-2'>
+              Web Mode
+            </Badge>
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">
-            To see Tauri features in action, run this app as a desktop application using <code>npm run tauri:dev</code>
+          <p className='text-muted-foreground'>
+            To see Tauri features in action, run this app as a desktop application using{' '}
+            <code>npm run tauri:dev</code>
           </p>
         </CardContent>
       </Card>
@@ -100,62 +103,64 @@ export const TauriDemo = () => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className='space-y-4'>
       <Card>
         <CardHeader>
           <CardTitle>Tauri Integration Demo</CardTitle>
           <CardDescription>
             This component demonstrates various Tauri features integrated with React.
-            <Badge variant="default" className="ml-2">Desktop Mode</Badge>
+            <Badge variant='default' className='ml-2'>
+              Desktop Mode
+            </Badge>
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className='space-y-4'>
           {/* Window Controls */}
           <div>
-            <h3 className="text-lg font-semibold mb-2">Window Controls</h3>
-            <Button onClick={handleSetTitle} variant="outline">
+            <h3 className='text-lg font-semibold mb-2'>Window Controls</h3>
+            <Button onClick={handleSetTitle} variant='outline'>
               Update Window Title
             </Button>
           </div>
 
           {/* File Operations */}
           <div>
-            <h3 className="text-lg font-semibold mb-2">File Operations</h3>
-            <div className="flex gap-2 mb-2">
-              <Button onClick={handleSelectFile} variant="outline">
-                <File className="w-4 h-4 mr-2" />
+            <h3 className='text-lg font-semibold mb-2'>File Operations</h3>
+            <div className='flex gap-2 mb-2'>
+              <Button onClick={handleSelectFile} variant='outline'>
+                <File className='w-4 h-4 mr-2' />
                 Select File
               </Button>
-              <Button onClick={handleSelectDirectory} variant="outline">
-                <Folder className="w-4 h-4 mr-2" />
+              <Button onClick={handleSelectDirectory} variant='outline'>
+                <Folder className='w-4 h-4 mr-2' />
                 Select Directory
               </Button>
             </div>
 
             {selectedFile && (
-              <div className="mb-2">
-                <p className="text-sm text-muted-foreground mb-1">Selected file:</p>
-                <code className="text-xs bg-muted p-1 rounded">{selectedFile}</code>
+              <div className='mb-2'>
+                <p className='text-sm text-muted-foreground mb-1'>Selected file:</p>
+                <code className='text-xs bg-muted p-1 rounded'>{selectedFile}</code>
               </div>
             )}
 
             {selectedDirectory && (
-              <div className="mb-2">
-                <p className="text-sm text-muted-foreground mb-1">Selected directory:</p>
-                <code className="text-xs bg-muted p-1 rounded">{selectedDirectory}</code>
+              <div className='mb-2'>
+                <p className='text-sm text-muted-foreground mb-1'>Selected directory:</p>
+                <code className='text-xs bg-muted p-1 rounded'>{selectedDirectory}</code>
               </div>
             )}
 
             {selectedFile && (
-              <div className="mb-2">
+              <div className='mb-2'>
                 <textarea
-                  className="w-full h-32 p-2 border rounded text-sm"
+                  className='w-full h-32 p-2 border rounded text-sm'
                   value={fileContent}
-                  onChange={(e) => setFileContent(e.target.value)}
-                  placeholder="File content will appear here..."
+                  onChange={e => setFileContent(e.target.value)}
+                  placeholder='File content will appear here...'
                 />
-                <Button onClick={handleSaveFile} className="mt-2">
-                  <Save className="w-4 h-4 mr-2" />
+                <Button onClick={handleSaveFile} className='mt-2'>
+                  <Save className='w-4 h-4 mr-2' />
                   Save File
                 </Button>
               </div>
@@ -164,16 +169,16 @@ export const TauriDemo = () => {
 
           {/* Project Management */}
           <div>
-            <h3 className="text-lg font-semibold mb-2">Project Management</h3>
-            <div className="flex gap-2 mb-2">
+            <h3 className='text-lg font-semibold mb-2'>Project Management</h3>
+            <div className='flex gap-2 mb-2'>
               <Input
-                placeholder="Project name"
+                placeholder='Project name'
                 value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                className="flex-1"
+                onChange={e => setProjectName(e.target.value)}
+                className='flex-1'
               />
               <Button onClick={handleCreateProject}>
-                <Download className="w-4 h-4 mr-2" />
+                <Download className='w-4 h-4 mr-2' />
                 Create Project
               </Button>
             </div>
@@ -181,12 +186,14 @@ export const TauriDemo = () => {
 
           {/* Notifications */}
           <div>
-            <h3 className="text-lg font-semibold mb-2">Notifications</h3>
+            <h3 className='text-lg font-semibold mb-2'>Notifications</h3>
             <Button
-              onClick={() => sendNotification('Test Notification', 'This is a test notification from ArchiComm!')}
-              variant="outline"
+              onClick={() =>
+                sendNotification('Test Notification', 'This is a test notification from ArchiComm!')
+              }
+              variant='outline'
             >
-              <Bell className="w-4 h-4 mr-2" />
+              <Bell className='w-4 h-4 mr-2' />
               Send Test Notification
             </Button>
           </div>

@@ -11,7 +11,12 @@ beforeEach(() => vi.resetAllMocks());
 
 describe('AI review integration', () => {
   it('maps structured backend response', async () => {
-    (invoke as any).mockResolvedValue({ summary: 'Looks solid', strengths: ['scaling'], risks: ['hotspot'], score: 78 });
+    (invoke as any).mockResolvedValue({
+      summary: 'Looks solid',
+      strengths: ['scaling'],
+      risks: ['hotspot'],
+      score: 78,
+    });
     const res = await reviewSolution('task1', 'my solution');
     expect(res.summary).toContain('solid');
     expect(res.score).toBe(78);
@@ -29,4 +34,3 @@ describe('AI review integration', () => {
     expect(typeof res.summary).toBe('string');
   });
 });
-

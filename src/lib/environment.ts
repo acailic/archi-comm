@@ -10,12 +10,12 @@ const detectRuntimeEnvironment = (): 'tauri' | 'web' => {
     if (typeof window !== 'undefined' && (window as any).__TAURI__) {
       return 'tauri';
     }
-    
+
     // Also check for Tauri API availability
     if (typeof window !== 'undefined' && (window as any).__TAURI_METADATA__) {
       return 'tauri';
     }
-    
+
     return 'web';
   } catch (error) {
     // If anything goes wrong, default to web environment
@@ -60,28 +60,28 @@ export const isProduction = (): boolean => {
 export const FEATURES = {
   // File system operations are only available in Tauri
   FILE_OPERATIONS: isTauriEnvironment(),
-  
+
   // Native notifications are available in both environments
   NOTIFICATIONS: true,
-  
+
   // Auto-save disabled per request; can re-enable later via flag
   AUTO_SAVE: false,
-  
+
   // Window management only in Tauri
   WINDOW_MANAGEMENT: isTauriEnvironment(),
-  
+
   // Export to native file system only in Tauri
   NATIVE_EXPORT: isTauriEnvironment(),
-  
+
   // Deep linking support varies by environment
   DEEP_LINKING: isTauriEnvironment(),
-  
+
   // Keyboard shortcuts work in both but may have different implementations
   KEYBOARD_SHORTCUTS: true,
-  
+
   // System integration features only in Tauri
   SYSTEM_INTEGRATION: isTauriEnvironment(),
-  
+
   // Performance monitoring available in both
   PERFORMANCE_MONITORING: true,
 } as const;
@@ -92,23 +92,23 @@ export const FEATURES = {
 export const CONFIG = {
   // Maximum file size for operations (bytes)
   MAX_FILE_SIZE: isTauriEnvironment() ? 100 * 1024 * 1024 : 10 * 1024 * 1024, // 100MB Tauri, 10MB web
-  
+
   // Auto-save interval (milliseconds)
   AUTO_SAVE_INTERVAL: isTauriEnvironment() ? 30000 : 60000, // 30s Tauri, 60s web
-  
+
   // Maximum number of undo steps
   MAX_UNDO_STEPS: isTauriEnvironment() ? 100 : 50,
-  
+
   // Chunk size for large operations
   CHUNK_SIZE: isTauriEnvironment() ? 1024 * 1024 : 512 * 1024, // 1MB Tauri, 512KB web
-  
+
   // Performance monitoring thresholds
   PERFORMANCE_THRESHOLDS: {
     RENDER_TIME: 16, // ms
     MEMORY_USAGE: isTauriEnvironment() ? 500 * 1024 * 1024 : 100 * 1024 * 1024, // 500MB Tauri, 100MB web
     BUNDLE_SIZE: 5 * 1024 * 1024, // 5MB
   },
-  
+
   // Cache configuration
   CACHE: {
     MAX_ENTRIES: isTauriEnvironment() ? 1000 : 500,
@@ -133,7 +133,7 @@ export const DEBUG = {
       console.groupEnd();
     }
   },
-  
+
   /**
    * Check if a feature is available and log if not
    */
@@ -144,14 +144,14 @@ export const DEBUG = {
     }
     return true;
   },
-  
+
   /**
    * Log performance metrics
    */
   logPerformance: (operation: string, duration: number, data?: any) => {
     if (isDevelopment() && FEATURES.PERFORMANCE_MONITORING) {
       console.log(`⚡ ${operation}: ${duration.toFixed(2)}ms`, data);
-      
+
       if (duration > CONFIG.PERFORMANCE_THRESHOLDS.RENDER_TIME) {
         console.warn(`⚠️ Slow operation detected: ${operation} took ${duration.toFixed(2)}ms`);
       }

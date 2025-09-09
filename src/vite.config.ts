@@ -18,17 +18,17 @@ export default defineConfig({
       lines: 70,
       functions: 65,
       branches: 55,
-      statements: 70
-    }
+      statements: 70,
+    },
   },
-  
+
   // Root directory and index.html location
   root: '.',
   publicDir: 'public',
-  
+
   // Prevent vite from obscuring rust errors
   clearScreen: false,
-  
+
   // Tauri expects a fixed port, fail if that port is not available
   server: {
     port: 5173,
@@ -42,13 +42,13 @@ export default defineConfig({
         }
       : undefined,
   },
-  
+
   // To make use of `TAURI_DEBUG` and other env variables
   // https://tauri.studio/v1/api/config#buildconfig.beforedevcommand
   envPrefix: ['VITE_', 'TAURI_'],
-  
+
   build: {
-      // Tauri supports es2021
+    // Tauri supports es2021
     target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
     // Don't minify for debug builds
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
@@ -98,7 +98,7 @@ export default defineConfig({
   esbuild: {
     drop: process.env.TAURI_DEBUG ? [] : ['console', 'debugger'],
   },
-  
+
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     alias: {

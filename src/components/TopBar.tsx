@@ -66,97 +66,125 @@ export function TopBar(props: TopBarProps) {
         'bg-[var(--glass-bg)] border-[var(--glass-border)] backdrop-blur-[var(--glass-blur)]',
         getElevation(2)
       )}
-      data-testid="canvas-toolbar"
+      data-testid='canvas-toolbar'
     >
-      <div className="flex items-center justify-between gap-4">
+      <div className='flex items-center justify-between gap-4'>
         {/* Left cluster: Back + Title */}
-        <div className="flex items-center gap-4 min-w-0">
-          <SmartTooltip content="Return to challenge selection" contextualHelp="Choose a different challenge or modify challenge requirements" shortcut="Alt+1">
-            <Button variant="ghost" size="sm" onClick={onBack} aria-label="Return to challenge selection">
-              <ArrowLeft className="w-4 h-4 mr-2" />
+        <div className='flex items-center gap-4 min-w-0'>
+          <SmartTooltip
+            content='Return to challenge selection'
+            contextualHelp='Choose a different challenge or modify challenge requirements'
+            shortcut='Alt+1'
+          >
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={onBack}
+              aria-label='Return to challenge selection'
+            >
+              <ArrowLeft className='w-4 h-4 mr-2' />
               Back
             </Button>
           </SmartTooltip>
-          <div className="min-w-0">
-            <h2 className={cx('truncate', 'font-semibold', designSystem.typography.lg)} title={challengeTitle}>
+          <div className='min-w-0'>
+            <h2
+              className={cx('truncate', 'font-semibold', designSystem.typography.lg)}
+              title={challengeTitle}
+            >
               {challengeTitle}
             </h2>
             {challengeDescription && (
-              <p className="text-xs text-muted-foreground truncate" title={challengeDescription}>
+              <p className='text-xs text-muted-foreground truncate' title={challengeDescription}>
                 {challengeDescription}
               </p>
             )}
-            <div className="text-[11px] text-muted-foreground mt-0.5" aria-live="polite">
-              {isSaving && <span className="text-blue-600">• Saving…</span>}
+            <div className='text-[11px] text-muted-foreground mt-0.5' aria-live='polite'>
+              {isSaving && <span className='text-blue-600'>• Saving…</span>}
               {designComplexity !== undefined && designComplexity > 70 && (
-                <span className="ml-2 text-amber-600">• Large design</span>
+                <span className='ml-2 text-amber-600'>• Large design</span>
               )}
             </div>
           </div>
         </div>
 
         {/* Right cluster: Tools */}
-        <div className="flex items-center gap-2" role="toolbar" aria-label="Canvas tools">
+        <div className='flex items-center gap-2' role='toolbar' aria-label='Canvas tools'>
           {/* Performance mode */}
           <SmartTooltip
-            content={performanceModeEnabled ? 'Disable performance optimizations' : 'Enable performance mode for large designs'}
-            contextualHelp="Performance mode optimizes rendering for designs with many components by reducing animation quality and enabling object pooling"
+            content={
+              performanceModeEnabled
+                ? 'Disable performance optimizations'
+                : 'Enable performance mode for large designs'
+            }
+            contextualHelp='Performance mode optimizes rendering for designs with many components by reducing animation quality and enabling object pooling'
           >
-            <Button variant="ghost" size="sm" onClick={onTogglePerformanceMode}>
-              <Zap className="mr-2 h-4 w-4" />
+            <Button variant='ghost' size='sm' onClick={onTogglePerformanceMode}>
+              <Zap className='mr-2 h-4 w-4' />
               {performanceModeEnabled ? 'Performance: ON' : 'Performance: OFF'}
             </Button>
           </SmartTooltip>
 
           {/* Hints toggle */}
           <SmartTooltip
-            content={showHints ? 'Hide solution hints and guidance' : 'Show architectural guidance and best practices'}
-            contextualHelp="Solution hints provide context-aware suggestions for architecture patterns and best practices"
-            shortcut="?"
+            content={
+              showHints
+                ? 'Hide solution hints and guidance'
+                : 'Show architectural guidance and best practices'
+            }
+            contextualHelp='Solution hints provide context-aware suggestions for architecture patterns and best practices'
+            shortcut='?'
           >
-            <Button variant="outline" size="sm" onClick={onToggleHints} aria-pressed={showHints}>
+            <Button variant='outline' size='sm' onClick={onToggleHints} aria-pressed={showHints}>
               {showHints ? 'Hide Hints' : 'Show Hints'}
             </Button>
           </SmartTooltip>
 
           {/* Command Palette / Search */}
-          <SmartTooltip 
-            content="Search commands" 
-            contextualHelp="Access all app commands and shortcuts" 
-            shortcut="Ctrl+K"
+          <SmartTooltip
+            content='Search commands'
+            contextualHelp='Access all app commands and shortcuts'
+            shortcut='Ctrl+K'
           >
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant='ghost'
+              size='sm'
               onClick={onOpenCommandPalette}
-              aria-label="Open command palette"
+              aria-label='Open command palette'
             >
-              <Search className="mr-2 h-4 w-4" />
+              <Search className='mr-2 h-4 w-4' />
               Search
             </Button>
           </SmartTooltip>
 
           {/* Save/Export */}
-          <div className="pl-2 ml-2 border-l border-border/30 flex items-center gap-2">
-            <SmartTooltip content="Save current design progress" shortcut="Ctrl+S">
-              <Button variant="outline" size="icon" onClick={onSave} aria-label="Save design">
-                <Save className="w-4 h-4" />
+          <div className='pl-2 ml-2 border-l border-border/30 flex items-center gap-2'>
+            <SmartTooltip content='Save current design progress' shortcut='Ctrl+S'>
+              <Button variant='outline' size='icon' onClick={onSave} aria-label='Save design'>
+                <Save className='w-4 h-4' />
               </Button>
             </SmartTooltip>
-            <SmartTooltip content="Export design as JSON file" shortcut="Ctrl+E">
-              <Button variant="outline" size="icon" onClick={onExportJSON} aria-label="Export JSON">
-                <Download className="w-4 h-4" />
+            <SmartTooltip content='Export design as JSON file' shortcut='Ctrl+E'>
+              <Button variant='outline' size='icon' onClick={onExportJSON} aria-label='Export JSON'>
+                <Download className='w-4 h-4' />
               </Button>
             </SmartTooltip>
-            <SmartTooltip content="Export design as PNG image" shortcut="Ctrl+Shift+E">
-              <Button variant="outline" size="icon" onClick={onExportPNG} disabled={!!isExporting} aria-label="Export PNG">
-                <Image className="w-4 h-4" />
+            <SmartTooltip content='Export design as PNG image' shortcut='Ctrl+Shift+E'>
+              <Button
+                variant='outline'
+                size='icon'
+                onClick={onExportPNG}
+                disabled={!!isExporting}
+                aria-label='Export PNG'
+              >
+                <Image className='w-4 h-4' />
               </Button>
             </SmartTooltip>
           </div>
 
           {/* Continue */}
-          <SmartTooltip content={canContinue ? 'Proceed to recording' : 'Add components to continue'}>
+          <SmartTooltip
+            content={canContinue ? 'Proceed to recording' : 'Add components to continue'}
+          >
             <Button onClick={onContinue} disabled={!canContinue || !!isExporting}>
               {isExporting ? 'Exporting...' : 'Continue'}
             </Button>

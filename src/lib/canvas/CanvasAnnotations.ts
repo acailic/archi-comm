@@ -3,7 +3,11 @@
  * Ultra-optimized comment and annotation system for canvas
  */
 
-import { CanvasOptimizer, PerformanceMonitor, MemoryOptimizer } from '../performance/PerformanceOptimizer';
+import {
+  CanvasOptimizer,
+  PerformanceMonitor,
+  MemoryOptimizer,
+} from '../performance/PerformanceOptimizer';
 
 export interface CanvasAnnotation {
   id: string;
@@ -49,14 +53,14 @@ export class CanvasAnnotationManager {
   private dragOffset = { x: 0, y: 0 };
   private editingAnnotation: string | null = null;
   private originalEditContent: string | null = null;
-  
+
   // Cache for stripped text content to avoid repeated HTML parsing
   private textContentCache: Map<string, string> = new Map();
-  
+
   // Performance optimization components
   private optimizer?: CanvasOptimizer;
   private performanceMonitor: PerformanceMonitor;
-  
+
   // Caches for expensive calculations
   private boundingBoxCache: Map<string, DirtyRegion> = new Map();
   private textMeasurementCache: Map<string, TextMetrics> = new Map();
@@ -73,8 +77,16 @@ export class CanvasAnnotationManager {
   /**
    * Add a new annotation (overloaded methods for convenience)
    */
-  addAnnotation(annotation: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'>): string;
-  addAnnotation(x: number, y: number, type: CanvasAnnotation['type'], content: string, style?: Partial<AnnotationStyle>): CanvasAnnotation;
+  addAnnotation(
+    annotation: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'>
+  ): string;
+  addAnnotation(
+    x: number,
+    y: number,
+    type: CanvasAnnotation['type'],
+    content: string,
+    style?: Partial<AnnotationStyle>
+  ): CanvasAnnotation;
   addAnnotation(
     annotationOrX: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'> | number,
     y?: number,
@@ -83,7 +95,7 @@ export class CanvasAnnotationManager {
     style?: Partial<AnnotationStyle>
   ): string | CanvasAnnotation {
     let annotation: Omit<CanvasAnnotation, 'id' | 'timestamp' | 'resolved' | 'replies'>;
-    
+
     if (typeof annotationOrX === 'number' && y !== undefined && type && content !== undefined) {
       // Called with parameters: addAnnotation(x, y, type, content, style?)
       annotation = {
@@ -93,7 +105,7 @@ export class CanvasAnnotationManager {
         content,
         author: 'Current User',
         color: '#3b82f6',
-        style: this.getDefaultStyle(type, style)
+        style: this.getDefaultStyle(type, style),
       };
     } else if (typeof annotationOrX === 'object') {
       // Called with full annotation object
@@ -107,17 +119,17 @@ export class CanvasAnnotationManager {
       id,
       timestamp: Date.now(),
       resolved: false,
-      replies: []
+      replies: [],
     };
 
     this.annotations.set(id, fullAnnotation);
-    
+
     // Performance monitoring and optimization
     this.performanceMonitor.measure('annotation-add', () => {
       // Calculate and cache bounding box
       const boundingBox = this.getBoundingBox(fullAnnotation);
       this.boundingBoxCache.set(id, boundingBox);
-      
+
       // Mark dirty region for optimized rendering
       if (this.optimizer) {
         this.optimizer.markDirty(boundingBox);
@@ -125,9 +137,9 @@ export class CanvasAnnotationManager {
         this.render();
       }
     });
-    
+
     this.notifyListeners('annotationAdded', fullAnnotation);
-    
+
     // Return the full annotation if called with coordinates, otherwise return id
     return typeof annotationOrX === 'number' ? fullAnnotation : id;
   }
@@ -140,21 +152,21 @@ export class CanvasAnnotationManager {
     if (annotation) {
       this.performanceMonitor.measure('annotation-update', () => {
         const updated = { ...annotation, ...updates };
-        
+
         // Clear caches for this annotation if content or position changed
         if (updates.content && updates.content !== annotation.content) {
           this.textContentCache.delete(id);
           this.wrappedTextCache.delete(id);
           this.textMeasurementCache.delete(id);
         }
-        
+
         // Calculate new bounding box if position or size changed
         const oldBoundingBox = this.boundingBoxCache.get(id);
         const newBoundingBox = this.getBoundingBox(updated);
         this.boundingBoxCache.set(id, newBoundingBox);
-        
+
         this.annotations.set(id, updated);
-        
+
         // Mark dirty regions for optimized rendering
         if (this.optimizer) {
           // Mark both old and new regions as dirty
@@ -166,7 +178,7 @@ export class CanvasAnnotationManager {
           this.render();
         }
       });
-      
+
       this.notifyListeners('annotationUpdated', this.annotations.get(id)!);
     }
   }
@@ -180,17 +192,17 @@ export class CanvasAnnotationManager {
       this.performanceMonitor.measure('annotation-remove', () => {
         // Get bounding box before removal for dirty region marking
         const boundingBox = this.boundingBoxCache.get(id);
-        
+
         // Clean up all caches
         this.annotations.delete(id);
         this.textContentCache.delete(id);
         this.wrappedTextCache.delete(id);
         this.textMeasurementCache.delete(id);
         this.boundingBoxCache.delete(id);
-        
+
         // Release pooled object
         MemoryOptimizer.releaseObject('annotation', annotation);
-        
+
         // Mark dirty region for optimized rendering
         if (this.optimizer && boundingBox) {
           this.optimizer.markDirty(boundingBox);
@@ -198,7 +210,7 @@ export class CanvasAnnotationManager {
           this.render();
         }
       });
-      
+
       this.notifyListeners('annotationRemoved', annotation);
     }
   }
@@ -213,7 +225,7 @@ export class CanvasAnnotationManager {
       const fullReply: AnnotationReply = {
         ...reply,
         id: replyId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       annotation.replies.push(fullReply);
@@ -251,7 +263,7 @@ export class CanvasAnnotationManager {
    */
   getAnnotationAt(x: number, y: number): CanvasAnnotation | null {
     const annotations = Array.from(this.annotations.values());
-    
+
     // Check in reverse order (top to bottom)
     for (let i = annotations.length - 1; i >= 0; i--) {
       const annotation = annotations[i];
@@ -259,7 +271,7 @@ export class CanvasAnnotationManager {
         return annotation;
       }
     }
-    
+
     return null;
   }
 
@@ -275,8 +287,12 @@ export class CanvasAnnotationManager {
    */
   getAnnotationsInArea(x: number, y: number, width: number, height: number): CanvasAnnotation[] {
     return Array.from(this.annotations.values()).filter(annotation => {
-      return annotation.x >= x && annotation.x <= x + width &&
-             annotation.y >= y && annotation.y <= y + height;
+      return (
+        annotation.x >= x &&
+        annotation.x <= x + width &&
+        annotation.y >= y &&
+        annotation.y <= y + height
+      );
     });
   }
 
@@ -305,7 +321,7 @@ export class CanvasAnnotationManager {
   private renderDirect(): void {
     // Clear the canvas completely before redrawing
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
+
     const annotations = Array.from(this.annotations.values());
     annotations.forEach(annotation => {
       this.renderAnnotation(annotation);
@@ -382,10 +398,10 @@ export class CanvasAnnotationManager {
     const { x, y, style, content } = annotation;
     const padding = 12;
     const maxWidth = 200;
-    
+
     // Strip HTML tags from rich text content for canvas rendering
     const plainTextContent = this.stripHtmlTags(content);
-    
+
     // Measure text
     this.ctx.font = `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`;
     const lines = this.wrapText(plainTextContent, maxWidth - padding * 2);
@@ -397,7 +413,7 @@ export class CanvasAnnotationManager {
     this.ctx.fillStyle = style.backgroundColor;
     this.ctx.strokeStyle = style.borderColor;
     this.ctx.lineWidth = style.borderWidth;
-    
+
     // Rounded rectangle background
     this.roundedRect(x, y, maxWidth, height, style.borderRadius);
     this.ctx.fill();
@@ -406,13 +422,9 @@ export class CanvasAnnotationManager {
     // Draw text
     this.ctx.fillStyle = style.textColor;
     this.ctx.globalAlpha = 1;
-    
+
     lines.forEach((line, index) => {
-      this.ctx.fillText(
-        line,
-        x + padding,
-        y + padding + (index + 1) * lineHeight
-      );
+      this.ctx.fillText(line, x + padding, y + padding + (index + 1) * lineHeight);
     });
 
     // Draw comment indicator (speech bubble tail)
@@ -429,7 +441,7 @@ export class CanvasAnnotationManager {
   private renderNote(annotation: CanvasAnnotation): void {
     const { x, y, style, content } = annotation;
     const size = 24;
-    
+
     // Draw note icon background
     this.ctx.fillStyle = style.backgroundColor;
     this.ctx.globalAlpha = style.opacity;
@@ -443,7 +455,7 @@ export class CanvasAnnotationManager {
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
     this.ctx.fillText('📝', x + size / 2, y + size / 2);
-    
+
     // Reset text alignment
     this.ctx.textAlign = 'left';
     this.ctx.textBaseline = 'alphabetic';
@@ -452,7 +464,7 @@ export class CanvasAnnotationManager {
   private renderLabel(annotation: CanvasAnnotation): void {
     const { x, y, style, content } = annotation;
     const padding = 8;
-    
+
     this.ctx.font = `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`;
     const textWidth = this.ctx.measureText(content).width;
     const width = textWidth + padding * 2;
@@ -463,7 +475,7 @@ export class CanvasAnnotationManager {
     this.ctx.fillStyle = style.backgroundColor;
     this.ctx.strokeStyle = style.borderColor;
     this.ctx.lineWidth = style.borderWidth;
-    
+
     this.roundedRect(x, y, width, height, style.borderRadius);
     this.ctx.fill();
     this.ctx.stroke();
@@ -526,14 +538,9 @@ export class CanvasAnnotationManager {
     this.ctx.lineWidth = 2;
     this.ctx.globalAlpha = 1;
     this.ctx.setLineDash([4, 4]);
-    
-    this.ctx.strokeRect(
-      x - margin,
-      y - margin,
-      width + margin * 2,
-      height + margin * 2
-    );
-    
+
+    this.ctx.strokeRect(x - margin, y - margin, width + margin * 2, height + margin * 2);
+
     this.ctx.setLineDash([]);
 
     // Render edit button
@@ -564,8 +571,8 @@ export class CanvasAnnotationManager {
     this.ctx.font = '12px system-ui';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillText('✏️', buttonX + buttonSize/2, buttonY + buttonSize/2);
-    
+    this.ctx.fillText('✏️', buttonX + buttonSize / 2, buttonY + buttonSize / 2);
+
     // Reset text alignment
     this.ctx.textAlign = 'left';
     this.ctx.textBaseline = 'alphabetic';
@@ -580,14 +587,9 @@ export class CanvasAnnotationManager {
     this.ctx.lineWidth = 3;
     this.ctx.globalAlpha = 0.8;
     this.ctx.setLineDash([6, 3]);
-    
-    this.ctx.strokeRect(
-      x - margin,
-      y - margin,
-      width + margin * 2,
-      height + margin * 2
-    );
-    
+
+    this.ctx.strokeRect(x - margin, y - margin, width + margin * 2, height + margin * 2);
+
     this.ctx.setLineDash([]);
 
     // Add editing icon
@@ -597,7 +599,7 @@ export class CanvasAnnotationManager {
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
     this.ctx.fillText('✏️', x + width - 15, y + 15);
-    
+
     // Reset text alignment
     this.ctx.textAlign = 'left';
     this.ctx.textBaseline = 'alphabetic';
@@ -634,7 +636,7 @@ export class CanvasAnnotationManager {
     for (const word of words) {
       const testLine = currentLine + (currentLine ? ' ' : '') + word;
       const metrics = this.ctx.measureText(testLine);
-      
+
       if (metrics.width > maxWidth && currentLine) {
         lines.push(currentLine);
         currentLine = word;
@@ -642,7 +644,7 @@ export class CanvasAnnotationManager {
         currentLine = testLine;
       }
     }
-    
+
     if (currentLine) {
       lines.push(currentLine);
     }
@@ -657,7 +659,7 @@ export class CanvasAnnotationManager {
    */
   private getBoundingBox(annotation: CanvasAnnotation): DirtyRegion {
     const { x, y, type, content, style } = annotation;
-    
+
     switch (type) {
       case 'comment': {
         const maxWidth = 200;
@@ -718,13 +720,16 @@ export class CanvasAnnotationManager {
       priority: 1,
       data: {
         shape: 'rounded-rectangle',
-        x, y, width: maxWidth, height,
+        x,
+        y,
+        width: maxWidth,
+        height,
         fillStyle: style.backgroundColor,
         strokeStyle: style.borderColor,
         lineWidth: style.borderWidth,
         borderRadius: style.borderRadius,
-        globalAlpha: style.opacity
-      }
+        globalAlpha: style.opacity,
+      },
     });
 
     // Queue text commands
@@ -737,8 +742,8 @@ export class CanvasAnnotationManager {
           x: x + padding,
           y: y + padding + (index + 1) * lineHeight,
           fillStyle: style.textColor,
-          font: `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`
-        }
+          font: `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`,
+        },
       });
     });
 
@@ -750,11 +755,11 @@ export class CanvasAnnotationManager {
         path: [
           { type: 'moveTo', x: x + 20, y: y + height },
           { type: 'lineTo', x: x + 30, y: y + height + 10 },
-          { type: 'lineTo', x: x + 40, y: y + height }
+          { type: 'lineTo', x: x + 40, y: y + height },
         ],
         fillStyle: style.backgroundColor,
-        strokeStyle: style.borderColor
-      }
+        strokeStyle: style.borderColor,
+      },
     });
   }
 
@@ -772,11 +777,14 @@ export class CanvasAnnotationManager {
       priority: 1,
       data: {
         shape: 'rounded-rectangle',
-        x, y, width: size, height: size,
+        x,
+        y,
+        width: size,
+        height: size,
         fillStyle: style.backgroundColor,
         borderRadius: 4,
-        globalAlpha: style.opacity
-      }
+        globalAlpha: style.opacity,
+      },
     });
 
     this.optimizer.queueRenderCommand({
@@ -789,8 +797,8 @@ export class CanvasAnnotationManager {
         fillStyle: style.textColor,
         font: `${size - 8}px system-ui`,
         textAlign: 'center',
-        textBaseline: 'middle'
-      }
+        textBaseline: 'middle',
+      },
     });
   }
 
@@ -799,7 +807,7 @@ export class CanvasAnnotationManager {
 
     const { x, y, style, content } = annotation;
     const padding = 8;
-    
+
     this.ctx.font = `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`;
     const textWidth = this.ctx.measureText(content).width;
     const width = textWidth + padding * 2;
@@ -810,13 +818,16 @@ export class CanvasAnnotationManager {
       priority: 1,
       data: {
         shape: 'rounded-rectangle',
-        x, y, width, height,
+        x,
+        y,
+        width,
+        height,
         fillStyle: style.backgroundColor,
         strokeStyle: style.borderColor,
         lineWidth: style.borderWidth,
         borderRadius: style.borderRadius,
-        globalAlpha: style.opacity
-      }
+        globalAlpha: style.opacity,
+      },
     });
 
     this.optimizer.queueRenderCommand({
@@ -827,8 +838,8 @@ export class CanvasAnnotationManager {
         x: x + padding,
         y: y + padding + style.fontSize,
         fillStyle: style.textColor,
-        font: `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`
-      }
+        font: `${style.fontWeight} ${style.fontSize}px system-ui, -apple-system, sans-serif`,
+      },
     });
   }
 
@@ -843,11 +854,14 @@ export class CanvasAnnotationManager {
       type: 'draw-connections',
       priority: 1,
       data: {
-        x1: x, y1: y, x2: endX, y2: endY,
+        x1: x,
+        y1: y,
+        x2: endX,
+        y2: endY,
         strokeStyle: style.borderColor,
         lineWidth: style.borderWidth,
-        globalAlpha: style.opacity
-      }
+        globalAlpha: style.opacity,
+      },
     });
 
     // Arrow head
@@ -861,21 +875,21 @@ export class CanvasAnnotationManager {
       data: {
         path: [
           { type: 'moveTo', x: endX, y: endY },
-          { 
-            type: 'lineTo', 
+          {
+            type: 'lineTo',
             x: endX - arrowLength * Math.cos(angle - arrowAngle),
-            y: endY - arrowLength * Math.sin(angle - arrowAngle)
+            y: endY - arrowLength * Math.sin(angle - arrowAngle),
           },
           { type: 'moveTo', x: endX, y: endY },
-          { 
-            type: 'lineTo', 
+          {
+            type: 'lineTo',
             x: endX - arrowLength * Math.cos(angle + arrowAngle),
-            y: endY - arrowLength * Math.sin(angle + arrowAngle)
-          }
+            y: endY - arrowLength * Math.sin(angle + arrowAngle),
+          },
         ],
         strokeStyle: style.borderColor,
-        lineWidth: style.borderWidth
-      }
+        lineWidth: style.borderWidth,
+      },
     });
   }
 
@@ -889,11 +903,14 @@ export class CanvasAnnotationManager {
       priority: 1,
       data: {
         shape: 'rounded-rectangle',
-        x, y, width, height,
+        x,
+        y,
+        width,
+        height,
         fillStyle: style.backgroundColor,
         borderRadius: style.borderRadius,
-        globalAlpha: style.opacity
-      }
+        globalAlpha: style.opacity,
+      },
     });
   }
 
@@ -913,8 +930,8 @@ export class CanvasAnnotationManager {
         height: height + margin * 2,
         strokeStyle: '#3b82f6',
         lineWidth: 2,
-        lineDash: [4, 4]
-      }
+        lineDash: [4, 4],
+      },
     });
   }
 
@@ -934,8 +951,8 @@ export class CanvasAnnotationManager {
         height: height + margin * 2,
         strokeStyle: '#10b981',
         lineWidth: 3,
-        lineDash: [6, 3]
-      }
+        lineDash: [6, 3],
+      },
     });
   }
 
@@ -972,19 +989,19 @@ export class CanvasAnnotationManager {
         this.performanceMonitor.measure('annotation-drag', () => {
           // Get old bounding box for dirty region
           const oldBoundingBox = this.boundingBoxCache.get(this.selectedAnnotation!);
-          
-          const updated = { 
-            ...annotation, 
+
+          const updated = {
+            ...annotation,
             x: x - this.dragOffset.x,
-            y: y - this.dragOffset.y 
+            y: y - this.dragOffset.y,
           };
-          
+
           // Calculate new bounding box
           const newBoundingBox = this.getBoundingBox(updated);
           this.boundingBoxCache.set(this.selectedAnnotation!, newBoundingBox);
-          
+
           this.annotations.set(this.selectedAnnotation!, updated);
-          
+
           // Mark dirty regions for optimized rendering
           if (this.optimizer) {
             if (oldBoundingBox) {
@@ -1001,9 +1018,13 @@ export class CanvasAnnotationManager {
       const rect = this.canvas.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      
+
       const annotation = this.getAnnotationAt(x, y);
-      if (annotation && this.selectedAnnotation === annotation.id && this.isClickOnEditButton(x, y, annotation)) {
+      if (
+        annotation &&
+        this.selectedAnnotation === annotation.id &&
+        this.isClickOnEditButton(x, y, annotation)
+      ) {
         this.canvas.style.cursor = 'pointer';
       } else if (annotation) {
         this.canvas.style.cursor = 'move';
@@ -1029,19 +1050,19 @@ export class CanvasAnnotationManager {
     const y = event.clientY - rect.top;
 
     const annotation = this.getAnnotationAt(x, y);
-    
+
     if (annotation) {
       // Check if click is on edit button area for selected annotation
       if (this.selectedAnnotation === annotation.id && this.isClickOnEditButton(x, y, annotation)) {
         this.startInlineEdit(annotation.id);
         return;
       }
-      
+
       this.selectedAnnotation = annotation.id;
     } else {
       this.selectedAnnotation = null;
     }
-    
+
     this.render();
   }
 
@@ -1051,7 +1072,7 @@ export class CanvasAnnotationManager {
     const y = event.clientY - rect.top;
 
     const annotation = this.getAnnotationAt(x, y);
-    
+
     if (annotation) {
       // Edit existing annotation
       this.startInlineEdit(annotation.id);
@@ -1064,16 +1085,15 @@ export class CanvasAnnotationManager {
         content: 'New comment',
         author: 'Current User',
         color: '#3b82f6',
-        style: this.getDefaultStyle('comment')
+        style: this.getDefaultStyle('comment'),
       });
-      
+
       // Start editing the new annotation immediately
       if (typeof newAnnotation !== 'string') {
         setTimeout(() => this.startInlineEdit(newAnnotation.id), 100);
       }
     }
   }
-
 
   private isPointInAnnotation(x: number, y: number, annotation: CanvasAnnotation): boolean {
     const { x: ax, y: ay, width = 200, height = 100 } = annotation;
@@ -1086,12 +1106,19 @@ export class CanvasAnnotationManager {
     const editButtonX = ax + width - 25; // Slightly larger clickable area
     const editButtonY = ay + 5;
     const buttonSize = 30; // 30x30 clickable area
-    
-    return x >= editButtonX && x <= editButtonX + buttonSize && 
-           y >= editButtonY && y <= editButtonY + buttonSize;
+
+    return (
+      x >= editButtonX &&
+      x <= editButtonX + buttonSize &&
+      y >= editButtonY &&
+      y <= editButtonY + buttonSize
+    );
   }
 
-  private getDefaultStyle(type: CanvasAnnotation['type'], overrides?: Partial<AnnotationStyle>): AnnotationStyle {
+  private getDefaultStyle(
+    type: CanvasAnnotation['type'],
+    overrides?: Partial<AnnotationStyle>
+  ): AnnotationStyle {
     const baseStyle: AnnotationStyle = {
       backgroundColor: '#ffffff',
       borderColor: '#e5e7eb',
@@ -1100,7 +1127,7 @@ export class CanvasAnnotationManager {
       fontWeight: 'normal',
       opacity: 0.95,
       borderRadius: 8,
-      borderWidth: 1
+      borderWidth: 1,
     };
 
     let typeStyle: AnnotationStyle;
@@ -1123,7 +1150,7 @@ export class CanvasAnnotationManager {
       default:
         typeStyle = baseStyle;
     }
-    
+
     return overrides ? { ...typeStyle, ...overrides } : typeStyle;
   }
 
@@ -1153,11 +1180,11 @@ export class CanvasAnnotationManager {
     try {
       const annotations = JSON.parse(json) as CanvasAnnotation[];
       this.annotations.clear();
-      
+
       annotations.forEach(annotation => {
         this.annotations.set(annotation.id, annotation);
       });
-      
+
       this.render();
     } catch (error) {
       console.error('Failed to import annotations:', error);
@@ -1260,7 +1287,7 @@ export class CanvasAnnotationManager {
       this.annotations.forEach(annotation => {
         MemoryOptimizer.releaseObject('annotation', annotation);
       });
-      
+
       this.annotations.clear();
       this.textContentCache.clear();
       this.wrappedTextCache.clear();
@@ -1268,30 +1295,31 @@ export class CanvasAnnotationManager {
       this.boundingBoxCache.clear();
       this.selectedAnnotation = null;
       this.editingAnnotation = null;
-      
+
       if (this.optimizer) {
         // Mark entire canvas as dirty
         this.optimizer.markDirty({
-          x: 0, y: 0,
+          x: 0,
+          y: 0,
           width: this.canvas.width,
-          height: this.canvas.height
+          height: this.canvas.height,
         });
       } else {
         this.render();
       }
     });
   }
-  
+
   /**
    * Strip HTML tags from content with caching for performance
    */
   private stripHtmlTags(content: string): string {
     if (!content) return '';
-    
+
     // Use the exported utility function
     return stripHtmlTags(content);
   }
-  
+
   /**
    * Get cached plain text content for an annotation
    */
@@ -1300,7 +1328,7 @@ export class CanvasAnnotationManager {
     if (cached !== undefined) {
       return cached;
     }
-    
+
     const plainText = this.stripHtmlTags(htmlContent);
     this.textContentCache.set(annotationId, plainText);
     return plainText;
@@ -1314,7 +1342,9 @@ export type Annotation = CanvasAnnotation;
 export type AnnotationType = CanvasAnnotation['type'];
 
 // Utility functions
-export const createAnnotationStyle = (overrides: Partial<AnnotationStyle> = {}): AnnotationStyle => {
+export const createAnnotationStyle = (
+  overrides: Partial<AnnotationStyle> = {}
+): AnnotationStyle => {
   return {
     backgroundColor: '#ffffff',
     borderColor: '#e5e7eb',
@@ -1324,7 +1354,7 @@ export const createAnnotationStyle = (overrides: Partial<AnnotationStyle> = {}):
     opacity: 0.95,
     borderRadius: 8,
     borderWidth: 1,
-    ...overrides
+    ...overrides,
   };
 };
 
@@ -1334,7 +1364,7 @@ export const createAnnotationStyle = (overrides: Partial<AnnotationStyle> = {}):
  */
 export const stripHtmlTags = (html: string): string => {
   if (!html) return '';
-  
+
   // Remove HTML tags but preserve content
   return html
     .replace(/<[^>]*>/g, '') // Remove all HTML tags
@@ -1352,11 +1382,11 @@ export const stripHtmlTags = (html: string): string => {
  */
 export const sanitizeHtmlContent = (html: string): string => {
   if (!html) return '';
-  
+
   // Allow only safe HTML tags for rich text formatting
   const allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'ul', 'ol', 'li'];
   const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g;
-  
+
   return html.replace(tagRegex, (match, tagName) => {
     if (allowedTags.includes(tagName.toLowerCase())) {
       return match;
@@ -1369,23 +1399,23 @@ export const predefinedStyles = {
   comment: createAnnotationStyle({
     backgroundColor: '#fef3c7',
     borderColor: '#f59e0b',
-    textColor: '#92400e'
+    textColor: '#92400e',
   }),
   warning: createAnnotationStyle({
     backgroundColor: '#fecaca',
     borderColor: '#ef4444',
-    textColor: '#b91c1c'
+    textColor: '#b91c1c',
   }),
   info: createAnnotationStyle({
     backgroundColor: '#dbeafe',
     borderColor: '#3b82f6',
-    textColor: '#1d4ed8'
+    textColor: '#1d4ed8',
   }),
   success: createAnnotationStyle({
     backgroundColor: '#d1fae5',
     borderColor: '#10b981',
-    textColor: '#047857'
-  })
+    textColor: '#047857',
+  }),
 };
 
 // Performance optimization interfaces

@@ -1,13 +1,13 @@
 import { appDataDir, join } from '@tauri-apps/api/path';
 import { createDir, readTextFile, writeTextFile, exists } from '@tauri-apps/api/fs';
 import { isTauri } from '../tauri';
-import { 
-  AIConfig, 
-  AIProvider, 
-  ConnectionTestResult, 
-  getDefaultConfig, 
+import {
+  AIConfig,
+  AIProvider,
+  ConnectionTestResult,
+  getDefaultConfig,
   validateApiKeyFormat,
-  AIConfigSchema
+  AIConfigSchema,
 } from '../types/AIConfig';
 
 export class AIConfigService {
@@ -43,7 +43,7 @@ export class AIConfigService {
 
     const configPath = await this.getConfigPath();
     const configDir = configPath.substring(0, configPath.lastIndexOf('/'));
-    
+
     try {
       await createDir(configDir, { recursive: true });
     } catch (error) {
@@ -53,32 +53,32 @@ export class AIConfigService {
 
   private encryptApiKey(apiKey: string): string {
     if (!apiKey) return '';
-    
+
     // Simple XOR encryption with base64 encoding for local storage
     const key = 'archicomm-ai-config-2024';
     let encrypted = '';
-    
+
     for (let i = 0; i < apiKey.length; i++) {
       const charCode = apiKey.charCodeAt(i) ^ key.charCodeAt(i % key.length);
       encrypted += String.fromCharCode(charCode);
     }
-    
+
     return btoa(encrypted);
   }
 
   private decryptApiKey(encryptedKey: string): string {
     if (!encryptedKey) return '';
-    
+
     try {
       const key = 'archicomm-ai-config-2024';
       const encrypted = atob(encryptedKey);
       let decrypted = '';
-      
+
       for (let i = 0; i < encrypted.length; i++) {
         const charCode = encrypted.charCodeAt(i) ^ key.charCodeAt(i % key.length);
         decrypted += String.fromCharCode(charCode);
       }
-      
+
       return decrypted;
     } catch (error) {
       console.error('Failed to decrypt API key:', error);
@@ -91,8 +91,8 @@ export class AIConfigService {
       ...config,
       openai: {
         ...config.openai,
-        apiKey: this.encryptApiKey(config.openai.apiKey)
-      }
+        apiKey: this.encryptApiKey(config.openai.apiKey),
+      },
     };
   }
 
@@ -101,8 +101,8 @@ export class AIConfigService {
       ...encryptedConfig,
       openai: {
         ...encryptedConfig.openai,
-        apiKey: this.decryptApiKey(encryptedConfig.openai.apiKey)
-      }
+        apiKey: this.decryptApiKey(encryptedConfig.openai.apiKey),
+      },
     };
   }
 
@@ -111,7 +111,7 @@ export class AIConfigService {
 
     try {
       const configPath = await this.getConfigPath();
-      
+
       if (isTauri()) {
         const fileExists = await exists(configPath);
         if (!fileExists) {
@@ -183,7 +183,7 @@ export class AIConfigService {
       return {
         success: false,
         error: 'API key is required',
-        responseTime: Date.now() - startTime
+        responseTime: Date.now() - startTime,
       };
     }
 
@@ -191,7 +191,7 @@ export class AIConfigService {
       return {
         success: false,
         error: 'Invalid API key format',
-        responseTime: Date.now() - startTime
+        responseTime: Date.now() - startTime,
       };
     }
 
@@ -200,61 +200,59 @@ export class AIConfigService {
         return {
           success: false,
           error: 'AI connection tests are only available in desktop app.',
-          responseTime: Date.now() - startTime
+          responseTime: Date.now() - startTime,
         };
       }
       const result = await this.testOpenAI(keyToTest, 'Hello, this is a test message.');
       return {
         ...result,
-        responseTime: Date.now() - startTime
+        responseTime: Date.now() - startTime,
       };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
-        responseTime: Date.now() - startTime
+        responseTime: Date.now() - startTime,
       };
     }
   }
-
 
   private async testOpenAI(apiKey: string, message: string): Promise<ConnectionTestResult> {
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
           messages: [{ role: 'user', content: message }],
           max_tokens: 50,
-          temperature: 0.1
-        })
+          temperature: 0.1,
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         return {
           success: false,
-          error: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`
+          error: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`,
         };
       }
 
       const data = await response.json();
       return {
         success: true,
-        model: data.model
+        model: data.model,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Network error'
+        error: error instanceof Error ? error.message : 'Network error',
       };
     }
   }
-
 
   async resetToDefaults(): Promise<void> {
     this.config = getDefaultConfig();
@@ -263,11 +261,12 @@ export class AIConfigService {
 
   async isAIConfigured(): Promise<boolean> {
     const config = await this.loadConfig();
-    return config.openai.enabled && 
-           config.openai.apiKey.trim() !== '' &&
-           validateApiKeyFormat(config.openai.apiKey);
+    return (
+      config.openai.enabled &&
+      config.openai.apiKey.trim() !== '' &&
+      validateApiKeyFormat(config.openai.apiKey)
+    );
   }
-
 
   validateApiKey(apiKey: string): boolean {
     return validateApiKeyFormat(apiKey);

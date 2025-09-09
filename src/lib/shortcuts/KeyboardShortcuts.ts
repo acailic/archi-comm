@@ -11,7 +11,14 @@
 
 // Only canonical modifiers; 'cmd' is normalized to 'meta'
 export type KeyModifier = 'ctrl' | 'meta' | 'alt' | 'shift';
-export type ShortcutCategory = 'general' | 'canvas' | 'components' | 'navigation' | 'project' | 'system' | 'tools';
+export type ShortcutCategory =
+  | 'general'
+  | 'canvas'
+  | 'components'
+  | 'navigation'
+  | 'project'
+  | 'system'
+  | 'tools';
 
 export interface ShortcutConfig {
   key: string;
@@ -21,6 +28,14 @@ export interface ShortcutConfig {
   modifiers?: KeyModifier[];
   preventDefault?: boolean;
   global?: boolean;
+}
+
+export interface ShortcutAction {
+  id: string;
+  description: string;
+  combination: string;
+  category: ShortcutCategory;
+  action: (event?: KeyboardEvent) => void | Promise<void>;
 }
 
 export class KeyboardShortcutManager {
@@ -77,7 +92,7 @@ export class KeyboardShortcutManager {
    * Temporarily disable shortcuts (useful when modals/overlays are open)
    */
   private temporarilyDisabled = false;
-  
+
   temporarilyDisableShortcuts(): void {
     this.temporarilyDisabled = true;
   }
@@ -107,6 +122,35 @@ export class KeyboardShortcutManager {
    */
   getShortcutsVersion(): number {
     return this.shortcutsVersion;
+  }
+
+  /**
+   * Get shortcut by ID
+   */
+  getShortcut(shortcutId: string): ShortcutAction | null {
+    const config = Array.from(this.shortcuts.values()).find(
+      s => s.description.toLowerCase().replace(/\s+/g, '_') === shortcutId
+    );
+    if (!config) return null;
+
+    return {
+      id: shortcutId,
+      description: config.description,
+      combination: this.generateShortcutKey(config.key, config.modifiers),
+      category: config.category,
+      action: config.action,
+    };
+  }
+
+  /**
+   * Execute shortcut by action
+   */
+  executeShortcut(shortcut: ShortcutAction, event?: KeyboardEvent): void {
+    try {
+      shortcut.action(event);
+    } catch (error) {
+      console.error('Failed to execute shortcut:', error);
+    }
   }
 
   /**
@@ -154,12 +198,12 @@ export class KeyboardShortcutManager {
       if (this.debugMode) {
         console.log(`Executing shortcut: ${shortcut.description} (${shortcutKey})`);
       }
-      
+
       if (shortcut.preventDefault !== false) {
         event.preventDefault();
         event.stopPropagation();
       }
-      
+
       // Execute with performance monitoring
       try {
         shortcut.action();
@@ -197,7 +241,7 @@ export class KeyboardShortcutManager {
 
   private generateShortcutKeyFromEvent(event: KeyboardEvent): string {
     const modifiers: KeyModifier[] = [];
-    
+
     if (event.ctrlKey) modifiers.push('ctrl');
     if (event.metaKey) modifiers.push('meta');
     if (event.altKey) modifiers.push('alt');
@@ -213,7 +257,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Create new project',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:new-project')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:new-project'));
+      },
     });
 
     this.register({
@@ -221,7 +267,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Open project',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:open-project')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:open-project'));
+      },
     });
 
     this.register({
@@ -229,7 +277,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Save project',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:save-project')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:save-project'));
+      },
     });
 
     this.register({
@@ -237,7 +287,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'AI Settings',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:ai-settings')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:ai-settings'));
+      },
     });
 
     // 'Add component': Alt+C, 'Add comment': Ctrl+Shift+C (no conflicts)
@@ -246,7 +298,9 @@ export class KeyboardShortcutManager {
       modifiers: ['alt'],
       description: 'Add component',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-component')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-component'));
+      },
     });
 
     this.register({
@@ -254,7 +308,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl', 'shift'],
       description: 'Add comment',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-comment')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-comment'));
+      },
     });
 
     this.register({
@@ -262,7 +318,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Undo',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:undo')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:undo'));
+      },
     });
 
     this.register({
@@ -270,7 +328,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Redo',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:redo')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:redo'));
+      },
     });
 
     this.register({
@@ -278,31 +338,30 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl', 'shift'],
       description: 'Redo',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:redo')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:redo'));
+      },
     });
 
     // Canvas shortcuts
-    this.register({
-      key: 'c',
-      modifiers: ['alt'],
-      description: 'Add component',
-      category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-component')); }
-    });
 
     this.register({
       key: 'l',
       modifiers: ['alt'],
       description: 'Add connection',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-connection')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-connection'));
+      },
     });
 
     this.register({
       key: 'Delete',
       description: 'Delete selected',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:delete-selected')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:delete-selected'));
+      },
     });
 
     this.register({
@@ -310,14 +369,18 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Select all',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:select-all')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:select-all'));
+      },
     });
 
     this.register({
       key: 'Escape',
       description: 'Clear selection',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:clear-selection')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:clear-selection'));
+      },
     });
 
     // Comment shortcuts
@@ -325,7 +388,9 @@ export class KeyboardShortcutManager {
       key: 'c',
       description: 'Add comment',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-comment')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-comment'));
+      },
     });
 
     this.register({
@@ -333,7 +398,9 @@ export class KeyboardShortcutManager {
       modifiers: ['alt'],
       description: 'Add note',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-note')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-note'));
+      },
     });
 
     this.register({
@@ -341,7 +408,9 @@ export class KeyboardShortcutManager {
       modifiers: ['shift'],
       description: 'Add label',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-label')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-label'));
+      },
     });
 
     this.register({
@@ -349,7 +418,9 @@ export class KeyboardShortcutManager {
       modifiers: ['shift'],
       description: 'Add arrow',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-arrow')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-arrow'));
+      },
     });
 
     this.register({
@@ -357,7 +428,9 @@ export class KeyboardShortcutManager {
       modifiers: ['shift'],
       description: 'Add highlight',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:add-highlight')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:add-highlight'));
+      },
     });
 
     // Component shortcuts
@@ -366,7 +439,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Duplicate selected',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:duplicate')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:duplicate'));
+      },
     });
 
     this.register({
@@ -374,7 +449,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Group selected',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:group')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:group'));
+      },
     });
 
     this.register({
@@ -382,7 +459,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Ungroup selected',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:ungroup')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:ungroup'));
+      },
     });
 
     // Navigation shortcuts
@@ -391,7 +470,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Find/Search',
       category: 'navigation',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:search')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:search'));
+      },
     });
 
     this.register({
@@ -399,7 +480,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Switch to Canvas view',
       category: 'navigation',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:view-canvas')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:view-canvas'));
+      },
     });
 
     this.register({
@@ -407,7 +490,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Switch to Component palette',
       category: 'navigation',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:view-components')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:view-components'));
+      },
     });
 
     this.register({
@@ -415,7 +500,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Switch to Project view',
       category: 'navigation',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:view-project')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:view-project'));
+      },
     });
 
     // Zoom and pan
@@ -424,7 +511,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Zoom in',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:zoom-in')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:zoom-in'));
+      },
     });
 
     this.register({
@@ -432,7 +521,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Zoom out',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:zoom-out')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:zoom-out'));
+      },
     });
 
     this.register({
@@ -440,7 +531,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Reset zoom',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:zoom-reset')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:zoom-reset'));
+      },
     });
 
     // System shortcuts
@@ -449,14 +542,18 @@ export class KeyboardShortcutManager {
       modifiers: ['shift'],
       description: 'Show shortcuts help',
       category: 'system',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:show-help')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:show-help'));
+      },
     });
 
     this.register({
       key: 'F11',
       description: 'Toggle fullscreen',
       category: 'system',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:toggle-fullscreen')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:toggle-fullscreen'));
+      },
     });
 
     // Arrow key navigation
@@ -464,28 +561,36 @@ export class KeyboardShortcutManager {
       key: 'ArrowUp',
       description: 'Move up',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:move-up')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:move-up'));
+      },
     });
 
     this.register({
       key: 'ArrowDown',
       description: 'Move down',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:move-down')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:move-down'));
+      },
     });
 
     this.register({
       key: 'ArrowLeft',
       description: 'Move left',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:move-left')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:move-left'));
+      },
     });
 
     this.register({
       key: 'ArrowRight',
       description: 'Move right',
       category: 'canvas',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:move-right')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:move-right'));
+      },
     });
 
     // Tool selection shortcuts
@@ -493,28 +598,36 @@ export class KeyboardShortcutManager {
       key: 'v',
       description: 'Select tool',
       category: 'tools',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-select')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:tool-select'));
+      },
     });
 
     this.register({
       key: 'h',
       description: 'Pan tool',
       category: 'tools',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-pan')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:tool-pan'));
+      },
     });
 
     this.register({
       key: 'z',
       description: 'Zoom tool',
       category: 'tools',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-zoom')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:tool-zoom'));
+      },
     });
 
     this.register({
       key: 'a',
       description: 'Annotate tool',
       category: 'tools',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:tool-annotate')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:tool-annotate'));
+      },
     });
 
     // Context menu shortcuts
@@ -522,7 +635,9 @@ export class KeyboardShortcutManager {
       key: 'F2',
       description: 'Edit properties',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:edit-properties')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:edit-properties'));
+      },
     });
 
     this.register({
@@ -530,7 +645,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Duplicate',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:duplicate')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:duplicate'));
+      },
     });
 
     this.register({
@@ -538,7 +655,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Copy',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:copy')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:copy'));
+      },
     });
 
     this.register({
@@ -546,7 +665,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl'],
       description: 'Paste',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:paste')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:paste'));
+      },
     });
 
     this.register({
@@ -554,7 +675,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl', 'shift'],
       description: 'Bring to front',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:bring-to-front')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:bring-to-front'));
+      },
     });
 
     this.register({
@@ -562,7 +685,9 @@ export class KeyboardShortcutManager {
       modifiers: ['ctrl', 'shift'],
       description: 'Send to back',
       category: 'components',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:send-to-back')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:send-to-back'));
+      },
     });
 
     this.register({
@@ -570,7 +695,9 @@ export class KeyboardShortcutManager {
       modifiers: ['shift'],
       description: 'Show context menu',
       category: 'general',
-      action: () => { void window.dispatchEvent(new CustomEvent('shortcut:show-context-menu')); }
+      action: () => {
+        void window.dispatchEvent(new CustomEvent('shortcut:show-context-menu'));
+      },
     });
   }
 
@@ -629,11 +756,11 @@ export const getGlobalShortcutManager = (): KeyboardShortcutManager | null => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return null;
   }
-  
+
   if (!_globalShortcutManager) {
     _globalShortcutManager = new KeyboardShortcutManager();
   }
-  
+
   return _globalShortcutManager;
 };
 
@@ -680,7 +807,7 @@ export const getShortcutsVersion = (): number => {
   return manager ? manager.getShortcutsVersion() : 0;
 };
 
-export const onShortcutsChange = (callback: () => void): () => void => {
+export const onShortcutsChange = (callback: () => void): (() => void) => {
   const manager = getGlobalShortcutManager();
   return manager ? manager.onShortcutsChange(callback) : () => false;
 };

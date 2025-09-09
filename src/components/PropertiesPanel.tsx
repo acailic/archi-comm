@@ -1,8 +1,9 @@
 import React from 'react';
+import { useCanvas } from '@/services/canvas/CanvasOrchestrator';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import type { DesignComponent } from '../App';
+import type { DesignComponent } from '@/shared/contracts';
 
 interface PropertiesPanelProps {
   selectedComponent: string | null;
@@ -11,7 +12,20 @@ interface PropertiesPanelProps {
   onDelete: (id: string) => void;
 }
 
-export function PropertiesPanel({ selectedComponent, components, onLabelChange, onDelete }: PropertiesPanelProps) {
+export function PropertiesPanel(props: PropertiesPanelProps) {
+  const ctx = (() => {
+    try {
+      return useCanvas();
+    } catch {
+      return null;
+    }
+  })();
+
+  const selectedComponent = props.selectedComponent ?? ctx?.selectedComponentId ?? null;
+  const components = props.components ?? ctx?.components ?? [];
+  const onLabelChange = props.onLabelChange ?? (ctx ? (id: string, label: string) => ctx.updateComponent(id, { label }) : undefined);
+  const onDelete = props.onDelete ?? (ctx ? (id: string) => ctx.deleteComponent(id) : undefined);
+
   if (!selectedComponent) {
     return null;
   }
@@ -22,29 +36,24 @@ export function PropertiesPanel({ selectedComponent, components, onLabelChange, 
   }
 
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border/30">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-accent"></div>
+    <Card className='bg-card/50 backdrop-blur-sm border-border/30'>
+      <CardHeader className='pb-2'>
+        <CardTitle className='text-sm flex items-center gap-2'>
+          <div className='w-2 h-2 rounded-full bg-accent'></div>
           Properties
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="space-y-3">
+      <CardContent className='pt-0'>
+        <div className='space-y-3'>
           <div>
-            <label className="text-xs font-medium block mb-1">Label</label>
-            <Input
-              value={component.label}
-              onChange={(e) => onLabelChange(component.id, e.target.value)}
-              size="sm"
-              className="text-xs"
-            />
+            <label className='text-xs font-medium block mb-1'>Label</label>
+            <Input value={component.label} onChange={e => onLabelChange(component.id, e.target.value)} size='sm' className='text-xs' />
           </div>
           <Button
-            variant="destructive"
-            size="sm"
+            variant='destructive'
+            size='sm'
             onClick={() => onDelete(component.id)}
-            className="w-full text-xs"
+            className='w-full text-xs'
           >
             Delete Component
           </Button>

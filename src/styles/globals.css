@@ -45,12 +45,12 @@
   --orange-500: 25 100% 50%;
 
   /* Elevation system */
-  --elevation-1: 0 1px 2px rgba(0,0,0,0.06);
-  --elevation-2: 0 4px 8px rgba(0,0,0,0.07), 0 1px 0 rgba(255,255,255,0.04) inset;
-  --elevation-3: 0 8px 16px rgba(0,0,0,0.08), 0 2px 0 rgba(255,255,255,0.04) inset;
-  --elevation-4: 0 12px 24px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.06) inset;
-  --elevation-5: 0 16px 32px rgba(0,0,0,0.12), 0 2px 0 rgba(255,255,255,0.06) inset;
-  --elevation-6: 0 24px 48px rgba(0,0,0,0.14), 0 2px 0 rgba(255,255,255,0.08) inset;
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --elevation-2: 0 4px 8px rgba(0, 0, 0, 0.07), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --elevation-3: 0 8px 16px rgba(0, 0, 0, 0.08), 0 2px 0 rgba(255, 255, 255, 0.04) inset;
+  --elevation-4: 0 12px 24px rgba(0, 0, 0, 0.1), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  --elevation-5: 0 16px 32px rgba(0, 0, 0, 0.12), 0 2px 0 rgba(255, 255, 255, 0.06) inset;
+  --elevation-6: 0 24px 48px rgba(0, 0, 0, 0.14), 0 2px 0 rgba(255, 255, 255, 0.08) inset;
 
   /* Glassmorphism */
   --glass-bg: color-mix(in oklab, var(--card) 70%, transparent);
@@ -77,13 +77,13 @@
   --space-3xl: 2rem;
 
   /* Typography extras */
-  --text-shadow-subtle: 0 1px 0 rgba(0,0,0,0.06);
+  --text-shadow-subtle: 0 1px 0 rgba(0, 0, 0, 0.06);
   --letter-spacing-tight: -0.01em;
 
   /* Interaction overlays */
-  --hover-overlay: rgba(0,0,0,0.04);
-  --focus-overlay: rgba(59,130,246,0.25);
-  --active-overlay: rgba(0,0,0,0.06);
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --focus-overlay: rgba(59, 130, 246, 0.25);
+  --active-overlay: rgba(0, 0, 0, 0.06);
 
   /* Layout system - Three-column design */
   --sidebar-width-sm: 280px;
@@ -91,7 +91,7 @@
   --sidebar-width-lg: 360px;
   --toolbar-height: 60px;
   --topbar-height: 64px;
-  
+
   /* Z-index scale */
   --z-canvas: 1;
   --z-sidebar: 10;
@@ -99,7 +99,7 @@
   --z-topbar: 30;
   --z-modal: 40;
   --z-tooltip: 50;
-  
+
   /* Responsive breakpoints (matching Tailwind) */
   --breakpoint-sm: 640px;
   --breakpoint-md: 768px;
@@ -148,12 +148,12 @@
   --orange-500: 25 100% 60%;
 
   /* Elevation system - tuned for dark */
-  --elevation-1: 0 1px 1.5px rgba(0,0,0,0.35);
-  --elevation-2: 0 2px 6px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.02) inset;
-  --elevation-3: 0 6px 12px rgba(0,0,0,0.50), 0 1px 0 rgba(255,255,255,0.02) inset;
-  --elevation-4: 0 10px 20px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.03) inset;
-  --elevation-5: 0 14px 28px rgba(0,0,0,0.60), 0 1px 0 rgba(255,255,255,0.03) inset;
-  --elevation-6: 0 20px 44px rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.04) inset;
+  --elevation-1: 0 1px 1.5px rgba(0, 0, 0, 0.35);
+  --elevation-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+  --elevation-3: 0 6px 12px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+  --elevation-4: 0 10px 20px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --elevation-5: 0 14px 28px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --elevation-6: 0 20px 44px rgba(0, 0, 0, 0.65), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 
   /* Glassmorphism */
   --glass-bg: color-mix(in oklab, var(--card) 65%, transparent);
@@ -180,13 +180,13 @@
   --space-3xl: 2rem;
 
   /* Typography extras */
-  --text-shadow-subtle: 0 1px 0 rgba(0,0,0,0.5);
+  --text-shadow-subtle: 0 1px 0 rgba(0, 0, 0, 0.5);
   --letter-spacing-tight: -0.01em;
 
   /* Interaction overlays */
-  --hover-overlay: rgba(255,255,255,0.04);
-  --focus-overlay: rgba(59,130,246,0.35);
-  --active-overlay: rgba(255,255,255,0.06);
+  --hover-overlay: rgba(255, 255, 255, 0.04);
+  --focus-overlay: rgba(59, 130, 246, 0.35);
+  --active-overlay: rgba(255, 255, 255, 0.06);
 
   /* Layout system - Three-column design (dark mode adjustments) */
   --sidebar-width-sm: 280px;
@@ -194,7 +194,7 @@
   --sidebar-width-lg: 360px;
   --toolbar-height: 60px;
   --topbar-height: 64px;
-  
+
   /* Z-index scale */
   --z-canvas: 1;
   --z-sidebar: 10;
@@ -259,7 +259,7 @@
  * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
  */
 @layer base {
-  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
     h1 {
       font-size: var(--text-2xl);
       font-weight: var(--font-weight-medium);
@@ -319,7 +319,7 @@ html {
   display: none !important;
 }
 
-.export-mode [class*="selected"] {
+.export-mode [class*='selected'] {
   display: none !important;
 }
 
@@ -345,52 +345,53 @@ html {
   .sidebar-width {
     width: var(--sidebar-width-md);
   }
-  
+
   .sidebar-width-sm {
     width: var(--sidebar-width-sm);
   }
-  
+
   .sidebar-width-lg {
     width: var(--sidebar-width-lg);
   }
-  
+
   /* Layout positioning */
   .layout-topbar {
     height: var(--topbar-height);
     z-index: var(--z-topbar);
   }
-  
+
   .layout-toolbar {
     height: var(--toolbar-height);
     z-index: var(--z-toolbar);
     top: var(--topbar-height);
   }
-  
+
   .layout-sidebar {
     z-index: var(--z-sidebar);
     top: calc(var(--topbar-height) + var(--toolbar-height));
     height: calc(100vh - var(--topbar-height) - var(--toolbar-height));
   }
-  
+
   .layout-canvas {
     z-index: var(--z-canvas);
     top: calc(var(--topbar-height) + var(--toolbar-height));
     height: calc(100vh - var(--topbar-height) - var(--toolbar-height));
   }
-  
+
   /* Responsive sidebar behavior */
   .sidebar-responsive {
-    transition: transform var(--transition-medium) ease-in-out,
-                width var(--transition-medium) ease-in-out,
-                opacity var(--transition-fast) ease-in-out;
+    transition:
+      transform var(--transition-medium) ease-in-out,
+      width var(--transition-medium) ease-in-out,
+      opacity var(--transition-fast) ease-in-out;
   }
-  
+
   .sidebar-collapsed {
     transform: translateX(-100%);
     opacity: 0;
     pointer-events: none;
   }
-  
+
   .sidebar-overlay {
     position: fixed;
     inset: 0;
@@ -400,19 +401,19 @@ html {
     pointer-events: none;
     transition: opacity var(--transition-medium) ease-in-out;
   }
-  
+
   .sidebar-overlay.active {
     opacity: 1;
     pointer-events: auto;
   }
-  
+
   /* Canvas area optimization */
   .canvas-area {
     flex: 1;
     min-width: 0; /* Allows flex item to shrink below content size */
     overflow: hidden;
   }
-  
+
   /* Toolbar positioning and styling */
   .canvas-toolbar {
     position: sticky;
@@ -423,7 +424,7 @@ html {
     box-shadow: var(--elevation-2);
     z-index: var(--z-toolbar);
   }
-  
+
   /* Mobile-first responsive design */
   @media (max-width: 767px) {
     .sidebar-width {
@@ -436,42 +437,42 @@ html {
       border-right: none;
       box-shadow: var(--elevation-4);
     }
-    
+
     .layout-canvas {
       width: 100%;
       margin-left: 0;
     }
-    
+
     .canvas-toolbar {
       padding-left: var(--space-sm);
       padding-right: var(--space-sm);
     }
   }
-  
+
   @media (min-width: 768px) and (max-width: 1023px) {
     .sidebar-width {
       width: var(--sidebar-width-sm);
     }
   }
-  
+
   @media (min-width: 1024px) {
     .sidebar-width {
       width: var(--sidebar-width-md);
     }
-    
+
     .sidebar-responsive {
       transform: translateX(0);
       opacity: 1;
       pointer-events: auto;
     }
   }
-  
+
   @media (min-width: 1280px) {
     .sidebar-width {
       width: var(--sidebar-width-lg);
     }
   }
-  
+
   /* Visual hierarchy improvements */
   .layout-container {
     display: flex;
@@ -479,46 +480,46 @@ html {
     height: 100vh;
     overflow: hidden;
   }
-  
+
   .layout-main {
     display: flex;
     flex: 1;
     min-height: 0;
   }
-  
+
   .layout-content {
     display: flex;
     flex: 1;
     min-width: 0;
     position: relative;
   }
-  
+
   /* Smooth animations for layout changes */
   .layout-transition {
     transition: all var(--transition-medium) ease-in-out;
   }
-  
+
   /* Focus management for accessibility */
   .sidebar-focus-trap {
     position: relative;
   }
-  
+
   .sidebar-focus-trap:focus-within {
     outline: 2px solid var(--focus-overlay);
     outline-offset: -2px;
   }
-  
+
   /* Performance optimizations */
   .layout-gpu-accelerated {
     transform: translateZ(0);
     will-change: transform;
   }
-  
+
   .layout-no-gpu {
     will-change: auto;
     transform: none;
   }
-  
+
   /* Glassmorphism effects for floating elements */
   .glass-panel {
     background: var(--glass-bg);
@@ -526,30 +527,30 @@ html {
     border: 1px solid var(--glass-border);
     box-shadow: var(--elevation-3);
   }
-  
+
   /* Toolbar specific styles */
   .toolbar-button {
     transition: all var(--transition-fast) ease-in-out;
     position: relative;
   }
-  
+
   .toolbar-button:hover {
     background: var(--hover-overlay);
     transform: translateY(-1px);
     box-shadow: var(--elevation-2);
   }
-  
+
   .toolbar-button:active {
     transform: translateY(0);
     background: var(--active-overlay);
   }
-  
+
   .toolbar-button.active {
     background: var(--primary);
     color: var(--primary-foreground);
     box-shadow: var(--elevation-2);
   }
-  
+
   /* Minimap and floating panels */
   .floating-panel {
     position: absolute;
@@ -561,7 +562,7 @@ html {
     z-index: var(--z-modal);
     animation: fadeInScale 200ms ease-out;
   }
-  
+
   @keyframes fadeInScale {
     from {
       opacity: 0;
@@ -572,31 +573,31 @@ html {
       transform: scale(1);
     }
   }
-  
+
   /* Grid overlay improvements */
   .canvas-grid {
     pointer-events: none;
     opacity: 0.3;
     transition: opacity var(--transition-medium) ease-in-out;
   }
-  
+
   .canvas-grid.visible {
     opacity: 0.6;
   }
-  
+
   /* Component selection and interaction states */
   .component-selected {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
     box-shadow: 0 0 0 4px var(--focus-overlay);
   }
-  
+
   .component-hover {
     outline: 1px solid var(--primary);
     outline-offset: 1px;
     transition: all var(--transition-fast) ease-in-out;
   }
-  
+
   /* Multi-selection styles */
   .selection-box {
     position: absolute;
@@ -605,17 +606,68 @@ html {
     pointer-events: none;
     z-index: calc(var(--z-canvas) + 1);
   }
-  
+
   /* Responsive text scaling */
   @media (max-width: 767px) {
     :root {
       --font-size: 13px;
     }
   }
-  
+
   @media (min-width: 1280px) {
     :root {
       --font-size: 15px;
     }
+  }
+}
+
+/* Responsive canvas and layout improvements */
+@layer utilities {
+  /* Mobile-first canvas optimizations */
+  @media (max-width: 1023px) {
+    .canvas-mobile {
+      touch-action: pan-x pan-y pinch-zoom;
+      overflow: auto;
+    }
+
+    .sidebar-mobile {
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+  }
+
+  /* Large screen optimizations */
+  @media (min-width: 1024px) {
+    .canvas-desktop {
+      min-height: 100vh;
+    }
+
+    .sidebar-desktop {
+      height: 100vh;
+      overflow-y: auto;
+    }
+  }
+
+  /* Touch-friendly interactions */
+  @media (hover: none) and (pointer: coarse) {
+    .touch-friendly {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    .canvas-component {
+      transform-origin: center;
+      transition: transform 0.2s ease;
+    }
+
+    .canvas-component:active {
+      transform: scale(1.05);
+    }
+  }
+
+  /* Improved scrolling for mobile */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
   }
 }

@@ -1,0 +1,30 @@
+# Default owner for everything
+* @acailic
+
+# Tauri configuration and Rust code
+/src-tauri/ @acailic
+
+# CI/CD workflows
+/.github/workflows/ @acailic
+
+# Core React components
+/src/components/ @acailic
+
+# Tests
+/e2e/ @acailic
+/__tests__/ @acailic
+/test/ @acailic
+
+# Config files
+/package.json @acailic
+/pnpm-lock.yaml @acailic
+/yarn.lock @acailic
+/package-lock.json @acailic
+/tsconfig.json @acailic
+/tsconfig.*.json @acailic
+/vite.config.* @acailic
+/eslint.config.* @acailic
+/.eslintrc* @acailic
+/.prettierrc* @acailic
+/.editorconfig @acailic
+

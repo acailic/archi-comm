@@ -22,14 +22,14 @@ export interface OnboardingState {
 
 export class OnboardingManager {
   private static instance: OnboardingManager | null = null;
-  
+
   private flows: Map<string, OnboardingFlow> = new Map();
   private state: OnboardingState = {
     isActive: false,
     currentFlow: null,
     currentStep: null,
     currentStepIndex: 0,
-    isVisible: false
+    isVisible: false,
   };
 
   private constructor() {
@@ -69,12 +69,18 @@ export class OnboardingManager {
   }
 
   public nextStep(): boolean {
-    if (!this.state.currentFlow || this.state.currentStepIndex >= this.state.currentFlow.steps.length - 1) {
-      return this.completeOnboarding();
+    if (!this.state.currentFlow) {
+      return false;
     }
 
-    this.state.currentStepIndex++;
-    this.state.currentStep = this.state.currentFlow.steps[this.state.currentStepIndex];
+    if (this.state.currentStepIndex >= this.state.currentFlow.steps.length - 1) {
+      // Always allow continuing - cycle back to first step or stay on last step
+      this.state.currentStepIndex = 0;
+      this.state.currentStep = this.state.currentFlow.steps[0];
+    } else {
+      this.state.currentStepIndex++;
+      this.state.currentStep = this.state.currentFlow.steps[this.state.currentStepIndex];
+    }
     return true;
   }
 
@@ -139,25 +145,28 @@ export class OnboardingManager {
         {
           id: 'welcome',
           title: 'Welcome to ArchiComm!',
-          content: 'Let\'s take a quick tour to get you started with creating your first architectural design.',
+          content:
+            "Let's take a quick tour to get you started with creating your first architectural design.",
           targetSelector: 'center',
-          placement: 'center'
+          placement: 'center',
         },
         {
           id: 'canvas-intro',
           title: 'Design Canvas',
-          content: 'This is your main workspace where you\'ll create and edit your architectural designs.',
+          content:
+            "This is your main workspace where you'll create and edit your architectural designs.",
           targetSelector: '[data-testid="design-canvas"]',
-          placement: 'top'
+          placement: 'top',
         },
         {
           id: 'component-palette',
           title: 'Component Palette',
-          content: 'Use this palette to add architectural components like walls, doors, and windows to your design.',
+          content:
+            'Use this palette to add architectural components like walls, doors, and windows to your design.',
           targetSelector: '[data-testid="component-palette"]',
-          placement: 'right'
-        }
-      ]
+          placement: 'right',
+        },
+      ],
     });
   }
 }
@@ -165,7 +174,7 @@ export class OnboardingManager {
 // React hook for easy integration
 export const useOnboarding = () => {
   const manager = OnboardingManager.getInstance();
-  
+
   return {
     startOnboarding: (flowId: string) => manager.startOnboarding(flowId),
     nextStep: () => manager.nextStep(),
@@ -177,6 +186,6 @@ export const useOnboarding = () => {
     isVisible: () => manager.isVisible(),
     setVisible: (visible: boolean) => manager.setVisible(visible),
     getCurrentFlow: () => manager.getCurrentFlow(),
-    getCurrentStep: () => manager.getCurrentStep()
+    getCurrentStep: () => manager.getCurrentStep(),
   };
 };

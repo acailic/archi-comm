@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { aiConfigService } from '../lib/services/AIConfigService';
-import { 
-  AIConfig, 
-  ConnectionTestResult, 
+import {
+  AIConfig,
+  ConnectionTestResult,
   getDefaultConfig,
-  validateApiKeyFormat
+  validateApiKeyFormat,
 } from '../lib/types/AIConfig';
 
 interface UseAIConfigState {
@@ -34,7 +34,7 @@ const initialState: UseAIConfigState = {
   saving: false,
   error: null,
   connectionTest: null,
-  testingConnection: false
+  testingConnection: false,
 };
 
 export function useAIConfig(): UseAIConfigReturn {
@@ -42,9 +42,11 @@ export function useAIConfig(): UseAIConfigReturn {
   const lastSavedConfigRef = useRef<string>('');
 
   const isAIConfigured = useCallback(() => {
-    return state.config.openai.enabled && 
-           state.config.openai.apiKey.trim() !== '' && 
-           validateApiKeyFormat(state.config.openai.apiKey);
+    return (
+      state.config.openai.enabled &&
+      state.config.openai.apiKey.trim() !== '' &&
+      validateApiKeyFormat(state.config.openai.apiKey)
+    );
   }, [state.config]);
 
   // Load configuration
@@ -55,10 +57,10 @@ export function useAIConfig(): UseAIConfigReturn {
       setState(prev => ({ ...prev, config, loading: false }));
       lastSavedConfigRef.current = JSON.stringify(config);
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: error instanceof Error ? error.message : 'Failed to load configuration' 
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to load configuration',
       }));
     }
   }, []);
@@ -71,10 +73,10 @@ export function useAIConfig(): UseAIConfigReturn {
       setState(prev => ({ ...prev, config, saving: false }));
       return true;
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        saving: false, 
-        error: error instanceof Error ? error.message : 'Failed to save configuration' 
+      setState(prev => ({
+        ...prev,
+        saving: false,
+        error: error instanceof Error ? error.message : 'Failed to save configuration',
       }));
       return false;
     }
@@ -83,30 +85,30 @@ export function useAIConfig(): UseAIConfigReturn {
   // Test connection
   const testConnection = useCallback(async (apiKey?: string): Promise<ConnectionTestResult> => {
     try {
-      setState(prev => ({ 
-        ...prev, 
-        testingConnection: true
+      setState(prev => ({
+        ...prev,
+        testingConnection: true,
       }));
 
       const result = await aiConfigService.testConnection(apiKey);
-      
-      setState(prev => ({ 
+
+      setState(prev => ({
         ...prev,
         testingConnection: false,
-        connectionTest: result
+        connectionTest: result,
       }));
 
       return result;
     } catch (error) {
       const result: ConnectionTestResult = {
         success: false,
-        error: error instanceof Error ? error.message : 'Connection test failed'
+        error: error instanceof Error ? error.message : 'Connection test failed',
       };
 
-      setState(prev => ({ 
+      setState(prev => ({
         ...prev,
         testingConnection: false,
-        connectionTest: result
+        connectionTest: result,
       }));
 
       return result;
@@ -119,22 +121,20 @@ export function useAIConfig(): UseAIConfigReturn {
       setState(prev => ({ ...prev, saving: true, error: null }));
       await aiConfigService.resetToDefaults();
       const config = await aiConfigService.loadConfig();
-      setState(prev => ({ 
-        ...prev, 
-        config, 
+      setState(prev => ({
+        ...prev,
+        config,
         saving: false,
-        connectionTest: null
+        connectionTest: null,
       }));
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        saving: false, 
-        error: error instanceof Error ? error.message : 'Failed to reset configuration' 
+      setState(prev => ({
+        ...prev,
+        saving: false,
+        error: error instanceof Error ? error.message : 'Failed to reset configuration',
       }));
     }
   }, []);
-
-
 
   // Clear error state
   const clearError = useCallback(() => {
@@ -145,10 +145,9 @@ export function useAIConfig(): UseAIConfigReturn {
   const clearTestResult = useCallback(() => {
     setState(prev => ({
       ...prev,
-      connectionTest: null
+      connectionTest: null,
     }));
   }, []);
-
 
   // Load configuration on mount
   useEffect(() => {
@@ -185,6 +184,6 @@ export function useAIConfig(): UseAIConfigReturn {
     resetToDefaults,
     clearError,
     clearTestResult,
-    isAIConfigured
+    isAIConfigured,
   };
 }
