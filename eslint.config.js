@@ -5,6 +5,9 @@ import typescriptParser from '@typescript-eslint/parser';
 export default [
   js.configs.recommended,
   {
+    ignores: ['scripts/*.js', 'vite.config.ts', 'eslint.config.js'],
+  },
+  {
     files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
       parser: typescriptParser,
@@ -32,7 +35,7 @@ export default [
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
-        
+
         // Browser globals
         window: 'readonly',
         document: 'readonly',
@@ -46,7 +49,7 @@ export default [
         cancelAnimationFrame: 'readonly',
         crypto: 'readonly',
         getComputedStyle: 'readonly',
-        
+
         // React globals
         React: 'readonly',
         JSX: 'readonly',
@@ -60,12 +63,15 @@ export default [
       'no-console': 'warn',
       'no-debugger': 'error',
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { 
-        varsIgnorePattern: '^_',
-        argsIgnorePattern: '^_' 
-      }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          varsIgnorePattern: '^_',
+          argsIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/no-explicit-any': 'warn',
-      
+
       // TypeScript strict rules
       '@typescript-eslint/no-unsafe-assignment': 'warn',
       '@typescript-eslint/no-unsafe-member-access': 'warn',
