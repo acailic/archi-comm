@@ -257,23 +257,22 @@ export function SolutionHints({
 
   return (
     <ContainerComponent
-      className={`h-full bg-card/50 backdrop-blur-sm border-l border-border/30 ${className}`}
+      className={`h-full bg-card/50 backdrop-blur-sm border-l border-border/30 flex flex-col ${className}`}
       {...containerProps}
     >
       {/* Header */}
-      <div className='flex items-center justify-between p-4 border-b border-border/30 bg-gradient-to-r from-muted/20 to-card/80 backdrop-blur-sm'>
-        <div className='flex items-center space-x-3'>
-          <div className='p-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-200/30'>
-            <Lightbulb className='w-4 h-4 text-amber-600' />
+      <div className='flex items-center justify-between p-3 border-b border-border/30 bg-gradient-to-r from-muted/20 to-card/80 backdrop-blur-sm'>
+        <div className='flex items-center space-x-2'>
+          <div className='p-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-200/30'>
+            <Lightbulb className='w-3.5 h-3.5 text-amber-600' />
           </div>
-          <div>
-            <h3 className='font-medium text-foreground'>Solution Hints</h3>
-            <p className='text-xs text-muted-foreground'>{progressMessage}</p>
+          <div className='min-w-0'>
+            <h3 className='font-medium text-foreground text-sm truncate'>Solution Hints</h3>
+            <p className='text-xs text-muted-foreground truncate'>{progressMessage}</p>
           </div>
         </div>
-
-        <Button variant='ghost' size='sm' onClick={onClose} className='px-2 hover:bg-muted/50'>
-          <EyeOff className='w-4 h-4' />
+        <Button variant='ghost' size='sm' onClick={onClose} className='px-1.5 hover:bg-muted/50 shrink-0'>
+          <EyeOff className='w-3.5 h-3.5' />
         </Button>
       </div>
 
@@ -305,14 +304,14 @@ export function SolutionHints({
 
   function SolutionHintsContent() {
     return (
-      <Tabs value={currentTab} onValueChange={setCurrentTab} className='p-4'>
-        <TabsList className='grid w-full grid-cols-2'>
-          <TabsTrigger value='hints' className='text-xs'>
+      <Tabs value={currentTab} onValueChange={setCurrentTab} className='p-3 flex-1 flex flex-col'>
+        <TabsList className='grid w-full grid-cols-2 mb-3'>
+          <TabsTrigger value='hints' className='text-xs px-2'>
             Hints ({visibleHints.length})
           </TabsTrigger>
           <TabsTrigger
             value='template'
-            className='text-xs'
+            className='text-xs px-2'
             disabled={!challenge.architectureTemplate}
           >
             Template
@@ -321,7 +320,7 @@ export function SolutionHints({
 
         <TabsContent value='hints' className='mt-4 space-y-3'>
           {isReady ? (
-            <ScrollArea className='h-96'>
+            <ScrollArea className='flex-1 min-h-0'>
               {Object.entries(hintsByType).map(([type, hints]) => (
                 <div key={type} className='mb-4'>
                   <div className='flex items-center space-x-2 mb-2'>
@@ -359,7 +358,7 @@ export function SolutionHints({
                             }`}
                             onClick={() => toggleHintExpansion(hint.id)}
                           >
-                            <CardHeader className='pb-2'>
+                            <CardHeader className='pb-1.5 px-3 pt-3'>
                               <div className='flex items-center justify-between'>
                                 <div className='flex items-center space-x-2'>
                                   <div

@@ -140,6 +140,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --report-unused-disable-directives --max-warnings 0 --fix",
+    "lint:file-length": "node scripts/check-file-length.mjs",
+    "lint:all": "npm run lint && npm run lint:file-length",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,md,json}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,css,md,json}\"",
     "preview": "tauri build --debug && echo \"Debug build created in src-tauri/target/debug/\"",

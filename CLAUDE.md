@@ -73,9 +73,9 @@ ArchiComm is a desktop architecture communication platform built with Tauri, Rea
 - Do what has been asked; nothing more, nothing less
 
 # ACTIVE CONTRIBUTORS
-- **User (Human)**: Works in Cursor IDE, directs the project, makes high-level decisions, has the best taste & judgement.
+- **User (Human)**: Works in  IDE, directs the project, makes high-level decisions, has the best taste & judgement.
 - **Human Developers**: Other devs working on this project (but they are not on localhost here)
-- **Cursor**: AI copilot activated by User, lives in the Cursor IDE, medium level of autonomy, can edit multiple files at once, can run terminal commands, can access the whole codebase; the User uses it to vibe-code the app.
+
 - **AI Agents, such as Codex or Claude Code**: Terminal-based AI agents with high autonomy, can edit multiple files simultaneously, understands entire codebase automatically, runs tests/Git operations, handles large-scale refactoring and complex debugging independently
 
 # FILE LENGTH

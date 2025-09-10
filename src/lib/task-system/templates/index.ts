@@ -493,6 +493,11 @@ export const allTemplates: TaskTemplate[] = [
 // Advanced templates (event-driven, enterprise patterns) are available in premium version
 export const builtInTemplates = [microservicesTemplate, serverlessTemplate];
 
+// Create templates registry for TemplateEngine
+export const templatesRegistry: Map<string, TaskTemplate> = new Map(
+  allTemplates.map(template => [template.id, template])
+);
+
 export default {
   microservices: microservicesTemplate,
   serverless: serverlessTemplate,

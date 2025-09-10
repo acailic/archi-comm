@@ -1,5 +1,17 @@
-import React, { useState } from 'react';
 import { useCanvas } from '@/services/canvas/CanvasOrchestrator';
+import type { DesignComponent, Layer } from '@/shared/contracts';
+import {
+  GripVertical,
+  Layers,
+  Plus,
+  Trash2,
+} from 'lucide-react';
+import { useState } from 'react';
+import { PropertiesPanel } from './PropertiesPanel';
+import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
+import { Input } from './ui/input';
+import { ScrollArea } from './ui/scroll-area';
 import {
   Sidebar,
   SidebarContent,
@@ -7,23 +19,7 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from './ui/sidebar';
-import { PropertiesPanel } from './PropertiesPanel';
-import type { DesignComponent, Layer } from '@/shared/contracts';
-import {
-  Layers,
-  FileText,
-  Copy,
-  ChevronDown,
-  ChevronRight,
-  Trash2,
-  GripVertical,
-  Plus,
-} from 'lucide-react';
-import { ScrollArea } from './ui/scroll-area';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Checkbox } from './ui/checkbox';
-import type { Challenge } from '@/shared/contracts';
+
 
 interface RightSidebarProps {
   selectedComponent: string | null;
@@ -38,7 +34,7 @@ interface RightSidebarProps {
   onToggleLayerVisibility: (id: string) => void;
   onReorderLayer: (id: string, newOrder: number) => void;
   onActiveLayerChange: (id: string | null) => void;
-  challenge?: Challenge;
+
 }
 
 export function RightSidebar(props: RightSidebarProps) {
@@ -58,29 +54,19 @@ export function RightSidebar(props: RightSidebarProps) {
   const activeLayerId = props.activeLayerId ?? ctx?.activeLayerId ?? null;
   const onActiveLayerChange = props.onActiveLayerChange ?? (ctx ? (id: string | null) => ctx.setActiveLayer(id) : undefined);
   const onCreateLayer = props.onCreateLayer ?? (ctx ? (name: string) => ctx.addLayer({ id: `layer-${Date.now()}`, name, visible: true }) : undefined);
-  const onRenameLayer = props.onRenameLayer;
-  const onDeleteLayer = props.onDeleteLayer;
-  const onToggleLayerVisibility = props.onToggleLayerVisibility;
-  const onReorderLayer = props.onReorderLayer;
-  const challenge = props.challenge;
-  const [showAssignment, setShowAssignment] = useState(true);
+  const onRenameLayer = props.onRenameLayer ?? (() => {});
+  const onDeleteLayer = props.onDeleteLayer ?? (() => {});
+  const onToggleLayerVisibility = props.onToggleLayerVisibility ?? (() => {});
+  const onReorderLayer = props.onReorderLayer ?? (() => {});
   const [editingLayer, setEditingLayer] = useState<string | null>(null);
   const [newLayerName, setNewLayerName] = useState('');
-
-  const copyAssignment = async () => {
-    try {
-      if (!challenge) return;
-      const text = `${challenge.title}\n\n${challenge.description}\n\nRequirements:\n- ${challenge.requirements.join('\n- ')}`;
-      await navigator.clipboard.writeText(text);
-    } catch {}
-  };
 
   return (
     <Sidebar
       side='right'
       variant='inset'
       collapsible='none'
-      className='h-full bg-transparent w-full lg:w-80 order-3 lg:order-2'
+      className='h-full bg-transparent w-80 fixed right-0 top-0 layout-sidebar-stable'
     >
       <SidebarContent className='flex flex-col h-full'>
         {/* Properties Panel */}
@@ -89,7 +75,7 @@ export function RightSidebar(props: RightSidebarProps) {
             <div className='w-2 h-2 rounded-full bg-accent'></div>
             Properties
           </SidebarGroupLabel>
-          <div className='p-4'>
+          <div className='p-4 layout-stable'>
             <PropertiesPanel
               selectedComponent={selectedComponent}
               components={components}
@@ -107,8 +93,8 @@ export function RightSidebar(props: RightSidebarProps) {
             <Layers className='w-4 h-4' />
             Layers
           </SidebarGroupLabel>
-          <div className='p-4'>
-            <ScrollArea className='h-32 rounded border bg-card/50'>
+          <div className='p-4 layout-stable'>
+            <ScrollArea className='h-32 rounded border bg-card/50 layout-container-stable'>
               <div className='p-2 space-y-1'>
                 {layers.map(layer => (
                   <div
@@ -118,7 +104,28 @@ export function RightSidebar(props: RightSidebarProps) {
                     }`}
                     onClick={() => onActiveLayerChange(layer.id)}
                   >
-                    <GripVertical className='w-3 h-3 text-muted-foreground cursor-grab' />
+                    <GripVertical
+                      className='w-3 h-3 text-muted-foreground cursor-grab'
+                      draggable={true}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', layer.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const draggedLayerId = e.dataTransfer.getData('text/plain');
+                        if (draggedLayerId !== layer.id) {
+                          onReorderLayer(draggedLayerId, layer.order);
+                        }
+                      }}
+                      onDragEnd={() => {
+                        // Clean up any drag state if needed
+                      }}
+                    />
                     <Checkbox
                       checked={layer.visible}
                       onCheckedChange={() => onToggleLayerVisibility(layer.id)}
@@ -197,62 +204,7 @@ export function RightSidebar(props: RightSidebarProps) {
           </div>
         </SidebarGroup>
 
-        <SidebarSeparator />
 
-        {/* Assignment Summary (Optional) */}
-        {challenge && (
-          <SidebarGroup>
-            <SidebarGroupLabel className='flex items-center justify-between'>
-              <div className='flex items-center gap-2'>
-                <FileText className='w-4 h-4' />
-                Assignment
-              </div>
-              <Button
-                variant='ghost'
-                size='sm'
-                className='h-7 px-2'
-                onClick={() => setShowAssignment(v => !v)}
-                aria-pressed={showAssignment}
-                aria-label={showAssignment ? 'Hide assignment' : 'Show assignment'}
-              >
-                {showAssignment ? (
-                  <ChevronDown className='w-4 h-4' />
-                ) : (
-                  <ChevronRight className='w-4 h-4' />
-                )}
-              </Button>
-            </SidebarGroupLabel>
-            {showAssignment && (
-              <div className='px-4 pb-2 space-y-2'>
-                <div className='text-sm font-medium leading-tight'>{challenge.title}</div>
-                <div className='text-xs text-muted-foreground leading-snug'>
-                  {challenge.description}
-                </div>
-                {challenge.requirements?.length > 0 && (
-                  <div className='mt-2'>
-                    <div className='text-xs font-medium mb-1'>Requirements</div>
-                    <ScrollArea className='h-28 rounded border bg-card/50'>
-                      <ul className='p-2 text-xs space-y-1'>
-                        {challenge.requirements.map((req, i) => (
-                          <li key={i} className='flex gap-2'>
-                            <span className='mt-[6px] inline-block h-1.5 w-1.5 rounded-full bg-foreground/60' />
-                            <span className='leading-snug'>{req}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </ScrollArea>
-                  </div>
-                )}
-                <div className='flex justify-end pt-1'>
-                  <Button variant='outline' size='sm' onClick={copyAssignment} className='h-7 px-2'>
-                    <Copy className='w-3.5 h-3.5 mr-1' />
-                    Copy
-                  </Button>
-                </div>
-              </div>
-            )}
-          </SidebarGroup>
-        )}
       </SidebarContent>
     </Sidebar>
   );

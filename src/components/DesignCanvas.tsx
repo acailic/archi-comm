@@ -32,7 +32,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [components, setComponents] = useState<DesignComponent[]>(initialData.components);
   const [connections, setConnections] = useState<Connection[]>(initialData.connections);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
-  const [connectionMode, setConnectionMode] = useState(false);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
   const [sessionStartTime] = useState<Date>(new Date());
@@ -90,25 +89,8 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, []);
 
   const handleComponentSelect = useCallback((id: string) => {
-    if (connectionMode) {
-      if (!connectionStart) {
-        setConnectionStart(id);
-      } else if (connectionStart !== id) {
-        const newConnection: Connection = {
-          id: `connection-${Date.now()}`,
-          from: connectionStart,
-          to: id,
-          label: 'Connection',
-          type: 'data'
-        };
-        setConnections(prev => [...prev, newConnection]);
-        setConnectionStart(null);
-        setConnectionMode(false);
-      }
-    } else {
-      setSelectedComponent(id);
-    }
-  }, [connectionMode, connectionStart]);
+    setSelectedComponent(id);
+  }, []);
 
   const handleComponentLabelChange = useCallback((id: string, label: string) => {
     setComponents(prev => prev.map(comp => 

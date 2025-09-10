@@ -640,15 +640,7 @@ export class KeyboardShortcutManager {
       },
     });
 
-    this.register({
-      key: 'd',
-      modifiers: ['ctrl'],
-      description: 'Duplicate',
-      category: 'components',
-      action: () => {
-        void window.dispatchEvent(new CustomEvent('shortcut:duplicate'));
-      },
-    });
+    // Note: Duplicate shortcut removed - already defined above as "Duplicate selected"
 
     this.register({
       key: 'c',

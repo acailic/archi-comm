@@ -28,12 +28,15 @@ export default defineConfig({
     exclude: ['**/e2e/**', '**/node_modules/**', '**/dist/**', '**/src-tauri/**'],
     // Reduced coverage thresholds for faster testing
     coverage: {
-      reporter: ['text'],
+      reporter: ['text', 'lcov', 'json', 'html', 'text-summary'],
+      reportsDirectory: './coverage',
       exclude: ['src-tauri/**', 'dist/**', 'e2e/**', '**/*.d.ts', '**/test/**'],
-      lines: 60,
-      functions: 50,
-      branches: 45,
-      statements: 60
+      lines: 70,
+      functions: 60,
+      branches: 55,
+      statements: 70,
+      clean: true,
+      all: true
     },
     // Faster test execution
     pool: 'forks',
@@ -79,6 +82,16 @@ export default defineConfig({
   // Environment variable configuration
   envPrefix: ['VITE_', 'TAURI_'],
   
+  // Web Worker configuration
+  worker: {
+    format: 'es',
+    plugins: [
+      react({
+        devTarget: 'esnext'
+      })
+    ]
+  },
+
   build: {
     // Optimized build configuration
     target: tauriPlatform === 'windows' ? 'chrome105' : 'safari13',

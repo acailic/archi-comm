@@ -1,10 +1,18 @@
-import React, { useMemo, useState } from 'react';
+/**
+ * /src/components/ReviewScreen.tsx
+ * Enhanced review phase component showing the designed system architecture
+ * Provides comprehensive review with visual design preview and AI analysis
+ * RELEVANT FILES: useAIReview.ts, CanvasComponent.tsx, ReviewPreviewCanvas.tsx, VerticalSidebar.tsx
+ */
+
+import React, { useMemo, useState, useRef } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { SidebarProvider, SidebarInset } from './ui/sidebar';
 import { VerticalSidebar } from './VerticalSidebar';
+import { CanvasComponent } from './CanvasComponent';
 import type { Challenge, DesignData, AudioData } from '@/shared/contracts';
 import {
   ArrowLeft,
@@ -15,6 +23,9 @@ import {
   Target,
   TrendingUp,
   CheckCircle,
+  Eye,
+  Layers,
+  GitBranch,
 } from 'lucide-react';
 import { useAIReview } from '../hooks/useAIReview';
 
@@ -36,6 +47,8 @@ export function ReviewScreen({
   onBackToAudio,
 }: ReviewScreenProps) {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+  const [reviewMode, setReviewMode] = useState<'overview' | 'detailed'>('overview');
+  const canvasRef = useRef<HTMLDivElement>(null);
   const {
     loading: aiLoading,
     error: aiError,
@@ -86,10 +99,35 @@ export function ReviewScreen({
     URL.revokeObjectURL(url);
   };
 
-  const solutionText = useMemo(() => {
-    const types = Array.from(new Set(designData.components.map(c => c.type))).join(', ');
-    return `Design Summary\nComponents: ${designData.components.length}\nConnections: ${designData.connections.length}\nTypes: ${types}\n`;
+  // Enhanced solution analysis
+  const designAnalysis = useMemo(() => {
+    const types = Array.from(new Set(designData.components.map(c => c.type)));
+    const componentsByType = types.map(type => ({
+      type,
+      count: designData.components.filter(c => c.type === type).length
+    }));
+    
+    const architectureScore = Math.min(100, 
+      (designData.components.length * 10) + 
+      (designData.connections.length * 15) +
+      (types.length * 5)
+    );
+    
+    return {
+      types,
+      componentsByType,
+      architectureScore,
+      complexity: designData.components.length + (designData.connections.length * 2),
+      hasDatabase: types.some(t => t.includes('database')),
+      hasCache: types.some(t => t.includes('cache')),
+      hasLoadBalancer: types.some(t => t.includes('load-balancer')),
+      hasMonitoring: types.some(t => t.includes('monitoring')),
+    };
   }, [designData]);
+  
+  const solutionText = useMemo(() => {
+    return `Design Summary\nComponents: ${designData.components.length}\nConnections: ${designData.connections.length}\nTypes: ${designAnalysis.types.join(', ')}\nArchitecture Score: ${designAnalysis.architectureScore}\n`;
+  }, [designData, designAnalysis]);
 
   return (
     <SidebarProvider>
@@ -120,16 +158,242 @@ export function ReviewScreen({
         </div>
 
         <div className='flex-1 flex'>
-          <VerticalSidebar
-            components={designData.components}
-            selectedComponent={selectedComponent}
-            onLabelChange={() => {}}
-            onDelete={() => {}}
-          />
+          {/* Left Sidebar - Challenge Requirements & Progress */}
+          <div className='w-80 border-r bg-card/50 flex flex-col'>
+            <div className='p-4 border-b'>
+              <h3 className='font-semibold text-sm mb-2'>Challenge Progress</h3>
+              <div className='space-y-2'>
+                <div className='flex justify-between text-sm'>
+                  <span>Requirements</span>
+                  <span className='text-muted-foreground'>5/5</span>
+                </div>
+                <Progress value={100} className='h-2' />
+              </div>
+            </div>
+            
+            <div className='flex-1 overflow-auto p-4'>
+              <div className='space-y-4'>
+                <div>
+                  <h4 className='font-medium text-sm mb-2'>✅ Requirements</h4>
+                  <div className='space-y-1'>
+                    {(challenge.requirements || []).map((req, idx) => (
+                      <div key={idx} className='flex items-start gap-2 text-xs p-2 bg-green-50 rounded border border-green-200'>
+                        <CheckCircle className='w-3 h-3 text-green-600 mt-0.5 flex-shrink-0' />
+                        <span className='text-green-800'>{req}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className='font-medium text-sm mb-2'>📊 Architecture Analysis</h4>
+                  <div className='space-y-2'>
+                    <div className='text-xs p-2 bg-blue-50 rounded border border-blue-200'>
+                      <div className='font-medium text-blue-800'>Scalability: {designAnalysis.hasLoadBalancer ? 'Good' : 'Needs Improvement'}</div>
+                      <div className='text-blue-600'>Load balancing: {designAnalysis.hasLoadBalancer ? 'Implemented' : 'Missing'}</div>
+                    </div>
+                    
+                    <div className='text-xs p-2 bg-purple-50 rounded border border-purple-200'>
+                      <div className='font-medium text-purple-800'>Performance: {designAnalysis.hasCache ? 'Optimized' : 'Basic'}</div>
+                      <div className='text-purple-600'>Caching: {designAnalysis.hasCache ? 'Implemented' : 'Consider adding'}</div>
+                    </div>
+                    
+                    <div className='text-xs p-2 bg-orange-50 rounded border border-orange-200'>
+                      <div className='font-medium text-orange-800'>Monitoring: {designAnalysis.hasMonitoring ? 'Good' : 'Missing'}</div>
+                      <div className='text-orange-600'>Observability: {designAnalysis.hasMonitoring ? 'Covered' : 'Add monitoring'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-          <SidebarInset className='flex-1'>
-            <div className='flex-1 overflow-auto p-8'>
-              <div className='max-w-6xl mx-auto space-y-6'>
+          {/* Center - Design Preview Canvas */}
+          <div className='flex-1 flex flex-col'>
+            <div className='border-b p-4 bg-background'>
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center gap-4'>
+                  <h3 className='font-semibold'>Design Review</h3>
+                  <div className='flex items-center gap-1 text-sm text-muted-foreground'>
+                    <Layers className='w-4 h-4' />
+                    {designData.components.length} components
+                    <GitBranch className='w-4 h-4 ml-2' />
+                    {designData.connections.length} connections
+                  </div>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <Button 
+                    variant={reviewMode === 'overview' ? 'default' : 'outline'} 
+                    size='sm'
+                    onClick={() => setReviewMode('overview')}
+                  >
+                    <Eye className='w-4 h-4 mr-1' />
+                    Overview
+                  </Button>
+                  <Button 
+                    variant={reviewMode === 'detailed' ? 'default' : 'outline'} 
+                    size='sm'
+                    onClick={() => setReviewMode('detailed')}
+                  >
+                    Detailed
+                  </Button>
+                </div>
+              </div>
+            </div>
+            
+            {/* Canvas Preview Area */}
+            <div className='flex-1 relative bg-background overflow-auto'>
+              <div 
+                ref={canvasRef}
+                className='w-full h-full relative'
+                style={{ minWidth: '2400px', minHeight: '1800px' }}
+              >
+                {/* Render components as in design phase */}
+                {designData.components.map((component) => (
+                  <div key={component.id} className='absolute'>
+                    <CanvasComponent
+                      component={component}
+                      isSelected={selectedComponent === component.id}
+                      isConnectionStart={false}
+                      zoomLevel={0.6}
+                      health={designAnalysis.architectureScore > 70 ? 'healthy' : 'warning'}
+                      connectionCount={designData.connections.filter(c => 
+                        c.from === component.id || c.to === component.id
+                      ).length}
+                      onSelect={() => setSelectedComponent(component.id)}
+                      onLabelChange={() => {}}
+                      onMove={() => {}}
+                      onStartConnection={() => {}}
+                      onCompleteConnection={() => {}}
+                      readonly={true}
+                    />
+                  </div>
+                ))}
+                
+                {/* Render connections */}
+                <svg 
+                  className='absolute inset-0 pointer-events-none'
+                  style={{ width: '2400px', height: '1800px' }}
+                >
+                  <defs>
+                    <marker
+                      id='arrowhead-review'
+                      markerWidth='10'
+                      markerHeight='7'
+                      refX='9'
+                      refY='3.5'
+                      orient='auto'
+                    >
+                      <polygon points='0 0, 10 3.5, 0 7' fill='hsl(var(--primary))' />
+                    </marker>
+                  </defs>
+                  
+                  {designData.connections.map((connection) => {
+                    const fromComponent = designData.components.find(c => c.id === connection.from);
+                    const toComponent = designData.components.find(c => c.id === connection.to);
+                    
+                    if (!fromComponent || !toComponent) return null;
+                    
+                    const fromX = fromComponent.x + 110; // Component width / 2
+                    const fromY = fromComponent.y + 70;  // Component height / 2
+                    const toX = toComponent.x + 110;
+                    const toY = toComponent.y + 70;
+                    
+                    return (
+                      <g key={connection.id}>
+                        <path
+                          d={`M ${fromX} ${fromY} L ${toX} ${toY}`}
+                          stroke='hsl(var(--primary))'
+                          strokeWidth='2'
+                          markerEnd='url(#arrowhead-review)'
+                        />
+                        <text
+                          x={(fromX + toX) / 2}
+                          y={(fromY + toY) / 2 - 8}
+                          textAnchor='middle'
+                          className='text-xs fill-foreground'
+                        >
+                          {connection.label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Sidebar - Review Details */}
+          <div className='w-80 border-l bg-card/50 flex flex-col'>
+            <div className='p-4 border-b'>
+              <h3 className='font-semibold text-sm'>Review Details</h3>
+            </div>
+            
+            <div className='flex-1 overflow-auto p-4 space-y-4'>
+              {/* Architecture Score */}
+              <Card>
+                <CardHeader className='pb-2'>
+                  <CardTitle className='text-sm'>Architecture Score</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className='text-2xl font-bold text-center mb-2'>
+                    {designAnalysis.architectureScore}
+                    <span className='text-lg text-muted-foreground'>/100</span>
+                  </div>
+                  <Progress value={designAnalysis.architectureScore} className='mb-2' />
+                  <p className='text-xs text-center text-muted-foreground'>
+                    {designAnalysis.architectureScore >= 80 ? 'Excellent' :
+                     designAnalysis.architectureScore >= 60 ? 'Good' : 'Needs Improvement'}
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* Component Details */}
+              {selectedComponent && (() => {
+                const component = designData.components.find(c => c.id === selectedComponent);
+                if (!component) return null;
+                return (
+                  <Card>
+                    <CardHeader className='pb-2'>
+                      <CardTitle className='text-sm'>Component Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className='space-y-2'>
+                      <div>
+                        <div className='text-xs font-medium'>Type</div>
+                        <Badge variant='secondary' className='text-xs'>
+                          {component.type.replace('-', ' ')}
+                        </Badge>
+                      </div>
+                      <div>
+                        <div className='text-xs font-medium'>Label</div>
+                        <div className='text-sm'>{component.label}</div>
+                      </div>
+                      <div>
+                        <div className='text-xs font-medium'>Connections</div>
+                        <div className='text-sm'>
+                          {designData.connections.filter(c => 
+                            c.from === component.id || c.to === component.id
+                          ).length}
+                        </div>
+                      </div>
+                      {component.description && (
+                        <div>
+                          <div className='text-xs font-medium'>Description</div>
+                          <div className='text-xs text-muted-foreground'>{component.description}</div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+        
+        {/* Bottom Panel - Detailed Review (when in detailed mode) */}
+        {reviewMode === 'detailed' && (
+          <div className='border-t bg-background p-6'>
+            <div className='max-w-6xl mx-auto space-y-6'>
                 {/* Summary Cards */}
                 <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
                   <Card>
@@ -400,27 +664,36 @@ export function ReviewScreen({
                   </Card>
                 </div>
 
-                {/* Action Buttons */}
-                <div className='flex justify-between items-center pt-6 border-t'>
-                  <div className='flex gap-2'>
-                    <Button variant='outline' onClick={onBackToDesign}>
-                      <ArrowLeft className='w-4 h-4 mr-2' />
-                      Back to Design
-                    </Button>
-                    <Button variant='outline' onClick={onBackToAudio}>
-                      <ArrowLeft className='w-4 h-4 mr-2' />
-                      Back to Recording
-                    </Button>
-                  </div>
-
-                  <Button onClick={onStartOver} size='lg'>
-                    <TrendingUp className='w-4 h-4 mr-2' />
-                    Try Another Challenge
-                  </Button>
-                </div>
               </div>
             </div>
-          </SidebarInset>
+          </div>
+        )}
+        
+        {/* Action Bar */}
+        <div className='border-t bg-background p-4'>
+          <div className='flex justify-between items-center'>
+            <div className='flex gap-2'>
+              <Button variant='outline' onClick={onBackToDesign}>
+                <ArrowLeft className='w-4 h-4 mr-2' />
+                Back to Design
+              </Button>
+              <Button variant='outline' onClick={onBackToAudio}>
+                <ArrowLeft className='w-4 h-4 mr-2' />
+                Back to Recording
+              </Button>
+            </div>
+            
+            <div className='flex gap-2'>
+              <Button variant='outline' onClick={handleExport}>
+                <Download className='w-4 h-4 mr-2' />
+                Export Session
+              </Button>
+              <Button onClick={onStartOver}>
+                <TrendingUp className='w-4 h-4 mr-2' />
+                Try Another Challenge
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </SidebarProvider>

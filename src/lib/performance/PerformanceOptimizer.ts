@@ -3,7 +3,7 @@
  * Designed to achieve top 0.01% performance benchmarks
  */
 
-import { useCallback, useRef, useMemo, useEffect, useState, startTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Simple WorkerManager to cap concurrent worker creation based on hardware concurrency
 export class WorkerManager {
@@ -12,7 +12,7 @@ export class WorkerManager {
   private capacity: number;
 
   private constructor() {
-    const hc = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) || 4;
+    const hc = (typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : undefined) ?? 4;
     this.capacity = Math.max(1, hc - 1);
   }
 
@@ -46,6 +46,12 @@ export class PerformanceMonitor {
   private frameCounter = 0;
   private lastFrameTime = 0;
   private fps = 60;
+  private lowFpsStreak = 0;
+  private lastWarnTs = 0;
+  private static readonly WARNING_COOLDOWN_MS = 5000;
+  private static readonly LOW_FPS_THRESHOLD = 30;
+  private static readonly LOW_FPS_STREAK_THRESHOLD = 10;
+  private static readonly isDevelopment = process.env.NODE_ENV !== 'production';
 
   // Changes:
   // 1. Add lazy initialization flag to PerformanceMonitor:
@@ -89,7 +95,7 @@ export class PerformanceMonitor {
 
     return new Promise<void>(resolve => {
       // Defer heavy initialization
-      requestIdleCallback(
+      (window.requestIdleCallback || window.setTimeout)(
         () => {
           this.initializePerformanceObserver();
           this.isFullyInitialized = true;
@@ -101,9 +107,9 @@ export class PerformanceMonitor {
   }
 
   // 3. Modify MemoryOptimizer to lazy initialize pools:
-  private static objectPools = new Map<string, any[]>();
+  private static objectPools = new Map<string, Array<unknown>>();
 
-  static getPool(type: string): any[] {
+  static getPool<T>(type: string): Array<T> {
     if (!this.objectPools.has(type)) {
       this.objectPools.set(type, []);
     }
@@ -148,14 +154,35 @@ export class PerformanceMonitor {
         const delta = timestamp - this.lastFrameTime;
         this.fps = Math.round(1000 / delta);
 
-        if (this.fps < 50) {
-          console.warn(`Low FPS detected: ${this.fps}`);
+        // Update low FPS streak
+        if (this.fps < PerformanceMonitor.LOW_FPS_THRESHOLD) {
+          this.lowFpsStreak++;
+
+          // Only warn in development and when streak threshold is met
+          const now = Date.now();
+          if (
+            PerformanceMonitor.isDevelopment &&
+            this.lowFpsStreak >= PerformanceMonitor.LOW_FPS_STREAK_THRESHOLD &&
+            now - this.lastWarnTs > PerformanceMonitor.WARNING_COOLDOWN_MS
+          ) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[Performance] Sustained low FPS detected: ${this.fps} FPS ` +
+              `(${this.lowFpsStreak} consecutive frames below ${PerformanceMonitor.LOW_FPS_THRESHOLD} FPS)`
+            );
+            this.lastWarnTs = now;
+          }
+
+          // Record metrics silently (without console spam)
           this.recordMetric('fps-drop', {
             timestamp,
             duration: 0,
             type: 'fps',
             value: this.fps,
           });
+        } else {
+          // Reset streak when FPS recovers
+          this.lowFpsStreak = 0;
         }
       }
 
@@ -183,7 +210,7 @@ export class PerformanceMonitor {
   }
 
   getMetrics(name: string): PerformanceMetric[] {
-    return this.metrics.get(name) || [];
+    return this.metrics.get(name) ?? [];
   }
 
   getCurrentFPS(): number {
@@ -191,7 +218,7 @@ export class PerformanceMonitor {
   }
 
   getAverageMetric(name: string): number {
-    const metrics = this.metrics.get(name) || [];
+    const metrics = this.metrics.get(name) ?? [];
     if (metrics.length === 0) return 0;
 
     const sum = metrics.reduce((acc, metric) => acc + metric.value, 0);
@@ -258,51 +285,147 @@ export class CanvasOptimizer {
   private dirtyRegions: DirtyRegion[] = [];
   private lastRenderTime = 0;
   private renderQueue: RenderCommand[] = [];
+  private isCanvasElement: boolean = false;
+  private compatibilityMode: boolean = false;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', {
-      alpha: false,
-      desynchronized: true,
-      willReadFrequently: false,
-    });
+  constructor(element: HTMLElement, config?: { compatibilityMode?: boolean }) {
+    // Handle both canvas and non-canvas elements
+    this.isCanvasElement = element instanceof HTMLCanvasElement;
+    this.compatibilityMode = config?.compatibilityMode ?? !this.isCanvasElement;
 
-    this.initializeOffscreenRendering();
-    this.optimizeCanvasSettings();
+    if (this.isCanvasElement) {
+      this.canvas = element as HTMLCanvasElement;
+      this.ctx = this.canvas.getContext('2d', {
+        alpha: false,
+        desynchronized: true,
+        willReadFrequently: false,
+      });
+    } else {
+      // For non-canvas elements, we operate in compatibility mode
+      console.log(`Operating in compatibility mode for ${element.tagName} element`);
+    }
+
+    // Only initialize canvas-specific features when appropriate
+    if (this.isCanvasElement && !this.compatibilityMode) {
+      this.initializeOffscreenRendering();
+      this.optimizeCanvasSettings();
+    }
   }
 
   private initializeOffscreenRendering() {
+    // Check for Web Worker support first
+    if (typeof Worker === 'undefined') {
+      console.warn('Web Workers not supported. Falling back to main thread rendering.');
+      return;
+    }
+
+    // Check worker capacity before attempting creation
+    const workerManager = WorkerManager.getInstance();
+    const capacity = workerManager.getCapacity();
+    const canUseWorker = workerManager.canCreateWorker();
+
+    if (!canUseWorker) {
+      console.warn(`Worker capacity reached (${capacity}). Falling back to main thread rendering.`);
+      return;
+    }
+
     try {
-      if ('OffscreenCanvas' in window && typeof OffscreenCanvas !== 'undefined') {
-        const capacity = WorkerManager.getInstance().getCapacity();
-        const canUseWorker = WorkerManager.getInstance().canCreateWorker();
-        if (!canUseWorker) {
-          console.warn(`Worker capacity reached (${capacity}). Skipping offscreen worker.`);
-          return;
-        }
+      // Check for OffscreenCanvas support
+      if (!('OffscreenCanvas' in window) || typeof OffscreenCanvas === 'undefined') {
+        console.warn('OffscreenCanvas not supported. Falling back to main thread rendering.');
+        return;
+      }
 
+      // Create OffscreenCanvas with error handling
+      try {
         this.offscreenCanvas = new OffscreenCanvas(this.canvas!.width, this.canvas!.height);
+      } catch (canvasError) {
+        console.warn('Failed to create OffscreenCanvas:', canvasError);
+        return;
+      }
 
-        // Use Web Worker for heavy rendering operations
+      // Create Web Worker with comprehensive error handling
+      try {
         const worker = new Worker(new URL('./canvas-renderer.ts', import.meta.url), { type: 'module' });
         this.worker = worker;
-        WorkerManager.getInstance().registerWorker(worker);
+        workerManager.registerWorker(worker);
+
+        // Set up worker error handling
+        this.worker.addEventListener('error', (error) => {
+          console.error('Worker error:', error);
+          this.handleWorkerFailure(worker);
+        });
+
+        this.worker.addEventListener('messageerror', (error) => {
+          console.error('Worker message error:', error);
+          this.handleWorkerFailure(worker);
+        });
+
+        this.worker.addEventListener('message', (ev: MessageEvent) => {
+          const message = ev.data as WorkerMessage;
+          if (message.type === 'error') {
+            // eslint-disable-next-line no-console
+            console.error('Worker reported error:', message.message);
+            this.handleWorkerFailure(worker);
+          } else if (message.type === 'terminate') {
+            workerManager.unregisterWorker(worker);
+          }
+        });
+
+        // Initialize worker with timeout
+        const initTimeout = setTimeout(() => {
+          console.warn('Worker initialization timeout. Falling back to main thread rendering.');
+          this.handleWorkerFailure(worker);
+        }, 5000);
+
+        // Send initialization message
         this.worker.postMessage({
           type: 'init',
           canvas: this.offscreenCanvas,
-        });
+        }, [this.offscreenCanvas]);
 
-        this.worker.addEventListener('error', () => {
-          WorkerManager.getInstance().unregisterWorker(worker);
-        });
-        this.worker.addEventListener('message', (ev: MessageEvent) => {
-          if (ev.data && ev.data.type === 'terminate') {
-            WorkerManager.getInstance().unregisterWorker(worker);
+        // Clear timeout on successful message
+        this.worker.addEventListener('message', (ev) => {
+          const data = ev.data as WorkerMessage;
+          if (data?.type === 'renderComplete') {
+            clearTimeout(initTimeout);
           }
-        });
+        }, { once: true });
+
+      } catch (workerError) {
+        console.warn('Failed to create Web Worker:', workerError);
+        return;
       }
+
     } catch (error) {
-      console.warn('OffscreenCanvas not supported or failed to initialize:', error);
+      console.warn('OffscreenCanvas initialization failed:', error);
+      this.fallbackToMainThread();
+    }
+  }
+
+  private handleWorkerFailure(worker: Worker) {
+    try {
+      WorkerManager.getInstance().unregisterWorker(worker);
+      worker.terminate();
+    } catch (error) {
+      console.warn('Error cleaning up failed worker:', error);
+    }
+
+    this.worker = null;
+    this.offscreenCanvas = null;
+    this.fallbackToMainThread();
+  }
+
+  private fallbackToMainThread() {
+    console.log('Canvas rendering will continue on main thread.');
+    // Ensure main thread rendering is still functional
+    if (!this.ctx && this.canvas) {
+      this.ctx = this.canvas.getContext('2d', {
+        alpha: false,
+        desynchronized: true,
+        willReadFrequently: false,
+      });
+      this.optimizeCanvasSettings();
     }
   }
 
@@ -321,12 +444,14 @@ export class CanvasOptimizer {
 
   // Batch rendering operations for maximum performance
   queueRenderCommand(command: RenderCommand) {
-    this.renderQueue.push(command);
+    if (!this.compatibilityMode) {
+      this.renderQueue.push(command);
+    }
   }
 
   // Process render queue with intelligent batching
   flushRenderQueue() {
-    if (this.renderQueue.length === 0) return;
+    if (this.renderQueue.length === 0 || this.compatibilityMode) return;
 
     const monitor = PerformanceMonitor.getInstance();
 
@@ -367,8 +492,9 @@ export class CanvasOptimizer {
     this.ctx?.beginPath();
 
     commands.forEach(cmd => {
-      if (cmd.data.shape === 'rectangle') {
-        this.ctx?.rect(cmd.data.x, cmd.data.y, cmd.data.width, cmd.data.height);
+      const data = cmd.data as RenderCommandShape;
+      if (data.shape === 'rectangle') {
+        this.ctx?.rect(data.x, data.y, data.width, data.height);
       }
     });
 
@@ -382,8 +508,9 @@ export class CanvasOptimizer {
     this.ctx?.beginPath();
 
     commands.forEach(cmd => {
-      this.ctx?.moveTo(cmd.data.x1, cmd.data.y1);
-      this.ctx?.lineTo(cmd.data.x2, cmd.data.y2);
+      const connData = cmd.data as RenderCommandConnection;
+      this.ctx?.moveTo(connData.x1, connData.y1);
+      this.ctx?.lineTo(connData.x2, connData.y2);
     });
 
     this.ctx?.stroke();
@@ -393,7 +520,8 @@ export class CanvasOptimizer {
     if (!this.ctx) return;
 
     commands.forEach(cmd => {
-      this.ctx?.clearRect(cmd.data.x, cmd.data.y, cmd.data.width, cmd.data.height);
+      const clearData = cmd.data as RenderCommandClear;
+      this.ctx?.clearRect(clearData.x, clearData.y, clearData.width, clearData.height);
     });
   }
 
@@ -447,18 +575,18 @@ export class CanvasOptimizer {
 }
 
 // Ultra-fast React component optimization hooks
-export const useOptimizedCallback = <T extends (...args: any[]) => any>(
-  callback: T,
+export const useOptimizedCallback = <TArgs extends unknown[], TReturn>(
+  callback: (...args: TArgs) => TReturn,
   deps: React.DependencyList
-): T => {
+): (...args: TArgs) => TReturn => {
   const memoizedCallback = useCallback(callback, deps);
 
   // Wrap with performance monitoring (with fallback)
   return useCallback(
-    (...args: Parameters<T>) => {
+    (...args: TArgs) => {
       try {
         const monitor = PerformanceMonitor.isReady() ? PerformanceMonitor.getInstance() : null;
-        if (monitor && monitor.measure) {
+        if (monitor?.measure) {
           return monitor.measure('callback-execution', () => {
             return memoizedCallback(...args);
           });
@@ -469,7 +597,7 @@ export const useOptimizedCallback = <T extends (...args: any[]) => any>(
       return memoizedCallback(...args);
     },
     [memoizedCallback]
-  ) as T;
+  ) as (...args: TArgs) => TReturn;
 };
 
 export const useStableReference = <T>(value: T): T => {
@@ -495,7 +623,7 @@ export const useOptimizedMemo = <T>(factory: () => T, deps: React.DependencyList
   return useMemo(() => {
     try {
       const monitor = PerformanceMonitor.isReady() ? PerformanceMonitor.getInstance() : null;
-      if (monitor && monitor.measure) {
+      if (monitor?.measure) {
         return monitor.measure('memo-computation', factory);
       }
     } catch (error) {
@@ -566,7 +694,7 @@ export function createLRUCache<K, V>(maxSize: number = 100) {
 // Memory management utilities
 // Modify MemoryOptimizer to support deferred initialization
 export class MemoryOptimizer {
-  private static pools = new Map<string, any[]>();
+  private static pools = new Map<string, Array<unknown>>();
   private static isInitialized = false;
   private static poolLimits = new Map<string, number>();
   private static defaultLimit = 1000;
@@ -582,7 +710,7 @@ export class MemoryOptimizer {
     this.isInitialized = true;
   }
 
-  static getPool(type: string): any[] {
+  static getPool<T>(type: string): Array<T> {
     if (!this.isInitialized) {
       this.initialize();
     }
@@ -590,7 +718,7 @@ export class MemoryOptimizer {
     if (!this.pools.has(type)) {
       this.pools.set(type, []);
     }
-    return this.pools.get(type)!;
+    return this.pools.get(type)! as Array<T>;
   }
 
   static poolObject<T>(type: string, factory: () => T): T {
@@ -600,7 +728,7 @@ export class MemoryOptimizer {
     return pool.length > 0 ? (pool.pop() as T) : factory();
   }
 
-  static releaseObject(type: string, obj: any) {
+  static releaseObject(type: string, obj: unknown) {
     const pool = this.getPool(type);
     pool.push(obj);
     const limit = this.poolLimits.get(type) ?? this.defaultLimit;
@@ -611,15 +739,16 @@ export class MemoryOptimizer {
     this.poolLimits.set(type, Math.max(0, maxSize));
   }
 
-  static memoizeWeak<T extends (...args: any[]) => any>(fn: T, keyFn?: (...args: Parameters<T>) => any, maxSize: number = 100): T {
-    const weak = new WeakMap<object, any>();
-    const lru = createLRUCache<any, any>(maxSize);
-    return ((...args: Parameters<T>): ReturnType<T> => {
-      const rawKey = keyFn ? keyFn(...args) : (args.length ? (args[0] as any) : '__noargs__');
+  static memoizeWeak<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn, keyFn?: (...args: TArgs) => unknown, maxSize: number = 100): (...args: TArgs) => TReturn {
+    const weak = new WeakMap<object, TReturn>();
+    const lru = createLRUCache<unknown, TReturn>(maxSize);
+    return ((...args: TArgs): TReturn => {
+      const rawKey = keyFn ? keyFn(...args) : (args.length ? (args[0] as unknown) : '__noargs__');
       if (rawKey && typeof rawKey === 'object') {
         const obj = rawKey as object;
-        if (weak.has(obj)) return weak.get(obj);
-        const val = fn(...(args as any));
+        const weakValue = weak.get(obj);
+        if (weakValue !== undefined) return weakValue;
+        const val = fn(...args);
         weak.set(obj, val);
         return val;
       }
@@ -628,15 +757,15 @@ export class MemoryOptimizer {
         : JSON.stringify(args);
       const hit = lru.get(primitiveKey);
       if (hit !== undefined) return hit;
-      const val = fn(...(args as any));
+      const val = fn(...args);
       lru.set(primitiveKey, val);
       return val;
-    }) as T;
+    });
   }
 }
 
 // Fast deep equality check with safety guards
-function deepEqual(a: any, b: any): boolean {
+function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
 
   // Handle null/undefined cases
@@ -646,11 +775,16 @@ function deepEqual(a: any, b: any): boolean {
     if (Array.isArray(a) !== Array.isArray(b)) return false;
 
     try {
-      const keys = Object.keys(a);
-      if (keys.length !== Object.keys(b).length) return false;
+      if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+
+      const aObj = a as { [key: string]: unknown };
+      const bObj = b as { [key: string]: unknown };
+
+      const keys = Object.keys(aObj);
+      if (keys.length !== Object.keys(bObj).length) return false;
 
       for (const key of keys) {
-        if (!(key in b) || !deepEqual(a[key], b[key])) return false;
+        if (!(key in bObj) || !deepEqual(aObj[key], bObj[key])) return false;
       }
 
       return true;
@@ -744,22 +878,22 @@ export class OptimizedEventSystem {
     };
   }
 
-  private throttle(func: Function, limit: number) {
+  private throttle<E extends Event>(func: (evt: E) => void, limit: number) {
     let inThrottle: boolean;
-    return function (this: any, ...args: any[]) {
+    return function (this: unknown, evt: E) {
       if (!inThrottle) {
-        func.apply(this, args);
+        func.call(this, evt);
         inThrottle = true;
         setTimeout(() => (inThrottle = false), limit);
       }
     };
   }
 
-  private debounce(func: Function, delay: number) {
-    let timeoutId: NodeJS.Timeout;
-    return function (this: any, ...args: any[]) {
+  private debounce<E extends Event>(func: (evt: E) => void, delay: number) {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    return function (this: unknown, evt: E) {
       clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func.apply(this, args), delay);
+      timeoutId = setTimeout(() => func.call(this, evt), delay);
     };
   }
 
@@ -772,10 +906,32 @@ export class OptimizedEventSystem {
 }
 
 // Types
+interface RenderCommandShape {
+  shape: 'rectangle';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface RenderCommandConnection {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+interface RenderCommandClear {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface RenderCommand {
-  type: string;
+  type: 'draw-components' | 'draw-connections' | 'clear-region';
   priority: number;
-  data: any;
+  data: RenderCommandShape | RenderCommandConnection | RenderCommandClear;
 }
 
 interface DirtyRegion {
@@ -783,6 +939,13 @@ interface DirtyRegion {
   y: number;
   width: number;
   height: number;
+}
+
+// Types for worker messages
+interface WorkerMessage {
+  type: 'init' | 'error' | 'terminate' | 'renderComplete';
+  message?: string;
+  canvas?: OffscreenCanvas;
 }
 
 // Types for initialization levels
@@ -812,7 +975,7 @@ export function usePerformanceMonitor(level: InitializationLevel = 'basic') {
       }
     };
 
-    init();
+    void init();
   }, [level]);
 
   return { isReady, monitor };
@@ -820,7 +983,14 @@ export function usePerformanceMonitor(level: InitializationLevel = 'basic') {
 
 // Hook for conditional performance utilities loading
 export function usePerformanceUtils(enabled: boolean = true) {
-  const [utils, setUtils] = useState<any>(null);
+  interface PerformanceUtils {
+    monitor: PerformanceMonitor;
+    MemoryOptimizer: typeof MemoryOptimizer;
+    OptimizedEventSystem: OptimizedEventSystem;
+    CanvasOptimizer: typeof CanvasOptimizer;
+  }
+
+  const [utils, setUtils] = useState<PerformanceUtils | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -842,16 +1012,15 @@ export function usePerformanceUtils(enabled: boolean = true) {
         });
       } catch (error) {
         console.warn('Failed to load performance utils:', error);
-        setUtils({}); // Provide empty object as fallback
+        // Keep as null on failure
+        setUtils(null);
       } finally {
         setLoading(false);
       }
     };
 
     // Defer loading to next frame
-    requestAnimationFrame(() => {
-      requestAnimationFrame(loadUtils);
-    });
+    requestAnimationFrame(() => void loadUtils());
   }, [enabled, utils]);
 
   return { utils, loading };

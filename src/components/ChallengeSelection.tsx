@@ -1,41 +1,47 @@
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowRight, Clock, Database, PlayCircle, Search, Target, TrendingUp } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import type { ExtendedChallenge } from '../lib/challenge-config';
+import { isTauriEnvironment } from '../lib/environment';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-// Safe imports with fallbacks
-let Challenge: any, ExtendedChallenge: any;
+// Safe imports with detailed error handling and typed fallbacks
+type Difficulty = 'beginner' | 'intermediate' | 'advanced';
+type Category = 'system-design' | 'architecture' | 'scaling';
 
-try {
-  const appModule = require('../App');
-  Challenge = appModule.Challenge;
-} catch (error) {
-  console.warn('App module not available for Challenge type, using fallback');
-  Challenge = {};
-}
+// Error handling utility that only logs in development
+const handleError = (context: string, error: unknown) => {
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.error(`[ChallengeSelection] ${context}:`, error);
+  }
+};
 
-try {
-  const challengeModule = require('../lib/challenge-config');
-  ExtendedChallenge = challengeModule.ExtendedChallenge;
-} catch (error) {
-  console.warn('Challenge config not available, using fallback');
-  ExtendedChallenge = {};
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  requirements: string[];
+  difficulty: Difficulty;
+  estimatedTime: number;
+  category: Category;
+  tags?: string[];
 }
-import { Search, Clock, TrendingUp, Target, Database, ArrowRight, PlayCircle } from 'lucide-react';
-import { isTauriEnvironment } from '../lib/environment';
-import type { ExtendedChallenge } from '../lib/challenge-config';
 
 interface ChallengeSelectionProps {
-  onChallengeSelect: (challenge: any) => void;
-  availableChallenges?: any[];
+  onChallengeSelect: (challenge: Challenge) => void;
+  availableChallenges?: Challenge[];
   onNavigateToPro?: () => void;
 }
 
+
+
 // ArchiComm Community Edition - Basic Educational Challenges
 // Focused on fundamental system design concepts for learning
-const challenges: any[] = [
+const challenges: Challenge[] = [
   {
     id: 'todo-app',
     title: 'Todo List Application',
@@ -128,8 +134,7 @@ const categoryIcons = {
 
 export function ChallengeSelection({
   onChallengeSelect,
-  availableChallenges,
-  onNavigateToPro,
+  availableChallenges
 }: ChallengeSelectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
@@ -138,7 +143,7 @@ export function ChallengeSelection({
   const [importedChallenges, setImportedChallenges] = useState<ExtendedChallenge[]>([]);
 
   // Previously used to gate premium challenges. All challenges are available in the community build.
-  const proChallenges: any[] = [
+  const proChallenges: Challenge[] = [
     {
       id: 'faang-system',
       title: 'FAANG-Style System Design',
@@ -181,28 +186,53 @@ export function ChallengeSelection({
           ? availableChallenges
           : challenges;
 
-      // Validate challenges structure
-      const validBaseChallenges = baseChallenges.filter(challenge => {
-        return (
-          challenge &&
-          typeof challenge.id === 'string' &&
-          typeof challenge.title === 'string' &&
-          typeof challenge.description === 'string' &&
-          Array.isArray(challenge.requirements) &&
-          typeof challenge.difficulty === 'string' &&
-          typeof challenge.estimatedTime === 'number' &&
-          typeof challenge.category === 'string'
-        );
-      });
+      // Validate challenges structure with proper fallbacks
+      const validBaseChallenges = baseChallenges
+        .map(challenge => {
+          // Ensure challenge has minimum required structure
+          if (!challenge || typeof challenge !== 'object') {
+            return null;
+          }
+
+          // Provide fallback values for missing properties
+          const baseChallenge = {
+            id: `challenge-${Math.random().toString(36).substr(2, 9)}`,
+            title: 'Untitled Challenge',
+            description: 'No description available',
+            requirements: ['No requirements specified'],
+            difficulty: 'beginner' as Difficulty,
+            estimatedTime: 30,
+            category: 'system-design' as Category
+          };
+          return {
+            ...baseChallenge,
+            ...challenge,
+            // Ensure required fields have valid values
+            id: challenge.id || baseChallenge.id,
+            title: challenge.title || baseChallenge.title,
+            description: challenge.description || baseChallenge.description,
+            requirements: Array.isArray(challenge.requirements) ? challenge.requirements : baseChallenge.requirements,
+            difficulty: ['beginner', 'intermediate', 'advanced'].includes(challenge.difficulty) ? challenge.difficulty as Difficulty : baseChallenge.difficulty,
+            estimatedTime: typeof challenge.estimatedTime === 'number' ? challenge.estimatedTime : baseChallenge.estimatedTime,
+            category: ['system-design', 'architecture', 'scaling'].includes(challenge.category) ? challenge.category as Category : baseChallenge.category
+          };
+        })
+        .filter(challenge => challenge !== null);
 
       if (validBaseChallenges.length === 0) {
-        console.warn('No valid challenges found, using fallback set');
+        // Only log warning in development mode to reduce noise
+        if (process.env.NODE_ENV === 'development') {
+          // Silent fallback to default challenges
+        }
         return [...challenges, ...proChallenges];
       }
 
       return [...validBaseChallenges, ...importedChallenges, ...proChallenges];
     } catch (error) {
-      console.error('Error processing challenges, using defaults:', error);
+      // Only log error in development mode
+      if (process.env.NODE_ENV === 'development') {
+        handleError('Error processing challenges', error);
+      }
       return [...challenges, ...importedChallenges, ...proChallenges];
     }
   }, [availableChallenges, importedChallenges]);
@@ -238,7 +268,10 @@ export function ChallengeSelection({
         return matchesSearch && matchesDifficulty && matchesCategory;
       });
     } catch (error) {
-      console.error('Error filtering challenges:', error);
+      // Only log error in development mode to reduce console noise
+      if (process.env.NODE_ENV === 'development') {
+        handleError('Error filtering challenges', error);
+      }
       return allChallenges; // Return all challenges if filtering fails
     }
   }, [searchQuery, selectedDifficulty, selectedCategory, allChallenges]);
@@ -268,7 +301,10 @@ export function ChallengeSelection({
         avgTime: isNaN(avgTime) ? 0 : avgTime,
       };
     } catch (error) {
-      console.error('Error calculating stats:', error);
+      // Only log error in development mode to reduce console noise
+      if (process.env.NODE_ENV === 'development') {
+        handleError('Error calculating stats', error);
+      }
       return { total: 0, beginner: 0, intermediate: 0, advanced: 0, avgTime: 0 };
     }
   }, [allChallenges]);
@@ -316,22 +352,24 @@ export function ChallengeSelection({
                   <Button
                     size='sm'
                     variant='outline'
-                    onClick={async () => {
-                      try {
-                        const { open } = await import('@tauri-apps/api/dialog');
-                        const selected = await open({
-                          multiple: false,
-                          filters: [{ name: 'JSON', extensions: ['json'] }],
-                        });
-                        if (!selected || typeof selected !== 'string') return;
-                        const { tauriChallengeAPI } = await import('../lib/challenge-config');
-                        const loaded = await tauriChallengeAPI.loadChallengesFromFile(selected);
-                        if (Array.isArray(loaded) && loaded.length > 0) {
-                          setImportedChallenges(prev => [...prev, ...loaded]);
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          const { open } = await import('@tauri-apps/api/dialog');
+                          const selected = await open({
+                            multiple: false,
+                            filters: [{ name: 'JSON', extensions: ['json'] }],
+                          });
+                          if (!selected || typeof selected !== 'string') return;
+                          const { tauriChallengeAPI } = await import('../lib/challenge-config');
+                          const loaded = await tauriChallengeAPI.loadChallengesFromFile(selected);
+                          if (Array.isArray(loaded) && loaded.length > 0) {
+                            setImportedChallenges(prev => [...prev, ...loaded]);
+                          }
+                        } catch (e) {
+                          handleError('Failed to import challenges', e);
                         }
-                      } catch (e) {
-                        console.error('Failed to import challenges:', e);
-                      }
+                      })();
                     }}
                   >
                     Import Challenge
@@ -355,7 +393,7 @@ export function ChallengeSelection({
               { label: 'Intermediate', value: stats.intermediate, color: 'text-yellow-500' },
               { label: 'Advanced', value: stats.advanced, color: 'text-red-500' },
               { label: 'Avg Time', value: `${stats.avgTime}m`, color: 'text-blue-500' },
-            ].map((stat, index) => (
+            ].map(stat => (
               <div key={stat.label} className='bg-muted/30 rounded-lg p-3 text-center'>
                 <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
                 <div className='text-xs text-muted-foreground'>{stat.label}</div>
@@ -444,7 +482,6 @@ export function ChallengeSelection({
                   const category = challenge.category || 'system-design';
                   const CategoryIcon = categoryIcons[category] || Target;
                   const challengeId = challenge.id || `challenge-${index}`;
-                  const isPremium = false;
                   return (
                     <motion.div
                       key={challengeId}
@@ -539,9 +576,19 @@ export function ChallengeSelection({
                           <Button
                             onClick={() => {
                               try {
+                                // Validate challenge has required ID before selection
+                                if (!challenge.id) {
+                                  if (process.env.NODE_ENV === 'development') {
+                                    handleError('Challenge missing required ID field', new Error('Missing ID'));
+                                  }
+                                  return;
+                                }
                                 onChallengeSelect(challenge);
                               } catch (error) {
-                                console.error('Error selecting challenge:', error);
+                                // Only log error in development mode to reduce console noise
+                                if (process.env.NODE_ENV === 'development') {
+                                  handleError('Error selecting challenge', error);
+                                }
                               }
                             }}
                             className='w-full group/btn bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-300'

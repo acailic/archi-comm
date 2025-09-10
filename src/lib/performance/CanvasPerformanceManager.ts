@@ -4,10 +4,9 @@
  */
 
 import {
-  PerformanceMonitor,
-  CanvasOptimizer,
-  MemoryOptimizer,
-  OptimizedEventSystem,
+    CanvasOptimizer,
+    OptimizedEventSystem,
+    PerformanceMonitor
 } from './PerformanceOptimizer';
 
 export interface CanvasPerformanceConfig {
@@ -81,13 +80,59 @@ export class CanvasPerformanceManager {
       ...config,
     };
 
-    this.performanceMonitor = PerformanceMonitor.getInstance();
-    this.eventSystem = new OptimizedEventSystem();
-    this.capabilities = this.detectSystemCapabilities();
+    // Initialize with error handling
+    try {
+      this.performanceMonitor = PerformanceMonitor.getInstance();
+    } catch (error) {
+      console.warn('Failed to initialize PerformanceMonitor:', error);
+      // Create a minimal fallback monitor
+      this.performanceMonitor = {
+        recordMetric: () => {},
+        getCurrentFPS: () => 60,
+        getMetrics: () => [],
+        getAverageMetric: () => 0,
+        measure: (name: string, fn: () => any) => fn(),
+      } as any;
+    }
 
-    this.initializeDefaultBudgets();
-    this.startPerformanceMonitoring();
-    this.adaptConfigurationToCapabilities();
+    try {
+      this.eventSystem = OptimizedEventSystem.getInstance();
+    } catch (error) {
+      console.warn('Failed to initialize OptimizedEventSystem:', error);
+      this.eventSystem = {} as any; // Fallback to empty object
+    }
+
+    // Detect capabilities with comprehensive error handling
+    try {
+      this.capabilities = this.detectSystemCapabilities();
+    } catch (error) {
+      console.warn('Failed to detect system capabilities:', error);
+      // Provide safe defaults
+      this.capabilities = {
+        supportsWorkers: false,
+        supportsOffscreenCanvas: false,
+        supportsWebGL: false,
+        supportsImageBitmap: false,
+        maxTextureSize: 2048,
+        devicePixelRatio: 1,
+        hardwareConcurrency: 4,
+        memoryInfo: { usedJSHeapSize: 0, totalJSHeapSize: 0 },
+      };
+    }
+
+    // Initialize with error handling
+    try {
+      this.initializeDefaultBudgets();
+      this.adaptConfigurationToCapabilities();
+      this.startPerformanceMonitoring();
+    } catch (error) {
+      console.warn('Failed to complete CanvasPerformanceManager initialization:', error);
+    }
+
+    if (this.config.debugMode) {
+      console.log('CanvasPerformanceManager initialized with config:', this.config);
+      console.log('System capabilities:', this.capabilities);
+    }
   }
 
   getWorkerCapacity(): number {
@@ -97,15 +142,35 @@ export class CanvasPerformanceManager {
 
   /**
    * Register a canvas system for performance management
+   * Now accepts any HTMLElement to better support SVG-based systems
    */
   registerCanvasSystem(
     id: string,
-    canvas: HTMLCanvasElement,
-    type: 'svg' | 'canvas2d' | 'webgl' = 'canvas2d'
+    element: HTMLElement,
+    type: 'svg' | 'canvas2d' | 'webgl' = 'svg'
   ): CanvasOptimizer {
-    // Create optimizer for this canvas
-    const optimizer = new CanvasOptimizer(canvas);
-    this.optimizers.set(id, optimizer);
+    // Validate element type against system type
+    if ((type === 'canvas2d' || type === 'webgl') && !(element instanceof HTMLCanvasElement)) {
+      console.warn(`Element type mismatch: ${type} system requires HTMLCanvasElement, got ${element.tagName}`);
+    }
+    // Check if already registered to prevent duplicates
+    if (this.optimizers.has(id)) {
+      if (this.config.debugMode) {
+        console.log(`Canvas system ${id} is already registered, returning existing optimizer`);
+      }
+      return this.optimizers.get(id)!;
+    }
+
+    // Create optimizer with appropriate mode
+    try {
+      const optimizer = new CanvasOptimizer(element, {
+        compatibilityMode: type === 'svg'
+      });
+      this.optimizers.set(id, optimizer);
+    } catch (error) {
+      console.error(`Failed to create optimizer for ${type} system:`, error);
+      throw new Error(`Canvas system registration failed for ${id}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
 
     // Initialize metrics tracking
     this.systemMetrics.set(id, {
@@ -123,9 +188,13 @@ export class CanvasPerformanceManager {
       this.performanceBudgets.set(id, this.getDefaultBudget(type));
     }
 
-    // Initialize worker if enabled and supported
-    if (this.config.enableWorkers && this.capabilities.supportsWorkers) {
-      this.initializeWorker(id, canvas);
+    // Initialize worker if enabled and supported (only for HTML canvas elements)
+    if (this.config.enableWorkers && this.capabilities.supportsWorkers && element instanceof HTMLCanvasElement) {
+      this.initializeWorker(id, element);
+    }
+
+    if (this.config.debugMode) {
+      console.log(`Canvas system ${id} registered successfully with type ${type}`);
     }
 
     this.notifyListeners('systemRegistered', { id, type });
@@ -136,27 +205,93 @@ export class CanvasPerformanceManager {
    * Unregister a canvas system
    */
   unregisterCanvasSystem(id: string): void {
+    // Only log if registration actually exists to reduce noise
+    if (!this.optimizers.has(id) && !this.workers.has(id) && !this.systemMetrics.has(id)) {
+      if (this.config.debugMode) {
+        console.log(`Canvas system ${id} was not registered, skipping unregister`);
+      }
+      return;
+    }
+
+    if (this.config.debugMode) {
+      console.log(`Unregistering canvas system: ${id}`);
+    }
+
     // Cleanup optimizer
     const optimizer = this.optimizers.get(id);
     if (optimizer) {
-      // Cleanup optimizer resources
+      try {
+        // Call cleanup method if optimizer has one
+        if (typeof (optimizer as any).cleanup === 'function') {
+          (optimizer as any).cleanup();
+        }
+      } catch (cleanupError) {
+        console.warn(`Error cleaning up optimizer for canvas ${id}:`, cleanupError);
+      }
       this.optimizers.delete(id);
     }
 
-    // Cleanup worker
+    // Cleanup worker with enhanced error handling
     const worker = this.workers.get(id);
     if (worker) {
       try {
-        worker.terminate();
-      } catch {}
+        // Send termination message first
+        worker.postMessage({ type: 'terminate' });
+
+        // Wait briefly then terminate
+        setTimeout(() => {
+          try {
+            worker.terminate();
+          } catch (terminateError) {
+            if (this.config.debugMode) {
+              console.warn(`Error terminating worker for canvas ${id}:`, terminateError);
+            }
+          }
+        }, 100);
+
+      } catch (error) {
+        if (this.config.debugMode) {
+          console.warn(`Error during worker cleanup for canvas ${id}:`, error);
+        }
+
+        // Force terminate as fallback
+        try {
+          worker.terminate();
+        } catch (forceTerminateError) {
+          // Silent fallback - only log in debug mode
+          if (this.config.debugMode) {
+            console.warn(`Error force-terminating worker for canvas ${id}:`, forceTerminateError);
+          }
+        }
+      }
+
       this.workers.delete(id);
+
+      // Remove from idle workers if present
+      const idleIndex = this.idleWorkers.indexOf(worker);
+      if (idleIndex !== -1) {
+        this.idleWorkers.splice(idleIndex, 1);
+      }
+
+      // Process queue to initialize waiting workers
       this.processWorkerQueue();
     }
 
-    // Cleanup metrics
+    // Remove from worker queue if present
+    this.workerQueue = this.workerQueue.filter(item => item.id !== id);
+
+    // Cleanup metrics and budgets
     this.systemMetrics.delete(id);
     this.performanceBudgets.delete(id);
 
+    // Remove system-specific recommendations
+    this.recommendations = this.recommendations.filter(
+      rec => !rec.message.includes(`System ${id}`) && !rec.message.includes(`canvas ${id}`)
+    );
+
+    if (this.config.debugMode) {
+      console.log(`Canvas system ${id} successfully unregistered`);
+    }
     this.notifyListeners('systemUnregistered', { id });
   }
 
@@ -302,23 +437,96 @@ export class CanvasPerformanceManager {
    * Cleanup all resources
    */
   cleanup(): void {
+    console.log('Starting CanvasPerformanceManager cleanup');
+
     // Stop monitoring
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
     }
 
-    // Cleanup all optimizers
+    // Cleanup all optimizers with error handling
+    this.optimizers.forEach((optimizer, id) => {
+      try {
+        if (typeof (optimizer as any).cleanup === 'function') {
+          (optimizer as any).cleanup();
+        }
+      } catch (error) {
+        console.warn(`Error cleaning up optimizer ${id}:`, error);
+      }
+    });
     this.optimizers.clear();
 
-    // Terminate all workers
-    this.workers.forEach(worker => worker.terminate());
-    this.workers.clear();
+    // Terminate all workers gracefully
+    const workerCleanupPromises: Promise<void>[] = [];
 
-    // Clear metrics and recommendations
+    this.workers.forEach((worker, id) => {
+      const cleanupPromise = new Promise<void>((resolve) => {
+        try {
+          // Send termination message
+          worker.postMessage({ type: 'terminate' });
+
+          // Set timeout for graceful shutdown
+          const timeout = setTimeout(() => {
+            try {
+              worker.terminate();
+            } catch (error) {
+              console.warn(`Error terminating worker ${id}:`, error);
+            }
+            resolve();
+          }, 1000); // 1 second timeout
+
+          // Listen for acknowledgment
+          const originalHandler = worker.onmessage;
+          worker.onmessage = (event) => {
+            if (event.data && event.data.type === 'terminate') {
+              clearTimeout(timeout);
+              worker.terminate();
+              resolve();
+            } else if (originalHandler) {
+              originalHandler(event);
+            }
+          };
+
+        } catch (error) {
+          console.warn(`Error during worker cleanup ${id}:`, error);
+          try {
+            worker.terminate();
+          } catch (terminateError) {
+            console.warn(`Error force-terminating worker ${id}:`, terminateError);
+          }
+          resolve();
+        }
+      });
+
+      workerCleanupPromises.push(cleanupPromise);
+    });
+
+    // Wait for all workers to cleanup (with timeout)
+    Promise.allSettled(workerCleanupPromises).then(() => {
+      console.log('All workers cleaned up');
+    }).catch((error) => {
+      console.warn('Error during worker cleanup:', error);
+    });
+
+    this.workers.clear();
+    this.idleWorkers.forEach(worker => {
+      try {
+        worker.terminate();
+      } catch (error) {
+        console.warn('Error terminating idle worker:', error);
+      }
+    });
+    this.idleWorkers = [];
+    this.workerQueue = [];
+
+    // Clear all data structures
     this.systemMetrics.clear();
+    this.performanceBudgets.clear();
     this.recommendations = [];
     this.listeners.clear();
+
+    console.log('CanvasPerformanceManager cleanup completed');
   }
 
   /**
@@ -334,6 +542,30 @@ export class CanvasPerformanceManager {
       capabilities: this.capabilities,
       aggregated: this.getAggregatedMetrics(),
     };
+  }
+
+  /**
+   * Send render command to worker (new method for updated worker interface)
+   */
+  renderToWorker(id: string, renderData: any): void {
+    const worker = this.workers.get(id);
+    if (!worker) {
+      console.warn(`No worker found for canvas ${id}`);
+      return;
+    }
+
+    try {
+      worker.postMessage({
+        type: 'render',
+        data: {
+          ...renderData,
+          qualityLevel: this.currentQualityLevel
+        }
+      });
+    } catch (error) {
+      console.error(`Failed to send render command to worker for canvas ${id}:`, error);
+      this.handleWorkerFailure(id, worker);
+    }
   }
 
   // Private methods
@@ -521,11 +753,16 @@ export class CanvasPerformanceManager {
   }
 
   private initializeWorker(id: string, canvas: HTMLCanvasElement): void {
-    if (!this.capabilities.supportsWorkers) return;
+    // Check worker support first
+    if (!this.capabilities.supportsWorkers) {
+      console.log(`Workers not supported. Canvas ${id} will use main thread rendering.`);
+      return;
+    }
 
-    // Capacity check
+    // Capacity check with detailed logging
     const capacity = this.getWorkerCapacity();
     if (this.workers.size >= capacity) {
+      console.log(`Worker capacity reached (${this.workers.size}/${capacity}). Queueing canvas ${id}.`);
       this.workerQueue.push({ id, canvas });
       this.performanceMonitor.recordMetric('worker-queue-length', {
         timestamp: Date.now(),
@@ -533,64 +770,280 @@ export class CanvasPerformanceManager {
         type: 'queue',
         value: this.workerQueue.length,
       });
+
+      // Add recommendation for capacity issues
+      this.addRecommendation({
+        type: 'warning',
+        message: `Worker capacity reached. Canvas ${id} queued for later initialization.`,
+        action: 'Consider reducing the number of concurrent canvas systems or upgrading hardware',
+        impact: 'medium',
+      });
       return;
     }
 
     try {
-      const worker = this.idleWorkers.pop() || new Worker(new URL('./canvas-renderer.ts', import.meta.url), { type: 'module' });
+      // Create or reuse worker with enhanced error handling
+      let worker: Worker;
 
-      worker.onmessage = event => {
-        this.handleWorkerMessage(id, event.data);
-      };
+      try {
+        worker = this.idleWorkers.pop() || new Worker(new URL('./canvas-renderer.ts', import.meta.url), { type: 'module' });
+      } catch (workerCreateError) {
+        console.error(`Failed to create worker for canvas ${id}:`, workerCreateError);
 
-      worker.onerror = error => {
-        console.warn(`Worker for canvas ${id} failed:`, error);
-        this.workers.delete(id);
-      };
-
-      // Initialize worker with canvas
-      if (this.capabilities.supportsOffscreenCanvas) {
+        // Try fallback worker creation without module type
         try {
-          const offscreen = canvas.transferControlToOffscreen();
-          worker.postMessage({ type: 'init', canvas: offscreen }, [offscreen]);
-        } catch (error) {
-          console.warn(`Failed to transfer control to offscreen for canvas ${id}:`, error);
+          worker = new Worker(new URL('./canvas-renderer.ts', import.meta.url));
+        } catch (fallbackError) {
+          console.error(`Fallback worker creation also failed for canvas ${id}:`, fallbackError);
+          this.addRecommendation({
+            type: 'critical',
+            message: `Worker creation failed for canvas ${id}. Using fallback main thread rendering.`,
+            action: 'Check browser compatibility or disable worker-based rendering',
+            impact: 'high',
+          });
+          return;
         }
       }
 
+      // Set up comprehensive worker event handling
+      worker.onmessage = (event) => {
+        try {
+          this.handleWorkerMessage(id, event.data);
+        } catch (messageError) {
+          console.error(`Error handling worker message for canvas ${id}:`, messageError);
+          this.handleWorkerFailure(id, worker);
+        }
+      };
+
+      worker.onerror = (error) => {
+        console.error(`Worker error for canvas ${id}:`, error);
+        this.handleWorkerFailure(id, worker);
+      };
+
+      worker.onmessageerror = (error) => {
+        console.error(`Worker message error for canvas ${id}:`, error);
+        this.handleWorkerFailure(id, worker);
+      };
+
+      // Initialize worker with OffscreenCanvas if supported
+      if (this.capabilities.supportsOffscreenCanvas) {
+        try {
+          // Check if canvas is still valid and attached to DOM
+          if (!canvas.parentNode) {
+            console.warn(`Canvas ${id} is not attached to DOM. Skipping OffscreenCanvas transfer.`);
+            worker.terminate();
+            return;
+          }
+
+          const offscreen = canvas.transferControlToOffscreen();
+
+          // Set up initialization timeout
+          const initTimeout = setTimeout(() => {
+            console.warn(`Worker initialization timeout for canvas ${id}. Terminating worker.`);
+            this.handleWorkerFailure(id, worker);
+          }, 10000); // 10 second timeout
+
+          // Send initialization message
+          worker.postMessage({ type: 'init', canvas: offscreen }, [offscreen]);
+
+          // Clear timeout on successful worker registration
+          const originalHandler = worker.onmessage;
+          worker.onmessage = (event) => {
+            if (event.data && (event.data.type === 'initialized' || event.data.type === 'renderComplete')) {
+              clearTimeout(initTimeout);
+              worker.onmessage = originalHandler; // Restore original handler
+            }
+            if (originalHandler) originalHandler(event);
+          };
+
+        } catch (transferError) {
+          console.error(`Failed to transfer control to offscreen for canvas ${id}:`, transferError);
+          this.addRecommendation({
+            type: 'warning',
+            message: `OffscreenCanvas transfer failed for canvas ${id}. Using fallback rendering.`,
+            action: 'Check canvas state and browser support for OffscreenCanvas',
+            impact: 'medium',
+          });
+
+          // Clean up failed worker
+          try {
+            worker.terminate();
+          } catch (terminateError) {
+            console.warn(`Error terminating failed worker for canvas ${id}:`, terminateError);
+          }
+          return;
+        }
+      } else {
+        console.log(`OffscreenCanvas not supported. Worker for canvas ${id} will use alternative rendering.`);
+
+        // Still initialize worker for other operations even without OffscreenCanvas
+        worker.postMessage({ type: 'init', canvas: null });
+      }
+
+      // Successfully register worker
       this.workers.set(id, worker);
+
+      // Update metrics to reflect active worker
+      const metrics = this.systemMetrics.get(id);
+      if (metrics) {
+        metrics.workerActive = true;
+      }
+
+      console.log(`Successfully initialized worker for canvas ${id}`);
       this.processWorkerQueue();
+
     } catch (error) {
-      console.warn(`Failed to create worker for canvas ${id}:`, error);
+      console.error(`Unexpected error initializing worker for canvas ${id}:`, error);
+      this.addRecommendation({
+        type: 'critical',
+        message: `Worker initialization failed for canvas ${id} due to unexpected error.`,
+        action: 'Check browser console for details and consider disabling worker-based rendering',
+        impact: 'high',
+      });
     }
+  }
+
+  private handleWorkerFailure(id: string, worker: Worker): void {
+    console.warn(`Handling worker failure for canvas ${id}`);
+
+    try {
+      // Clean up worker
+      worker.terminate();
+    } catch (terminateError) {
+      console.warn(`Error terminating failed worker for canvas ${id}:`, terminateError);
+    }
+
+    // Remove from active workers
+    this.workers.delete(id);
+
+    // Update metrics
+    const metrics = this.systemMetrics.get(id);
+    if (metrics) {
+      metrics.workerActive = false;
+    }
+
+    // Add performance recommendation
+    this.addRecommendation({
+      type: 'warning',
+      message: `Worker for canvas ${id} failed and was terminated. Falling back to main thread rendering.`,
+      action: 'Check worker stability or disable worker-based rendering if issues persist',
+      impact: 'medium',
+    });
+
+    // Process queue in case this failure frees up capacity
+    this.processWorkerQueue();
   }
 
   private processWorkerQueue() {
     const capacity = this.getWorkerCapacity();
+    const processedCount = 0;
+
     while (this.workerQueue.length > 0 && this.workers.size < capacity) {
-      const next = this.workerQueue.shift()!;
-      this.initializeWorker(next.id, next.canvas);
+      const next = this.workerQueue.shift();
+      if (!next) break;
+
+      // Validate queued item
+      if (!next.canvas?.parentNode) {
+        console.warn(`Removing invalid canvas ${next.id} from worker queue`);
+        continue;
+      }
+
+      try {
+        this.initializeWorker(next.id, next.canvas);
+      } catch (error) {
+        console.error(`Failed to process queued worker for canvas ${next.id}:`, error);
+
+        // Add to recommendations
+        this.addRecommendation({
+          type: 'warning',
+          message: `Failed to initialize queued worker for canvas ${next.id}`,
+          action: 'Check canvas state and worker compatibility',
+          impact: 'medium',
+        });
+      }
     }
+
+    // Update queue metrics
     this.performanceMonitor.recordMetric('worker-queue-length', {
       timestamp: Date.now(),
       duration: 0,
       type: 'queue',
       value: this.workerQueue.length,
     });
+
+    // Log queue processing if in debug mode
+    if (this.config.debugMode && this.workerQueue.length > 0) {
+      console.log(`Worker queue processed. Remaining items: ${this.workerQueue.length}`);
+    }
   }
 
   private handleWorkerMessage(id: string, message: any): void {
+    if (!message || typeof message !== 'object') {
+      console.warn(`Invalid worker message for canvas ${id}:`, message);
+      return;
+    }
+
     switch (message.type) {
+      case 'initialized':
+        console.log(`Worker initialized successfully for canvas ${id}:`, message.message);
+        // Worker is ready to receive render commands
+        const initMetrics = this.systemMetrics.get(id);
+        if (initMetrics) {
+          initMetrics.workerActive = true;
+        }
+        break;
+
       case 'renderComplete':
+        // Record successful render performance
         this.performanceMonitor.recordMetric(`${id}-worker-render`, {
           timestamp: Date.now(),
-          duration: message.duration,
+          duration: message.duration || 0,
           type: 'worker-render',
-          value: message.duration,
+          value: message.duration || 0,
+        });
+
+        // Update system metrics
+        const metrics = this.systemMetrics.get(id);
+        if (metrics && typeof message.duration === 'number') {
+          metrics.renderTime = message.duration;
+          if (typeof message.memoryUsage === 'number') {
+            metrics.memoryUsage = message.memoryUsage;
+          }
+        }
+        break;
+
+      case 'error':
+        console.error(`Worker reported error for canvas ${id}:`, message.message || 'Unknown error');
+
+        // Record error metrics
+        this.performanceMonitor.recordMetric(`${id}-worker-error`, {
+          timestamp: Date.now(),
+          duration: 0,
+          type: 'worker-error',
+          value: 1,
+        });
+
+        // Add performance recommendation for worker errors
+        this.addRecommendation({
+          type: 'warning',
+          message: `Worker for canvas ${id} reported an error: ${message.message || 'Unknown error'}`,
+          action: 'Check worker logs and consider fallback rendering',
+          impact: 'medium',
         });
         break;
-      case 'error':
-        console.error(`Worker error for canvas ${id}:`, message.error);
+
+      case 'terminate':
+        console.log(`Worker for canvas ${id} requested termination`);
+        const worker = this.workers.get(id);
+        if (worker) {
+          this.handleWorkerFailure(id, worker);
+        }
+        break;
+
+      default:
+        if (this.config.debugMode) {
+          console.log(`Unknown worker message type for canvas ${id}:`, message.type);
+        }
         break;
     }
   }
@@ -710,8 +1163,8 @@ export const useCanvasPerformanceManager = (config?: Partial<CanvasPerformanceCo
 
   return {
     manager,
-    registerCanvas: (id: string, canvas: HTMLCanvasElement, type?: 'svg' | 'canvas2d' | 'webgl') =>
-      manager.registerCanvasSystem(id, canvas, type),
+    registerCanvas: (id: string, element: HTMLElement, type?: 'svg' | 'canvas2d' | 'webgl') =>
+      manager.registerCanvasSystem(id, element, type),
     unregisterCanvas: (id: string) => manager.unregisterCanvasSystem(id),
     getMetrics: () => manager.getAggregatedMetrics(),
     getRecommendations: () => manager.getRecommendations(),

@@ -5,11 +5,15 @@
 # ArchiComm Community Edition
 ### A desktop companion for learning and practicing system design
 
-<!-- Quality & Ecosystem Badges -->
-<a href="https://github.com/acailic/archi-comm/actions/workflows/ci.yml"><img alt="Build" src="https://github.com/acailic/archi-comm/actions/workflows/ci.yml/badge.svg?branch=main"></a>
-<a href="https://github.com/acailic/archi-comm/actions/workflows/coverage.yml"><img alt="Coverage" src="https://github.com/acailic/archi-comm/actions/workflows/coverage.yml/badge.svg?branch=main"></a>
-<a href="https://github.com/acailic/archi-comm/actions/workflows/security.yml"><img alt="Security" src="https://github.com/acailic/archi-comm/actions/workflows/security.yml/badge.svg?branch=main"></a>
-<a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+<!-- Quality & Security Badges -->
+[![Build Status](https://github.com/acailic/archi-comm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/acailic/archi-comm/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/acailic/archi-comm/branch/main/graph/badge.svg)](https://codecov.io/gh/acailic/archi-comm)
+[![Coveralls](https://coveralls.io/repos/github/acailic/archi-comm/badge.svg?branch=main)](https://coveralls.io/github/acailic/archi-comm?branch=main)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=alert_status)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=security_rating)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=ncloc)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 <img alt="Version" src="https://img.shields.io/badge/version-0.2.1-blue.svg">
 <img alt="Node >=18" src="https://img.shields.io/badge/node-%3E%3D18.0.0-339933?logo=node.js&logoColor=white">
 <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
@@ -56,17 +60,45 @@ See also: [src/docs/SystemDesignPractice.md](src/docs/SystemDesignPractice.md)
 
 ---
 
-## Quick Start
+## Installation
 
+### Direct Download (All Platforms)
+Download the latest signed release for your platform from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
+
+### macOS
+Using Homebrew (recommended):
+```bash
+# Binary installation
+brew install --cask archi-comm
+
+# Or, for source installation
+brew install archi-comm
+```
+
+### Windows
+Download and run the signed installer from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
+
+### Linux
+Download the AppImage or .deb package from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
+
+### Development Setup
 ```bash
 # Clone and launch the desktop app
 git clone https://github.com/acailic/archicomm.git
 cd archicomm
 npm install
-npm run dev   # or: npm start
+npm run tauri:dev  # for desktop development
+# or
+npm run dev        # for web development
 ```
 
-Build binaries: `npm run build` (Tauri bundles for your OS).
+Build binaries: `npm run build` (creates signed Tauri bundles for your OS).
+
+### Auto-Updates
+ArchiComm includes an automatic update system that securely downloads and installs updates. You can:
+- Enable/disable automatic update checks in preferences
+- Manually check for updates from the Help menu
+- View update history and release notes
 
 ---
 

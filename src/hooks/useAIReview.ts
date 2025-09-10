@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import type { ReviewResp } from '../shared/contracts';
+import type { ReviewResp } from '../lib/contracts/schema';
 
 interface UseAIReviewOptions {
   rateLimitMs?: number;
@@ -56,10 +56,8 @@ export function useAIReview(options: UseAIReviewOptions = {}) {
     setHistory([]);
   }, []);
 
-  const state = useMemo(
-    () => ({ loading, error, result, history }),
-    [loading, error, result, history]
+  return useMemo(
+    () => ({ loading, error, result, history, review, reset }),
+    [loading, error, result, history, review, reset]
   );
-
-  return { ...state, review, reset };
 }

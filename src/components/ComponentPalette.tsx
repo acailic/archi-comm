@@ -1,62 +1,56 @@
-import React, { useState } from 'react';
-import { useDrag } from 'react-dnd';
-import { CardContent, CardHeader, CardTitle } from './ui/card';
-import { EnhancedCard } from './ui/enhanced-card';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
 import type { DesignComponent } from '@/shared/contracts';
 import {
-  Server,
-  Database,
-  Zap,
-  Globe,
-  Monitor,
-  HardDrive,
-  Cloud,
-  Container,
-  Layers,
   Activity,
-  Shield,
-  Key,
-  Lock,
-  Code,
-  Smartphone,
-  MessageSquare,
+  AlertTriangle,
   Archive,
   BarChart3,
-  AlertTriangle,
-  FileText,
-  Search,
-  Workflow,
-  GitBranch,
-  Radio,
-  Wifi,
-  Cpu,
-  Memory,
-  Network,
-  CloudCog,
-  FolderOpen,
   Box,
   Boxes,
-  Settings,
-  Users,
+  Brain,
+  Cloud,
+  CloudCog,
+  Code,
+  Container,
+  Cpu,
+  Database,
+  Database as DB,
+  FileText,
+  FolderOpen,
+  GitBranch,
+  Globe,
+  HardDrive,
+  Key,
+  Layers,
+  Lock,
+  MessageSquare,
+  Monitor,
+  Network,
+  Radio,
+  Search,
+  Server,
+  Shield,
+  Smartphone,
+  Timer,
   UserCheck,
   Webhook,
-  Timer,
-  Gauge,
-  TrendingUp,
-  Brain,
-  Database as DB,
-  HardDriveIcon,
+  Wifi,
+  Workflow,
+  Zap,
 } from 'lucide-react';
+import React, { useState } from 'react';
+import { useDrag } from 'react-dnd';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { CardContent, CardHeader, CardTitle } from './ui/card';
+import { EnhancedCard } from './ui/enhanced-card';
+import { Input } from './ui/input';
+import { ScrollArea } from './ui/scroll-area';
+import { Tabs } from './ui/tabs';
 
 interface ComponentType {
   type: DesignComponent['type'];
   label: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   color: string;
   category: string;
   description: string;
@@ -590,7 +584,7 @@ function DraggableComponent({
       ref={drag}
       data-testid={`palette-item-${type}`}
       className={`
-        group p-2.5 rounded-lg border border-border/50 cursor-move transition-all duration-200
+        group p-2 rounded-lg border border-border/50 cursor-move transition-all duration-200
         hover:border-primary/50 hover:bg-accent/30 hover:shadow-sm hover:scale-[1.02]
         active:scale-95 bg-card/30 backdrop-blur-sm
         ${isDragging ? 'opacity-50 rotate-1 scale-105 border-primary shadow-lg' : ''}
@@ -599,9 +593,9 @@ function DraggableComponent({
     >
       <div className='flex items-center space-x-2.5'>
         <div
-          className={`w-7 h-7 rounded-md ${color} flex items-center justify-center transition-all duration-200 group-hover:scale-110 shadow-sm`}
+          className={`w-6 h-6 rounded-md ${color} flex items-center justify-center transition-all duration-200 group-hover:scale-110 shadow-sm`}
         >
-          <Icon className='w-3.5 h-3.5 text-white' />
+          <Icon className='w-3 h-3 text-white' />
         </div>
         <div className='flex-1 min-w-0'>
           <span className='text-sm font-medium truncate block leading-tight'>{label}</span>
@@ -632,7 +626,7 @@ export function ComponentPalette() {
         <CardTitle className='flex items-center justify-between text-sm'>
           <span className='bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent'></span>
         </CardTitle>
-        <div className='space-y-3'>
+        <div className='space-y-2'>
           <div className='relative'>
             <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
             <Input

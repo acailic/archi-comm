@@ -1,20 +1,18 @@
-import React, { useState, Suspense } from 'react';
+import type { Challenge } from '@/shared/contracts';
+import { ChevronDown, ChevronRight, Copy, FileText } from 'lucide-react';
+import React, { Suspense, useState } from 'react';
+import { Button } from './ui/button';
+import { ScrollArea } from './ui/scroll-area';
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarSeparator,
 } from './ui/sidebar';
 // Lazy-load and memoize ComponentPalette to improve performance
 const ComponentPalette = React.lazy(() =>
   import('./ComponentPalette').then(m => ({ default: React.memo(m.ComponentPalette) }))
 );
-import type { DesignComponent } from '@/shared/contracts';
-import { FileText, Copy, ChevronDown, ChevronRight } from 'lucide-react';
-import { ScrollArea } from './ui/scroll-area';
-import { Button } from './ui/button';
-import type { Challenge } from '@/shared/contracts';
 
 interface VerticalSidebarProps {
   challenge?: Challenge;
@@ -26,9 +24,24 @@ export function VerticalSidebar({ challenge }: VerticalSidebarProps) {
   const copyAssignment = async () => {
     try {
       if (!challenge) return;
-      const text = `${challenge.title}\n\n${challenge.description}\n\nRequirements:\n- ${challenge.requirements.join('\n- ')}`;
+      // Build text content with safe fallbacks
+      let text = `${challenge.title || ''}\n\n${challenge.description || ''}`;
+
+      // Only add requirements if they exist and are an array
+      if (Array.isArray(challenge.requirements) && challenge.requirements.length > 0) {
+        text += `\n\nRequirements:\n- ${challenge.requirements.join('\n- ')}`;
+      }
+
+      // Handle clipboard API availability
+      if (!navigator?.clipboard?.writeText) {
+        // Silently fail - user will notice copy didn't work
+        return;
+      }
+
       await navigator.clipboard.writeText(text);
-    } catch {}
+    } catch {
+      // Silently fail - user will notice if copy didn't work
+    }
   };
 
   return (
@@ -37,8 +50,7 @@ export function VerticalSidebar({ challenge }: VerticalSidebarProps) {
       side='left'
       variant='sidebar'
       collapsible='none'
-      className='h-full w-full lg:w-80 shrink-0 border-r lg:border-b-0 border-b bg-card/50 order-1 lg:order-0'
-      style={{ width: '100%', maxWidth: '20rem' }}
+      className='h-full sidebar-width lg:sidebar-width-lg layout-sidebar-stable shrink-0 border-r lg:border-b-0 border-b bg-card/50'
     >
       <SidebarContent className='flex flex-col h-full'>
         {/* Assignment summary */}
@@ -65,8 +77,8 @@ export function VerticalSidebar({ challenge }: VerticalSidebarProps) {
               </Button>
             </SidebarGroupLabel>
             {showAssignment && (
-              <div className='px-4 pb-2 space-y-2'>
-                <div className='text-sm font-medium leading-tight'>{challenge.title}</div>
+              <div className='bg-accent/10 rounded-lg p-3 mx-2 mb-2 border-l-2 border-primary/20 layout-stable'>
+                <div className='text-base font-semibold leading-tight text-primary'>{challenge.title}</div>
                 <div className='text-xs text-muted-foreground leading-snug'>
                   {challenge.description}
                 </div>
@@ -74,11 +86,10 @@ export function VerticalSidebar({ challenge }: VerticalSidebarProps) {
                   <div className='mt-2'>
                     <div className='text-xs font-medium mb-1'>Requirements</div>
                     <ScrollArea className='h-28 rounded border bg-card/50'>
-                      <ul className='p-2 text-xs space-y-1'>
+                      <ul className='p-2 text-xs space-y-1.5 list-disc ml-4'>
                         {challenge.requirements.map((req, i) => (
-                          <li key={`${req}-${i}`} className='flex gap-2'>
-                            <span className='mt-[6px] inline-block h-1.5 w-1.5 rounded-full bg-foreground/60' />
-                            <span className='leading-snug'>{req}</span>
+                          <li key={`${req}-${i}`} className='leading-snug text-foreground/90'>
+                            {req}
                           </li>
                         ))}
                       </ul>
@@ -86,7 +97,12 @@ export function VerticalSidebar({ challenge }: VerticalSidebarProps) {
                   </div>
                 )}
                 <div className='flex justify-end pt-1'>
-                  <Button variant='outline' size='sm' onClick={copyAssignment} className='h-7 px-2'>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => void copyAssignment()}
+                    className='h-7 px-2'
+                  >
                     <Copy className='w-3.5 h-3.5 mr-1' />
                     Copy
                   </Button>
@@ -96,9 +112,9 @@ export function VerticalSidebar({ challenge }: VerticalSidebarProps) {
           </SidebarGroup>
         )}
 
-        <SidebarGroup className='flex-1'>
-          <SidebarGroupLabel>Component Library</SidebarGroupLabel>
-          <div className='flex-1 p-2'>
+        <SidebarGroup className='flex-1 px-1.5 layout-stable'>
+          <SidebarGroupLabel className='flex items-center justify-between text-primary'>Component Library</SidebarGroupLabel>
+          <div className='flex-1 p-1.5 layout-container-stable'>
             <Suspense
               fallback={
                 <div className='text-xs text-muted-foreground p-2'>Loading components…</div>

@@ -11,6 +11,7 @@ updates:
     labels:
       - dependencies
       - npm
+      - security
     reviewers:
       - acailic
     assignees:
@@ -19,6 +20,10 @@ updates:
     commit-message:
       prefix: build
       include: scope
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    security-updates-only: true
     ignore:
       # Major updates for frameworks or tools that may require manual review
       - dependency-name: "@tauri-apps/*"

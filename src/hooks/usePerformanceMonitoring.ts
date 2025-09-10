@@ -208,7 +208,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
     const avgRenderTime = monitor.getAverageMetric('render');
     const memoryUsage = calculateMemoryUsage();
     const poolEfficiency = calculatePoolEfficiency();
-    const activeMeasurements = activeMeasurements.current.size;
+    const activeMeasurementsCount = activeMeasurements.current.size;
 
     const newData: PerformanceData = {
       fps,
@@ -216,7 +216,7 @@ export function usePerformanceMonitoring(config: PerformanceConfig = {}) {
       memoryUsage,
       poolEfficiency,
       healthScore: 0, // Will be calculated below
-      activeMeasurements,
+      activeMeasurements: activeMeasurementsCount,
       history: [],
     };
 

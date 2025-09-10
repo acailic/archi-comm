@@ -97,14 +97,14 @@
         "frameworks": [],
         "minimumSystemVersion": "10.13",
         "exceptionDomain": "",
-        "signingIdentity": null,
-        "providerShortName": null,
-        "entitlements": null
+        "signingIdentity": "${APPLE_SIGNING_IDENTITY}",
+        "providerShortName": "${APPLE_PROVIDER_SHORT_NAME}",
+        "entitlements": "entitlements.plist"
       },
       "windows": {
-        "certificateThumbprint": null,
+        "certificateThumbprint": "${WINDOWS_CERTIFICATE_THUMBPRINT}",
         "digestAlgorithm": "sha256",
-        "timestampUrl": ""
+        "timestampUrl": "http://timestamp.digicert.com"
       }
     },
     "systemTray": {
@@ -131,7 +131,12 @@
       }
     ],
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+        "https://github.com/acailic/archi-comm/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": "${TAURI_UPDATER_PUBLIC_KEY}"
     }
   }
 }
