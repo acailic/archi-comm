@@ -6,14 +6,6 @@
  */
 
 import React, { useMemo, useState, useRef } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Progress } from './ui/progress';
-import { SidebarProvider, SidebarInset } from './ui/sidebar';
-import { VerticalSidebar } from './VerticalSidebar';
-import { CanvasComponent } from './CanvasComponent';
-import type { Challenge, DesignData, AudioData } from '@/shared/contracts';
 import {
   ArrowLeft,
   RotateCcw,
@@ -28,6 +20,14 @@ import {
   GitBranch,
 } from 'lucide-react';
 import { useAIReview } from '../hooks/useAIReview';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Progress } from './ui/progress';
+import { SidebarProvider } from './ui/sidebar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { CanvasComponent } from './CanvasComponent';
+import type { Challenge, DesignData, AudioData } from '@/shared/contracts';
 
 interface ReviewScreenProps {
   challenge: Challenge;
@@ -129,20 +129,333 @@ export function ReviewScreen({
     return `Design Summary\nComponents: ${designData.components.length}\nConnections: ${designData.connections.length}\nTypes: ${designAnalysis.types.join(', ')}\nArchitecture Score: ${designAnalysis.architectureScore}\n`;
   }, [designData, designAnalysis]);
 
+  // Render the detailed review panel separately to avoid JSX parsing edge cases
+  const renderDetailedPanel = () => {
+    if (reviewMode !== 'detailed') return null;
+    return (
+      <div className='border-t bg-background p-6'>
+        <div className='max-w-6xl mx-auto space-y-6'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+            <Card>
+              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+                <CardTitle className='text-sm font-medium'>Components Used</CardTitle>
+                <Target className='h-4 w-4 text-muted-foreground' />
+              </CardHeader>
+              <CardContent>
+                <div className='text-2xl font-bold'>{designData.components.length}</div>
+                <p className='text-xs text-muted-foreground'>System components</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+                <CardTitle className='text-sm font-medium'>Recording Duration</CardTitle>
+                <Clock className='h-4 w-4 text-muted-foreground' />
+              </CardHeader>
+              <CardContent>
+                <div className='text-2xl font-bold'>{formatDuration(audioData.duration)}</div>
+                <p className='text-xs text-muted-foreground'>Audio explanation</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+                <CardTitle className='text-sm font-medium'>Word Count</CardTitle>
+                <MessageSquare className='h-4 w-4 text-muted-foreground' />
+              </CardHeader>
+              <CardContent>
+                <div className='text-2xl font-bold'>{audioData.wordCount}</div>
+                <p className='text-xs text-muted-foreground'>Words in transcript</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Performance Analysis</CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-4'>
+              <div>
+                <div className='flex justify-between mb-2'>
+                  <span className='text-sm font-medium'>Clarity Score</span>
+                  <span className='text-sm text-muted-foreground'>
+                    {Math.round(audioData.analysisMetrics.clarityScore)}%
+                  </span>
+                </div>
+                <Progress value={audioData.analysisMetrics.clarityScore} />
+              </div>
+
+              <div>
+                <div className='flex justify-between mb-2'>
+                  <span className='text-sm font-medium'>Technical Depth</span>
+                  <span className='text-sm text-muted-foreground'>
+                    {Math.round(audioData.analysisMetrics.technicalDepth)}%
+                  </span>
+                </div>
+                <Progress value={audioData.analysisMetrics.technicalDepth} />
+              </div>
+
+              <div>
+                <div className='flex justify-between mb-2'>
+                  <span className='text-sm font-medium'>Business Focus</span>
+                  <span className='text-sm text-muted-foreground'>
+                    {Math.round(audioData.analysisMetrics.businessFocus)}%
+                  </span>
+                </div>
+                <Progress value={audioData.analysisMetrics.businessFocus} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Self-Assessment Checklist</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-2'>
+                {(challenge.requirements || []).map((req, idx) => (
+                  <label key={idx} className='flex items-start gap-2 text-sm'>
+                    <input type='checkbox' className='mt-1' />
+                    <span>{req}</span>
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className='flex flex-row items-center justify-between space-y-0'>
+              <CardTitle>AI Review</CardTitle>
+              <div className='flex items-center gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  disabled={aiLoading}
+                  onClick={() => requestAIReview(challenge.id, solutionText)}
+                >
+                  {aiLoading ? 'Reviewing…' : 'Request Review'}
+                </Button>
+                {aiResult && <Button variant='ghost' size='sm' onClick={resetAI}>Clear</Button>}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {aiError && (
+                <div className='text-sm text-red-600 mb-2'>
+                  {aiError}{' '}
+                  <Button variant='link' onClick={() => requestAIReview(challenge.id, solutionText)}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+              {!aiResult && !aiLoading && (
+                <div className='text-sm text-muted-foreground'>
+                  Click "Request Review" to generate AI feedback for your design.
+                </div>
+              )}
+              {aiResult && (
+                <div className='space-y-3'>
+                  <div>
+                    <div className='flex items-center justify-between'>
+                      <span className='text-sm font-medium'>Overall Score</span>
+                      <Badge variant='secondary'>{aiResult.score}</Badge>
+                    </div>
+                    <Progress value={aiResult.score} className='mt-1' />
+                  </div>
+                  <div>
+                    <div className='text-sm font-medium mb-1'>Summary</div>
+                    <div className='text-sm whitespace-pre-wrap'>{aiResult.summary}</div>
+                  </div>
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                    <div>
+                      <div className='text-sm font-medium mb-1'>Strengths</div>
+                      <ul className='list-disc list-inside text-sm'>
+                        {(aiResult.strengths || []).map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <div className='text-sm font-medium mb-1'>Risks</div>
+                      <ul className='list-disc list-inside text-sm'>
+                        {(aiResult.risks || []).map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  {aiHistory.length > 0 && (
+                    <div className='mt-4'>
+                      <div className='text-sm font-medium mb-2'>Previous Results</div>
+                      <div className='space-y-2'>
+                        {aiHistory.map(h => (
+                          <div key={h.id} className='flex items-center justify-between border rounded p-2'>
+                            <div className='text-xs'>
+                              <div>{new Date(h.timestamp).toLocaleString()}</div>
+                              <div className='text-muted-foreground'>Score: {h.result.score}</div>
+                            </div>
+                            <label className='text-xs inline-flex items-center gap-2'>
+                              <input
+                                type='checkbox'
+                                className='accent-primary'
+                                checked={compareSelection.includes(h.id)}
+                                onChange={() => toggleCompare(h.id)}
+                              />
+                              Compare
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedComparisons && (
+                    <div className='mt-4 border-t pt-3'>
+                      <div className='text-sm font-medium mb-2'>Comparison</div>
+                      <div className='grid grid-cols-2 gap-4 text-xs'>
+                        {selectedComparisons.map((h, idx) => (
+                          <div key={h.id} className='border rounded p-2'>
+                            <div className='flex items-center justify-between mb-1'>
+                              <span className='font-medium'>Run {idx + 1}</span>
+                              <Badge variant='secondary'>Score {h.result.score}</Badge>
+                            </div>
+                            <div className='mb-2'>
+                              <div className='text-muted-foreground'>Time</div>
+                              <div>{new Date(h.timestamp).toLocaleString()}</div>
+                            </div>
+                            <div className='mb-2'>
+                              <div className='text-muted-foreground'>Summary</div>
+                              <div className='whitespace-pre-wrap'>{h.result.summary}</div>
+                            </div>
+                            <div className='mb-2'>
+                              <div className='text-muted-foreground'>Strengths</div>
+                              <ul className='list-disc list-inside'>
+                                {(h.result.strengths || []).map((s, i) => (
+                                  <li key={i}>{s}</li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div>
+                              <div className='text-muted-foreground'>Risks</div>
+                              <ul className='list-disc list-inside'>
+                                {(h.result.risks || []).map((r, i) => (
+                                  <li key={i}>{r}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+            <Card>
+              <CardHeader>
+                <CardTitle>Design Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className='space-y-2'>
+                  <div className='flex justify-between'>
+                    <span>Components:</span>
+                    <Badge variant='secondary'>{designData.components.length}</Badge>
+                  </div>
+                  <div className='flex justify-between'>
+                    <span>Connections:</span>
+                    <Badge variant='secondary'>{designData.connections.length}</Badge>
+                  </div>
+                  <div className='flex justify-between'>
+                    <span>Complexity (approx):</span>
+                    <Badge variant='secondary'>
+                      {designData.components.length + designData.connections.length * 2}
+                    </Badge>
+                  </div>
+                  <div className='flex justify-between'>
+                    <span>Challenge:</span>
+                    <Badge variant='outline'>{challenge.difficulty}</Badge>
+                  </div>
+                </div>
+
+                <div className='mt-4 pt-4 border-t'>
+                  <h4 className='font-medium mb-2'>Component Types Used:</h4>
+                  <div className='flex flex-wrap gap-1'>
+                    {Array.from(new Set(designData.components.map(c => c.type))).map(type => (
+                      <Badge key={type} variant='outline' className='text-xs'>
+                        {type.replace('-', ' ')}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Transcript Preview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className='max-h-48 overflow-auto text-sm'>
+                  {audioData.transcript || 'No transcript available'}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <SidebarProvider>
       <div className='h-full flex flex-col'>
-        {/* Header */}
+        
         <div className='border-b bg-card p-4'>
           <div className='flex items-center justify-between'>
-            <div>
-              <h2 className='flex items-center gap-2'>
-                <CheckCircle className='w-5 h-5 text-green-500' />
-                Session Complete
-              </h2>
-              <p className='text-sm text-muted-foreground'>
-                Review your system design and explanation for {challenge.title}
-              </p>
+            <div className='flex items-center gap-3'>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={onStartOver}
+                      className='px-3'
+                      aria-label='Back to Challenges'
+                      title='Back to Challenges'
+                    >
+                      <ArrowLeft className='w-4 h-4' />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Back to Challenges</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={onBackToDesign}
+                      className='px-3'
+                      aria-label='Back to Design'
+                      title='Back to Design'
+                    >
+                      <ArrowLeft className='w-4 h-4' />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Back to Design</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <div>
+                <h2 className='flex items-center gap-2'>
+                  <CheckCircle className='w-5 h-5 text-green-500' />
+                  Session Complete
+                </h2>
+                <p className='text-sm text-muted-foreground'>
+                  Review your system design and explanation for {challenge.title}
+                </p>
+              </div>
             </div>
             <div className='flex items-center gap-2'>
               <Button variant='outline' size='sm' onClick={handleExport}>
@@ -158,8 +471,8 @@ export function ReviewScreen({
         </div>
 
         <div className='flex-1 flex'>
-          {/* Left Sidebar - Challenge Requirements & Progress */}
-          <div className='w-80 border-r bg-card/50 flex flex-col'>
+          
+          <div className='w-80 border-r bg-card flex flex-col'>
             <div className='p-4 border-b'>
               <h3 className='font-semibold text-sm mb-2'>Challenge Progress</h3>
               <div className='space-y-2'>
@@ -208,7 +521,7 @@ export function ReviewScreen({
             </div>
           </div>
 
-          {/* Center - Design Preview Canvas */}
+          
           <div className='flex-1 flex flex-col'>
             <div className='border-b p-4 bg-background'>
               <div className='flex items-center justify-between'>
@@ -241,14 +554,14 @@ export function ReviewScreen({
               </div>
             </div>
             
-            {/* Canvas Preview Area */}
+            
             <div className='flex-1 relative bg-background overflow-auto'>
               <div 
                 ref={canvasRef}
                 className='w-full h-full relative'
                 style={{ minWidth: '2400px', minHeight: '1800px' }}
               >
-                {/* Render components as in design phase */}
+                
                 {designData.components.map((component) => (
                   <div key={component.id} className='absolute'>
                     <CanvasComponent
@@ -270,7 +583,7 @@ export function ReviewScreen({
                   </div>
                 ))}
                 
-                {/* Render connections */}
+                
                 <svg 
                   className='absolute inset-0 pointer-events-none'
                   style={{ width: '2400px', height: '1800px' }}
@@ -323,14 +636,14 @@ export function ReviewScreen({
             </div>
           </div>
 
-          {/* Right Sidebar - Review Details */}
-          <div className='w-80 border-l bg-card/50 flex flex-col'>
+          
+          <div className='w-80 border-l bg-card flex flex-col'>
             <div className='p-4 border-b'>
               <h3 className='font-semibold text-sm'>Review Details</h3>
             </div>
             
             <div className='flex-1 overflow-auto p-4 space-y-4'>
-              {/* Architecture Score */}
+              
               <Card>
                 <CardHeader className='pb-2'>
                   <CardTitle className='text-sm'>Architecture Score</CardTitle>
@@ -348,7 +661,7 @@ export function ReviewScreen({
                 </CardContent>
               </Card>
               
-              {/* Component Details */}
+              
               {selectedComponent && (() => {
                 const component = designData.components.find(c => c.id === selectedComponent);
                 if (!component) return null;
@@ -390,286 +703,9 @@ export function ReviewScreen({
           </div>
         </div>
         
-        {/* Bottom Panel - Detailed Review (when in detailed mode) */}
-        {reviewMode === 'detailed' && (
-          <div className='border-t bg-background p-6'>
-            <div className='max-w-6xl mx-auto space-y-6'>
-                {/* Summary Cards */}
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-                  <Card>
-                    <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                      <CardTitle className='text-sm font-medium'>Components Used</CardTitle>
-                      <Target className='h-4 w-4 text-muted-foreground' />
-                    </CardHeader>
-                    <CardContent>
-                      <div className='text-2xl font-bold'>{designData.components.length}</div>
-                      <p className='text-xs text-muted-foreground'>System components</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                      <CardTitle className='text-sm font-medium'>Recording Duration</CardTitle>
-                      <Clock className='h-4 w-4 text-muted-foreground' />
-                    </CardHeader>
-                    <CardContent>
-                      <div className='text-2xl font-bold'>{formatDuration(audioData.duration)}</div>
-                      <p className='text-xs text-muted-foreground'>Audio explanation</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                      <CardTitle className='text-sm font-medium'>Word Count</CardTitle>
-                      <MessageSquare className='h-4 w-4 text-muted-foreground' />
-                    </CardHeader>
-                    <CardContent>
-                      <div className='text-2xl font-bold'>{audioData.wordCount}</div>
-                      <p className='text-xs text-muted-foreground'>Words in transcript</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Analysis Metrics */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Performance Analysis</CardTitle>
-                  </CardHeader>
-                  <CardContent className='space-y-4'>
-                    <div>
-                      <div className='flex justify-between mb-2'>
-                        <span className='text-sm font-medium'>Clarity Score</span>
-                        <span className='text-sm text-muted-foreground'>
-                          {Math.round(audioData.analysisMetrics.clarityScore)}%
-                        </span>
-                      </div>
-                      <Progress value={audioData.analysisMetrics.clarityScore} />
-                    </div>
-
-                    <div>
-                      <div className='flex justify-between mb-2'>
-                        <span className='text-sm font-medium'>Technical Depth</span>
-                        <span className='text-sm text-muted-foreground'>
-                          {Math.round(audioData.analysisMetrics.technicalDepth)}%
-                        </span>
-                      </div>
-                      <Progress value={audioData.analysisMetrics.technicalDepth} />
-                    </div>
-
-                    <div>
-                      <div className='flex justify-between mb-2'>
-                        <span className='text-sm font-medium'>Business Focus</span>
-                        <span className='text-sm text-muted-foreground'>
-                          {Math.round(audioData.analysisMetrics.businessFocus)}%
-                        </span>
-                      </div>
-                      <Progress value={audioData.analysisMetrics.businessFocus} />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Self-Assessment Checklist */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Self-Assessment Checklist</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className='space-y-2'>
-                      {(challenge.requirements || []).map((req, idx) => (
-                        <label key={idx} className='flex items-start gap-2 text-sm'>
-                          <input type='checkbox' className='mt-1' />
-                          <span>{req}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* AI Review */}
-                <Card>
-                  <CardHeader className='flex flex-row items-center justify-between space-y-0'>
-                    <CardTitle>AI Review</CardTitle>
-                    <div className='flex items-center gap-2'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        disabled={aiLoading}
-                        onClick={() => requestAIReview(challenge.id, solutionText)}
-                      >
-                        {aiLoading ? 'Reviewing…' : 'Request Review'}
-                      </Button>
-                      {aiResult && (
-                        <Button variant='ghost' size='sm' onClick={resetAI}>Clear</Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {aiError && (
-                      <div className='text-sm text-red-600 mb-2'>
-                        {aiError} <Button variant='link' onClick={() => requestAIReview(challenge.id, solutionText)}>Retry</Button>
-                      </div>
-                    )}
-                    {!aiResult && !aiLoading && (
-                      <div className='text-sm text-muted-foreground'>Click "Request Review" to generate AI feedback for your design.</div>
-                    )}
-                    {aiResult && (
-                      <div className='space-y-3'>
-                        <div>
-                          <div className='flex items-center justify-between'>
-                            <span className='text-sm font-medium'>Overall Score</span>
-                            <Badge variant='secondary'>{aiResult.score}</Badge>
-                          </div>
-                          <Progress value={aiResult.score} className='mt-1' />
-                        </div>
-                        <div>
-                          <div className='text-sm font-medium mb-1'>Summary</div>
-                          <div className='text-sm whitespace-pre-wrap'>{aiResult.summary}</div>
-                        </div>
-                        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                          <div>
-                            <div className='text-sm font-medium mb-1'>Strengths</div>
-                            <ul className='list-disc list-inside text-sm'>
-                              {(aiResult.strengths || []).map((s, i) => (
-                                <li key={i}>{s}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div>
-                            <div className='text-sm font-medium mb-1'>Risks</div>
-                            <ul className='list-disc list-inside text-sm'>
-                              {(aiResult.risks || []).map((r, i) => (
-                                <li key={i}>{r}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                        {aiHistory.length > 0 && (
-                          <div className='mt-4'>
-                            <div className='text-sm font-medium mb-2'>Previous Results</div>
-                            <div className='space-y-2'>
-                              {aiHistory.map(h => (
-                                <div key={h.id} className='flex items-center justify-between border rounded p-2'>
-                                  <div className='text-xs'>
-                                    <div>{new Date(h.timestamp).toLocaleString()}</div>
-                                    <div className='text-muted-foreground'>Score: {h.result.score}</div>
-                                  </div>
-                                  <label className='text-xs inline-flex items-center gap-2'>
-                                    <input
-                                      type='checkbox'
-                                      className='accent-primary'
-                                      checked={compareSelection.includes(h.id)}
-                                      onChange={() => toggleCompare(h.id)}
-                                    />
-                                    Compare
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {selectedComparisons && (
-                          <div className='mt-4 border-t pt-3'>
-                            <div className='text-sm font-medium mb-2'>Comparison</div>
-                            <div className='grid grid-cols-2 gap-4 text-xs'>
-                              {selectedComparisons.map((h, idx) => (
-                                <div key={h.id} className='border rounded p-2'>
-                                  <div className='flex items-center justify-between mb-1'>
-                                    <span className='font-medium'>Run {idx + 1}</span>
-                                    <Badge variant='secondary'>Score {h.result.score}</Badge>
-                                  </div>
-                                  <div className='mb-2'>
-                                    <div className='text-muted-foreground'>Time</div>
-                                    <div>{new Date(h.timestamp).toLocaleString()}</div>
-                                  </div>
-                                  <div className='mb-2'>
-                                    <div className='text-muted-foreground'>Summary</div>
-                                    <div className='whitespace-pre-wrap'>{h.result.summary}</div>
-                                  </div>
-                                  <div className='mb-2'>
-                                    <div className='text-muted-foreground'>Strengths</div>
-                                    <ul className='list-disc list-inside'>
-                                      {(h.result.strengths || []).map((s, i) => (
-                                        <li key={i}>{s}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                  <div>
-                                    <div className='text-muted-foreground'>Risks</div>
-                                    <ul className='list-disc list-inside'>
-                                      {(h.result.risks || []).map((r, i) => (
-                                        <li key={i}>{r}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Design Summary */}
-                <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Design Summary</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className='space-y-2'>
-                        <div className='flex justify-between'>
-                          <span>Components:</span>
-                          <Badge variant='secondary'>{designData.components.length}</Badge>
-                        </div>
-                        <div className='flex justify-between'>
-                          <span>Connections:</span>
-                          <Badge variant='secondary'>{designData.connections.length}</Badge>
-                        </div>
-                        <div className='flex justify-between'>
-                          <span>Complexity (approx):</span>
-                          <Badge variant='secondary'>
-                            {designData.components.length + designData.connections.length * 2}
-                          </Badge>
-                        </div>
-                        <div className='flex justify-between'>
-                          <span>Challenge:</span>
-                          <Badge variant='outline'>{challenge.difficulty}</Badge>
-                        </div>
-                      </div>
-
-                      <div className='mt-4 pt-4 border-t'>
-                        <h4 className='font-medium mb-2'>Component Types Used:</h4>
-                        <div className='flex flex-wrap gap-1'>
-                          {Array.from(new Set(designData.components.map(c => c.type))).map(type => (
-                            <Badge key={type} variant='outline' className='text-xs'>
-                              {type.replace('-', ' ')}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Transcript Preview</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className='max-h-48 overflow-auto text-sm'>
-                        {audioData.transcript || 'No transcript available'}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        )}
+        {renderDetailedPanel()}
         
-        {/* Action Bar */}
+        
         <div className='border-t bg-background p-4'>
           <div className='flex justify-between items-center'>
             <div className='flex gap-2'>

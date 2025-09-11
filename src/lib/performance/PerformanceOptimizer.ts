@@ -56,7 +56,7 @@ export class PerformanceMonitor {
   // Changes:
   // 1. Add lazy initialization flag to PerformanceMonitor:
   private static isInitialized = false;
-  private initializationLevel: InitializationLevel = 'basic';
+  private _initializationLevel: InitializationLevel = 'basic';
   private isFullyInitialized = false;
 
   static getInstance(level: InitializationLevel = 'basic'): PerformanceMonitor {
@@ -113,16 +113,16 @@ export class PerformanceMonitor {
     if (!this.objectPools.has(type)) {
       this.objectPools.set(type, []);
     }
-    return this.objectPools.get(type)!;
+    return this.objectPools.get(type)! as Array<T>;
   }
 
   static poolObject<T>(type: string, factory: () => T): T {
-    const pool = this.getPool(type);
-    return pool.length > 0 ? pool.pop() : factory();
+    const pool = this.getPool<T>(type);
+    return pool.length > 0 ? (pool.pop() as T) : factory();
   }
 
   constructor(level: InitializationLevel = 'basic') {
-    this.initializationLevel = level;
+    this._initializationLevel = level;
 
     if (level !== 'none') {
       this.initializeBasic();
@@ -165,7 +165,7 @@ export class PerformanceMonitor {
             this.lowFpsStreak >= PerformanceMonitor.LOW_FPS_STREAK_THRESHOLD &&
             now - this.lastWarnTs > PerformanceMonitor.WARNING_COOLDOWN_MS
           ) {
-            // eslint-disable-next-line no-console
+             
             console.warn(
               `[Performance] Sustained low FPS detected: ${this.fps} FPS ` +
               `(${this.lowFpsStreak} consecutive frames below ${PerformanceMonitor.LOW_FPS_THRESHOLD} FPS)`
@@ -283,7 +283,7 @@ export class CanvasOptimizer {
   private worker: Worker | null = null;
   private framePool: ImageData[] = [];
   private dirtyRegions: DirtyRegion[] = [];
-  private lastRenderTime = 0;
+  private _lastRenderTime = 0;
   private renderQueue: RenderCommand[] = [];
   private isCanvasElement: boolean = false;
   private compatibilityMode: boolean = false;
@@ -364,7 +364,7 @@ export class CanvasOptimizer {
         this.worker.addEventListener('message', (ev: MessageEvent) => {
           const message = ev.data as WorkerMessage;
           if (message.type === 'error') {
-            // eslint-disable-next-line no-console
+             
             console.error('Worker reported error:', message.message);
             this.handleWorkerFailure(worker);
           } else if (message.type === 'terminate') {

@@ -8,10 +8,10 @@ import {
 } from '@tauri-apps/api/notification';
 import { writeTextFile, createDir } from '@tauri-apps/api/fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
+import type { Project, Component, DiagramElement, Connection } from '../services/tauri';
 import { isTauriEnvironment } from './environment';
 // Domain types are centralized in services/tauri
  
-import type { Project, Component, DiagramElement, Connection } from '../services/tauri';
 
 // Helper function to check if we're running in Tauri
 /**

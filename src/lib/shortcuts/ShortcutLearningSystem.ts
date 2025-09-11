@@ -1,5 +1,5 @@
-import { getGlobalShortcutManager, ShortcutAction, ShortcutCategory } from './KeyboardShortcuts';
 import { UXOptimizer } from '../user-experience/UXOptimizer';
+import { getGlobalShortcutManager, ShortcutAction, ShortcutCategory } from './KeyboardShortcuts';
 
 export interface ShortcutUsageMetrics {
   shortcutId: string;

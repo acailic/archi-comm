@@ -1,8 +1,8 @@
 import * as React from 'react';
+import { ArrowLeft, Zap, Image, Download, Save, Search } from 'lucide-react';
+import { cx, designSystem, getElevation } from '../lib/design-system';
 import { Button } from './ui/button';
 import { SmartTooltip } from './ui/SmartTooltip';
-import { cx, designSystem, getElevation } from '../lib/design-system';
-import { ArrowLeft, Zap, Image, Download, Save, Search } from 'lucide-react';
 
 export interface TopBarProps {
   // Navigation

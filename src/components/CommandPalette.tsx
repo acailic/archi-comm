@@ -1,18 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 // Comment 1: Move relevantKeys to a module-level Set for performance
 const RELEVANT_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter', 'Escape']);
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  getAllShortcuts,
-  formatShortcutKey,
-  getGlobalShortcutManager,
-  getShortcutsVersion,
-} from '../lib/shortcuts/KeyboardShortcuts';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Dialog, DialogContent } from './ui/dialog';
-import { Badge } from './ui/badge';
-import { Separator } from './ui/separator';
+import { motion } from 'framer-motion';
 import {
   Search,
   Target,
@@ -21,15 +10,22 @@ import {
   Eye,
   RotateCcw,
   Save,
-  Download,
   ArrowRight,
   Command,
-  Zap,
   Settings,
   HelpCircle,
   Keyboard,
   Star,
 } from 'lucide-react';
+import {
+  getAllShortcuts,
+  formatShortcutKey,
+  getShortcutsVersion,
+} from '../lib/shortcuts/KeyboardShortcuts';
+import { Input } from './ui/input';
+import { Dialog, DialogContent } from './ui/dialog';
+import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
 
 interface CommandPaletteProps {
   isOpen: boolean;

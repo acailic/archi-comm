@@ -1,4 +1,3 @@
-import type { DesignComponent } from '@/shared/contracts';
 import {
   Activity,
   AlertTriangle,
@@ -46,6 +45,7 @@ import { EnhancedCard } from './ui/enhanced-card';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Tabs } from './ui/tabs';
+import type { DesignComponent } from '@/shared/contracts';
 
 interface ComponentType {
   type: DesignComponent['type'];
@@ -624,7 +624,7 @@ export function ComponentPalette() {
     <EnhancedCard elevation={2} glass className='h-full flex flex-col' gradientBorder>
       <CardHeader className='pb-3 bg-gradient-to-r from-muted/30 via-card to-muted/20 border-b border-border/20'>
         <CardTitle className='flex items-center justify-between text-sm'>
-          <span className='bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent'></span>
+          <span className='bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent' />
         </CardTitle>
         <div className='space-y-2'>
           <div className='relative'>

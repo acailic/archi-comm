@@ -5,8 +5,8 @@
  * RELEVANT FILES: CanvasArea.tsx, ConnectionEditorPopover.tsx
  */
 
+import { useCallback, useEffect, useState } from 'react';
 import type { Connection } from '@/shared/contracts';
-import { useCallback, useState } from 'react';
 
 interface UseConnectionEditorProps {
   connections: Connection[];
@@ -18,7 +18,7 @@ interface UseConnectionEditorProps {
 interface UseConnectionEditorResult {
   selectedConnection: Connection | null;
   popoverPosition: { x: number; y: number } | null;
-  handleConnectionSelect: (id: string, x: number, y: number) => void;
+  handleConnectionSelect: (id: string | null, x?: number, y?: number) => void;
   handleConnectionUpdate: {
     onLabelChange: (id: string, label: string) => void;
     onTypeChange: (id: string, type: Connection['type']) => void;
@@ -36,14 +36,44 @@ export function useConnectionEditor({
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ x: number; y: number } | null>(null);
 
+  // Clear stale selections when selected connection is removed from connections array
+  useEffect(() => {
+    if (selectedConnectionId && !connections.find(c => c.id === selectedConnectionId)) {
+      setSelectedConnectionId(null);
+      setPopoverPosition(null);
+    }
+  }, [connections, selectedConnectionId]);
+
   const selectedConnection = selectedConnectionId
     ? connections.find(c => c.id === selectedConnectionId) || null
     : null;
 
-  const handleConnectionSelect = useCallback((id: string, x: number, y: number) => {
+  const handleConnectionSelect = useCallback((id: string | null, x?: number, y?: number) => {
+    if (id === null) {
+      // Deselect connection (e.g., when clicking on canvas background)
+      setSelectedConnectionId(null);
+      setPopoverPosition(null);
+      return;
+    }
+
+    // Validate that the connection exists
+    const connection = connections.find(c => c.id === id);
+    if (!connection) {
+      console.warn(`Connection with id ${id} not found`);
+      return;
+    }
+
+    // Set selection and position for React Flow edge
     setSelectedConnectionId(id);
-    setPopoverPosition({ x, y });
-  }, []);
+
+    // Position popover using midpoint coordinates from CustomEdge component
+    if (x !== undefined && y !== undefined) {
+      setPopoverPosition({ x, y });
+    } else {
+      // Fallback: close popover if coordinates not provided
+      setPopoverPosition(null);
+    }
+  }, [connections]);
 
   const handleConnectionUpdate = {
     onLabelChange: useCallback((id: string, label: string) => {
@@ -68,11 +98,17 @@ export function useConnectionEditor({
     setPopoverPosition(null);
   }, []);
 
+  // Handle clicks outside of connections to deselect
+  const handleCanvasClick = useCallback(() => {
+    handleConnectionSelect(null);
+  }, [handleConnectionSelect]);
+
   return {
     selectedConnection,
     popoverPosition,
     handleConnectionSelect,
     handleConnectionUpdate,
-    closeEditor
+    closeEditor,
+    handleCanvasClick
   };
 }

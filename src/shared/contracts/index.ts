@@ -54,13 +54,17 @@ export interface LoadBalancerProperties {
   healthCheck?: boolean;
 }
 
+export interface BaseComponentProperties {
+  showLabel?: boolean;
+}
+
 export type ComponentProperties =
-  | DatabaseProperties
-  | ServiceProperties
-  | CacheProperties
-  | ApiGatewayProperties
-  | LoadBalancerProperties
-  | Record<string, unknown>;
+  | (DatabaseProperties & BaseComponentProperties)
+  | (ServiceProperties & BaseComponentProperties)
+  | (CacheProperties & BaseComponentProperties)
+  | (ApiGatewayProperties & BaseComponentProperties)
+  | (LoadBalancerProperties & BaseComponentProperties)
+  | (Record<string, unknown> & BaseComponentProperties);
 
 export interface DesignComponent {
   id: string;
@@ -106,10 +110,20 @@ export interface DesignMetadata {
   [key: string]: unknown;
 }
 
+export interface InfoCard {
+  id: string;
+  x: number;
+  y: number;
+  content: string;
+  color?: 'yellow' | 'blue' | 'green' | 'red' | 'purple';
+  isEditing?: boolean;
+}
+
 export interface DesignData {
   schemaVersion?: number;
   components: DesignComponent[];
   connections: Connection[];
+  infoCards?: InfoCard[];
   layers: Layer[];
   gridConfig?: GridConfig;
   activeTool?: ToolType;

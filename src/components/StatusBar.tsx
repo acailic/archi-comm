@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Badge } from './ui/badge';
 import {
   Clock,
   Target,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react';
 import { PerformanceMonitor } from '../lib/performance/PerformanceOptimizer';
 import { useUXOptimizer } from '../lib/user-experience/UXOptimizer';
+import { Badge } from './ui/badge';
 
 interface StatusBarProps {
   currentScreen: string;

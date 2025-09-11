@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export enum AIProvider {
   OPENAI = 'openai',
+  GEMINI = 'gemini',
+  CLAUDE = 'claude'
 }
 
 export interface AIModel {
@@ -23,6 +25,8 @@ export interface AIProviderConfig {
 
 export interface AIConfig {
   openai: AIProviderConfig;
+  gemini: AIProviderConfig;
+  claude: AIProviderConfig;
 }
 
 export interface ConnectionTestResult {
@@ -78,6 +82,8 @@ export const AIProviderConfigSchema = z
 
 export const AIConfigSchema = z.object({
   openai: AIProviderConfigSchema,
+  gemini: AIProviderConfigSchema,
+  claude: AIProviderConfigSchema,
 });
 
 export const ConnectionTestResultSchema = z.object({
@@ -87,8 +93,12 @@ export const ConnectionTestResultSchema = z.object({
   model: z.string().optional(),
 });
 
-// API key validation pattern for OpenAI
-export const API_KEY_PATTERN = /^sk-[a-zA-Z0-9-]{48,}$/;
+// API key validation patterns
+export const API_KEY_PATTERNS = {
+  [AIProvider.OPENAI]: /^sk-[a-zA-Z0-9-]{32,}$/,
+  [AIProvider.GEMINI]: /^AIzaSy[a-zA-Z0-9-]{32,}$/,
+  [AIProvider.CLAUDE]: /^sk-ant-api03-[a-zA-Z0-9-]{32,}$/
+};
 
 // Utility function to get default config
 export function getDefaultConfig(): AIConfig {
@@ -97,10 +107,19 @@ export function getDefaultConfig(): AIConfig {
       apiKey: '',
       enabled: false,
     },
+    gemini: {
+      apiKey: '',
+      enabled: false,
+    },
+    claude: {
+      apiKey: '',
+      enabled: false,
+    }
   };
 }
 
 // Utility function to validate API key format
-export function validateApiKeyFormat(apiKey: string): boolean {
-  return API_KEY_PATTERN.test(apiKey);
+export function validateApiKeyFormat(provider: AIProvider, apiKey: string): boolean {
+  const pattern = API_KEY_PATTERNS[provider];
+  return pattern ? pattern.test(apiKey) : false;
 }

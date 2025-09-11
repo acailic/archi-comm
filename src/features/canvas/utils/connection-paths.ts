@@ -5,28 +5,26 @@
  * RELEVANT FILES: CanvasArea.tsx, ConnectionSvgLayer.tsx, design-system.ts
  */
 
-import type { DesignComponent, Connection } from '@/shared/contracts';
-import { type Point, type ConnectionPoint } from '@/shared/types';
+import type { Connection, DesignComponent } from '@/shared/contracts';
+import type { ConnectionPoint, Point } from '@/shared/types';
 
 export interface ConnectionEndpoints {
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
+  from: Point;
+  to: Point;
 }
 
 /**
  * Calculate the connection points on a component's edges
  */
 export function calculateConnectionPoints(component: DesignComponent): Record<string, ConnectionPoint> {
-  const centerX = component.x + 64; // Half of component width (128px)
-  const centerY = component.y + 40; // Half of component height (80px)
+  const width = 220; // Default component width
+  const height = 140; // Default component height
 
   return {
-    top: { x: centerX, y: component.y - 1 },
-    bottom: { x: centerX, y: component.y + 81 },
-    left: { x: component.x - 1, y: centerY },
-    right: { x: component.x + 129, y: centerY }
+    top: { x: component.x + width / 2, y: component.y },
+    right: { x: component.x + width, y: component.y + height / 2 },
+    bottom: { x: component.x + width / 2, y: component.y + height },
+    left: { x: component.x, y: component.y + height / 2 }
   };
 }
 
@@ -41,15 +39,14 @@ export function createStraightPath(from: Point, to: Point): string {
  * Generate curved bezier path between two points
  */
 export function createCurvedPath(from: Point, to: Point): string {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const curvature = Math.min(distance * 0.3, 100);
-  
-  const midX1 = from.x + (dx > 0 ? curvature : -curvature);
-  const midX2 = to.x + (dx > 0 ? -curvature : curvature);
-  
-  return `M ${from.x} ${from.y} C ${midX1} ${from.y}, ${midX2} ${to.y}, ${to.x} ${to.y}`;
+  const midX = (from.x + to.x) / 2;
+  const midY = (from.y + to.y) / 2;
+  const cp1x = from.x + (midX - from.x) * 0.5;
+  const cp1y = from.y;
+  const cp2x = to.x - (to.x - midX) * 0.5;
+  const cp2y = to.y;
+
+  return `M ${from.x} ${from.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${to.x} ${to.y}`;
 }
 
 /**
@@ -61,56 +58,43 @@ export function createSteppedPath(from: Point, to: Point): string {
 }
 
 /**
- * Calculate connection endpoints between two components
+ * Get connection endpoints based on component positions and connection type
  */
-export function getConnectionEndpoints(
-  fromComponent: DesignComponent,
-  toComponent: DesignComponent
-): ConnectionEndpoints {
-  const fromCenterX = fromComponent.x + 64;
-  const fromCenterY = fromComponent.y + 40;
-  const toCenterX = toComponent.x + 64;
-  const toCenterY = toComponent.y + 40;
+function getConnectionEndpoints(connection: Connection, components: DesignComponent[]): ConnectionEndpoints | null {
+  const fromComponent = components.find(c => c.id === connection.from);
+  const toComponent = components.find(c => c.id === connection.to);
 
-  // Calculate angle between components
-  const angle = Math.atan2(toCenterY - fromCenterY, toCenterX - fromCenterX);
-  
-  // Component dimensions
-  const compWidth = 128;
-  const compHeight = 80;
+  if (!fromComponent || !toComponent) return null;
 
-  // Calculate edge points
-  const fromX = fromCenterX + Math.cos(angle) * (compWidth / 2);
-  const fromY = fromCenterY + Math.sin(angle) * (compHeight / 2);
-  const toX = toCenterX - Math.cos(angle) * (compWidth / 2);
-  const toY = toCenterY - Math.sin(angle) * (compHeight / 2);
+  const fromPoints = calculateConnectionPoints(fromComponent);
+  const toPoints = calculateConnectionPoints(toComponent);
 
-  return { fromX, fromY, toX, toY };
+  // Default to connecting bottom-to-top
+  return {
+    from: fromPoints.bottom,
+    to: toPoints.top
+  };
 }
 
 /**
- * Generate full connection path based on style
+ * Generate the SVG path for a connection based on style
  */
 export function getConnectionPath(
   connection: Connection,
   components: DesignComponent[],
   style: 'straight' | 'curved' | 'stepped' = 'curved'
-): string {
-  const fromComponent = components.find(c => c.id === connection.from);
-  const toComponent = components.find(c => c.id === connection.to);
-  
-  if (!fromComponent || !toComponent) return '';
-
-  const { fromX, fromY, toX, toY } = getConnectionEndpoints(fromComponent, toComponent);
-  const from = { x: fromX, y: fromY };
-  const to = { x: toX, y: toY };
+): string | null {
+  const endpoints = getConnectionEndpoints(connection, components);
+  if (!endpoints) return null;
 
   switch (style) {
+    case 'straight':
+      return createStraightPath(endpoints.from, endpoints.to);
     case 'curved':
-      return createCurvedPath(from, to);
+      return createCurvedPath(endpoints.from, endpoints.to);
     case 'stepped':
-      return createSteppedPath(from, to);
+      return createSteppedPath(endpoints.from, endpoints.to);
     default:
-      return createStraightPath(from, to);
+      return createCurvedPath(endpoints.from, endpoints.to);
   }
 }

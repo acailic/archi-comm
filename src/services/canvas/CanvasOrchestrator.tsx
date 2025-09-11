@@ -1,18 +1,25 @@
-import React, { createContext, useContext, useMemo, useState, useCallback, useEffect } from 'react';
-import type {
-  DesignComponent,
-  Connection,
-  Layer,
-  GridConfig,
-  ToolType,
-  DesignData,
-} from '@/shared/contracts';
-import { useCanvasTelemetry } from './CanvasTelemetry';
+import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { CanvasPersistence } from './CanvasPersistence';
+import { useCanvasTelemetry } from './CanvasTelemetry';
 import { TemplateEngine } from './TemplateEngine';
+import type {
+  Connection,
+  DesignComponent,
+  DesignData,
+  GridConfig,
+  Layer,
+  ToolType,
+} from '@/shared/contracts';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { useAutoSave } from '@/hooks/useAutoSave';
 
+// Import adapter functions for React Flow compatibility
+// These are used by the canvas components but not directly by the orchestrator
+
+/**
+ * Canvas state interface - compatible with both custom SVG and React Flow implementations
+ * The orchestrator remains agnostic to the rendering implementation and works with domain objects
+ */
 export interface CanvasState {
   components: DesignComponent[];
   connections: Connection[];
@@ -29,6 +36,11 @@ export interface CanvasState {
   saveStatus: 'idle' | 'saving' | 'saved' | 'error';
 }
 
+/**
+ * Canvas actions interface - all operations work with domain objects
+ * These actions are compatible with both custom SVG and React Flow implementations
+ * The canvas components handle the conversion to/from React Flow format internally
+ */
 export interface CanvasActions {
   addComponent: (component: Omit<DesignComponent, 'id'> & { id?: string }) => string;
   moveComponent: (id: string, x: number, y: number) => void;
@@ -37,6 +49,7 @@ export interface CanvasActions {
   selectComponent: (id: string | null, multi?: boolean) => void;
   clearSelection: () => void;
   addConnection: (conn: Omit<Connection, 'id'> & { id?: string }) => string;
+  updateConnection: (id: string, patch: Partial<Connection>) => void;
   deleteConnection: (id: string) => void;
   setActiveLayer: (layerId: string | null) => void;
   addLayer: (layer: Omit<Layer, 'order'> & { order?: number }) => void;
@@ -52,6 +65,9 @@ export interface CanvasActions {
   addMultipleComponents: (components: Array<Omit<DesignComponent, 'id'> & { id?: string }>) => string[];
   moveMultipleComponents: (ids: string[], deltaX: number, deltaY: number) => void;
   duplicateComponent: (id: string) => string | null;
+  // React Flow specific helpers (optional, for advanced use cases)
+  batchUpdateComponents: (updates: Array<{ id: string; patch: Partial<DesignComponent> }>) => void;
+  batchUpdateConnections: (updates: Array<{ id: string; patch: Partial<Connection> }>) => void;
 }
 
 export interface CanvasOrchestratorValue extends CanvasState, CanvasActions {}
@@ -208,6 +224,13 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     return id;
   }, [connections, updateState, telemetry]);
 
+  const updateConnection: CanvasActions['updateConnection'] = useCallback((id, patch) => {
+    updateState({
+      connections: connections.map(c => (c.id === id ? { ...c, ...patch } : c))
+    });
+    telemetry.trackCanvasAction('connection-update', { id, patch });
+  }, [connections, updateState, telemetry]);
+
   const deleteConnection: CanvasActions['deleteConnection'] = useCallback((id) => {
     updateState({ connections: connections.filter(c => c.id !== id) });
     telemetry.trackCanvasAction('connection-delete', { id });
@@ -247,7 +270,7 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
       layers,
       gridConfig,
       activeTool,
-      metadata: { 
+      metadata: {
         lastModified: new Date().toISOString(),
         created: initialData.metadata?.created || new Date().toISOString(),
         version: '1.0'
@@ -273,7 +296,7 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
 
   const moveMultipleComponents: CanvasActions['moveMultipleComponents'] = useCallback((ids, deltaX, deltaY) => {
     updateState({
-      components: components.map(c => 
+      components: components.map(c =>
         ids.includes(c.id) ? { ...c, x: c.x + deltaX, y: c.y + deltaY } : c
       )
     });
@@ -283,7 +306,7 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
   const duplicateComponent: CanvasActions['duplicateComponent'] = useCallback((id) => {
     const component = components.find(c => c.id === id);
     if (!component) return null;
-    
+
     const newId = `${component.type}-${Date.now()}`;
     const duplicated: DesignComponent = {
       ...component,
@@ -292,11 +315,30 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
       y: component.y + 20,
       label: `${component.label} Copy`
     };
-    
+
     updateState({ components: [...components, duplicated] });
     telemetry.trackCanvasAction('component-duplicate', { originalId: id, newId });
     return newId;
   }, [components, updateState, telemetry]);
+
+  // Batch operations for React Flow performance optimization
+  const batchUpdateComponents: CanvasActions['batchUpdateComponents'] = useCallback((updates) => {
+    const updatedComponents = components.map(component => {
+      const update = updates.find(u => u.id === component.id);
+      return update ? { ...component, ...update.patch } : component;
+    });
+    updateState({ components: updatedComponents });
+    telemetry.trackCanvasAction('components-batch-update', { count: updates.length });
+  }, [components, updateState, telemetry]);
+
+  const batchUpdateConnections: CanvasActions['batchUpdateConnections'] = useCallback((updates) => {
+    const updatedConnections = connections.map(connection => {
+      const update = updates.find(u => u.id === connection.id);
+      return update ? { ...connection, ...update.patch } : connection;
+    });
+    updateState({ connections: updatedConnections });
+    telemetry.trackCanvasAction('connections-batch-update', { count: updates.length });
+  }, [connections, updateState, telemetry]);
 
   // Undo/Redo actions
   const undo = useCallback(() => {
@@ -330,6 +372,7 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     selectComponent,
     clearSelection,
     addConnection,
+    updateConnection,
     deleteConnection,
     setActiveLayer,
     addLayer,
@@ -344,7 +387,9 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     forceSave,
     addMultipleComponents,
     moveMultipleComponents,
-    duplicateComponent
+    duplicateComponent,
+    batchUpdateComponents,
+    batchUpdateConnections
   }), [
     components,
     connections,
@@ -366,6 +411,7 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     selectComponent,
     clearSelection,
     addConnection,
+    updateConnection,
     deleteConnection,
     setActiveLayer,
     addLayer,
@@ -380,7 +426,9 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     forceSave,
     addMultipleComponents,
     moveMultipleComponents,
-    duplicateComponent
+    duplicateComponent,
+    batchUpdateComponents,
+    batchUpdateConnections
   ]);
 
   return (

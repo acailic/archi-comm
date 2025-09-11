@@ -32,7 +32,9 @@ export function calculateComponentBounds(component: { x: number; y: number; widt
   const bounds = { x: component.x, y: component.y, width, height };
   try {
     boundsCache.set(component as any, bounds);
-  } catch {}
+  } catch {
+    // WeakMap.set can fail if component is not an object, ignore silently
+  }
   return bounds;
 }
 

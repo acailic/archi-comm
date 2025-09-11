@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useAutoSave } from './useAutoSave';
 import { CanvasPerformanceManager, type CanvasPerformanceConfig } from '@/lib/performance/CanvasPerformanceManager';
 import { useCanvas } from '@/services/canvas/CanvasOrchestrator';
-import { useAutoSave } from './useAutoSave';
 
 interface UseCanvasIntegrationOptions {
   canvasId: string;

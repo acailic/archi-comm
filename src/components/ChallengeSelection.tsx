@@ -15,7 +15,7 @@ type Category = 'system-design' | 'architecture' | 'scaling';
 // Error handling utility that only logs in development
 const handleError = (context: string, error: unknown) => {
   if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line no-console
+     
     console.error(`[ChallengeSelection] ${context}:`, error);
   }
 };

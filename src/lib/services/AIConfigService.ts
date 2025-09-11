@@ -3,7 +3,6 @@ import { createDir, readTextFile, writeTextFile, exists } from '@tauri-apps/api/
 import { isTauri } from '../tauri';
 import {
   AIConfig,
-  AIProvider,
   ConnectionTestResult,
   getDefaultConfig,
   validateApiKeyFormat,

@@ -1,7 +1,7 @@
+import { useCallback, useMemo } from 'react';
 import { useUXOptimizer } from '../lib/user-experience/UXOptimizer';
 import { getLogger } from '../lib/logger';
 import { addError, addPerformanceError, errorStore } from '../lib/errorStore';
-import { useCallback, useMemo } from 'react';
 
 export interface NavigationData {
   screen: string;

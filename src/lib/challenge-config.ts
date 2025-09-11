@@ -6,12 +6,11 @@ export const CACHE_KEYS = {
 };
 
 // Remove dynamic require and use strict types
-import type { Challenge } from '@/shared/contracts';
-import type { DesignComponent, Connection } from '@/shared/contracts';
+import { invoke } from '@tauri-apps/api/tauri';
+import { isTauriEnvironment } from './environment';
+import type { Challenge , DesignComponent, Connection } from '@/shared/contracts';
 
 // Tauri integration
-import { isTauriEnvironment } from './environment';
-import { invoke } from '@tauri-apps/api/tauri';
 
 // ArchiComm Community Edition - Challenge Configuration
 // This file contains the challenge system configuration for the community version

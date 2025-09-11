@@ -1,5 +1,3 @@
-import { useCanvas } from '@/services/canvas/CanvasOrchestrator';
-import type { DesignComponent, Layer } from '@/shared/contracts';
 import {
   GripVertical,
   Layers,
@@ -19,6 +17,8 @@ import {
   SidebarGroupLabel,
   SidebarSeparator,
 } from './ui/sidebar';
+import type { DesignComponent, Layer } from '@/shared/contracts';
+import { useCanvas } from '@/services/canvas/CanvasOrchestrator';
 
 
 interface RightSidebarProps {
@@ -72,7 +72,7 @@ export function RightSidebar(props: RightSidebarProps) {
         {/* Properties Panel */}
         <SidebarGroup>
           <SidebarGroupLabel className='flex items-center gap-2'>
-            <div className='w-2 h-2 rounded-full bg-accent'></div>
+            <div className='w-2 h-2 rounded-full bg-accent' />
             Properties
           </SidebarGroupLabel>
           <div className='p-4 layout-stable'>

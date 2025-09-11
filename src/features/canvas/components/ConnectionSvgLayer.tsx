@@ -5,9 +5,9 @@
  * RELEVANT FILES: CanvasArea.tsx, connection-paths.ts, component-styles.ts
  */
 
-import type { Connection, DesignComponent } from '@/shared/contracts';
 import { useMemo } from 'react';
 import { getConnectionPath } from '../utils/connection-paths';
+import type { Connection, DesignComponent } from '@/shared/contracts';
 
 interface ConnectionSvgLayerProps {
   connections: Connection[];

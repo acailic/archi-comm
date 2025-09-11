@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
+import { defineConfig } from 'vite';
 
 // Safe environment variable access
 const host = (typeof process !== 'undefined' && process.env) ? process.env.TAURI_DEV_HOST : undefined;
@@ -18,12 +18,12 @@ export default defineConfig({
       // Note: Removing Emotion jsxImportSource avoids requiring '@emotion/react'
     })
   ],
-  
+
   // Simplified test configuration
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: ['./src/test/setup.ts'],
+    setupFiles: ['./src/test/setup-test.ts'],
     css: true,
     exclude: ['**/e2e/**', '**/node_modules/**', '**/dist/**', '**/src-tauri/**'],
     // Reduced coverage thresholds for faster testing
@@ -46,14 +46,14 @@ export default defineConfig({
       }
     }
   },
-  
+
   // Root directory and index.html location
   root: '.',
   publicDir: 'public',
-  
+
   // Simplified development configuration
   clearScreen: false,
-  
+
   server: {
     port: 5173,
     strictPort: false, // Allow fallback ports for flexibility
@@ -78,10 +78,10 @@ export default defineConfig({
       usePolling: false
     }
   },
-  
+
   // Environment variable configuration
   envPrefix: ['VITE_', 'TAURI_'],
-  
+
   // Web Worker configuration
   worker: {
     format: 'es',
@@ -149,7 +149,7 @@ export default defineConfig({
     minifyIdentifiers: !isTauriDebug,
     minifySyntax: !isTauriDebug
   },
-  
+
   resolve: {
     // Streamlined file extensions
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
@@ -165,7 +165,7 @@ export default defineConfig({
     // Optimize dependency resolution
     dedupe: ['react', 'react-dom'],
   },
-  
+
   // Performance optimizations
   optimizeDeps: {
     include: [

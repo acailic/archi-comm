@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, Keyboard, Zap } from 'lucide-react';
 import {
   getAllShortcuts,
-  getShortcutsByCategory,
   formatShortcutKey,
   type ShortcutConfig,
   type ShortcutCategory,

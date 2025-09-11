@@ -71,6 +71,7 @@ ArchiComm is a desktop architecture communication platform built with Tauri, Rea
 - NEVER push to github unless the User explicitly tells you to
 - DO NOT run 'npm run build' unless the User tells you to
 - Do what has been asked; nothing more, nothing less
+- Dont leave out not reference variables and also not working code for start
 
 # ACTIVE CONTRIBUTORS
 - **User (Human)**: Works in  IDE, directs the project, makes high-level decisions, has the best taste & judgement.

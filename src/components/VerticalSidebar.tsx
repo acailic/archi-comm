@@ -1,4 +1,5 @@
-import type { Challenge } from '@/shared/contracts';
+'use client';
+
 import { ChevronDown, ChevronRight, Copy, FileText } from 'lucide-react';
 import React, { Suspense, useState } from 'react';
 import { Button } from './ui/button';
@@ -9,6 +10,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from './ui/sidebar';
+import type { Challenge } from '@/shared/contracts';
 // Lazy-load and memoize ComponentPalette to improve performance
 const ComponentPalette = React.lazy(() =>
   import('./ComponentPalette').then(m => ({ default: React.memo(m.ComponentPalette) }))

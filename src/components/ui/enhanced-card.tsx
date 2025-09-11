@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './card';
 import {
   animations,
   cx,
@@ -11,6 +10,7 @@ import {
   SizeVariant,
   StyleVariant,
 } from '../../lib/design-system';
+import { Card, CardContent, CardHeader, CardTitle } from './card';
 
 export interface EnhancedCardProps extends React.HTMLAttributes<HTMLDivElement> {
   elevation?: ElevationLevel;

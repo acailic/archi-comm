@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Plus,
+  Edit3,
+  Trash2,
+  Save,
+  Upload,
+  Download,
+  Copy,
+  CheckCircle,
+  AlertCircle,
+  BookOpen,
+} from 'lucide-react';
+import { ExtendedChallenge, challengeManager, tauriChallengeAPI } from '../lib/challenge-config';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,22 +24,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Alert, AlertDescription } from './ui/alert';
-import {
-  Plus,
-  Edit3,
-  Trash2,
-  Save,
-  Upload,
-  Download,
-  FileText,
-  Settings,
-  Copy,
-  CheckCircle,
-  AlertCircle,
-  Target,
-  BookOpen,
-} from 'lucide-react';
-import { ExtendedChallenge, challengeManager, tauriChallengeAPI } from '../lib/challenge-config';
 import type { Challenge } from '@/shared/contracts';
 
 interface ChallengeManagerProps {

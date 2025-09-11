@@ -12,11 +12,10 @@ import {
   useEffect,
   useCallback,
   lazy,
-  type LazyExoticComponent,
   type FC,
   type ErrorInfo,
 } from 'react';
-import { isTauriEnvironment, DEBUG, CONFIG } from '../lib/environment';
+import { DEBUG } from '../lib/environment';
 import { webNotificationManager } from '../services/web-fallback';
 
 // Error boundary state
@@ -43,11 +42,11 @@ export interface LazyWrapperOptions {
 // Loading skeleton components
 const DefaultLoadingSkeleton: FC = () => (
   <div className='lazy-loading-skeleton' role='status' aria-label='Loading component'>
-    <div className='skeleton-header'></div>
+    <div className='skeleton-header' />
     <div className='skeleton-content'>
-      <div className='skeleton-line'></div>
-      <div className='skeleton-line short'></div>
-      <div className='skeleton-line'></div>
+      <div className='skeleton-line' />
+      <div className='skeleton-line short' />
+      <div className='skeleton-line' />
     </div>
     <style jsx>{`
       .lazy-loading-skeleton {

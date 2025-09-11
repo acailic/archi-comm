@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
+import { Folder, File, Save, Download, Bell } from 'lucide-react';
+import { useIsTauri, useWindow, useNotification, useFile, useProject } from '../lib/hooks/useTauri';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
-import { useIsTauri, useWindow, useNotification, useFile, useProject } from '../lib/hooks/useTauri';
 import { Badge } from './ui/badge';
-import { Folder, File, Save, Download, Bell } from 'lucide-react';
 
 export const TauriDemo = () => {
   const isTauriApp = useIsTauri();

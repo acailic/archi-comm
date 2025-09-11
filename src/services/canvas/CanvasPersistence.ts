@@ -305,7 +305,7 @@ export class CanvasPersistence {
   async exportPNG(element: HTMLElement, options: { quality?: number; scale?: number; width?: number; height?: number } = {}): Promise<string> {
     const { quality = 1.0, scale = 2, width, height } = options;
     
-    if (!element || !element.clientWidth || !element.clientHeight) {
+    if (!element?.clientWidth || !element.clientHeight) {
       throw new Error('Invalid element or element has no dimensions');
     }
     
@@ -325,7 +325,7 @@ export class CanvasPersistence {
       
       const dataUrl = await toPng(element, exportOptions);
       
-      if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+      if (!dataUrl?.startsWith('data:image/')) {
         throw new Error('Invalid image data generated');
       }
       

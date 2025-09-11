@@ -5,10 +5,11 @@
  * RELEVANT FILES: CanvasComponent.tsx, CanvasArea.tsx, canvas-utils.ts
  */
 
-import { snapToGrid } from '@/shared/canvasUtils';
-import type { DesignComponent } from '@/shared/contracts';
 import { useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
+import type { XYCoord } from 'react-dnd';
+import type { DesignComponent } from '@/shared/contracts';
+import { snapToGrid } from '@/shared/canvasUtils';
 
 interface UseComponentDragProps {
   component: DesignComponent;
@@ -18,10 +19,27 @@ interface UseComponentDragProps {
   gridSpacing?: number;
 }
 
+// Type definitions for drag and drop items
+interface DragItem {
+  id: string;
+}
+
+interface DropItem {
+  fromId: string;
+}
+
+interface DragCollectedProps {
+  isDragging: boolean;
+}
+
+interface DropCollectedProps {
+  // Add any drop-related collected props here if needed
+}
+
 interface UseComponentDragResult {
   isDragging: boolean;
   isDragPreview: boolean;
-  ref: React.RefObject<HTMLDivElement>;
+  ref: (el: HTMLDivElement | null) => void;
 }
 
 export function useComponentDrag({
@@ -33,48 +51,64 @@ export function useComponentDrag({
 }: UseComponentDragProps): UseComponentDragResult {
   const ref = useRef<HTMLDivElement>(null);
   const [isDragPreview, setIsDragPreview] = useState(false);
+  
+  // Store initial client offset for proper coordinate calculation
+  const initialClientOffset = useRef<XYCoord | null>(null);
 
-  const [{ isDragging }, drag] = useDrag(() => ({
+  const [{ isDragging }, drag] = useDrag<DragItem, unknown, DragCollectedProps>(() => ({
     type: 'canvas-component',
     item: { id: component.id },
-    collect: monitor => ({
+    collect: (monitor): DragCollectedProps => ({
       isDragging: monitor.isDragging(),
     }),
-    begin: () => {
+    begin: (monitor) => {
       setIsDragPreview(true);
+      // Store initial client offset for coordinate calculation
+      initialClientOffset.current = monitor.getInitialClientOffset();
       return { id: component.id };
     },
     end: (item, monitor) => {
       setIsDragPreview(false);
-      if (!monitor.didDrop() && ref.current) {
-        const offset = monitor.getDifferenceFromInitialOffset();
-        if (offset) {
-          let newX = component.x + offset.x;
-          let newY = component.y + offset.y;
+      if (!monitor.didDrop() && ref.current && initialClientOffset.current) {
+        const currentClientOffset = monitor.getClientOffset();
+        if (currentClientOffset) {
+          // Calculate position using canvas coordinate system
+          const canvasRect = ref.current.parentElement?.getBoundingClientRect();
+          if (canvasRect) {
+            // Calculate the difference in client coordinates
+            const deltaX = currentClientOffset.x - initialClientOffset.current.x;
+            const deltaY = currentClientOffset.y - initialClientOffset.current.y;
+            
+            let newX = component.x + deltaX;
+            let newY = component.y + deltaY;
 
-          // Apply snap-to-grid if enabled
-          if (shouldSnapToGrid) {
-            const snapped = snapToGrid(newX, newY, gridSpacing);
-            newX = snapped.x;
-            newY = snapped.y;
+            // Apply snap-to-grid if enabled
+            if (shouldSnapToGrid) {
+              const snapped = snapToGrid(newX, newY, gridSpacing);
+              newX = snapped.x;
+              newY = snapped.y;
+            }
+
+            onMove(component.id, newX, newY);
           }
-
-          onMove(component.id, newX, newY);
         }
       }
+      // Reset initial offset
+      initialClientOffset.current = null;
     },
   }), [component.id, component.x, component.y, onMove, shouldSnapToGrid, gridSpacing]);
 
-  const [, drop] = useDrop(() => ({
+  const [, drop] = useDrop<DropItem, unknown, DropCollectedProps>(() => ({
     accept: 'connection-point',
-    drop: (item: { fromId: string }) => {
-      if (item.fromId !== component.id && onCompleteConnection) {
+    drop: (item) => {
+      // Add null checks to prevent runtime errors
+      if (item?.fromId && item.fromId !== component.id && onCompleteConnection) {
         onCompleteConnection(item.fromId, component.id);
       }
     },
   }), [component.id, onCompleteConnection]);
 
-  // Combine drag and drop refs
+  // Combine drag and drop refs into a single callback ref
   const combinedRef = (el: HTMLDivElement | null) => {
     ref.current = el;
     drag(drop(el));
@@ -83,11 +117,6 @@ export function useComponentDrag({
   return {
     isDragging,
     isDragPreview,
-    ref: {
-      current: ref.current,
-      set current(value) {
-        combinedRef(value);
-      }
-    }
+    ref: combinedRef
   };
 }

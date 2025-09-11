@@ -1,10 +1,10 @@
-import { Project as ProjectSchema } from '../contracts/schema';
-import type { Project } from '../contracts/schema';
 import { invoke } from '@tauri-apps/api/tauri';
-import { BaseDirectory, readTextFile, writeTextFile, createDir, exists, removeFile } from '@tauri-apps/api/fs';
+import { readTextFile, writeTextFile, createDir, exists, removeFile } from '@tauri-apps/api/fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
+import type { Project } from '../contracts/schema';
+import { Project as ProjectSchema } from '../contracts/schema';
 import { isTauriEnvironment } from '../environment';
-import type { DesignComponent, Connection, Layer, DesignData } from '../../shared/contracts';
+import type { DesignData } from '../../shared/contracts';
 
 export async function createProject(name: string, description: string): Promise<Project> {
   const raw = await invoke<unknown>('create_project', { name, description });
@@ -87,7 +87,7 @@ export async function saveDesign(
   const retries = Math.max(0, options.retries ?? 2);
   let attempt = 0;
   // Retry write on failure
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     try {
       await ensureProjectDir();

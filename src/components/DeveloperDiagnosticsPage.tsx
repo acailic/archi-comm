@@ -1,18 +1,12 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
-  Download,
-  Trash2,
-  RefreshCw,
   Search,
-  Filter,
   Copy,
-  ExternalLink,
   Monitor,
   Activity,
   AlertTriangle,
-  Info,
   CheckCircle,
   Clock,
   MemoryStick,
@@ -25,10 +19,6 @@ import {
   FileText,
   BarChart3,
   Terminal,
-  Eye,
-  EyeOff,
-  ChevronDown,
-  ChevronRight,
   Maximize2,
   Minimize2,
 } from 'lucide-react';
@@ -42,7 +32,6 @@ import {
   RUNTIME_ENV,
   FEATURES,
   CONFIG,
-  DEBUG,
 } from '../lib/environment';
 import { logger, LogLevel } from '../lib/logger';
 import { getCanvasPerformanceManager } from '../lib/performance/CanvasPerformanceManager';
@@ -64,10 +53,14 @@ const triggerDownload = (
     setTimeout(() => {
       try {
         URL.revokeObjectURL(url);
-      } catch {}
+      } catch {
+        // Ignore cleanup errors
+      }
       try {
         document.body.removeChild(a);
-      } catch {}
+      } catch {
+        // Ignore cleanup errors
+      }
     }, 150);
   } catch (err) {
     console.error('Failed to trigger download', err);
@@ -223,7 +216,9 @@ const EnvironmentTab: React.FC = () => {
                           a.click();
                           setTimeout(() => URL.revokeObjectURL(url), 1000);
                           document.body.removeChild(a);
-                        } catch {}
+                        } catch {
+                          // Ignore download errors
+                        }
                       }}
                       className='px-3 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700'
                     >Export Diagnostics</button>
@@ -897,7 +892,7 @@ const SystemInfoTab: React.FC = () => {
   if (loading) {
     return (
       <div className='flex items-center justify-center py-12'>
-        <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
+        <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary' />
       </div>
     );
   }

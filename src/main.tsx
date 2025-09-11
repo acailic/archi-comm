@@ -76,7 +76,7 @@ const LoadingFallback = () => (
   <div className='h-screen w-screen flex items-center justify-center bg-background'>
     <div className='flex flex-col items-center gap-4'>
       <div className='relative'>
-        <div className='w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin'></div>
+        <div className='w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin' />
       </div>
       <div className='text-center'>
         <h2 className='text-lg font-semibold text-foreground'>Loading ArchiComm</h2>
@@ -349,7 +349,9 @@ function loadAndRenderApp() {
 
       try {
         (window as any).__APP_LOAD_ERROR__ = error;
-      } catch {}
+      } catch {
+        // Ignore error storing failures
+      }
 
       const Fallback = () => (
         <div className='h-screen w-screen flex items-center justify-center bg-background'>

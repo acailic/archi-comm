@@ -1,9 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { ArrowLeft, Mic, Square, Play, Pause, FileText, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import type { Challenge, DesignData, AudioData } from '@/shared/contracts';
-import { ArrowLeft, Mic, Square, Play, Pause, FileText, AlertTriangle } from 'lucide-react';
 
 const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
@@ -30,6 +30,11 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showNoAudioWarning, setShowNoAudioWarning] = useState(false);
+  // Track when user pressed Continue during an active recording
+  const pendingContinueRef = useRef(false);
+  // Keep latest values available inside async callbacks without stale closures
+  const transcriptRef = useRef('');
+  const durationRef = useRef(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -65,6 +70,25 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         if (!mountedRef.current) return;
         const blob = new Blob(chunks, { type: 'audio/webm' });
         setAudioBlob(blob);
+        // If user clicked Continue while still recording, complete with this blob now
+        if (pendingContinueRef.current) {
+          pendingContinueRef.current = false;
+          const audioData: AudioData = {
+            blob,
+            transcript: transcriptRef.current,
+            duration: durationRef.current,
+            wordCount: transcriptRef.current
+              .split(' ')
+              .filter(word => word.length > 0).length,
+            businessValueTags: [],
+            analysisMetrics: {
+              clarityScore: 75,
+              technicalDepth: 80,
+              businessFocus: 60,
+            },
+          };
+          onComplete(audioData);
+        }
       };
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -118,7 +142,22 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
     };
   }, []);
 
+  // Keep refs synced with latest state for use in async handlers
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
   const handleContinue = useCallback(() => {
+    // If recording is active, stop first and continue once audio finalizes
+    if (isRecording) {
+      pendingContinueRef.current = true;
+      stopRecording();
+      return;
+    }
+
     // If the user proceeds with neither audio nor transcript, show a small, non-blocking notice
     if (!audioBlob && !transcript.trim()) {
       setShowNoAudioWarning(true);
@@ -137,7 +176,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       },
     };
     onComplete(audioData);
-  }, [audioBlob, transcript, duration, onComplete]);
+  }, [audioBlob, transcript, duration, isRecording, stopRecording, onComplete]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

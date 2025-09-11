@@ -197,7 +197,7 @@ export class CanvasErrorBoundary extends Component<Props, State> {
     const canvases = document.querySelectorAll('canvas');
     for (const canvas of canvases) {
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      if (gl && gl.isContextLost()) {
+      if (gl?.isContextLost()) {
         // Canvas context is lost, try to restore it
         canvas.addEventListener('webglcontextrestored', () => {
           console.log('WebGL context restored');
@@ -317,7 +317,7 @@ export class CanvasErrorBoundary extends Component<Props, State> {
     }
   };
 
-  private handleReportBug = () => {
+  private handleReportBug = async () => {
     const errorReport = {
       error: this.state.error?.message,
       stack: this.state.error?.stack,
@@ -328,13 +328,20 @@ export class CanvasErrorBoundary extends Component<Props, State> {
       timestamp: new Date().toISOString()
     };
 
-    // Copy to clipboard
-    navigator.clipboard?.writeText(JSON.stringify(errorReport, null, 2)).then(() => {
-      alert('Error report copied to clipboard');
-    }).catch(() => {
+    // Check if clipboard API is available
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(errorReport, null, 2));
+        alert('Error report copied to clipboard');
+      } catch (error) {
+        console.log('Error report:', errorReport);
+        alert('Error report logged to console');
+      }
+    } else {
+      // Fallback when clipboard API is unavailable
       console.log('Error report:', errorReport);
-      alert('Error report logged to console');
-    });
+      alert('Error report logged to console (clipboard unavailable)');
+    }
   };
 
   override componentWillUnmount() {

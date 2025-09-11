@@ -112,14 +112,20 @@ export function formatDate(date: Date): string {
  * Format bytes to human-readable string
  */
 export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 Bytes';
+  // Validate input: ensure bytes is a finite number greater than zero
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 Bytes';
+  }
 
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  // Clamp index to prevent out-of-bounds array access
+  const clampedIndex = Math.min(i, sizes.length - 1);
 
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  return `${parseFloat((bytes / Math.pow(k, clampedIndex)).toFixed(dm))} ${sizes[clampedIndex]}`;
 }
 
 /**

@@ -1,32 +1,32 @@
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  EyeOff,
+  HelpCircle,
+  Lightbulb,
+  RotateCcw,
+  Target,
+  Zap
+} from 'lucide-react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import { ExtendedChallenge, SolutionHint } from '../lib/challenge-config';
+import type { FramerMotionModule, AnimatePresenceComponent } from '../lib/types/FramerMotion';
 import { Badge } from './ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
-import {
-  Lightbulb,
-  ChevronRight,
-  ChevronDown,
-  Clock,
-  Target,
-  Zap,
-  BookOpen,
-  Eye,
-  EyeOff,
-  RotateCcw,
-  HelpCircle,
-} from 'lucide-react';
-import { ExtendedChallenge, SolutionHint } from '../lib/challenge-config';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
-// Lazy load heavy animation components
-const LazyMotionDiv = React.lazy(() =>
-  import('framer-motion').then(m => ({ default: m.motion.div }))
-);
-const LazyAnimatePresence = React.lazy(() =>
-  import('framer-motion').then(m => ({ default: m.AnimatePresence }))
-);
+// Lazy load heavy animation components (removed unused)
+// const LazyMotionDiv = React.lazy(() =>
+//   import('framer-motion').then(m => ({ default: m.motion.div }))
+// );
+// const LazyAnimatePresence = React.lazy(() =>
+//   import('framer-motion').then(m => ({ default: m.AnimatePresence }))
+// );
 
 // Lightweight loading states
 const HintsLoadingSkeleton = () => (
@@ -52,9 +52,16 @@ const TemplateLoadingSkeleton = () => (
   </div>
 );
 
+interface ComponentData {
+  id: string;
+  type: string;
+  label?: string;
+  // Add other common properties as needed
+}
+
 interface SolutionHintsProps {
   challenge: ExtendedChallenge;
-  currentComponents?: any[];
+  currentComponents?: ComponentData[];
   onHintViewed?: (hintId: string) => void;
   onTemplateRequest?: () => void;
   onClose?: () => void;
@@ -78,18 +85,30 @@ const hintTypeColors = {
   optimization: 'from-red-500 to-red-600',
 };
 
+interface AnimationHookReturn {
+  animationsReady: boolean;
+  motionComponents: FramerMotionModule | null;
+  motion: FramerMotionModule['motion'] | undefined;
+  AnimatePresence: AnimatePresenceComponent | undefined;
+}
+
 // Performance optimization hooks
-const useAnimations = (enabled: boolean = true) => {
+const useAnimations = (enabled: boolean = true): AnimationHookReturn => {
   const [animationsReady, setAnimationsReady] = useState(false);
-  const [motionComponents, setMotionComponents] = useState<any>(null);
+  const [motionComponents, setMotionComponents] = useState<FramerMotionModule | null>(null);
 
   useEffect(() => {
     if (enabled && !animationsReady) {
       // Load framer-motion only when needed
-      import('framer-motion').then(framerMotion => {
-        setMotionComponents(framerMotion);
-        setAnimationsReady(true);
-      });
+      import('framer-motion')
+        .then((framerMotion: FramerMotionModule) => {
+          setMotionComponents(framerMotion);
+          setAnimationsReady(true);
+        })
+        .catch((error) => {
+          console.warn('Failed to load framer-motion:', error);
+          setAnimationsReady(false);
+        });
     }
   }, [enabled, animationsReady]);
 
@@ -101,7 +120,7 @@ const useAnimations = (enabled: boolean = true) => {
   };
 };
 
-const useProgressCalculation = (currentComponents: any[]) => {
+const useProgressCalculation = (currentComponents: ComponentData[]) => {
   return useMemo(() => {
     return {
       componentsCount: currentComponents.length,
@@ -245,7 +264,7 @@ export function SolutionHints({
     return null;
   }
 
-  const ContainerComponent = animationsReady && motion ? motion.div : 'div';
+  const ContainerComponent = (animationsReady && motion ? motion.div : 'div') as React.ElementType;
   const containerProps =
     animationsReady && motion
       ? {
@@ -321,116 +340,120 @@ export function SolutionHints({
         <TabsContent value='hints' className='mt-4 space-y-3'>
           {isReady ? (
             <ScrollArea className='flex-1 min-h-0'>
-              {Object.entries(hintsByType).map(([type, hints]) => (
-                <div key={type} className='mb-4'>
-                  <div className='flex items-center space-x-2 mb-2'>
-                    {React.createElement(hintTypeIcons[type as keyof typeof hintTypeIcons], {
-                      className: 'w-3 h-3',
-                    })}
-                    <span className='text-xs font-medium capitalize'>{type.replace('-', ' ')}</span>
-                    <Badge variant='outline' className='text-xs'>
-                      {hints.length}
-                    </Badge>
-                  </div>
+              {(Object.entries(hintsByType || {})).map(([type, hints]) => {
+                const Icon = hintTypeIcons[type as keyof typeof hintTypeIcons] || HelpCircle;
+                return (
+                  <div key={type} className='mb-4'>
+                    <div className='flex items-center space-x-2 mb-2'>
+                      {React.createElement(Icon, {
+                        className: 'w-3 h-3',
+                      })}
+                      <span className='text-xs font-medium capitalize'>{type.replace('-', ' ')}</span>
+                      <Badge variant='outline' className='text-xs'>
+                        {hints.length}
+                      </Badge>
+                    </div>
 
-                  <div className='space-y-2'>
-                    {hints.map(hint => {
-                      const isExpanded = expandedHints.has(hint.id);
-                      const isViewed = viewedHints.has(hint.id);
-                      const HintIcon = hintTypeIcons[hint.type];
+                    <div className='space-y-2'>
+                      {hints.map(hint => {
+                        const isExpanded = expandedHints.has(hint.id);
+                        const isViewed = viewedHints.has(hint.id);
+                        const HintIcon = hintTypeIcons[hint.type as keyof typeof hintTypeIcons] || HelpCircle;
+                        const hintColor = hintTypeColors[hint.type as keyof typeof hintTypeColors] || 'from-gray-500 to-gray-600';
 
-                      const HintCard = ({ children }: { children: React.ReactNode }) => {
-                        if (animationsReady && motion) {
-                          return (
-                            <motion.div key={hint.id} layout className='group'>
-                              {children}
-                            </motion.div>
-                          );
-                        }
-                        return <div className='group'>{children}</div>;
-                      };
+                        const HintCard = ({ children }: { children: React.ReactNode }) => {
+                          if (animationsReady && motion) {
+                            return (
+                              <motion.div key={hint.id} layout className='group'>
+                                {children}
+                              </motion.div>
+                            );
+                          }
+                          return <div className='group'>{children}</div>;
+                        };
 
-                      return (
-                        <HintCard key={hint.id}>
-                          <Card
-                            className={`cursor-pointer transition-all duration-200 hover:shadow-md border-l-4 ${
-                              isViewed ? 'border-l-green-500 bg-green-50/50' : 'border-l-gray-300'
-                            }`}
-                            onClick={() => toggleHintExpansion(hint.id)}
-                          >
-                            <CardHeader className='pb-1.5 px-3 pt-3'>
-                              <div className='flex items-center justify-between'>
-                                <div className='flex items-center space-x-2'>
-                                  <div
-                                    className={`p-1 rounded bg-gradient-to-r ${hintTypeColors[hint.type]} bg-opacity-10`}
-                                  >
-                                    <HintIcon className='w-3 h-3' />
-                                  </div>
-                                  <CardTitle className='text-sm'>{hint.title}</CardTitle>
-                                  {!isViewed && (
-                                    <div className='w-2 h-2 bg-blue-500 rounded-full' />
-                                  )}
-                                </div>
-
-                                <div className='flex items-center space-x-1'>
-                                  <Badge
-                                    variant='outline'
-                                    className='text-xs'
-                                    style={{
-                                      color:
-                                        hint.difficulty === 'beginner'
-                                          ? '#10b981'
-                                          : hint.difficulty === 'intermediate'
-                                            ? '#f59e0b'
-                                            : '#ef4444',
-                                    }}
-                                  >
-                                    {hint.difficulty}
-                                  </Badge>
-                                  {isExpanded ? (
-                                    <ChevronDown className='w-4 h-4' />
-                                  ) : (
-                                    <ChevronRight className='w-4 h-4' />
-                                  )}
-                                </div>
-                              </div>
-                            </CardHeader>
-
-                            {/* Conditional animation for hint expansion */}
-                            {isExpanded &&
-                              (animationsReady && AnimatePresence ? (
-                                <Suspense fallback={<div className='p-2'>Loading...</div>}>
-                                  <AnimatePresence>
-                                    <motion.div
-                                      initial={{ opacity: 0, height: 0 }}
-                                      animate={{ opacity: 1, height: 'auto' }}
-                                      exit={{ opacity: 0, height: 0 }}
-                                      transition={{ duration: 0.2 }}
+                        return (
+                          <HintCard key={hint.id}>
+                            <Card
+                              className={`cursor-pointer transition-all duration-200 hover:shadow-md border-l-4 ${
+                                isViewed ? 'border-l-green-500 bg-green-50/50' : 'border-l-gray-300'
+                              }`}
+                              onClick={() => toggleHintExpansion(hint.id)}
+                            >
+                              <CardHeader className='pb-1.5 px-3 pt-3'>
+                                <div className='flex items-center justify-between'>
+                                  <div className='flex items-center space-x-2'>
+                                    <div
+                                      className={`p-1 rounded bg-gradient-to-r ${hintColor} bg-opacity-10`}
                                     >
-                                      <CardContent className='pt-0'>
-                                        <Separator className='mb-3' />
-                                        <CardDescription className='text-sm leading-relaxed'>
-                                          {hint.content}
-                                        </CardDescription>
-                                      </CardContent>
-                                    </motion.div>
-                                  </AnimatePresence>
-                                </Suspense>
-                              ) : (
-                                <CardContent className='pt-0'>
-                                  <Separator className='mb-3' />
-                                  <CardDescription className='text-sm leading-relaxed'>
-                                    {hint.content}
-                                  </CardDescription>
-                                </CardContent>
-                              ))}
-                          </Card>
-                        </HintCard>
-                      );
-                    })}
+                                      <HintIcon className='w-3 h-3' />
+                                    </div>
+                                    <CardTitle className='text-sm'>{hint.title}</CardTitle>
+                                    {!isViewed && (
+                                      <div className='w-2 h-2 bg-blue-500 rounded-full' />
+                                    )}
+                                  </div>
+
+                                  <div className='flex items-center space-x-1'>
+                                    <Badge
+                                      variant='outline'
+                                      className='text-xs'
+                                      style={{
+                                        color:
+                                          hint.difficulty === 'beginner'
+                                            ? '#10b981'
+                                            : hint.difficulty === 'intermediate'
+                                              ? '#f59e0b'
+                                              : '#ef4444',
+                                      }}
+                                    >
+                                      {hint.difficulty}
+                                    </Badge>
+                                    {isExpanded ? (
+                                      <ChevronDown className='w-4 h-4' />
+                                    ) : (
+                                      <ChevronRight className='w-4 h-4' />
+                                    )}
+                                  </div>
+                                </div>
+                              </CardHeader>
+
+                              {/* Conditional animation for hint expansion */}
+                              {isExpanded &&
+                                (animationsReady && AnimatePresence ? (
+                                  <Suspense fallback={<div className='p-2'>Loading...</div>}>
+                                    <AnimatePresence>
+                                      <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                      >
+                                        <CardContent className='pt-0'>
+                                          <Separator className='mb-3' />
+                                          <CardDescription className='text-sm leading-relaxed'>
+                                            {hint.content}
+                                          </CardDescription>
+                                        </CardContent>
+                                      </motion.div>
+                                    </AnimatePresence>
+                                  </Suspense>
+                                ) : (
+                                  <CardContent className='pt-0'>
+                                    <Separator className='mb-3' />
+                                    <CardDescription className='text-sm leading-relaxed'>
+                                      {hint.content}
+                                    </CardDescription>
+                                  </CardContent>
+                                ))}
+                            </Card>
+                          </HintCard>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {Object.keys(hintsByType).length === 0 && (
                 <div className='text-center py-6 text-muted-foreground'>
@@ -461,7 +484,7 @@ export function SolutionHints({
 
                     <Button
                       size='sm'
-                      onClick={onTemplateRequest}
+                      onClick={() => onTemplateRequest?.()}
                       className='bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
                     >
                       Load Template

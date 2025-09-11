@@ -8,22 +8,17 @@ import {
   RotateCcw,
   Settings,
   TrendingUp,
-  Activity,
   Zap,
   Clock,
   MemoryStick,
-  Target,
   AlertTriangle,
-  CheckCircle,
   Info,
   Maximize2,
   Minimize2,
   BarChart3,
-  LineChart,
-  PieChart,
   Monitor,
 } from 'lucide-react';
-import { PerformanceMonitor, MemoryOptimizer } from '../lib/performance/PerformanceOptimizer';
+import { PerformanceMonitor } from '../lib/performance/PerformanceOptimizer';
 
 interface PerformanceDashboardProps {
   isOpen: boolean;

@@ -1,8 +1,8 @@
 import React from 'react';
-import { loadTiptapReact, loadTiptapStarterKit, loadTiptapExtensions } from '@/lib/lazy-imports/tiptap-loader';
 import { Bold, Italic, List, ListOrdered } from 'lucide-react';
 import { Button } from './button';
 import { cn } from './utils';
+import { loadTiptapReact, loadTiptapStarterKit, loadTiptapExtensions } from '@/lib/lazy-imports/tiptap-loader';
 
 interface RichTextEditorProps {
   value: string;

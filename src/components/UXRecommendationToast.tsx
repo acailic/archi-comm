@@ -1,8 +1,8 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+import { Lightbulb, TrendingUp, Zap, AlertCircle } from 'lucide-react';
 import { useUXOptimizer } from '../lib/user-experience/UXOptimizer';
 import { useUXTracker } from '../hooks/useUXTracker';
-import { Lightbulb, TrendingUp, Zap, AlertCircle } from 'lucide-react';
 
 export interface UXRecommendation {
   id: string;

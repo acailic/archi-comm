@@ -219,7 +219,7 @@ class MemoryBufferSink implements LogSink {
         } catch {
           dataMatch = false;
         }
-        const errorMatch = entry.error && entry.error.message.toLowerCase().includes(searchLower);
+        const errorMatch = entry.error?.message.toLowerCase().includes(searchLower);
 
         if (!messageMatch && !dataMatch && !errorMatch) {
           return false;

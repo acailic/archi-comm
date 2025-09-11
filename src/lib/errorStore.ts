@@ -3,7 +3,7 @@
  * Lightweight error management system for tracking application errors during development
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isDevelopment } from './environment';
 
 // Error types and interfaces

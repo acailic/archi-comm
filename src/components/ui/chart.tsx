@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { cn } from './utils';
 import { loadRecharts } from '@/lib/lazy-imports/recharts-loader';
 
-import { cn } from './utils';
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const;

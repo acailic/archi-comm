@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useRef } from 'react';
-import { Button } from './ui/button';
+import React, { useMemo, useRef } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import type { DesignComponent, Connection, Layer, ViewportInfo } from '../shared/contracts';
 import { useOptimizedCallback, useOptimizedMemo } from '../lib/performance/PerformanceOptimizer';
+import { Button } from './ui/button';
 
 interface MinimapProps {
   components: DesignComponent[];

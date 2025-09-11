@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+  Trash2,
+  Plus,
+  MessageCircle,
+  Undo,
+  Redo,
+  ChevronDown,
+  Palette,
+  Save,
+  Clock,
+} from 'lucide-react';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -8,7 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -22,19 +32,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Slider } from '@/components/ui/slider';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { ColorPicker } from '@/components/ui/color-picker';
-import {
-  Trash2,
-  Plus,
-  MessageCircle,
-  Undo,
-  Redo,
-  ChevronDown,
-  Palette,
-  Type,
-  Save,
-  Clock,
-} from 'lucide-react';
-import { Annotation, AnnotationType, AnnotationStyle } from '@/lib/canvas/CanvasAnnotations';
+import { Annotation, AnnotationStyle } from '@/lib/canvas/CanvasAnnotations';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { ANNOTATION_PRESETS, getPresetById } from '@/lib/canvas/annotation-presets';

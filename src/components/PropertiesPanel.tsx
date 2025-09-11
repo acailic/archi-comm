@@ -3,31 +3,33 @@
 // Provides component library and properties editing in separate tabs
 // RELEVANT FILES: ComponentPalette.tsx, DesignCanvas.tsx
 
-import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import {
+  Edit3,
+  Eye,
+  EyeOff,
+  Info,
+  Layers,
+  Palette,
+  Settings,
+  Trash2
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { DesignComponent } from '../shared/contracts';
+import { ComponentPalette } from './ComponentPalette';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
-import { ComponentPalette } from './ComponentPalette';
-import { 
-  Settings, 
-  Trash2, 
-  Edit3, 
-  Link, 
-  Palette,
-  Info,
-  Layers
-} from 'lucide-react';
-import type { DesignComponent, Connection } from '../shared/contracts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 interface PropertiesPanelProps {
   selectedComponent: string | null;
   components: DesignComponent[];
   onLabelChange: (id: string, label: string) => void;
   onDelete: (id: string) => void;
+  onShowLabelToggle?: (id: string, visible: boolean) => void;
 }
 
 export function PropertiesPanel({
@@ -35,36 +37,48 @@ export function PropertiesPanel({
   components,
   onLabelChange,
   onDelete,
+  onShowLabelToggle,
 }: PropertiesPanelProps) {
   const [activeTab, setActiveTab] = useState('components');
-  
-  const selectedComponentData = selectedComponent 
+
+  const selectedComponentData = selectedComponent
     ? components.find(c => c.id === selectedComponent)
     : null;
 
+  // Automatically switch to properties tab when a component is selected
+  useEffect(() => {
+    if (selectedComponent) {
+      setActiveTab('properties');
+    }
+  }, [selectedComponent]);
+
   return (
-    <div className="w-80 bg-card/30 backdrop-blur-sm border-l border-border/30 flex flex-col h-full">
+    <div className="h-full bg-card border-l border-border/30 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-border/30">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold flex items-center gap-2">
+      <div className="p-3 border-b border-border/30">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold flex items-center gap-1.5 text-sm">
             <Settings className="w-4 h-4" />
             Properties
           </h3>
-          {selectedComponent && (
-            <Badge variant="outline" className="text-xs">
+          {selectedComponent ? (
+            <Badge variant="default" className="text-[10px] h-5 px-1.5 bg-primary">
+              Selected
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5">
               {components.length} components
             </Badge>
           )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-8">
-            <TabsTrigger value="components" className="text-xs">
+          <TabsList className="grid w-full grid-cols-2 h-7">
+            <TabsTrigger value="components" className="text-[11px]">
               <Layers className="w-3 h-3 mr-1" />
               Library
             </TabsTrigger>
-            <TabsTrigger value="properties" className="text-xs">
+            <TabsTrigger value="properties" className="text-[11px]">
               <Edit3 className="w-3 h-3 mr-1" />
               Properties
             </TabsTrigger>
@@ -82,21 +96,21 @@ export function PropertiesPanel({
           {/* Properties Tab */}
           <TabsContent value="properties" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="p-4 space-y-4">
+              <div className="p-3 space-y-3">
                 {/* Selected Component Properties */}
                 {selectedComponentData ? (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
-                    <Card className="bg-card/50 backdrop-blur-sm border-border/30">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
+                    <Card className="bg-card border-border/30">
+                      <CardHeader className="pb-1 py-2">
+                        <CardTitle className="text-xs flex items-center gap-2">
                           <Palette className="w-4 h-4 text-accent" />
                           Component Details
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="pt-0 space-y-4">
+                      <CardContent className="pt-0 space-y-3">
                         {/* Component Type */}
                         <div>
                           <label className="text-xs font-medium block mb-1 text-muted-foreground">
@@ -119,6 +133,28 @@ export function PropertiesPanel({
                             className="text-xs"
                             placeholder="Enter component label..."
                           />
+                        </div>
+
+                        {/* Label Visibility Toggle */}
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Show Label
+                          </label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onShowLabelToggle?.(
+                              selectedComponentData.id,
+                              !(selectedComponentData.properties?.showLabel !== false)
+                            )}
+                            className="h-6 px-2"
+                          >
+                            {(selectedComponentData.properties?.showLabel !== false) ? (
+                              <Eye className="w-3 h-3" />
+                            ) : (
+                              <EyeOff className="w-3 h-3" />
+                            )}
+                          </Button>
                         </div>
 
                         {/* Position */}
@@ -163,7 +199,7 @@ export function PropertiesPanel({
                             variant="destructive"
                             size="sm"
                             onClick={() => onDelete(selectedComponentData.id)}
-                            className="w-full text-xs"
+                            className="w-full text-[11px] h-8"
                           >
                             <Trash2 className="w-3 h-3 mr-2" />
                             Delete Component
@@ -173,10 +209,10 @@ export function PropertiesPanel({
                     </Card>
                   </motion.div>
                 ) : (
-                  <Card className="bg-muted/20 backdrop-blur-sm border-border/30">
-                    <CardContent className="p-6 text-center">
-                      <Info className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
-                      <p className="text-sm text-muted-foreground mb-1">No component selected</p>
+                  <Card className="bg-muted/10 border-border/30">
+                    <CardContent className="p-4 text-center">
+                      <Info className="w-6 h-6 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-xs text-muted-foreground mb-1">No component selected</p>
                       <p className="text-xs text-muted-foreground">
                         Click on a component to view and edit its properties
                       </p>
@@ -185,35 +221,35 @@ export function PropertiesPanel({
                 )}
 
                 {/* Design Overview */}
-                <Card className="bg-card/50 backdrop-blur-sm border-border/30">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
+                <Card className="bg-card border-border/30">
+                  <CardHeader className="pb-1 py-2">
+                    <CardTitle className="text-xs flex items-center gap-2">
                       <Info className="w-4 h-4 text-primary" />
                       Design Overview
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0 space-y-3">
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div className="text-center p-2 bg-muted/30 rounded">
-                        <div className="font-semibold text-sm">{components.length}</div>
+                  <CardContent className="pt-0 space-y-2">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="text-center p-1.5 bg-muted/30 rounded">
+                        <div className="font-semibold text-xs">{components.length}</div>
                         <div className="text-muted-foreground">Components</div>
                       </div>
-                      <div className="text-center p-2 bg-muted/30 rounded">
-                        <div className="font-semibold text-sm">
+                      <div className="text-center p-1.5 bg-muted/30 rounded">
+                        <div className="font-semibold text-xs">
                           {components.filter(c => c.label !== c.type.charAt(0).toUpperCase() + c.type.slice(1)).length}
                         </div>
                         <div className="text-muted-foreground">Customized</div>
                       </div>
                     </div>
-                    
+
                     {components.length > 0 && (
                       <div>
-                        <label className="text-xs font-medium block mb-2 text-muted-foreground">
+                        <label className="text-[11px] font-medium block mb-1.5 text-muted-foreground">
                           Component Types
                         </label>
                         <div className="flex flex-wrap gap-1">
                           {Array.from(new Set(components.map(c => c.type))).map(type => (
-                            <Badge key={type} variant="outline" className="text-xs">
+                            <Badge key={type} variant="outline" className="text-[10px] h-5">
                               {type.replace('-', ' ')}
                             </Badge>
                           ))}

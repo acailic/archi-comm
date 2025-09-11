@@ -5,7 +5,6 @@
  * RELEVANT FILES: CanvasComponent.tsx, design-system.ts
  */
 
-import { designSystem } from '@/lib/design-system';
 import { type DesignComponent } from '@/shared/contracts';
 import { cn } from '@/lib/utils';
 

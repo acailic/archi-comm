@@ -3,23 +3,26 @@
 // Provides simplified layout with AssignmentPanel, CanvasArea, and PropertiesPanel
 // RELEVANT FILES: CanvasArea.tsx, PropertiesPanel.tsx, AssignmentPanel.tsx, SolutionHints.tsx
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Button } from './ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { ArrowLeft, Save, Download, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Save, Download, Lightbulb, Search, Activity, Clock, Zap } from 'lucide-react';
 import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
 import type {
   Connection,
   DesignComponent,
   DesignData,
   Challenge,
+  InfoCard,
 } from '../shared/contracts';
+import { ReactFlowCanvas } from '../features/canvas/components/ReactFlowCanvas';
 import { AssignmentPanel } from './AssignmentPanel';
-import { CanvasArea } from './CanvasArea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Button } from './ui/button';
 import { PropertiesPanel } from './PropertiesPanel';
 import { SolutionHints } from './SolutionHints';
+import { CommandPalette } from './CommandPalette';
+import { ResizablePanel } from './ui/ResizablePanel';
 
 interface DesignCanvasProps {
   challenge: Challenge;
@@ -31,10 +34,21 @@ interface DesignCanvasProps {
 export function DesignCanvas({ challenge, initialData, onComplete, onBack }: DesignCanvasProps) {
   const [components, setComponents] = useState<DesignComponent[]>(initialData.components);
   const [connections, setConnections] = useState<Connection[]>(initialData.connections);
+  const [infoCards, setInfoCards] = useState<InfoCard[]>(initialData.infoCards || []);
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [sessionStartTime] = useState<Date>(new Date());
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  // Update current time every second for status bar
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Get extended challenge data
   const extendedChallenge = challengeManager.getChallengeById(challenge.id) as ExtendedChallenge || challenge;
@@ -77,7 +91,9 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       type: componentType,
       x,
       y,
-      label: formatComponentLabel(componentType)
+      // Start with empty label; user can edit inline on canvas
+      label: '',
+      properties: { showLabel: true }
     };
     setComponents(prev => [...prev, newComponent]);
   }, []);
@@ -120,13 +136,49 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     setSelectedComponent(null);
   }, []);
 
+  const handleShowLabelToggle = useCallback((id: string, visible: boolean) => {
+    setComponents(prev => prev.map(comp => 
+      comp.id === id 
+        ? { ...comp, properties: { ...comp.properties, showLabel: visible } } 
+        : comp
+    ));
+  }, []);
+
+  const handleInfoCardAdd = useCallback((x: number, y: number) => {
+    const newInfoCard: InfoCard = {
+      id: `info-card-${Date.now()}`,
+      x,
+      y,
+      content: '',
+      color: 'yellow',
+      isEditing: true
+    };
+    setInfoCards(prev => [...prev, newInfoCard]);
+  }, []);
+
+  const handleInfoCardUpdate = useCallback((id: string, content: string) => {
+    setInfoCards(prev => prev.map(card => 
+      card.id === id ? { ...card, content, isEditing: false } : card
+    ));
+  }, []);
+
+  const handleInfoCardDelete = useCallback((id: string) => {
+    setInfoCards(prev => prev.filter(card => card.id !== id));
+  }, []);
+
+  const handleInfoCardColorChange = useCallback((id: string, color: string) => {
+    setInfoCards(prev => prev.map(card => 
+      card.id === id ? { ...card, color: color as InfoCard['color'] } : card
+    ));
+  }, []);
+
   const handleSave = useCallback(() => {
-    const designData = { components, connections };
+    const designData = { components, connections, infoCards };
     localStorage.setItem('archicomm-design', JSON.stringify(designData));
-  }, [components, connections]);
+  }, [components, connections, infoCards]);
 
   const handleExport = useCallback(() => {
-    const designData = { components, connections };
+    const designData = { components, connections, infoCards };
     const dataStr = JSON.stringify(designData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -137,12 +189,13 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [components, connections, challenge.id]);
+  }, [components, connections, infoCards, challenge.id]);
 
   const handleContinue = useCallback(() => {
     const designData: DesignData = {
       components,
       connections,
+      infoCards,
       layers: [],
       metadata: {
         created: initialData.metadata?.created || new Date().toISOString(),
@@ -151,7 +204,12 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
       }
     };
     onComplete(designData);
-  }, [components, connections, initialData.metadata.created, onComplete]);
+  }, [components, connections, infoCards, initialData.metadata?.created, onComplete]);
+
+  // Status bar calculations
+  const timeElapsed = Math.floor((currentTime.getTime() - sessionStartTime.getTime()) / 1000 / 60);
+  const componentTypes = Array.from(new Set(components.map(c => c.type))).length;
+  const selectedComponentData = selectedComponent ? components.find(c => c.id === selectedComponent) : null;
 
   return (
     <TooltipProvider>
@@ -182,6 +240,22 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowCommandPalette(true)}
+                    className="px-3"
+                  >
+                    <Search className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Search Actions
+                </TooltipContent>
+              </Tooltip>
+              
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
@@ -239,33 +313,40 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
         <div className="flex-1 flex">
           {/* Assignment Panel - Left Sidebar */}
-          <AssignmentPanel 
-            challenge={extendedChallenge}
-            progress={{
-              componentsCount: components.length,
-              connectionsCount: connections.length,
-              timeElapsed: Math.floor((Date.now() - sessionStartTime.getTime()) / 1000 / 60)
-            }}
-            currentComponents={components}
-          />
+          <ResizablePanel 
+            side="left"
+            defaultWidth={320}
+            minWidth={200}
+            maxWidth={500}
+          >
+            <AssignmentPanel 
+              challenge={extendedChallenge}
+              progress={{
+                componentsCount: components.length,
+                connectionsCount: connections.length,
+                timeElapsed: Math.floor((Date.now() - sessionStartTime.getTime()) / 1000 / 60)
+              }}
+              currentComponents={components}
+            />
+          </ResizablePanel>
 
           {/* Canvas Area - Center */}
           <div className="flex-1 relative">
-            <CanvasArea
-              components={components}
-              connections={connections}
-              layers={[]}
-              activeLayerId={null}
-              selectedComponent={selectedComponent}
-              connectionStart={connectionStart}
-              onComponentDrop={handleComponentDrop}
-              onComponentMove={handleComponentMove}
-              onComponentSelect={handleComponentSelect}
-              onConnectionLabelChange={handleConnectionLabelChange}
-              onConnectionDelete={handleConnectionDelete}
-              onConnectionTypeChange={handleConnectionTypeChange}
-              onStartConnection={(id: string) => setConnectionStart(id)}
-              onCompleteConnection={(fromId: string, toId: string) => {
+          <ReactFlowCanvas
+            components={components}
+            connections={connections}
+            infoCards={infoCards}
+            selectedComponent={selectedComponent}
+            connectionStart={connectionStart}
+            onComponentDrop={handleComponentDrop}
+            onComponentMove={handleComponentMove}
+            onComponentSelect={handleComponentSelect}
+            onComponentLabelChange={handleComponentLabelChange}
+            onConnectionLabelChange={handleConnectionLabelChange}
+            onConnectionDelete={handleConnectionDelete}
+            onConnectionTypeChange={handleConnectionTypeChange}
+            onStartConnection={(id: string) => setConnectionStart(id)}
+            onCompleteConnection={(fromId: string, toId: string) => {
                 if (fromId !== toId) {
                   const newConnection = {
                     id: `connection-${Date.now()}`,
@@ -278,6 +359,10 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                 }
                 setConnectionStart(null);
               }}
+              onInfoCardAdd={handleInfoCardAdd}
+              onInfoCardUpdate={handleInfoCardUpdate}
+              onInfoCardDelete={handleInfoCardDelete}
+              onInfoCardColorChange={handleInfoCardColorChange}
             />
             
             {/* Solution Hints Overlay */}
@@ -293,13 +378,63 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           </div>
 
           {/* Properties Panel - Right Sidebar */}
-          <PropertiesPanel 
-            selectedComponent={selectedComponent}
-            components={components}
-            onLabelChange={handleComponentLabelChange}
-            onDelete={handleDeleteComponent}
-          />
+          <ResizablePanel 
+            side="right"
+            defaultWidth={320}
+            minWidth={250}
+            maxWidth={600}
+          >
+            <PropertiesPanel 
+              selectedComponent={selectedComponent}
+              components={components}
+              onLabelChange={handleComponentLabelChange}
+              onDelete={handleDeleteComponent}
+              onShowLabelToggle={handleShowLabelToggle}
+            />
+          </ResizablePanel>
         </div>
+
+        {/* Status Bar */}
+        <div className="border-t bg-card/30 backdrop-blur-sm p-2 flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <Activity className="w-3 h-3" />
+              <span>{components.length} Components</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Zap className="w-3 h-3" />
+              <span>{connections.length} Connections</span>
+            </div>
+            {infoCards.length > 0 && (
+              <div className="flex items-center gap-1">
+                <span>{infoCards.length} Comments</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <span>{componentTypes} Types</span>
+            </div>
+            {selectedComponentData && (
+              <div className="flex items-center gap-1 text-primary">
+                <span>Selected: {selectedComponentData.label}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>{timeElapsed}m elapsed</span>
+            </div>
+            <div className="text-xs">
+              {currentTime.toLocaleTimeString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Command Palette */}
+        <CommandPalette 
+          isOpen={showCommandPalette}
+          onClose={() => setShowCommandPalette(false)}
+        />
       </div>
     </DndProvider>
     </TooltipProvider>

@@ -4,9 +4,9 @@
  */
 
 import {
-    CanvasOptimizer,
-    OptimizedEventSystem,
-    PerformanceMonitor
+  CanvasOptimizer,
+  OptimizedEventSystem,
+  PerformanceMonitor
 } from './PerformanceOptimizer';
 
 export interface CanvasPerformanceConfig {
@@ -28,12 +28,21 @@ export interface PerformanceBudget {
 
 export interface CanvasSystemMetrics {
   id: string;
-  type: 'svg' | 'canvas2d' | 'webgl';
+  type: 'reactflow' | 'svg' | 'canvas2d' | 'webgl';
   fps: number;
   renderTime: number;
   memoryUsage: number;
   complexity: number;
   workerActive: boolean;
+  // React Flow specific metrics
+  nodeCount: number;
+  edgeCount: number;
+  viewportZoom: number;
+  viewportX: number;
+  viewportY: number;
+  lastRenderDuration: number;
+  nodeRenderTime: number;
+  edgeRenderTime: number;
 }
 
 export interface PerformanceRecommendation {
@@ -53,6 +62,7 @@ export class CanvasPerformanceManager {
   private performanceMonitor: PerformanceMonitor;
   private eventSystem: OptimizedEventSystem;
   private systemMetrics: Map<string, CanvasSystemMetrics> = new Map();
+  private reactFlowMetrics: Map<string, ReactFlowMetrics> = new Map();
   private performanceBudgets: Map<string, PerformanceBudget> = new Map();
   private recommendations: PerformanceRecommendation[] = [];
   private capabilities: SystemCapabilities;
@@ -60,6 +70,7 @@ export class CanvasPerformanceManager {
   private monitoringInterval: NodeJS.Timeout | null = null;
   private adaptiveQualityEnabled = true;
   private currentQualityLevel = 1.0;
+  private reactFlowInstances: Map<string, any> = new Map();
 
   static getInstance(config?: Partial<CanvasPerformanceConfig>): CanvasPerformanceManager {
     if (!CanvasPerformanceManager.instance) {
@@ -142,17 +153,19 @@ export class CanvasPerformanceManager {
 
   /**
    * Register a canvas system for performance management
-   * Now accepts any HTMLElement to better support SVG-based systems
+   * Updated to support React Flow systems alongside traditional canvas systems
    */
   registerCanvasSystem(
     id: string,
     element: HTMLElement,
-    type: 'svg' | 'canvas2d' | 'webgl' = 'svg'
+    type: 'reactflow' | 'svg' | 'canvas2d' | 'webgl' = 'reactflow',
+    reactFlowInstance?: any
   ): CanvasOptimizer {
     // Validate element type against system type
     if ((type === 'canvas2d' || type === 'webgl') && !(element instanceof HTMLCanvasElement)) {
       console.warn(`Element type mismatch: ${type} system requires HTMLCanvasElement, got ${element.tagName}`);
     }
+
     // Check if already registered to prevent duplicates
     if (this.optimizers.has(id)) {
       if (this.config.debugMode) {
@@ -164,12 +177,18 @@ export class CanvasPerformanceManager {
     // Create optimizer with appropriate mode
     try {
       const optimizer = new CanvasOptimizer(element, {
-        compatibilityMode: type === 'svg'
+        compatibilityMode: type === 'svg' || type === 'reactflow'
       });
       this.optimizers.set(id, optimizer);
     } catch (error) {
       console.error(`Failed to create optimizer for ${type} system:`, error);
       throw new Error(`Canvas system registration failed for ${id}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+
+    // Store React Flow instance for performance monitoring
+    if (type === 'reactflow' && reactFlowInstance) {
+      this.reactFlowInstances.set(id, reactFlowInstance);
+      this.setupReactFlowMonitoring(id, reactFlowInstance);
     }
 
     // Initialize metrics tracking
@@ -181,7 +200,34 @@ export class CanvasPerformanceManager {
       memoryUsage: 0,
       complexity: 0,
       workerActive: false,
+      // React Flow specific metrics
+      nodeCount: 0,
+      edgeCount: 0,
+      viewportZoom: 1,
+      viewportX: 0,
+      viewportY: 0,
+      lastRenderDuration: 0,
+      nodeRenderTime: 0,
+      edgeRenderTime: 0,
     });
+
+    // Initialize React Flow specific metrics
+    if (type === 'reactflow') {
+      this.reactFlowMetrics.set(id, {
+        nodeCount: 0,
+        edgeCount: 0,
+        viewportZoom: 1,
+        viewportX: 0,
+        viewportY: 0,
+        lastRenderDuration: 0,
+        nodeRenderTime: 0,
+        edgeRenderTime: 0,
+        layoutCalculationTime: 0,
+        connectionCalculationTime: 0,
+        visibleNodeCount: 0,
+        visibleEdgeCount: 0,
+      });
+    }
 
     // Set up performance budget for this system
     if (!this.performanceBudgets.has(id)) {
@@ -279,6 +325,10 @@ export class CanvasPerformanceManager {
 
     // Remove from worker queue if present
     this.workerQueue = this.workerQueue.filter(item => item.id !== id);
+
+    // Cleanup React Flow instance and metrics
+    this.reactFlowInstances.delete(id);
+    this.reactFlowMetrics.delete(id);
 
     // Cleanup metrics and budgets
     this.systemMetrics.delete(id);
@@ -522,6 +572,8 @@ export class CanvasPerformanceManager {
 
     // Clear all data structures
     this.systemMetrics.clear();
+    this.reactFlowMetrics.clear();
+    this.reactFlowInstances.clear();
     this.performanceBudgets.clear();
     this.recommendations = [];
     this.listeners.clear();
@@ -537,6 +589,7 @@ export class CanvasPerformanceManager {
       timestamp: Date.now(),
       config: this.config,
       metrics: Object.fromEntries(this.systemMetrics),
+      reactFlowMetrics: Object.fromEntries(this.reactFlowMetrics),
       budgets: Object.fromEntries(this.performanceBudgets),
       recommendations: this.recommendations,
       capabilities: this.capabilities,
@@ -609,6 +662,7 @@ export class CanvasPerformanceManager {
 
   private initializeDefaultBudgets(): void {
     const budgets = {
+      reactflow: { renderTime: 8, memoryUsage: 150, fpsThreshold: 58, complexityThreshold: 1500 },
       svg: { renderTime: 16, memoryUsage: 100, fpsThreshold: 50, complexityThreshold: 1000 },
       canvas2d: { renderTime: 8, memoryUsage: 200, fpsThreshold: 55, complexityThreshold: 500 },
       webgl: { renderTime: 4, memoryUsage: 300, fpsThreshold: 58, complexityThreshold: 2000 },
@@ -619,13 +673,13 @@ export class CanvasPerformanceManager {
     });
   }
 
-  private getDefaultBudget(type: 'svg' | 'canvas2d' | 'webgl'): PerformanceBudget {
+  private getDefaultBudget(type: 'reactflow' | 'svg' | 'canvas2d' | 'webgl'): PerformanceBudget {
     return (
       this.performanceBudgets.get(`default-${type}`) || {
-        renderTime: 16,
-        memoryUsage: 100,
-        fpsThreshold: 50,
-        complexityThreshold: 500,
+        renderTime: type === 'reactflow' ? 8 : 16, // React Flow should be more efficient
+        memoryUsage: type === 'reactflow' ? 150 : 100,
+        fpsThreshold: type === 'reactflow' ? 58 : 50,
+        complexityThreshold: type === 'reactflow' ? 1500 : 500, // React Flow can handle more complexity
       }
     );
   }
@@ -658,6 +712,11 @@ export class CanvasPerformanceManager {
 
       // Update worker status
       metrics.workerActive = this.workers.has(id);
+
+      // Update React Flow specific metrics
+      if (metrics.type === 'reactflow') {
+        this.updateReactFlowMetrics(id, metrics);
+      }
     });
   }
 
@@ -1111,6 +1170,212 @@ export class CanvasPerformanceManager {
     }
   }
 
+  private setupReactFlowMonitoring(id: string, reactFlowInstance: any): void {
+    if (!reactFlowInstance) return;
+
+    try {
+      // Monitor viewport changes
+      const handleViewportChange = (viewport: { x: number; y: number; zoom: number }) => {
+        const metrics = this.reactFlowMetrics.get(id);
+        if (metrics) {
+          metrics.viewportX = viewport.x;
+          metrics.viewportY = viewport.y;
+          metrics.viewportZoom = viewport.zoom;
+        }
+
+        // Record viewport change performance
+        this.performanceMonitor.recordMetric(`${id}-viewport-change`, {
+          timestamp: Date.now(),
+          duration: 0,
+          type: 'viewport-change',
+          value: viewport.zoom,
+        });
+      };
+
+      // Monitor node/edge changes
+      const handleNodesChange = (nodes: any[]) => {
+        const startTime = performance.now();
+
+        const metrics = this.reactFlowMetrics.get(id);
+        if (metrics) {
+          metrics.nodeCount = nodes.length;
+
+          // Calculate visible nodes (simplified - in viewport)
+          const viewport = reactFlowInstance.getViewport();
+          metrics.visibleNodeCount = nodes.filter(node =>
+            this.isNodeVisible(node, viewport)
+          ).length;
+        }
+
+        const duration = performance.now() - startTime;
+        this.performanceMonitor.recordMetric(`${id}-nodes-change`, {
+          timestamp: Date.now(),
+          duration,
+          type: 'nodes-change',
+          value: nodes.length,
+        });
+      };
+
+      const handleEdgesChange = (edges: any[]) => {
+        const startTime = performance.now();
+
+        const metrics = this.reactFlowMetrics.get(id);
+        if (metrics) {
+          metrics.edgeCount = edges.length;
+
+          // Calculate visible edges
+          const viewport = reactFlowInstance.getViewport();
+          metrics.visibleEdgeCount = edges.filter(edge =>
+            this.isEdgeVisible(edge, viewport)
+          ).length;
+        }
+
+        const duration = performance.now() - startTime;
+        this.performanceMonitor.recordMetric(`${id}-edges-change`, {
+          timestamp: Date.now(),
+          duration,
+          type: 'edges-change',
+          value: edges.length,
+        });
+      };
+
+      // Set up event listeners if the React Flow instance supports them
+      if (typeof reactFlowInstance.onViewportChange === 'function') {
+        reactFlowInstance.onViewportChange(handleViewportChange);
+      }
+
+      if (typeof reactFlowInstance.onNodesChange === 'function') {
+        reactFlowInstance.onNodesChange(handleNodesChange);
+      }
+
+      if (typeof reactFlowInstance.onEdgesChange === 'function') {
+        reactFlowInstance.onEdgesChange(handleEdgesChange);
+      }
+
+    } catch (error) {
+      console.warn(`Failed to setup React Flow monitoring for ${id}:`, error);
+    }
+  }
+
+  private updateReactFlowMetrics(id: string, systemMetrics: CanvasSystemMetrics): void {
+    const reactFlowMetrics = this.reactFlowMetrics.get(id);
+    const reactFlowInstance = this.reactFlowInstances.get(id);
+
+    if (!reactFlowMetrics || !reactFlowInstance) return;
+
+    try {
+      // Update system metrics with React Flow data
+      systemMetrics.nodeCount = reactFlowMetrics.nodeCount;
+      systemMetrics.edgeCount = reactFlowMetrics.edgeCount;
+      systemMetrics.viewportZoom = reactFlowMetrics.viewportZoom;
+      systemMetrics.viewportX = reactFlowMetrics.viewportX;
+      systemMetrics.viewportY = reactFlowMetrics.viewportY;
+
+      // Calculate complexity based on visible elements
+      const visibilityComplexity = reactFlowMetrics.visibleNodeCount + (reactFlowMetrics.visibleEdgeCount * 0.5);
+      const zoomComplexity = Math.max(1, reactFlowMetrics.viewportZoom * 2);
+      systemMetrics.complexity = visibilityComplexity * zoomComplexity;
+
+      // Update render times from React Flow specific metrics
+      const nodeRenderMetrics = this.performanceMonitor.getMetrics(`${id}-nodes-change`);
+      if (nodeRenderMetrics.length > 0) {
+        systemMetrics.nodeRenderTime = this.performanceMonitor.getAverageMetric(`${id}-nodes-change`);
+      }
+
+      const edgeRenderMetrics = this.performanceMonitor.getMetrics(`${id}-edges-change`);
+      if (edgeRenderMetrics.length > 0) {
+        systemMetrics.edgeRenderTime = this.performanceMonitor.getAverageMetric(`${id}-edges-change`);
+      }
+
+      // Calculate layout performance
+      const layoutMetrics = this.performanceMonitor.getMetrics(`${id}-layout`);
+      if (layoutMetrics.length > 0) {
+        reactFlowMetrics.layoutCalculationTime = this.performanceMonitor.getAverageMetric(`${id}-layout`);
+      }
+
+    } catch (error) {
+      console.warn(`Error updating React Flow metrics for ${id}:`, error);
+    }
+  }
+
+  private isNodeVisible(node: any, viewport: { x: number; y: number; zoom: number }): boolean {
+    // Simplified visibility check - in a real implementation, this would consider
+    // the actual viewport bounds and node dimensions
+    if (!node.position) return true;
+
+    // Basic check if node is roughly in viewport
+    const nodeX = node.position.x * viewport.zoom + viewport.x;
+    const nodeY = node.position.y * viewport.zoom + viewport.y;
+
+    // Assume viewport size (this should be actual viewport dimensions)
+    const viewportWidth = 1200;
+    const viewportHeight = 800;
+
+    return nodeX > -200 && nodeX < viewportWidth + 200 &&
+           nodeY > -200 && nodeY < viewportHeight + 200;
+  }
+
+  private isEdgeVisible(edge: any, viewport: { x: number; y: number; zoom: number }): boolean {
+    // Simplified edge visibility - edges are visible if either source or target node is visible
+    // In a real implementation, this would check the actual edge path
+    return true; // For now, assume all edges are visible
+  }
+
+  /**
+   * Record React Flow specific performance metrics
+   */
+  recordReactFlowMetric(id: string, metricType: string, duration: number, value?: number): void {
+    this.performanceMonitor.recordMetric(`${id}-${metricType}`, {
+      timestamp: Date.now(),
+      duration,
+      type: metricType,
+      value: value || duration,
+    });
+
+    // Update React Flow metrics
+    const metrics = this.reactFlowMetrics.get(id);
+    if (metrics) {
+      switch (metricType) {
+        case 'layout-calculation':
+          metrics.layoutCalculationTime = duration;
+          break;
+        case 'connection-calculation':
+          metrics.connectionCalculationTime = duration;
+          break;
+        case 'node-render':
+          metrics.nodeRenderTime = duration;
+          break;
+        case 'edge-render':
+          metrics.edgeRenderTime = duration;
+          break;
+      }
+    }
+  }
+
+  /**
+   * Get React Flow specific metrics
+   */
+  getReactFlowMetrics(id: string): ReactFlowMetrics | undefined {
+    return this.reactFlowMetrics.get(id);
+  }
+
+  /**
+   * Update React Flow node/edge counts
+   */
+  updateReactFlowCounts(id: string, nodeCount: number, edgeCount: number): void {
+    const metrics = this.reactFlowMetrics.get(id);
+    if (metrics) {
+      metrics.nodeCount = nodeCount;
+      metrics.edgeCount = edgeCount;
+    }
+
+    const systemMetrics = this.systemMetrics.get(id);
+    if (systemMetrics) {
+      systemMetrics.nodeCount = nodeCount;
+      systemMetrics.edgeCount = edgeCount;
+    }
+  }
+
   private notifyListeners(event: string, data: any): void {
     this.listeners.forEach(listener => {
       try {
@@ -1148,6 +1413,7 @@ export interface PerformanceExport {
   timestamp: number;
   config: CanvasPerformanceConfig;
   metrics: Record<string, CanvasSystemMetrics>;
+  reactFlowMetrics: Record<string, ReactFlowMetrics>;
   budgets: Record<string, PerformanceBudget>;
   recommendations: PerformanceRecommendation[];
   capabilities: SystemCapabilities;
@@ -1163,12 +1429,17 @@ export const useCanvasPerformanceManager = (config?: Partial<CanvasPerformanceCo
 
   return {
     manager,
-    registerCanvas: (id: string, element: HTMLElement, type?: 'svg' | 'canvas2d' | 'webgl') =>
-      manager.registerCanvasSystem(id, element, type),
+    registerCanvas: (id: string, element: HTMLElement, type?: 'reactflow' | 'svg' | 'canvas2d' | 'webgl', reactFlowInstance?: any) =>
+      manager.registerCanvasSystem(id, element, type, reactFlowInstance),
     unregisterCanvas: (id: string) => manager.unregisterCanvasSystem(id),
     getMetrics: () => manager.getAggregatedMetrics(),
+    getReactFlowMetrics: (id: string) => manager.getReactFlowMetrics(id),
     getRecommendations: () => manager.getRecommendations(),
     optimizePerformance: () => manager.optimizePerformance(),
+    recordReactFlowMetric: (id: string, metricType: string, duration: number, value?: number) =>
+      manager.recordReactFlowMetric(id, metricType, duration, value),
+    updateReactFlowCounts: (id: string, nodeCount: number, edgeCount: number) =>
+      manager.updateReactFlowCounts(id, nodeCount, edgeCount),
   };
 };
 

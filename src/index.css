@@ -6705,3 +6705,156 @@ html {
     opacity: 0;
   }
 }
+
+/* Panel resizing styles */
+body.resizing-panel {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
+body.resizing-panel * {
+  user-select: none !important;
+}
+
+/* Keep essential elements interactive */
+body.resizing-panel .resize-handle,
+body.resizing-panel .resize-handle * {
+  pointer-events: auto !important;
+}
+
+/* Subtle pulse animation for resize handles on hover */
+@keyframes resize-handle-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scaleY(1.1);
+  }
+}
+
+.resize-handle:hover .resize-indicator {
+  animation: resize-handle-pulse 2s ease-in-out infinite;
+}
+
+/* Force scrollbars to always be visible */
+[data-radix-scroll-area-viewport] {
+  scrollbar-width: thin !important;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
+  background: hsl(var(--background)) !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.4) !important;
+  border-radius: 6px !important;
+  border: 2px solid hsl(var(--background)) !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.6) !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:active {
+  background-color: hsl(var(--muted-foreground) / 0.8) !important;
+}
+
+/* Force vertical scrolling on both left and right sidebar content areas */
+/* Left sidebar (first child) */
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:nth-child(1) > div.h-full.bg-card\/50.backdrop-blur-sm.border-r.border-border\/30.flex.flex-col.overflow-hidden > div.relative.flex-1,
+/* Right sidebar (last child) */  
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:last-child > div.h-full.bg-card\/30.backdrop-blur-sm.border-l.border-border\/30.flex.flex-col.overflow-hidden > div.flex-1.overflow-hidden {
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.4) hsl(var(--background)) !important;
+}
+
+/* Left sidebar webkit scrollbar */
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:nth-child(1) > div.h-full.bg-card\/50.backdrop-blur-sm.border-r.border-border\/30.flex.flex-col.overflow-hidden > div.relative.flex-1::-webkit-scrollbar,
+/* Right sidebar webkit scrollbar */
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:last-child > div.h-full.bg-card\/30.backdrop-blur-sm.border-l.border-border\/30.flex.flex-col.overflow-hidden > div.flex-1.overflow-hidden::-webkit-scrollbar {
+  width: 12px !important;
+}
+
+/* Left and right sidebar webkit scrollbar track */
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:nth-child(1) > div.h-full.bg-card\/50.backdrop-blur-sm.border-r.border-border\/30.flex.flex-col.overflow-hidden > div.relative.flex-1::-webkit-scrollbar-track,
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:last-child > div.h-full.bg-card\/30.backdrop-blur-sm.border-l.border-border\/30.flex.flex-col.overflow-hidden > div.flex-1.overflow-hidden::-webkit-scrollbar-track {
+  background: hsl(var(--background)) !important;
+  border-radius: 6px !important;
+}
+
+/* Left and right sidebar webkit scrollbar thumb */
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:nth-child(1) > div.h-full.bg-card\/50.backdrop-blur-sm.border-r.border-border\/30.flex.flex-col.overflow-hidden > div.relative.flex-1::-webkit-scrollbar-thumb,
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:last-child > div.h-full.bg-card\/30.backdrop-blur-sm.border-l.border-border\/30.flex.flex-col.overflow-hidden > div.flex-1.overflow-hidden::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.4) !important;
+  border-radius: 6px !important;
+  border: 2px solid hsl(var(--background)) !important;
+}
+
+/* Left and right sidebar webkit scrollbar thumb hover */
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:nth-child(1) > div.h-full.bg-card\/50.backdrop-blur-sm.border-r.border-border\/30.flex.flex-col.overflow-hidden > div.relative.flex-1::-webkit-scrollbar-thumb:hover,
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:last-child > div.h-full.bg-card\/30.backdrop-blur-sm.border-l.border-border\/30.flex.flex-col.overflow-hidden > div.flex-1.overflow-hidden::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.6) !important;
+}
+
+/* Left and right sidebar webkit scrollbar thumb active */
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:nth-child(1) > div.h-full.bg-card\/50.backdrop-blur-sm.border-r.border-border\/30.flex.flex-col.overflow-hidden > div.relative.flex-1::-webkit-scrollbar-thumb:active,
+#root > div > div.h-screen.flex.flex-col > div.flex-1.flex > div:last-child > div.h-full.bg-card\/30.backdrop-blur-sm.border-l.border-border\/30.flex.flex-col.overflow-hidden > div.flex-1.overflow-hidden::-webkit-scrollbar-thumb:active {
+  background-color: hsl(var(--muted-foreground) / 0.8) !important;
+}
+
+/* Alternative approach: Target any flex-1 element in sidebars that needs scrolling */
+.h-full.overflow-hidden .relative.flex-1,
+.h-full.overflow-hidden > .relative.flex-1,
+.h-full.overflow-hidden .flex-1.overflow-hidden,
+.h-full.overflow-hidden > .flex-1.overflow-hidden {
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.4) hsl(var(--background)) !important;
+}
+
+.h-full.overflow-hidden .relative.flex-1::-webkit-scrollbar,
+.h-full.overflow-hidden > .relative.flex-1::-webkit-scrollbar,
+.h-full.overflow-hidden .flex-1.overflow-hidden::-webkit-scrollbar,
+.h-full.overflow-hidden > .flex-1.overflow-hidden::-webkit-scrollbar {
+  width: 12px !important;
+}
+
+.h-full.overflow-hidden .relative.flex-1::-webkit-scrollbar-track,
+.h-full.overflow-hidden > .relative.flex-1::-webkit-scrollbar-track,
+.h-full.overflow-hidden .flex-1.overflow-hidden::-webkit-scrollbar-track,
+.h-full.overflow-hidden > .flex-1.overflow-hidden::-webkit-scrollbar-track {
+  background: hsl(var(--background)) !important;
+  border-radius: 6px !important;
+}
+
+.h-full.overflow-hidden .relative.flex-1::-webkit-scrollbar-thumb,
+.h-full.overflow-hidden > .relative.flex-1::-webkit-scrollbar-thumb,
+.h-full.overflow-hidden .flex-1.overflow-hidden::-webkit-scrollbar-thumb,
+.h-full.overflow-hidden > .flex-1.overflow-hidden::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.4) !important;
+  border-radius: 6px !important;
+  border: 2px solid hsl(var(--background)) !important;
+}
+
+.h-full.overflow-hidden .relative.flex-1::-webkit-scrollbar-thumb:hover,
+.h-full.overflow-hidden > .relative.flex-1::-webkit-scrollbar-thumb:hover,
+.h-full.overflow-hidden .flex-1.overflow-hidden::-webkit-scrollbar-thumb:hover,
+.h-full.overflow-hidden > .flex-1.overflow-hidden::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.6) !important;
+}
+
+.h-full.overflow-hidden .relative.flex-1::-webkit-scrollbar-thumb:active,
+.h-full.overflow-hidden > .relative.flex-1::-webkit-scrollbar-thumb:active,
+.h-full.overflow-hidden .flex-1.overflow-hidden::-webkit-scrollbar-thumb:active,
+.h-full.overflow-hidden > .flex-1.overflow-hidden::-webkit-scrollbar-thumb:active {
+  background-color: hsl(var(--muted-foreground) / 0.8) !important;
+}

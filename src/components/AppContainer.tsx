@@ -5,7 +5,9 @@ import { DesignCanvas } from '@/components/DesignCanvas';
 import { CommandPalette } from '@/components/CommandPalette';
 import { getLogger } from '@/lib/logger';
 import { challengeManager, ExtendedChallenge } from '@/lib/challenge-config';
-import type { DesignData, Challenge } from '@/shared/contracts';
+import type { DesignData, Challenge, AudioData } from '@/shared/contracts';
+import { AudioRecording } from '@/components/AudioRecording';
+import { ReviewScreen } from '@/components/ReviewScreen';
 
 export type AppVariant = 'basic' | 'complex' | 'safe';
 
@@ -46,9 +48,13 @@ export default function AppContainer() {
     layers: [],
     metadata: { created: new Date().toISOString(), lastModified: new Date().toISOString(), version: '1.0' },
   });
+  const [audioData, setAudioData] = useState<AudioData | null>(null);
+  const [phase, setPhase] = useState<'design' | 'audio-recording' | 'review'>('design');
   const [availableChallenges, setAvailableChallenges] = useState<ExtendedChallenge[]>([]);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<'challenge-selection' | 'design-canvas'>('challenge-selection');
+  const [currentScreen, setCurrentScreen] = useState<
+    'challenge-selection' | 'design-canvas' | 'audio-recording' | 'review'
+  >('challenge-selection');
 
   useEffect(() => {
     try {
@@ -60,6 +66,14 @@ export default function AppContainer() {
 
   const handleComplete = (data: DesignData) => {
     setDesignData(data);
+    setPhase('audio-recording');
+    setCurrentScreen('audio-recording');
+  };
+
+  const handleAudioComplete = (data: AudioData) => {
+    setAudioData(data);
+    setPhase('review');
+    setCurrentScreen('review');
   };
 
   // Keyboard shortcuts
@@ -85,16 +99,64 @@ export default function AppContainer() {
       return (
         <ChallengeSelection
           availableChallenges={availableChallenges}
-          onChallengeSelect={(c: Challenge) => setSelectedChallenge(c)}
+          onChallengeSelect={(c: Challenge) => {
+            setSelectedChallenge(c);
+            setPhase('design');
+            setCurrentScreen('design-canvas');
+          }}
         />
       );
     }
+
+    if (phase === 'audio-recording') {
+      return (
+        <AudioRecording
+          challenge={selectedChallenge}
+          designData={designData}
+          onComplete={handleAudioComplete}
+          onBack={() => {
+            setPhase('design');
+            setCurrentScreen('design-canvas');
+          }}
+        />
+      );
+    }
+
+    if (phase === 'review' && audioData) {
+      return (
+        <ReviewScreen
+          challenge={selectedChallenge}
+          designData={designData}
+          audioData={audioData}
+          onStartOver={() => {
+            setSelectedChallenge(null);
+            setPhase('design');
+            setAudioData(null);
+            setCurrentScreen('challenge-selection');
+          }}
+          onBackToDesign={() => {
+            setPhase('design');
+            setCurrentScreen('design-canvas');
+          }}
+          onBackToAudio={() => {
+            setPhase('audio-recording');
+            setCurrentScreen('audio-recording');
+          }}
+        />
+      );
+    }
+
+    // Default to design canvas
     return (
       <DesignCanvas
         challenge={selectedChallenge}
         initialData={designData}
         onComplete={handleComplete}
-        onBack={() => setSelectedChallenge(null)}
+        onBack={() => {
+          setSelectedChallenge(null);
+          setPhase('design');
+          setCurrentScreen('challenge-selection');
+        }}
       />
     );
   };
@@ -110,11 +172,20 @@ export default function AppContainer() {
         <CommandPalette
           isOpen={showCommandPalette}
           onClose={() => setShowCommandPalette(false)}
-          currentScreen={selectedChallenge ? 'design-canvas' : 'challenge-selection'}
+          currentScreen={selectedChallenge ? currentScreen : 'challenge-selection'}
           onNavigate={(screen) => {
             if (screen === 'challenge-selection') {
               setSelectedChallenge(null);
+              setPhase('design');
               setCurrentScreen('challenge-selection');
+            }
+            if (screen === 'audio-recording' && selectedChallenge) {
+              setPhase('audio-recording');
+              setCurrentScreen('audio-recording');
+            }
+            if (screen === 'review' && selectedChallenge && audioData) {
+              setPhase('review');
+              setCurrentScreen('review');
             }
             setShowCommandPalette(false);
           }}
@@ -130,4 +201,3 @@ export default function AppContainer() {
     </div>
   );
 }
-

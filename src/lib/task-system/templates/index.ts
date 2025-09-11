@@ -1,12 +1,9 @@
+import { z } from 'zod';
 import {
   TaskTemplate,
-  ComponentDefinition,
-  TaskConstraint,
-  EvaluationCriteria,
 } from '../TaskPlugin';
-import type { DesignComponent, Connection } from '@/shared/contracts';
 import urlShortener from '../plugins/url-shortener/task.json';
-import { z } from 'zod';
+import type { DesignComponent, Connection } from '@/shared/contracts';
 
 /**
  * ArchiComm Community Edition - Basic Templates Only

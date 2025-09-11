@@ -355,7 +355,7 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
           case 'ArrowLeft':
             goBack();
             break;
-          case 'ArrowRight':
+          case 'ArrowRight': {
             // Navigate to next logical screen
             const sessionScreens = [
               'challenge-selection',
@@ -368,6 +368,7 @@ export const RouterProvider: React.FC<RouterProviderProps> = ({
               navigateTo(sessionScreens[currentIndex + 1] as Screen);
             }
             break;
+          }
         }
       }
     };

@@ -5,12 +5,6 @@
  * RELEVANT FILES: CanvasArea.tsx, useConnectionEditor.ts
  */
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
-import type { Connection } from '@/shared/contracts';
 import * as Popover from '@radix-ui/react-popover';
 import {
     ArrowRight,
@@ -20,6 +14,12 @@ import {
     Zap
 } from 'lucide-react';
 import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import type { Connection } from '@/shared/contracts';
 
 interface ConnectionEditorPopoverProps {
   selectedConnection: Connection;
@@ -48,7 +48,7 @@ export function ConnectionEditorPopover({
   ];
 
   return (
-    <Popover.Root open={true} onOpenChange={open => !open && onClose()}>
+    <Popover.Root defaultOpen onOpenChange={open => !open && onClose()}>
       <Popover.Portal>
         <Popover.Content
           side="top"

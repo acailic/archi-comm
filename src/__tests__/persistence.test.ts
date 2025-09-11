@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { saveDesign, loadDesign } from '../lib/api/tauriClient';
 import type { DesignData } from '../shared/contracts';
 
 const sampleDesign: DesignData = {

@@ -5,9 +5,9 @@
  * RELEVANT FILES: CanvasComponent.tsx, DesignSystem.ts, connection-paths.ts
  */
 
+import { useDrag } from 'react-dnd';
 import { designSystem } from '@/lib/design-system';
 import { cn } from '@/lib/utils';
-import { useDrag } from 'react-dnd';
 
 export interface ConnectionPointProps {
   position: 'top' | 'bottom' | 'left' | 'right';

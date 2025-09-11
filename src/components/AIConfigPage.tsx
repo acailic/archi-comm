@@ -17,6 +17,12 @@ import {
   X,
 } from 'lucide-react';
 
+import { useAIConfig } from '../hooks/useAIConfig';
+import {
+  AIConfig,
+  AIConfigSchema,
+  DEFAULT_SETTINGS,
+} from '../lib/types/AIConfig';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import {
   Form,
@@ -34,13 +40,6 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Slider } from './ui/slider';
 
-import { useAIConfig } from '../hooks/useAIConfig';
-import {
-  AIConfig,
-  AIConfigSchema,
-  validateApiKeyFormat,
-  DEFAULT_SETTINGS,
-} from '../lib/types/AIConfig';
 
 const FormSchema = AIConfigSchema;
 

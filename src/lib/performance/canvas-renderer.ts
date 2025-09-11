@@ -70,7 +70,7 @@ class CanvasRenderer {
   private ctx: OffscreenCanvasRenderingContext2D | null = null;
   private initialized = false;
   private renderCount = 0;
-  private lastRenderTime = 0;
+  private _lastRenderTime = 0;
   private fallbackMode = false;
 
   async initialize(canvas?: OffscreenCanvas | null): Promise<void> {

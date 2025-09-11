@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   getGlobalShortcutManager,
   ShortcutAction,
@@ -10,7 +11,6 @@ import {
   LearningRecommendation,
 } from '../lib/shortcuts/ShortcutLearningSystem';
 import { Button } from './ui/button';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface ShortcutCustomizationPanelProps {
   isOpen: boolean;

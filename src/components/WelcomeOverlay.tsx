@@ -1,7 +1,7 @@
 import React from 'react';
-import { Button } from './ui/button';
-import { useOnboarding } from '../lib/onboarding/OnboardingManager';
 import { ArrowRight, Users } from 'lucide-react';
+import { useOnboarding } from '../lib/onboarding/OnboardingManager';
+import { Button } from './ui/button';
 
 interface WelcomeOverlayProps {
   onComplete: () => void;
