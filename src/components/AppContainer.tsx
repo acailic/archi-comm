@@ -5,9 +5,12 @@ import { DesignCanvas } from '@/components/DesignCanvas';
 import { CommandPalette } from '@/components/CommandPalette';
 import { getLogger } from '@/lib/logger';
 import { challengeManager, ExtendedChallenge } from '@/lib/challenge-config';
-import type { DesignData, Challenge, AudioData } from '@/shared/contracts';
+import type { DesignData, Challenge, AudioData } from '@/shared/contracts/index';
 import { AudioRecording } from '@/components/AudioRecording';
 import { ReviewScreen } from '@/components/ReviewScreen';
+import { ScenarioViewer } from '@/dev';
+import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
+import { useDevShortcuts } from '@/dev/DevShortcuts';
 
 export type AppVariant = 'basic' | 'complex' | 'safe';
 
@@ -55,12 +58,30 @@ export default function AppContainer() {
   const [currentScreen, setCurrentScreen] = useState<
     'challenge-selection' | 'design-canvas' | 'audio-recording' | 'review'
   >('challenge-selection');
+  const [showDevScenarios, setShowDevScenarios] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     try {
       setAvailableChallenges(challengeManager.getAllChallenges());
     } catch (error) {
       logger.error('Failed to load challenges', error as any);
+    }
+  }, []);
+
+  // Check for development scenario viewer route
+  useEffect(() => {
+    if (isDevelopment()) {
+      const checkDevRoute = () => {
+        const pathname = window.location.pathname || '';
+        setShowDevScenarios(pathname.includes('/dev/scenarios'));
+      };
+      
+      checkDevRoute();
+      
+      // Listen for navigation changes
+      window.addEventListener('popstate', checkDevRoute);
+      return () => window.removeEventListener('popstate', checkDevRoute);
     }
   }, []);
 
@@ -76,14 +97,62 @@ export default function AppContainer() {
     setCurrentScreen('review');
   };
 
-  // Keyboard shortcuts
+  // Global shortcuts integration
+  const globalShortcuts = useGlobalShortcuts({
+    handlers: {
+      onCommandPalette: () => setShowCommandPalette(true),
+      onNavigateToScreen: (screen: string) => {
+        if (screen === 'challenge-selection') {
+          setSelectedChallenge(null);
+          setPhase('design');
+          setCurrentScreen('challenge-selection');
+          setShowDevScenarios(false);
+        }
+      }
+    },
+    currentScreen,
+    selectedChallenge,
+  });
+
+  // Development shortcuts integration
+  const devShortcuts = useDevShortcuts({
+    handlers: {
+      onToggleScenarios: () => {
+        if (isDevelopment()) {
+          const newShowDev = !showDevScenarios;
+          setShowDevScenarios(newShowDev);
+          if (newShowDev) {
+            // Update URL to /dev/scenarios
+            window.history.pushState({}, '', '/dev/scenarios');
+          } else {
+            // Go back to previous route
+            window.history.back();
+          }
+        }
+      },
+      onToggleDemoMode: () => {
+        setIsDemoMode(prev => !prev);
+      },
+      onReset: () => {
+        if (showDevScenarios) {
+          setShowDevScenarios(false);
+          window.history.pushState({}, '', '/');
+        }
+        // Reset main app state
+        setSelectedChallenge(null);
+        setPhase('design');
+        setCurrentScreen('challenge-selection');
+        setAudioData(null);
+        setShowCommandPalette(false);
+      },
+    },
+    enabled: isDevelopment(),
+    scenarioViewerActive: showDevScenarios,
+  });
+
+  // Legacy keyboard shortcuts for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Command palette (Cmd/Ctrl + K)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCommandPalette(true);
-      }
       // Escape to close command palette
       if (e.key === 'Escape' && showCommandPalette) {
         setShowCommandPalette(false);
@@ -95,6 +164,11 @@ export default function AppContainer() {
   }, [showCommandPalette]);
 
   const Screen = () => {
+    // Development-only scenario viewer
+    if (isDevelopment() && showDevScenarios) {
+      return <ScenarioViewer />;
+    }
+
     if (!selectedChallenge) {
       return (
         <ChallengeSelection

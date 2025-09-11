@@ -49,6 +49,7 @@ npm test
 - Tests pass locally: `npm test` (and E2E if UI flows changed)
 - Coverage: add/extend tests for new core utilities, hooks, and services
 - Accessibility: basic keyboard navigation and ARIA where applicable
+- Scenarios: documentation completeness and validated interactive controls
 
 ## Testing Guidelines
 
@@ -61,6 +62,58 @@ npm test
   - Scenarios under `e2e/` with clear user flows
   - Prefer deterministic selectors; avoid brittle timing
   - CI config: `.github/workflows/e2e.yml`
+
+## Scenario Development Guidelines
+
+Use the built-in scenario system to document and validate components interactively.
+
+### Creating Effective Scenarios
+- Follow naming: IDs kebab-case; clear human-readable names
+- Cover core states: empty, loading, success, error, disabled
+- Include responsive and theme variants where applicable
+- Add accessibility-focused scenarios (labels, errors, keyboard order)
+
+### Interactive Controls Guidelines
+- Choose control types that reflect prop semantics (select/boolean/range)
+- Provide sensible `defaultValue` and constraints (min/max/step)
+- Validate with Zod where possible; surface helpful messages
+- Keep control changes performant; debounce expensive work
+
+### Scenario Documentation Standards
+- Add `documentation.summary` and at least one `usageExamples` entry
+- List `bestPractices` for UX, performance, and accessibility
+- Provide ARIA guidance and keyboard behavior where needed
+- Link `relatedScenarios` for quick discovery
+
+### Code Example Guidelines
+- Use TypeScript/TSX and keep examples runnable
+- Include both basic and advanced patterns when relevant
+- Demonstrate error handling and edge cases
+- Prefer minimal but realistic examples
+
+### Scenario Quality Checklist
+- [ ] Comprehensive state coverage implemented
+- [ ] Controls configured with validation and defaults
+- [ ] Documentation complete (summary + example)
+- [ ] Accessibility checks (labels, focus, announcements)
+- [ ] Performance impact reviewed
+- [ ] Responsive and cross-browser basics verified
+
+### Scenario Contribution Workflow
+- Branch name: `scenarios/<component>-<feature>`
+- Include scenario, docs, and any test updates in the PR
+- Validate documentation generation locally if modified
+- Request review from UI maintainers
+
+### Tools and Automation
+- Use the Scenario Viewer (`/dev/scenarios`) to iterate quickly
+- Leverage the Documentation Generator utils under `src/dev/utils`
+- Consider adding e2e flows when scenarios change user-visible behavior
+
+### Migration and Maintenance
+- Keep scenarios in sync with component API changes
+- Migrate older scenarios to include `documentation` blocks
+- Remove deprecated scenarios in a dedicated PR with a clear rationale
 
 ## Debugging Tips
 

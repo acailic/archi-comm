@@ -3,7 +3,7 @@ import { ArrowLeft, Mic, Square, Play, Pause, FileText, AlertTriangle } from 'lu
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import type { Challenge, DesignData, AudioData } from '@/shared/contracts';
+import type { Challenge, DesignData, AudioData } from '@/shared/contracts/index';
 
 const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
