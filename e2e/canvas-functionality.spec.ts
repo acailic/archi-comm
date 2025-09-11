@@ -280,6 +280,7 @@ test.describe('Canvas functionality', () => {
     );
 
     expect(unexpectedErrors).toHaveLength(0);
+  });
   test('supports edge selection and editing', async ({ page }) => {
     // Skip if no challenge selected
     const challengeCard = page.locator('[data-testid="challenge-card"]').first();
@@ -377,4 +378,3 @@ test.describe('Canvas functionality', () => {
     }
   });
 });
-

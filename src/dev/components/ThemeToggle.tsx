@@ -7,6 +7,8 @@
 
 import React from 'react';
 import { useTheme } from 'next-themes';
+import { Sun, Moon, Monitor } from 'lucide-react';
+import { ThemeMode } from '../types';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,8 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sun, Moon, Monitor, Palette } from 'lucide-react';
-import { ThemeMode } from '../types';
 
 interface ThemeToggleProps {
   variant?: 'default' | 'ghost' | 'outline';

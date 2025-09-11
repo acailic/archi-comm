@@ -4,27 +4,25 @@
 // RELEVANT FILES: ./DevShortcuts.tsx, ./ScenarioViewer.tsx, ../components/ui/card.tsx, ../components/ui/button.tsx
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Input } from '../components/ui/input';
-import { PropControls } from './components/PropControls';
-import type { ControlsConfig, PropChangeEvent } from './types';
 import { 
   Monitor, 
-  Eye, 
   Copy, 
   Download, 
   X, 
   ChevronDown, 
   ChevronRight,
   Search,
-  Filter,
   Clock,
   MemoryStick,
   Zap,
   Settings
 } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { PropControls } from './components/PropControls';
+import type { ControlsConfig, PropChangeEvent } from './types';
 
 export interface DevUtilitiesProps {
   isStateInspectorOpen: boolean;

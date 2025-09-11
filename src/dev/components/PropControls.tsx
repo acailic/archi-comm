@@ -4,6 +4,14 @@
 // RELEVANT FILES: src/dev/types.ts, src/dev/DevUtilities.tsx, src/components/ui/button.tsx, src/components/ui/input.tsx
 
 import React, { useState, useCallback, useMemo } from 'react';
+import { Copy, RotateCcw, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  ControlsConfig,
+  ControlDefinition,
+  ValidationResult,
+  PropChangeEvent,
+} from '../types';
+import { validatePropChange, mergePropsWithDefaults } from '../utils/propValidation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,14 +22,6 @@ import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Copy, RotateCcw, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import {
-  ControlsConfig,
-  ControlDefinition,
-  ValidationResult,
-  PropChangeEvent,
-} from '../types';
-import { validatePropChange, mergePropsWithDefaults } from '../utils/propValidation';
 
 interface PropControlsProps {
   scenarioId: string;
@@ -82,7 +82,7 @@ const ControlInput: React.FC<ControlInputProps> = ({
       );
 
     case 'number':
-    case 'range':
+    case 'range': {
       const numValue = typeof value === 'number' ? value : Number(value) || control.min || 0;
       return (
         <div className="space-y-2">
@@ -122,6 +122,7 @@ const ControlInput: React.FC<ControlInputProps> = ({
           )}
         </div>
       );
+    }
 
     case 'boolean':
       return (

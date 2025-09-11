@@ -65,13 +65,8 @@ export function getControlHelp(control: { label?: string; description?: string }
 
 export function generateValidationHelp(schema?: z.ZodSchema): string {
   if (!schema) return 'No validation rules defined.';
-  try {
-    // We cannot fully introspect arbitrary Zod schemas generically without parsing internals.
-    // Provide a generic statement.
-    return 'Props are validated using a Zod schema; invalid inputs will surface inline errors.';
-  } catch {
-    return 'Validation schema present.';
-  }
+  // Provide a generic statement without try/catch to satisfy no-unreachable
+  return 'Props are validated using a Zod schema; invalid inputs will surface inline errors.';
 }
 
 export function getAccessibilityGuidance(scenario: EnhancedScenario): string[] {
@@ -163,7 +158,7 @@ export function exportScenarioDocumentation(
     const body = scenarios
       .map(s => `<section><h2>${s.name}</h2><p>${s.documentation?.summary ?? s.description}</p></section>`) 
       .join('\n');
-    return `<!doctype html><html><head><meta charset=\"utf-8\"/><title>Scenario Docs</title></head><body>${body}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"/><title>Scenario Docs</title></head><body>${body}</body></html>`;
   }
   // markdown
   return scenarios

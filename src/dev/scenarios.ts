@@ -13,14 +13,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, 
 import { Input } from '../components/ui/input';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
 import type { EnhancedScenarioDefinition, ControlsConfig } from './types';
-import type { Challenge, DesignData, AudioData } from '../shared/contracts/index';
-import type { DesignComponent, Connection } from '../shared/contracts/index';
 import { 
   mockChallenges, 
   mockCanvasStates, 
-  mockAudioStates, 
-  mockComponentConfigs,
-  mockDesignPatterns,
+  mockAudioStates,
   mockUIComponentData
 } from './testData';
 

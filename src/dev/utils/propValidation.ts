@@ -295,11 +295,12 @@ export function normalizeProps(
       case 'boolean':
         normalized[propName] = Boolean(value);
         break;
-      case 'select':
+      case 'select': {
         // Ensure the value is one of the valid options
         const validOptions = control.options?.map(opt => opt.value) || [];
         normalized[propName] = validOptions.includes(value) ? value : validOptions[0];
         break;
+      }
       default:
         normalized[propName] = String(value || '');
     }

@@ -4,15 +4,7 @@
 // RELEVANT FILES: ./types.ts, ./scenarios.ts, ../components/ui/sidebar.tsx, ../components/ui/card.tsx
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Search, AlertCircle, Play, Code2, Layers, Eye, EyeOff, Settings, Palette } from 'lucide-react';
-import { scenarios } from './scenarios';
-import type { Scenario, ScenarioCategory, DynamicPropsState, PropChangeEvent, EnhancedScenario, ControlsConfig } from './types';
-import { useDevShortcuts } from './DevShortcuts';
-import { DevUtilities } from './DevUtilities';
-import { ThemeProvider } from './components/ThemeProvider';
-import { ThemeToggle } from './components/ThemeToggle';
-import { PropControls } from './components/PropControls';
-import { mergePropsWithDefaults } from './utils/propValidation';
+import { Search, AlertCircle, Play, Code2, Layers, Eye, EyeOff, Settings } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -30,6 +22,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { scenarios } from './scenarios';
+import type { Scenario, ScenarioCategory, DynamicPropsState, PropChangeEvent, EnhancedScenario } from './types';
+import { useDevShortcuts } from './DevShortcuts';
+import { DevUtilities } from './DevUtilities';
+import { ThemeProvider } from './components/ThemeProvider';
+import { ThemeToggle } from './components/ThemeToggle';
+import { PropControls } from './components/PropControls';
+import { mergePropsWithDefaults } from './utils/propValidation';
 
 // Error boundary component for safe scenario rendering
 interface ErrorBoundaryState {
