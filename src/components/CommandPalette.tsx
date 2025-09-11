@@ -35,7 +35,7 @@ interface CommandPaletteProps {
   selectedChallenge: any;
 }
 
-interface Command {
+interface CommandData {
   id: string;
   title: string;
   description: string;
@@ -48,7 +48,7 @@ interface Command {
 
 // Comment 4: Extract CommandItem outside main component and memoize
 interface CommandItemProps {
-  command: Command;
+  command: CommandData;
   index: number;
   isSelected: boolean;
   onClick: () => void;
@@ -130,7 +130,7 @@ export function CommandPalette({
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const commands: Command[] = useMemo(() => {
+  const commands: CommandData[] = useMemo(() => {
     const allShortcuts = getAllShortcuts();
     const getShortcutDisplay = (description: string) => {
       const shortcut = allShortcuts.find(s =>
@@ -272,7 +272,7 @@ export function CommandPalette({
   }, [commands, query]);
 
   const groupedCommands = useMemo(() => {
-    const groups: Record<string, Command[]> = {
+    const groups: Record<string, CommandData[]> = {
       navigation: [],
       actions: [],
       help: [],

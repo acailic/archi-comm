@@ -235,7 +235,7 @@ class MemoryBufferSink implements LogSink {
       case 'json':
         return safeStringify(this.buffer, 2);
 
-      case 'csv':
+      case 'csv': {
         const headers = 'Timestamp,Level,Scope,Message,Data,Error\n';
         const rows = this.buffer
           .map(entry => {
@@ -246,6 +246,7 @@ class MemoryBufferSink implements LogSink {
           })
           .join('\n');
         return headers + rows;
+      }
 
       case 'txt':
         return this.buffer

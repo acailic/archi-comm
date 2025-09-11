@@ -48,7 +48,7 @@ const DefaultLoadingSkeleton: FC = () => (
       <div className='skeleton-line short' />
       <div className='skeleton-line' />
     </div>
-    <style jsx>{`
+    <style>{`
       .lazy-loading-skeleton {
         padding: 1rem;
         background: #f8f9fa;
@@ -110,7 +110,7 @@ const DefaultErrorFallback: FC<{ error: Error; retry: () => void; componentName?
     <button onClick={retry} className='retry-button'>
       Try Again
     </button>
-    <style jsx>{`
+    <style>{`
       .lazy-error-fallback {
         padding: 2rem;
         text-align: center;

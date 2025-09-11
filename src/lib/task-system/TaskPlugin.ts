@@ -389,9 +389,10 @@ export class TaskPluginManager {
   private checkConstraint(constraint: TaskConstraint, design: DesignData): boolean {
     // Implementation depends on constraint type
     switch (constraint.type) {
-      case 'component-limit':
+      case 'component-limit': {
         const limit = parseInt(constraint.rule);
         return design.components.length <= limit;
+      }
       case 'connection-rule':
         // Custom connection validation logic
         return true;
@@ -406,9 +407,10 @@ export class TaskPluginManager {
     context: ValidationContext
   ): boolean {
     switch (rule.type) {
-      case 'component-count':
+      case 'component-count': {
         const expectedCount = parseInt(rule.condition);
         return design.components.length >= expectedCount;
+      }
       case 'connection-exists':
         return design.connections.some(conn => conn.type === rule.condition);
       case 'pattern-match':

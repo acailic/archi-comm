@@ -8,7 +8,7 @@ export const CACHE_KEYS = {
 // Remove dynamic require and use strict types
 import { invoke } from '@tauri-apps/api/tauri';
 import { isTauriEnvironment } from './environment';
-import type { Challenge , DesignComponent, Connection } from '@/shared/contracts';
+import type { Challenge, DesignComponent, Connection } from '@/shared/contracts';
 
 // Tauri integration
 
@@ -646,7 +646,7 @@ export class ChallengeManager {
       case 'tauri':
         return tauriChallengeAPI.loadChallengesFromFile(path || 'challenges.json');
 
-      case 'api':
+      case 'api': {
         if (typeof fetch === 'undefined') {
           console.warn('fetch not available, cannot load from API');
           return [];
@@ -666,6 +666,7 @@ export class ChallengeManager {
 
         const data = await response.json();
         return data.challenges || data || [];
+      }
 
       case 'file':
         return tauriChallengeAPI.loadChallengesFromFile(path || 'challenges.json');

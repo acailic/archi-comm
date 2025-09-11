@@ -12,14 +12,14 @@ export const Position = z.object({ x: z.number(), y: z.number() });
 //   "description": "Main API endpoint",
 //   "layerId": "layer-backend-services"
 // }
-export const DiagramElement = z.object({
+export const DiagramElementSchema = z.object({
   id: z.string(),
   element_type: z.string(),
   position: Position,
   properties: z.record(z.string()).default({}), // layerId stored here for backward compatibility
 });
 
-export const Connection = z.object({
+export const ConnectionSchema = z.object({
   id: z.string(),
   source_id: z.string(),
   target_id: z.string(),
@@ -27,7 +27,7 @@ export const Connection = z.object({
   properties: z.record(z.string()).default({}),
 });
 
-export const Component = z.object({
+export const ComponentSchema = z.object({
   id: z.string(),
   name: z.string(),
   component_type: z.enum(['Frontend', 'Backend', 'Database', 'Api', 'Service', 'Integration']),
@@ -37,25 +37,25 @@ export const Component = z.object({
   metadata: z.record(z.string()).default({}),
 });
 
-export const Project = z.object({
+export const ProjectSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
   status: z.enum(['Planning', 'InProgress', 'Review', 'Complete']),
-  components: z.array(Component),
+  components: z.array(ComponentSchema),
 });
 
-export type Project = z.infer<typeof Project>;
-export type Component = z.infer<typeof Component>;
-export type DiagramElement = z.infer<typeof DiagramElement>;
-export type Connection = z.infer<typeof Connection>;
+export type Project = z.infer<typeof ProjectSchema>;
+export type Component = z.infer<typeof ComponentSchema>;
+export type DiagramElement = z.infer<typeof DiagramElementSchema>;
+export type Connection = z.infer<typeof ConnectionSchema>;
 
-export const ReviewResp = z.object({
+export const ReviewRespSchema = z.object({
   summary: z.string(),
   strengths: z.array(z.string()).default([]),
   risks: z.array(z.string()).default([]),
   score: z.number().int().min(0).max(100).default(0),
 });
-export type ReviewResp = z.infer<typeof ReviewResp>;
+export type ReviewResp = z.infer<typeof ReviewRespSchema>;
