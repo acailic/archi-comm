@@ -1,8 +1,8 @@
-import { act, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TestBackend } from 'react-dnd-test-backend';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CanvasArea } from '../components/CanvasArea';
 import {
   createReactFlowEdge,
@@ -16,9 +16,14 @@ import {
   updateReactFlowEdge,
   updateReactFlowNode,
   type ArchiCommEdge,
-  type ArchiCommNode
+  type ArchiCommNode,
 } from '../features/canvas/utils/rf-adapters';
 import type { Connection, DesignComponent } from '../shared/contracts';
+
+// Ensure test isolation by cleaning up the DOM after each test
+afterEach(() => {
+  cleanup();
+});
 
 describe('Canvas UI basics', () => {
   // Controls are now part of React Flow
@@ -54,7 +59,7 @@ describe('Canvas Component Management', () => {
       x: 100,
       y: 100,
       label: 'Web Server',
-      layerId: 'layer1'
+      layerId: 'layer1',
     },
     {
       id: 'comp2',
@@ -62,8 +67,8 @@ describe('Canvas Component Management', () => {
       x: 300,
       y: 200,
       label: 'Database',
-      layerId: 'layer1'
-    }
+      layerId: 'layer1',
+    },
   ];
 
   const mockConnections: Connection[] = [
@@ -73,11 +78,9 @@ describe('Canvas Component Management', () => {
       to: 'comp2',
       label: 'API Call',
       type: 'data',
-      direction: 'end'
-    }
+      direction: 'end',
+    },
   ];
-
-
 
   const defaultProps = {
     components: mockComponents,
@@ -99,7 +102,7 @@ describe('Canvas Component Management', () => {
 
   it('renders components with correct connection counts and health status', () => {
     render(
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
           <CanvasArea {...defaultProps} />
         </div>
@@ -120,9 +123,12 @@ describe('Canvas Component Management', () => {
   });
 
   it('calls onViewportChange when zoom occurs', () => {
+    // Some handlers in React Flow or integration layers may debounce viewport changes.
+    // Use fake timers to deterministically flush any debounced callbacks.
+    vi.useFakeTimers();
 
     render(
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
           <CanvasArea {...defaultProps} />
         </div>
@@ -139,16 +145,27 @@ describe('Canvas Component Management', () => {
       act(() => {
         fireEvent.wheel(reactFlowWrapper, { deltaY: -100, ctrlKey: true });
       });
+
+      // Advance timers to flush any debounce on viewport change events.
+      vi.advanceTimersByTime(400);
     }
 
-    // onViewportChange should be called during zoom operations
-    // Note: This may not be called immediately due to implementation details
-    // but the test verifies the prop is wired up correctly
+    // Use waitFor to accommodate async/debounced updates before asserting.
+    // We assert the viewport element remains available post-zoom interaction.
+    // If a dedicated onViewportChange spy is wired in the future, replace this
+    // with: expect(onViewportChange).toHaveBeenCalled().
+    return waitFor(
+      () => {
+        const viewport = document.querySelector('.react-flow__viewport');
+        expect(viewport).toBeInTheDocument();
+      },
+      { timeout: 1000 }
+    );
   });
 
   it('supports accessibility navigation with ARIA attributes', () => {
     render(
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
           <CanvasArea {...defaultProps} />
         </div>
@@ -173,12 +190,12 @@ describe('Canvas Component Management', () => {
     const onComponentSelect = vi.fn();
 
     render(
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
           <CanvasArea
             {...defaultProps}
             onComponentSelect={onComponentSelect}
-            selectedComponent="comp1"
+            selectedComponent='comp1'
           />
         </div>
       </DndProvider>
@@ -206,13 +223,9 @@ describe('Canvas Component Management', () => {
     const onGroupMove = vi.fn();
 
     render(
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
-          <CanvasArea
-            {...defaultProps}
-
-            selectedComponent="comp1"
-          />
+          <CanvasArea {...defaultProps} selectedComponent='comp1' />
         </div>
       </DndProvider>
     );
@@ -237,7 +250,7 @@ describe('Canvas Component Management', () => {
 
   it('shows focus state when canvas receives focus', () => {
     render(
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
           <CanvasArea {...defaultProps} />
         </div>
@@ -260,10 +273,11 @@ describe('Canvas Component Management', () => {
 
 describe('Canvas Performance and Optimization', () => {
   it('initializes performance manager registration', () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    render(
-      <DndProvider backend={HTML5Backend}>
+    const { unmount } = render(
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
           <CanvasArea
             components={[]}
@@ -287,17 +301,26 @@ describe('Canvas Performance and Optimization', () => {
 
     // Performance manager registration may warn if not properly set up
     // This test verifies the component doesn't crash during initialization
-    if (consoleSpy.mock.calls.length > 0) {
-      expect(consoleSpy).toHaveBeenCalledWith('Performance registration failed', expect.any(Error));
+    if (warnSpy.mock.calls.length > 0) {
+      expect(warnSpy).toHaveBeenCalledWith('Performance registration failed', expect.any(Error));
     }
 
-    consoleSpy.mockRestore();
+    // Unmount and verify no additional warnings/errors occur during cleanup.
+    const warnCountBeforeUnmount = warnSpy.mock.calls.length;
+    const errorCountBeforeUnmount = errorSpy.mock.calls.length;
+
+    unmount();
+
+    expect(warnSpy.mock.calls.length).toBe(warnCountBeforeUnmount);
+    expect(errorSpy.mock.calls.length).toBe(errorCountBeforeUnmount);
+
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it('handles React Flow viewport changes efficiently', () => {
-
     render(
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={TestBackend}>
         <div style={{ width: 800, height: 600 }}>
           <CanvasArea
             components={[]}
@@ -331,7 +354,7 @@ describe('React Flow Adapter Functions', () => {
       label: 'Web Server',
       description: 'Main web server',
       properties: { replicas: 3, port: 8080 },
-      layerId: 'layer1'
+      layerId: 'layer1',
     },
     {
       id: 'comp2',
@@ -340,8 +363,8 @@ describe('React Flow Adapter Functions', () => {
       y: 200,
       label: 'Database',
       properties: { type: 'relational', replicas: 2 },
-      layerId: 'layer1'
-    }
+      layerId: 'layer1',
+    },
   ];
 
   const mockConnections: Connection[] = [
@@ -352,7 +375,7 @@ describe('React Flow Adapter Functions', () => {
       label: 'API Call',
       type: 'data',
       protocol: 'HTTP',
-      direction: 'end'
+      direction: 'end',
     },
     {
       id: 'conn2',
@@ -360,8 +383,8 @@ describe('React Flow Adapter Functions', () => {
       to: 'comp1',
       label: 'Response',
       type: 'async',
-      direction: 'both'
-    }
+      direction: 'both',
+    },
   ];
 
   describe('toReactFlowNodes', () => {
@@ -380,11 +403,11 @@ describe('React Flow Adapter Functions', () => {
           label: 'Web Server',
           description: 'Main web server',
           properties: { replicas: 3, port: 8080 },
-          layerId: 'layer1'
+          layerId: 'layer1',
         },
         draggable: true,
         selectable: true,
-        deletable: true
+        deletable: true,
       });
     });
 
@@ -394,7 +417,7 @@ describe('React Flow Adapter Functions', () => {
         type: 'cache',
         x: 50,
         y: 75,
-        label: 'Cache'
+        label: 'Cache',
       };
 
       const nodes = toReactFlowNodes([minimalComponent]);
@@ -408,11 +431,11 @@ describe('React Flow Adapter Functions', () => {
           label: 'Cache',
           description: undefined,
           properties: undefined,
-          layerId: undefined
+          layerId: undefined,
         },
         draggable: true,
         selectable: true,
-        deletable: true
+        deletable: true,
       });
     });
   });
@@ -433,16 +456,16 @@ describe('React Flow Adapter Functions', () => {
           label: 'API Call',
           type: 'data',
           protocol: 'HTTP',
-          direction: 'end'
+          direction: 'end',
         },
         deletable: true,
         selectable: true,
         markerEnd: {
           type: 'arrowclosed',
           width: 20,
-          height: 20
+          height: 20,
         },
-        markerStart: undefined
+        markerStart: undefined,
       });
 
       const edge2 = edges.find(e => e.id === 'conn2');
@@ -456,13 +479,13 @@ describe('React Flow Adapter Functions', () => {
         { id: '1', from: 'a', to: 'b', label: 'Data', type: 'data', direction: 'end' },
         { id: '2', from: 'a', to: 'b', label: 'Control', type: 'control', direction: 'end' },
         { id: '3', from: 'a', to: 'b', label: 'Sync', type: 'sync', direction: 'end' },
-        { id: '4', from: 'a', to: 'b', label: 'Async', type: 'async', direction: 'end' }
+        { id: '4', from: 'a', to: 'b', label: 'Async', type: 'async', direction: 'end' },
       ];
 
       const edges = toReactFlowEdges(testConnections);
 
-      expect(edges[0].type).toBe('default');    // data -> default
-      expect(edges[1].type).toBe('step');       // control -> step
+      expect(edges[0].type).toBe('default'); // data -> default
+      expect(edges[1].type).toBe('step'); // control -> step
       expect(edges[2].type).toBe('smoothstep'); // sync -> smoothstep
       expect(edges[3].type).toBe('smoothstep'); // async -> smoothstep
     });
@@ -492,8 +515,8 @@ describe('React Flow Adapter Functions', () => {
         {
           type: 'position',
           id: 'comp1',
-          position: { x: 150, y: 120 }
-        }
+          position: { x: 150, y: 120 },
+        },
       ];
 
       const updatedComponents = fromNodeChanges(changes, mockComponents);
@@ -513,18 +536,18 @@ describe('React Flow Adapter Functions', () => {
           label: 'Redis Cache',
           description: 'In-memory cache',
           properties: { type: 'redis', ttl: 3600 },
-          layerId: 'layer1'
+          layerId: 'layer1',
         },
         draggable: true,
         selectable: true,
-        deletable: true
+        deletable: true,
       };
 
       const changes: NodeChange[] = [
         {
           type: 'add',
-          item: newNode
-        }
+          item: newNode,
+        },
       ];
 
       const updatedComponents = fromNodeChanges(changes, mockComponents);
@@ -539,7 +562,7 @@ describe('React Flow Adapter Functions', () => {
         label: 'Redis Cache',
         description: 'In-memory cache',
         properties: { type: 'redis', ttl: 3600 },
-        layerId: 'layer1'
+        layerId: 'layer1',
       });
     });
 
@@ -547,8 +570,8 @@ describe('React Flow Adapter Functions', () => {
       const changes: NodeChange[] = [
         {
           type: 'remove',
-          id: 'comp1'
-        }
+          id: 'comp1',
+        },
       ];
 
       const updatedComponents = fromNodeChanges(changes, mockComponents);
@@ -562,13 +585,13 @@ describe('React Flow Adapter Functions', () => {
         {
           type: 'select',
           id: 'comp1',
-          selected: true
+          selected: true,
         },
         {
           type: 'dimensions',
           id: 'comp1',
-          dimensions: { width: 100, height: 50 }
-        }
+          dimensions: { width: 100, height: 50 },
+        },
       ];
 
       const updatedComponents = fromNodeChanges(changes, mockComponents);
@@ -588,17 +611,17 @@ describe('React Flow Adapter Functions', () => {
           label: 'Control Flow',
           type: 'control',
           protocol: 'TCP',
-          direction: 'end'
+          direction: 'end',
         },
         deletable: true,
-        selectable: true
+        selectable: true,
       };
 
       const changes: EdgeChange[] = [
         {
           type: 'add',
-          item: newEdge
-        }
+          item: newEdge,
+        },
       ];
 
       const updatedConnections = fromEdgeChanges(changes, mockConnections);
@@ -612,7 +635,7 @@ describe('React Flow Adapter Functions', () => {
         label: 'Control Flow',
         type: 'control',
         protocol: 'TCP',
-        direction: 'end'
+        direction: 'end',
       });
     });
 
@@ -620,8 +643,8 @@ describe('React Flow Adapter Functions', () => {
       const changes: EdgeChange[] = [
         {
           type: 'remove',
-          id: 'conn1'
-        }
+          id: 'conn1',
+        },
       ];
 
       const updatedConnections = fromEdgeChanges(changes, mockConnections);
@@ -645,11 +668,11 @@ describe('React Flow Adapter Functions', () => {
           label: 'Web Server',
           description: 'Main web server',
           properties: { replicas: 3, port: 8080 },
-          layerId: 'layer1'
+          layerId: 'layer1',
         },
         draggable: true,
         selectable: true,
-        deletable: true
+        deletable: true,
       });
     });
   });
@@ -668,16 +691,16 @@ describe('React Flow Adapter Functions', () => {
           label: 'API Call',
           type: 'data',
           protocol: 'HTTP',
-          direction: 'end'
+          direction: 'end',
         },
         deletable: true,
         selectable: true,
         markerEnd: {
           type: 'arrowclosed',
           width: 20,
-          height: 20
+          height: 20,
         },
-        markerStart: undefined
+        markerStart: undefined,
       });
     });
   });
@@ -690,7 +713,7 @@ describe('React Flow Adapter Functions', () => {
         x: 200,
         y: 250,
         label: 'Updated Server',
-        properties: { replicas: 5, port: 9090 }
+        properties: { replicas: 5, port: 9090 },
       };
 
       const updatedNode = updateReactFlowNode(originalNode, updatedComponent);
@@ -710,7 +733,7 @@ describe('React Flow Adapter Functions', () => {
         ...mockConnections[0],
         label: 'Updated API Call',
         type: 'async',
-        direction: 'both'
+        direction: 'both',
       };
 
       const updatedEdge = updateReactFlowEdge(originalEdge, updatedConnection);
@@ -724,4 +747,3 @@ describe('React Flow Adapter Functions', () => {
     });
   });
 });
-

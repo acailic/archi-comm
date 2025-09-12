@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import os from 'os';
+
+// Centralized configuration values
+const IS_CI = !!process.env.CI;
+const OUTPUT_BASE = 'e2e/test-results';
+const CPU_COUNT = os.cpus()?.length ?? 1;
+const WORKERS = IS_CI ? 1 : Math.max(2, Math.floor(CPU_COUNT / 2));
 
 export default defineConfig({
   testDir: './e2e',
@@ -25,14 +32,17 @@ export default defineConfig({
   reporter: [
     ['list'],
     // HTML reporter with visual diffs
-    ['html', {
-      outputFolder: 'e2e/test-results/html-report',
-      open: 'never'
-    }],
+    [
+      'html',
+      {
+        outputFolder: `${OUTPUT_BASE}/html-report`,
+        open: 'never',
+      },
+    ],
     // JUnit XML for CI/CD integration
-    ['junit', { outputFile: 'e2e/test-results/junit-results.xml' }],
+    ['junit', { outputFile: `${OUTPUT_BASE}/junit-results.xml` }],
     // JSON reporter for programmatic access
-    ['json', { outputFile: 'e2e/test-results/test-results.json' }]
+    ['json', { outputFile: `${OUTPUT_BASE}/test-results.json` }],
   ],
   use: {
     baseURL: 'http://localhost:5173',
@@ -45,9 +55,9 @@ export default defineConfig({
     // Standard functional testing
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
+      use: { ...devices['Desktop Chrome'] },
     },
-    
+
     // Visual testing project with scenario integration
     {
       name: 'scenario-visual',
@@ -132,7 +142,7 @@ export default defineConfig({
       retries: process.env.CI ? 3 : 1,
     },
   ],
-  
+
   webServer: {
     command: 'npm run web:dev',
     port: 5173,
@@ -147,21 +157,20 @@ export default defineConfig({
       DISABLE_ANIMATION: 'true',
     },
   },
-  
+
   // Output directory configuration for visual artifacts
-  outputDir: 'e2e/test-results',
-  
+  outputDir: OUTPUT_BASE,
+
   // Test artifact retention
   preserveOutput: process.env.CI ? 'failures-only' : 'always',
-  
+
   // Worker configuration for parallel visual testing
-  workers: process.env.CI ? 2 : 4,
-  
+  workers: WORKERS,
+
   // Shared test configuration
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  
-  // Screenshot storage configuration
-  snapshotDir: 'e2e/test-results/screenshots',
-});
 
+  // Screenshot storage configuration
+  snapshotDir: `${OUTPUT_BASE}/screenshots`,
+});
