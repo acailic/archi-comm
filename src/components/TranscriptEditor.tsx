@@ -4,8 +4,9 @@
 // RELEVANT FILES: src/components/ui/rich-text-editor.tsx, src/lib/lazy-imports/tiptap-loader.ts, src/shared/contracts/index.ts
 
 import React from 'react';
-import { Bold, Italic, List, ListOrdered, Clock, Highlighter, Search } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Clock, Highlighter, Search, ChevronUp, ChevronDown, Wand2 } from 'lucide-react';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { cn } from './ui/utils';
 import {
   loadTiptapReact,
@@ -24,6 +25,12 @@ interface TranscriptEditorProps {
   className?: string;
   onFocus?: () => void;
   onBlur?: () => void;
+  disabled?: boolean;
+  // New props for enhanced functionality
+  realtimeText?: string; // Live transcription preview
+  isRealtime?: boolean; // Whether real-time mode is active
+  transcriptionSource?: 'whisper-rs' | 'transformers-js' | 'whisper-wasm' | 'web-speech'; // Source indicator
+  onRetranscribe?: (engine: string) => void; // Callback to retranscribe with different engine
 }
 
 type LoadedTiptapTranscript = {
@@ -124,6 +131,11 @@ function TranscriptEditorInner(
     className,
     onFocus,
     onBlur,
+    // enhanced props
+    realtimeText,
+    isRealtime,
+    transcriptionSource,
+    onRetranscribe,
   }: TranscriptEditorProps & { mods: LoadedTiptapTranscript },
   ref: React.ForwardedRef<HTMLDivElement>
 ) {
@@ -241,6 +253,24 @@ function TranscriptEditorInner(
     '#ffa500', // Orange
   ];
 
+  // Map source to display label
+  const sourceLabel = transcriptionSource
+    ? {
+        'whisper-rs': 'Whisper-rs',
+        'transformers-js': 'Transformers.js',
+        'whisper-wasm': 'Whisper.cpp WASM',
+        'web-speech': 'Web Speech',
+      }[transcriptionSource]
+    : undefined;
+
+  // Engines for quick switching
+  const engineOptions = [
+    { label: 'Whisper-rs', value: 'Whisper-rs' },
+    { label: 'Transformers.js', value: 'Transformers.js' },
+    { label: 'Whisper.cpp WASM', value: 'Whisper.cpp WASM' },
+    { label: 'Web Speech API', value: 'Web Speech API' },
+  ];
+
   return (
     <div
       ref={ref}
@@ -250,7 +280,8 @@ function TranscriptEditorInner(
       )}
     >
       {/* Main Toolbar */}
-      <div className='border-b border-input px-3 py-2 flex items-center gap-1 flex-wrap'>
+      <div className='border-b border-input px-3 py-2 flex items-center justify-between gap-1 flex-wrap'>
+        {/* Left: formatting */}
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           isActive={editor.isActive('bold')}
@@ -312,6 +343,27 @@ function TranscriptEditorInner(
             />
           ))}
         </div>
+        {/* Right: source badge and engine switcher */}
+        <div className='ml-auto flex items-center gap-2'>
+          {sourceLabel && (
+            <Badge variant='outline' className='text-xs'>{sourceLabel}</Badge>
+          )}
+          {onRetranscribe && (
+            <div className='flex items-center gap-1'>
+              <span className='text-xs text-muted-foreground'>Engine:</span>
+              <select
+                className='border rounded px-2 py-1 text-xs bg-background'
+                onChange={(e) => onRetranscribe(e.target.value)}
+                defaultValue={sourceLabel ? (engineOptions.find(o => o.label === sourceLabel)?.value || '') : ''}
+              >
+                <option value='' disabled>Select</option>
+                {engineOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Search Toolbar */}
@@ -340,6 +392,10 @@ function TranscriptEditorInner(
           Highlight All
         </Button>
       </div>
+
+      {isRealtime && realtimeText && (
+        <div className="border-b border-input px-3 py-2 bg-blue-50 text-sm">{realtimeText}</div>
+      )}
 
       <EditorContent
         editor={editor}
@@ -372,6 +428,10 @@ const TranscriptEditor = React.forwardRef<HTMLDivElement, TranscriptEditorProps>
       className,
       onFocus,
       onBlur,
+      realtimeText,
+      isRealtime,
+      transcriptionSource,
+      onRetranscribe,
     },
     ref
   ) => {
@@ -469,6 +529,10 @@ const TranscriptEditor = React.forwardRef<HTMLDivElement, TranscriptEditorProps>
         className={className}
         onFocus={onFocus}
         onBlur={onBlur}
+        realtimeText={realtimeText}
+        isRealtime={isRealtime}
+        transcriptionSource={transcriptionSource}
+        onRetranscribe={onRetranscribe}
       />
     );
   }

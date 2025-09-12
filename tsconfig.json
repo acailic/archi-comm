@@ -34,11 +34,8 @@
     }
   },
   "include": [
-    "src",
-    "vite.config.ts",
-    "playwright.config.ts",
-    "e2e/**/*.ts",
-    "e2e/**/*.tsx"
+    "src/**/*",
+    "src/types/**/*"
   ],
   "exclude": [
     "node_modules",

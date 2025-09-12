@@ -144,29 +144,70 @@ New in this build:
 
 ---
 
-## Audio Features (Community Edition)
+## Enhanced Audio Recording & Transcription
 
-ArchiComm Community Edition includes basic audio recording capabilities to help you practice explaining your system designs verbally—a crucial skill for technical interviews and design reviews.
+ArchiComm now supports multiple audio recording and transcription engines for maximum compatibility and performance:
 
-### Included Features
-- **Audio Recording**: Record your design explanations with built-in microphone support
-- **Manual Transcription**: Enter text transcripts alongside your audio recordings
-- **Playback Controls**: Review your recorded explanations with integrated audio playback
-- **Duration Tracking**: Monitor recording time with real-time duration display
-- **Word Count Analysis**: Track transcript length and speaking pace metrics
+### Recording Engines
 
-<details>
-<summary><b>Pro Version Audio Features</b></summary>
+- **MediaRecorder API**: Browser-native recording with automatic format detection
+- **RecordRTC**: Enhanced cross-browser recording with pause/resume capabilities
+- **Native Recording**: High-quality desktop recording via Tauri/CPAL (desktop app only)
 
-- Automatic speech-to-text conversion
-- Voice command recognition
-- Audio analysis and feedback
-- Offline transcription
+### Transcription Engines
 
-[Upgrade to Pro](https://archicomm.com/pro)
-</details>
+- **Whisper-rs** (Primary): High-quality offline transcription using OpenAI Whisper models via Rust
+- **Transformers.js**: Browser-based offline transcription using Moonshine models
+- **Whisper.cpp WebAssembly**: High-performance browser-based Whisper implementation
+- **Web Speech API**: Real-time browser transcription for immediate feedback
 
-See [TODO.md](TODO.md) for the complete roadmap of planned audio and speech features.
+### Features
+
+- **Automatic Engine Selection**: Chooses the best available engine based on environment
+- **Fallback Support**: Gracefully falls back to alternative engines if primary fails
+- **Real-time Transcription**: Live transcription preview during recording
+- **Multiple Audio Formats**: Support for WebM, OGG, MP4, WAV, and MP3
+- **Audio Processing**: Automatic noise reduction, echo cancellation, and format conversion
+- **Rich Text Editing**: Enhanced transcript editor with formatting, timestamps, and highlighting
+- **Offline Capability**: Full transcription without internet connection (desktop app)
+- **Privacy-Focused**: Audio processing can be done entirely locally
+
+### Usage
+
+```typescript
+import { createAudioManager } from './lib/audio';
+
+// Initialize with automatic engine selection
+const audioManager = await createAudioManager({
+  enableRealtimeTranscription: true,
+  fallbackToWebSpeech: true
+});
+
+// Start recording with real-time transcription
+await audioManager.startRecording();
+
+// Stop and get both audio and transcript
+const result = await audioManager.stopRecording();
+console.log('Audio:', result.audio);
+console.log('Transcript:', result.transcript);
+```
+
+### Configuration
+
+The audio system can be configured through the AudioManager options:
+
+- `preferredRecordingEngine`: Choose specific recording engine
+- `preferredTranscriptionEngine`: Choose specific transcription engine
+- `enableRealtimeTranscription`: Enable live transcription during recording
+- `audioProcessingOptions`: Configure audio quality and processing
+
+### Dependencies
+
+New audio libraries added:
+- `@xenova/transformers`: Browser-based ML models
+- `recordrtc`: Enhanced audio recording
+- `lamejs`: MP3 encoding
+- Audio processing utilities for format conversion
 
 ---
 
@@ -358,89 +399,6 @@ ArchiComm Pro unlocks advanced features for professional users, including automa
 ---
 
 ## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-
-**Made with ❤️ by the ArchiComm Team**
-
-*Empowering architects to design the future, one component at a time.*
-
-⭐ **Star us on GitHub** • 🐦 **Follow on Twitter** • 💬 **Join Discord**
-
-</div>
-| Open Project | `Ctrl + O` | `Cmd + O` | Open existing project |
-| Save Project | `Ctrl + S` | `Cmd + S` | Save current project |
-| Save As | `Ctrl + Shift + S` | `Cmd + Shift + S` | Save with new name |
-| Export | `Ctrl + E` | `Cmd + E` | Export project |
-
-### **🎯 Selection & Editing**
-| Action | Windows/Linux | macOS | Description |
-|:---|:---:|:---:|:---|
-| Select All | `Ctrl + A` | `Cmd + A` | Select all components |
-| Multi-Select | `Shift + Click` | `Shift + Click` | Add to selection |
-| Box Select | `Drag` | `Drag` | Select with rectangle |
-| Lasso Select | `L + Drag` | `L + Drag` | Free-form selection |
-| Invert Selection | `Ctrl + I` | `Cmd + I` | Invert current selection |
-
-### **↩️ History & Undo**
-| Action | Windows/Linux | macOS | Description |
-|:---|:---:|:---:|:---|
-| Undo | `Ctrl + Z` | `Cmd + Z` | Undo last action |
-| Redo | `Ctrl + Y` | `Cmd + Shift + Z` | Redo last undone action |
-| History Panel | `Ctrl + H` | `Cmd + H` | Show history timeline |
-
-### **🎨 View & Layout**
-| Action | Windows/Linux | macOS | Description |
-|:---|:---:|:---:|:---|
-| Grid Toggle | `Ctrl + '` | `Cmd + '` | Show/hide grid |
-| Snap Toggle | `Ctrl + ;` | `Cmd + ;` | Toggle snapping |
-| Rulers | `Ctrl + R` | `Cmd + R` | Show/hide rulers |
-| Guides | `Ctrl + Shift + ;` | `Cmd + Shift + ;` | Show/hide guides |
-| Layers Panel | `F7` | `F7` | Toggle layers panel |
-
-### **🔍 Navigation & Search**
-| Action | Windows/Linux | macOS | Description |
-|:---|:---:|:---:|:---|
-| Find Component | `Ctrl + F` | `Cmd + F` | Find specific component |
-| Go to Component | `Ctrl + G` | `Cmd + G` | Navigate to component |
-| Next Match | `F3` | `Cmd + G` | Go to next search result |
-| Previous Match | `Shift + F3` | `Cmd + Shift + G` | Go to previous result |
-
-### **⚙️ Tools & Modes**
-| Action | Windows/Linux | macOS | Description |
-|:---|:---:|:---:|:---|
-| Hand Tool | `H` | `H` | Pan/navigate mode |
-| Select Tool | `V` | `V` | Default selection tool |
-| Text Tool | `T` | `T` | Add text labels |
-| Shape Tool | `U` | `U` | Draw basic shapes |
-| Measure Tool | `M` | `M` | Measure distances |
-
-### **🎵 Audio & Recording**
-| Action | Windows/Linux | macOS | Description |
-|:---|:---:|:---:|:---|
-| Start Recording | `R` | `R` | Begin audio recording |
-| Stop Recording | `Esc` | `Esc` | Stop audio recording |
-| Play/Pause | `Spacebar` | `Spacebar` | Play/pause audio |
-| Quick Voice Note | `Shift + V` | `Shift + V` | Record quick voice note |
-
-### **🚀 Performance & System**
-| Action | Windows/Linux | macOS | Description |
-|:---|:---:|:---:|:---|
-| Performance Monitor | `Ctrl + Shift + P` | `Cmd + Shift + P` | Show performance stats |
-| Memory Usage | `Ctrl + Shift + M` | `Cmd + Shift + M` | Display memory usage |
-| Developer Tools | `F12` | `Cmd + Option + I` | Open developer console |
-| Reload App | `Ctrl + R` | `Cmd + R` | Reload application |
-| Hard Refresh | `Ctrl + Shift + R` | `Cmd + Shift + R` | Clear cache and reload |
-
-</details>
-
----
-
-## 📄 **License**
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 

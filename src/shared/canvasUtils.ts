@@ -20,6 +20,58 @@ export interface DesignComponentBounds {
   height: number;
 }
 
+// Spatial index powered by RBush for fast culling / hit-tests
+// These helpers are optional; consumers can keep using the simple functions above.
+type IndexedItem<T> = { minX: number; minY: number; maxX: number; maxY: number; item: T };
+// Use a loose typing to avoid requiring @types/rbush in all environments
+type RBushIndex<T> = any;
+
+/**
+ * Build a spatial index for a list of components.
+ */
+export function buildComponentSpatialIndex<T extends { x: number; y: number; width?: number; height?: number }>(
+  components: T[]
+): RBushIndex<T> {
+  // Lazy import to avoid bundling RBush in environments that don't use it
+  const RBush = require('rbush');
+  const tree: RBushIndex<T> = new RBush();
+  const items: IndexedItem<T>[] = components.map(c => {
+    const b = calculateComponentBounds(c);
+    return { minX: b.x, minY: b.y, maxX: b.x + b.width, maxY: b.y + b.height, item: c };
+  });
+  tree.load(items);
+  return tree;
+}
+
+/**
+ * Query visible components using the spatial index.
+ */
+export function getVisibleComponentsIndexed<T extends { x: number; y: number; width?: number; height?: number }>(
+  index: RBushIndex<T>,
+  viewport: ViewportInfo,
+  padding = 0
+): T[] {
+  if (!viewport || viewport.width === 0 || viewport.height === 0) return [] as T[];
+  const minX = viewport.x - padding;
+  const minY = viewport.y - padding;
+  const maxX = viewport.x + viewport.width + padding;
+  const maxY = viewport.y + viewport.height + padding;
+  const hits = index.search({ minX, minY, maxX, maxY }) as unknown as IndexedItem<T>[];
+  return hits.map(h => h.item);
+}
+
+/**
+ * Hit-test at a point using the spatial index.
+ */
+export function hitTestIndexed<T extends { x: number; y: number; width?: number; height?: number }>(
+  index: RBushIndex<T>,
+  x: number,
+  y: number
+): T[] {
+  const hits = index.search({ minX: x, minY: y, maxX: x, maxY: y }) as unknown as IndexedItem<T>[];
+  return hits.map(h => h.item);
+}
+
 // Lightweight bounds cache to avoid repeated object allocations during culling
 const boundsCache = new WeakMap<any, DesignComponentBounds>();
 

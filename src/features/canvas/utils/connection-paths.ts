@@ -7,6 +7,7 @@
 
 import type { Connection, DesignComponent } from '@/shared/contracts';
 import type { ConnectionPoint, Point } from '@/shared/types';
+import { getBoxToBoxArrow } from 'perfect-arrows';
 
 export interface ConnectionEndpoints {
   from: Point;
@@ -39,14 +40,30 @@ export function createStraightPath(from: Point, to: Point): string {
  * Generate curved bezier path between two points
  */
 export function createCurvedPath(from: Point, to: Point): string {
-  const midX = (from.x + to.x) / 2;
-  const midY = (from.y + to.y) / 2;
-  const cp1x = from.x + (midX - from.x) * 0.5;
-  const cp1y = from.y;
-  const cp2x = to.x - (to.x - midX) * 0.5;
-  const cp2y = to.y;
+  // Use perfect-arrows for a nicer, collision-aware curve
+  // Treat endpoints as 1x1 boxes to get properly padded curves
+  const [sx, sy, cx, cy, ex, ey] = getBoxToBoxArrow(
+    from.x,
+    from.y,
+    1,
+    1,
+    to.x,
+    to.y,
+    1,
+    1,
+    {
+      bow: 0.2,
+      stretch: 0.5,
+      stretchMin: 40,
+      stretchMax: 420,
+      padStart: 8,
+      padEnd: 12,
+      straights: true,
+    }
+  ) as unknown as [number, number, number, number, number, number];
 
-  return `M ${from.x} ${from.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${to.x} ${to.y}`;
+  // Quadratic Bezier path: start -> control -> end
+  return `M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`;
 }
 
 /**

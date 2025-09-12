@@ -47,6 +47,7 @@ import { ConnectionEditorPopover } from './ConnectionEditorPopover';
 import { CustomEdge } from './CustomEdge';
 import { CustomNode } from './CustomNode';
 import { InfoCard as InfoCardComponent } from './InfoCard';
+import { computeLayout } from '../utils/auto-layout';
 
 interface ReactFlowCanvasProps {
   components: DesignComponent[];
@@ -71,6 +72,9 @@ interface ReactFlowCanvasProps {
   snapToGrid?: boolean;
   gridSpacing?: number;
   showConnectors?: boolean;
+  // Optional auto-layout options
+  autoLayout?: boolean;
+  layoutDirection?: 'RIGHT' | 'DOWN' | 'LEFT' | 'UP';
 }
 
 type ConnectionStyle = 'straight' | 'curved' | 'stepped';
@@ -130,32 +134,39 @@ function ReactFlowCanvasInternal({
   snapToGrid = false,
   gridSpacing = 20,
   showConnectors = true,
+  autoLayout = true,
+  layoutDirection = 'RIGHT',
 }: ReactFlowCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useReactFlow();
   const [connectionStyle, setConnectionStyle] = useState<ConnectionStyle>('curved');
+  const [layoutPositions, setLayoutPositions] = useState<Record<string, { x: number; y: number }>>({});
 
   // Convert domain objects to React Flow format with proper CustomNode data
   const createEnhancedNodes = useCallback(
     (components: DesignComponent[]) => {
-      return components.map(component => ({
-        id: component.id,
-        type: 'custom',
-        position: { x: component.x, y: component.y },
-        data: {
-          component,
-          isSelected: selectedComponent === component.id,
-          isConnectionStart: connectionStart === component.id,
-          onSelect: onComponentSelect,
-          onStartConnection: onStartConnection,
-          onLabelChange: onComponentLabelChange || (() => {}),
-        },
-        draggable: true,
-        selectable: true,
-        deletable: true,
-      }));
+      return components.map(component => {
+        const pos = layoutPositions[component.id] ?? { x: component.x, y: component.y };
+        return {
+          id: component.id,
+          type: 'custom',
+          position: { x: pos.x, y: pos.y },
+          data: {
+            component,
+            isSelected: selectedComponent === component.id,
+            isConnectionStart: connectionStart === component.id,
+            onSelect: onComponentSelect,
+            onStartConnection: onStartConnection,
+            onLabelChange: onComponentLabelChange || (() => {}),
+          },
+          draggable: true,
+          selectable: true,
+          deletable: true,
+        };
+      });
     },
     [
+      layoutPositions,
       selectedComponent,
       connectionStart,
       onComponentSelect,
@@ -219,6 +230,28 @@ function ReactFlowCanvasInternal({
   useEffect(() => {
     setEdges(syncedEdges);
   }, [syncedEdges, setEdges]);
+
+  // Compute ELK auto-layout positions when enabled
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!autoLayout) {
+        setLayoutPositions({});
+        return;
+      }
+      const map = await computeLayout(components, connections, { direction: layoutDirection });
+      if (!cancelled) {
+        setLayoutPositions(map);
+        try {
+          reactFlowInstance?.fitView?.({ padding: 0.2 });
+        } catch {}
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [autoLayout, layoutDirection, components, connections, reactFlowInstance]);
 
   // Drag and drop setup
   const [{ isOver }, drop] = useDrop(

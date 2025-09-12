@@ -8,6 +8,7 @@ import {
   PerformanceMonitor,
   MemoryOptimizer,
 } from '../performance/PerformanceOptimizer';
+import RBush from 'rbush';
 
 export interface CanvasAnnotation {
   id: string;
@@ -45,6 +46,8 @@ export interface AnnotationStyle {
 
 export class CanvasAnnotationManager {
   private annotations: Map<string, CanvasAnnotation> = new Map();
+  private index: RBush<{ minX: number; minY: number; maxX: number; maxY: number; id: string }>
+    = new RBush();
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private listeners: Set<AnnotationEventListener> = new Set();
@@ -123,6 +126,15 @@ export class CanvasAnnotationManager {
     };
 
     this.annotations.set(id, fullAnnotation);
+    // Index the new annotation by its bounding box for faster hit-tests
+    const bb = this.getBoundingBox(fullAnnotation);
+    this.index.insert({
+      minX: bb.x,
+      minY: bb.y,
+      maxX: bb.x + bb.width,
+      maxY: bb.y + bb.height,
+      id,
+    });
 
     // Performance monitoring and optimization
     this.performanceMonitor.measure('annotation-add', () => {
@@ -167,6 +179,24 @@ export class CanvasAnnotationManager {
 
         this.annotations.set(id, updated);
 
+        // Update spatial index
+        if (oldBoundingBox) {
+          this.index.remove({
+            minX: oldBoundingBox.x,
+            minY: oldBoundingBox.y,
+            maxX: oldBoundingBox.x + oldBoundingBox.width,
+            maxY: oldBoundingBox.y + oldBoundingBox.height,
+            id,
+          }, (a, b) => a.id === b.id);
+        }
+        this.index.insert({
+          minX: newBoundingBox.x,
+          minY: newBoundingBox.y,
+          maxX: newBoundingBox.x + newBoundingBox.width,
+          maxY: newBoundingBox.y + newBoundingBox.height,
+          id,
+        });
+
         // Mark dirty regions for optimized rendering
         if (this.optimizer) {
           // Mark both old and new regions as dirty
@@ -199,6 +229,17 @@ export class CanvasAnnotationManager {
         this.wrappedTextCache.delete(id);
         this.textMeasurementCache.delete(id);
         this.boundingBoxCache.delete(id);
+
+        // Remove from spatial index
+        if (boundingBox) {
+          this.index.remove({
+            minX: boundingBox.x,
+            minY: boundingBox.y,
+            maxX: boundingBox.x + boundingBox.width,
+            maxY: boundingBox.y + boundingBox.height,
+            id,
+          }, (a, b) => a.id === b.id);
+        }
 
         // Release pooled object
         MemoryOptimizer.releaseObject('annotation', annotation);
@@ -262,17 +303,20 @@ export class CanvasAnnotationManager {
    * Get annotation at specific coordinates
    */
   getAnnotationAt(x: number, y: number): CanvasAnnotation | null {
-    const annotations = Array.from(this.annotations.values());
-
-    // Check in reverse order (top to bottom)
-    for (let i = annotations.length - 1; i >= 0; i--) {
-      const annotation = annotations[i];
-      if (this.isPointInAnnotation(x, y, annotation)) {
-        return annotation;
+    // Fast spatial query first
+    const hits = this.index.search({ minX: x, minY: y, maxX: x, maxY: y });
+    if (!hits.length) return null;
+    // Refine by actual shape bounds and prefer the most recent
+    const candidates: CanvasAnnotation[] = [];
+    for (const h of hits) {
+      const ann = this.annotations.get(h.id);
+      if (ann && this.isPointInAnnotation(x, y, ann)) {
+        candidates.push(ann);
       }
     }
-
-    return null;
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => b.timestamp - a.timestamp);
+    return candidates[0] ?? null;
   }
 
   /**
@@ -286,14 +330,13 @@ export class CanvasAnnotationManager {
    * Get annotations in a specific area
    */
   getAnnotationsInArea(x: number, y: number, width: number, height: number): CanvasAnnotation[] {
-    return Array.from(this.annotations.values()).filter(annotation => {
-      return (
-        annotation.x >= x &&
-        annotation.x <= x + width &&
-        annotation.y >= y &&
-        annotation.y <= y + height
-      );
-    });
+    const hits = this.index.search({ minX: x, minY: y, maxX: x + width, maxY: y + height });
+    const list: CanvasAnnotation[] = [];
+    for (const h of hits) {
+      const ann = this.annotations.get(h.id);
+      if (ann) list.push(ann);
+    }
+    return list;
   }
 
   /**
@@ -1293,6 +1336,7 @@ export class CanvasAnnotationManager {
       this.wrappedTextCache.clear();
       this.textMeasurementCache.clear();
       this.boundingBoxCache.clear();
+      this.index.clear();
       this.selectedAnnotation = null;
       this.editingAnnotation = null;
 

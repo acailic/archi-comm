@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { LoadingSpinner, useLoadingState } from './ui/LoadingSpinner';
 import { TranscriptEditor } from './TranscriptEditor';
+import { AudioManager, AudioManagerOptions, getDefaultAudioManagerOptions } from '../lib/audio';
 import type {
   Challenge,
   DesignData,
@@ -58,12 +59,23 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isRecordingSupported, setIsRecordingSupported] = useState<boolean>(true);
   const [chosenMime, setChosenMime] = useState<string | null>(null);
+  
+  // New audio manager state
+  const [audioManager, setAudioManager] = useState<AudioManager | null>(null);
+  const [availableEngines, setAvailableEngines] = useState<{recording: string[], transcription: string[]}>({recording: [], transcription: []});
+  const [selectedRecordingEngine, setSelectedRecordingEngine] = useState<string>('auto');
+  const [selectedTranscriptionEngine, setSelectedTranscriptionEngine] = useState<string>('auto');
+  const [realtimeTranscript, setRealtimeTranscript] = useState('');
+  const [isRealtimeEnabled, setIsRealtimeEnabled] = useState(false);
+  const [engineStatus, setEngineStatus] = useState<{[key: string]: 'available' | 'unavailable' | 'loading'}>({});
+  const [isUsingNewSystem, setIsUsingNewSystem] = useState(false);
 
   // Track when user pressed Continue during an active recording
   const pendingContinueRef = useRef(false);
   // Keep latest values available inside async callbacks without stale closures
   const transcriptRef = useRef('');
   const durationRef = useRef(0);
+  const startTimeRef = useRef(0);
 
   // Loading state for transcription
   const {
@@ -76,22 +88,78 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
-  // Transcription function
+  // Initialize AudioManager on component mount
+  useEffect(() => {
+    const initializeAudioManager = async () => {
+      try {
+        const manager = new AudioManager();
+        const options: AudioManagerOptions = {
+          ...getDefaultAudioManagerOptions(),
+          enableRealtimeTranscription: isRealtimeEnabled,
+          preferredRecordingEngine: selectedRecordingEngine === 'auto' ? undefined : selectedRecordingEngine,
+          preferredTranscriptionEngine: selectedTranscriptionEngine === 'auto' ? undefined : selectedTranscriptionEngine
+        };
+        
+        await manager.initialize(options);
+        setAudioManager(manager);
+        setIsUsingNewSystem(true);
+        
+        // Get available engines for UI selection
+        const engines = await manager.getAvailableEngines();
+        setAvailableEngines(engines);
+        
+        // Set up real-time transcription callback
+        manager.onRealtimeTranscript((text, isFinal) => {
+          if (isFinal) {
+            setTranscript(prev => prev + ' ' + text);
+            transcriptRef.current = transcriptRef.current + ' ' + text;
+          } else {
+            setRealtimeTranscript(text);
+          }
+        });
+        
+        console.log('AudioManager initialized with engines:', engines);
+      } catch (error) {
+        console.warn('AudioManager initialization failed, falling back to original system:', error);
+        setIsUsingNewSystem(false);
+        // Keep original system as fallback
+      }
+    };
+    
+    initializeAudioManager();
+  }, [isRealtimeEnabled, selectedRecordingEngine, selectedTranscriptionEngine]);
+
+  // Dispose AudioManager when it changes or on unmount
+  useEffect(() => {
+    return () => { audioManager?.dispose().catch(console.warn); };
+  }, [audioManager]);
+
+  // Enhanced transcription function that uses AudioManager when available
   const transcribeAudio = useCallback(
     async (blob: Blob) => {
       if (!blob) return;
 
       try {
         setTranscriptionError(null);
-        startTranscription('Saving audio file...');
-
-        // Save audio blob to temporary file (auto-detect filename/extension)
-        const filePath = await audioUtils.saveAudioBlob(blob);
-
         startTranscription('Transcribing audio...');
 
-        // Transcribe the audio file
-        const transcriptionResponse = await transcriptionUtils.transcribeAudio(filePath);
+        let transcriptionResponse;
+        
+        if (audioManager && isUsingNewSystem) {
+          // Use new AudioManager system
+          transcriptionResponse = await audioManager.transcribeAudio(blob, selectedTranscriptionEngine === 'auto' ? undefined : selectedTranscriptionEngine);
+        } else {
+          // Fallback to original system
+          startTranscription('Saving audio file...');
+          const filePath = await audioUtils.saveAudioBlob(blob);
+          startTranscription('Transcribing audio...');
+          transcriptionResponse = await transcriptionUtils.transcribeAudio(filePath);
+          
+          // Optional: Cleanup the temporary file
+          setTimeout(() => {
+            audioUtils.cleanupAudioFile(filePath).catch(console.warn);
+          }, 1000);
+        }
 
         if (mountedRef.current) {
           setTranscript(transcriptionResponse.text);
@@ -100,11 +168,6 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         }
 
         finishTranscription();
-
-        // Optional: Cleanup the temporary file
-        setTimeout(() => {
-          audioUtils.cleanupAudioFile(filePath).catch(console.warn);
-        }, 1000);
       } catch (error) {
         console.error('Transcription failed:', error);
         const errorMessage = getErrorMessage(error);
@@ -112,7 +175,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         finishTranscription();
       }
     },
-    [startTranscription, finishTranscription]
+    [audioManager, isUsingNewSystem, selectedTranscriptionEngine, startTranscription, finishTranscription]
   );
 
   const startRecording = useCallback(async () => {
@@ -120,6 +183,21 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       // Clear any previous errors when starting new recording
       setTranscriptionError(null);
       setRecordingError(null);
+
+      // Use new AudioManager-based system when available
+      if (audioManager && isUsingNewSystem) {
+        await audioManager.startRecording({
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        });
+
+        if (mountedRef.current) {
+          setIsRecording(true);
+          setDuration(0);
+        }
+        return; // Skip legacy path
+      }
 
       // Check if getUserMedia is available
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -169,6 +247,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         chosenMime: supportedMime,
       });
 
+      // Legacy MediaRecorder fallback path
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = supportedMime
         ? new MediaRecorder(stream, { mimeType: supportedMime })
@@ -187,7 +266,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         setChosenMime(supportedMime);
       }
 
-      // Start duration timer
+      // Start duration timer (legacy path)
       const startTime = Date.now();
       const timer = setInterval(() => {
         if (mountedRef.current) {
@@ -236,7 +315,38 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
     }
   }, [transcribeAudio]);
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(async () => {
+    // If using new system via AudioManager
+    if (audioManager && isUsingNewSystem && isRecording) {
+      try {
+        const { audio, transcript: liveTranscript } = await audioManager.stopRecording();
+        if (mountedRef.current) {
+          setAudioBlob(audio);
+          if (liveTranscript) setTranscript(liveTranscript);
+          setIsRecording(false);
+        }
+
+        // If user clicked Continue while still recording, complete now
+        if (pendingContinueRef.current) {
+          pendingContinueRef.current = false;
+          const cleanTranscript = (liveTranscript ?? transcriptRef.current).replace(/<[^>]*>/g, '');
+          const audioData: AudioData = {
+            blob: audio,
+            transcript: cleanTranscript,
+            duration: durationRef.current,
+            wordCount: cleanTranscript.split(' ').filter(w => w.length > 0).length,
+            businessValueTags: [],
+            analysisMetrics: { clarityScore: 75, technicalDepth: 80, businessFocus: 60 },
+          };
+          onComplete(audioData);
+        }
+      } catch (err) {
+        console.error('AudioManager stopRecording failed:', err);
+      }
+      return;
+    }
+
+    // Legacy MediaRecorder fallback
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
@@ -244,7 +354,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         setIsRecording(false);
       }
     }
-  }, [isRecording]);
+  }, [audioManager, isUsingNewSystem, isRecording, onComplete]);
 
   // Play/pause audio
   const toggleAudioPlayback = useCallback(() => {
@@ -465,15 +575,80 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                   )}
                 </div>
 
+                {/* Engine selection controls */}
+                {isUsingNewSystem && availableEngines.recording.length > 1 && (
+                  <div className="flex items-center gap-4 mb-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <label className="font-medium">Recording Engine:</label>
+                      <select 
+                        value={selectedRecordingEngine} 
+                        onChange={(e) => setSelectedRecordingEngine(e.target.value)}
+                        className="border rounded px-2 py-1"
+                        disabled={isRecording}
+                      >
+                        <option value="auto">Auto-select</option>
+                        {availableEngines.recording.map(engine => (
+                          <option key={engine} value={engine}>{engine}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <label className="font-medium">Transcription Engine:</label>
+                      <select 
+                        value={selectedTranscriptionEngine} 
+                        onChange={(e) => setSelectedTranscriptionEngine(e.target.value)}
+                        className="border rounded px-2 py-1"
+                      >
+                        <option value="auto">Auto-select</option>
+                        {availableEngines.transcription.map(engine => (
+                          <option key={engine} value={engine}>{engine}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        checked={isRealtimeEnabled} 
+                        onChange={(e) => setIsRealtimeEnabled(e.target.checked)}
+                        id="realtime-transcription"
+                        disabled={isRecording}
+                      />
+                      <label htmlFor="realtime-transcription">Real-time transcription</label>
+                    </div>
+                  </div>
+                )}
+
                 {isRecording && (
                   <div className='mt-4 flex items-center justify-center gap-2'>
                     <div className='w-3 h-3 bg-red-500 rounded-full animate-pulse' />
                     <span className='text-sm text-muted-foreground'>Recording...</span>
+                    {isUsingNewSystem && audioManager && (
+                      <span className='text-xs text-blue-600 ml-2'>
+                        via {audioManager.getCurrentEngines().recording}
+                      </span>
+                    )}
                   </div>
                 )}
+                
+                {/* Show real-time transcript preview */}
+                {isRealtimeEnabled && realtimeTranscript && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                    <span className="text-blue-600 font-medium">Live: </span>
+                    <span className="text-blue-800">{realtimeTranscript}</span>
+                  </div>
+                )}
+                
                 {!isRecording && chosenMime && (
                   <div className='mt-2 text-xs text-muted-foreground'>
                     Using format: {chosenMime}
+                  </div>
+                )}
+                
+                {!isRecording && isUsingNewSystem && audioManager && (
+                  <div className='mt-2 text-xs text-muted-foreground'>
+                    Using: {audioManager.getCurrentEngines().recording} → {audioManager.getCurrentEngines().transcription}
                   </div>
                 )}
               </div>
