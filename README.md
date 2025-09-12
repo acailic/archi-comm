@@ -5,14 +5,8 @@
 # ArchiComm Community Edition
 ### A desktop companion for learning and practicing system design
 
-<!-- Quality & Security Badges -->
+<!-- Badges (simplified) -->
 [![Build Status](https://github.com/acailic/archi-comm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/acailic/archi-comm/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/acailic/archi-comm/branch/main/graph/badge.svg)](https://codecov.io/gh/acailic/archi-comm)
-[![Coveralls](https://coveralls.io/repos/github/acailic/archi-comm/badge.svg?branch=main)](https://coveralls.io/github/acailic/archi-comm?branch=main)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=alert_status)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=security_rating)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
-[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=ncloc)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 <img alt="Version" src="https://img.shields.io/badge/version-0.2.1-blue.svg">
 <img alt="Node >=18" src="https://img.shields.io/badge/node-%3E%3D18.0.0-339933?logo=nodedotjs&logoColor=white">
