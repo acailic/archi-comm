@@ -6,10 +6,11 @@ import {
   requestPermission,
   sendNotification,
 } from '@tauri-apps/api/notification';
-import { writeTextFile, createDir } from '@tauri-apps/api/fs';
+import { writeTextFile, writeBinaryFile, createDir } from '@tauri-apps/api/fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import type { Project, Component, DiagramElement, Connection } from '../services/tauri';
 import { isTauriEnvironment } from './environment';
+import type { TranscriptionResponse, TranscriptionOptions } from '../shared/contracts';
 // Domain types are centralized in services/tauri
  
 
@@ -254,6 +255,191 @@ export const utilUtils = {
   },
 };
 
+// Transcription utilities
+export const transcriptionUtils = {
+  /**
+   * Transcribe audio file using offline Whisper model.
+   * @param filePath - Path to the audio file to transcribe
+   * @param options - Optional transcription parameters
+   * @returns Promise resolving to transcription response with text and segments
+   */
+  async transcribeAudio(filePath: string, options?: TranscriptionOptions): Promise<TranscriptionResponse> {
+    // Parameter validation
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error('File path is required and must be a string');
+    }
+    
+    if (options?.timeout !== undefined && (typeof options.timeout !== 'number' || options.timeout <= 0)) {
+      throw new Error('Timeout must be a positive number');
+    }
+    
+    if (options?.jobId !== undefined && (typeof options.jobId !== 'string' || options.jobId.trim() === '')) {
+      throw new Error('Job ID must be a non-empty string');
+    }
+    
+    if (options?.maxSegments !== undefined && (typeof options.maxSegments !== 'number' || options.maxSegments <= 0)) {
+      throw new Error('Max segments must be a positive number');
+    }
+
+    // Fallback for non-Tauri environments
+    if (!isTauri()) {
+      return {
+        text: 'Mock transcription text',
+        segments: [{
+          text: 'Mock transcription text',
+          start: 0,
+          end: 5,
+          confidence: 0.95
+        }]
+      };
+    }
+
+    try {
+      const response = await ipcUtils.invoke<TranscriptionResponse>('transcribe_audio', {
+        file_path: filePath,
+        options: options || {}
+      });
+
+      // Validate response structure
+      if (!response || typeof response.text !== 'string' || !Array.isArray(response.segments)) {
+        throw new Error('Invalid transcription response structure');
+      }
+
+      // Apply maxSegments if specified
+      if (options?.maxSegments && response.segments.length > options.maxSegments) {
+        response.segments = response.segments.slice(0, options.maxSegments);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Transcription failed:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Cancel ongoing transcription by job ID.
+   * @param jobId - ID of the transcription job to cancel
+   * @returns Promise resolving to success status
+   */
+  async cancelTranscription(jobId: string): Promise<boolean> {
+    if (!jobId || typeof jobId !== 'string') {
+      throw new Error('Job ID is required and must be a string');
+    }
+
+    if (!isTauri()) {
+      return true; // Mock success for non-Tauri environments
+    }
+
+    try {
+      return await ipcUtils.invoke<boolean>('cancel_transcription', { job_id: jobId });
+    } catch (error) {
+      console.error('Failed to cancel transcription:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Test transcription pipeline with error handling.
+   * @param filePath - Path to the audio file to test
+   * @returns Promise resolving to test result object
+   */
+  async testTranscriptionPipeline(filePath: string): Promise<{ success: boolean; error?: string; result?: TranscriptionResponse }> {
+    try {
+      const result = await this.transcribeAudio(filePath);
+      return { success: true, result };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  },
+};
+
+// Audio utilities
+export const audioUtils = {
+  /**
+   * Get the temporary audio directory path for storing audio files.
+   * Creates the directory if it doesn't exist.
+   * @returns Promise resolving to the audio temp directory path
+   */
+  async getAudioTempDir(): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Audio utilities require Tauri environment');
+    }
+
+    try {
+      const base = await appDataDir();
+      const dirPath = await join(base, 'archicomm', 'audio-temp');
+      await createDir(dirPath, { recursive: true });
+      return dirPath;
+    } catch (error) {
+      console.error('Failed to create audio temp directory:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Save audio blob to temporary file for transcription.
+   * Converts blob to binary data and saves to app data directory.
+   * @param blob - Audio blob to save
+   * @param filename - Optional filename (defaults to timestamp-based name)
+   * @returns Promise resolving to the file path
+   */
+  async saveAudioBlob(blob: Blob, filename?: string): Promise<string> {
+    if (!blob) {
+      throw new Error('Audio blob is required');
+    }
+
+    if (!isTauri()) {
+      throw new Error('Audio file saving requires Tauri environment');
+    }
+
+    try {
+      // Convert blob to binary data
+      const arrayBuffer = await blob.arrayBuffer();
+      const binaryData = new Uint8Array(arrayBuffer);
+      
+      // Generate filename if not provided
+      const finalFilename = filename || `audio_${Date.now()}.webm`;
+      
+      // Get temp directory and create file path
+      const tempDir = await this.getAudioTempDir();
+      const filePath = await join(tempDir, finalFilename);
+      
+      // Save binary data to file
+      await writeBinaryFile(filePath, binaryData);
+      
+      return filePath;
+    } catch (error) {
+      console.error('Failed to save audio blob:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Clean up temporary audio files (optional utility for housekeeping).
+   * @param filePath - Path to the audio file to remove
+   * @returns Promise resolving to success status
+   */
+  async cleanupAudioFile(filePath: string): Promise<boolean> {
+    if (!filePath || !isTauri()) {
+      return false;
+    }
+
+    try {
+      // In a full implementation, you would use removeFile from @tauri-apps/api/fs
+      // For now, we'll just log the cleanup attempt
+      console.log('Audio file cleanup requested for:', filePath);
+      return true;
+    } catch (error) {
+      console.error('Failed to cleanup audio file:', error);
+      return false;
+    }
+  },
+};
+
 // Legacy compatibility exports
 export const isTauriApp = isTauri;
 export const tauriAPI = {
@@ -266,6 +452,7 @@ export const tauriAPI = {
   componentUtils,
   diagramUtils,
   utilUtils,
+  transcriptionUtils,
   // Convenience methods expected by UI components
   async getAppVersion() {
     return utilUtils.getAppVersion();

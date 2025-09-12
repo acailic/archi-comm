@@ -16,7 +16,7 @@ export const mockChallenges: ExtendedChallenge[] = [
     estimatedTime: 30,
     category: 'system-design',
     tags: ['caching', 'databases', 'scaling'],
-    objectives: [
+    requirements: [
       'Design database schema for URL mappings',
       'Handle high read/write ratios',
       'Implement caching strategy',
@@ -27,6 +27,8 @@ export const mockChallenges: ExtendedChallenge[] = [
       'Think about cache-aside pattern for frequently accessed URLs',
       'Base62 encoding is commonly used for short URLs'
     ],
+    referenceTranscript: 'For a URL shortener system, we need to handle both shortening and redirecting URLs efficiently. The architecture starts with a load balancer distributing requests to multiple application servers. Each server connects to a database for storing URL mappings and a cache layer for frequently accessed URLs. The database should be optimized for fast lookups and can be either relational or NoSQL. Redis cache helps reduce database load by storing popular URL mappings. We also need to consider URL encoding algorithms like Base62 for generating short URLs and implementing analytics for tracking click counts.',
+    keyConcepts: ['database', 'cache', 'load balancer', 'redis', 'url encoding', 'base62', 'application server', 'analytics', 'nosql', 'lookup'],
     template: {
       components: [
         { type: 'api-gateway', position: { x: 200, y: 100 }, label: 'API Gateway' },
@@ -48,7 +50,7 @@ export const mockChallenges: ExtendedChallenge[] = [
     estimatedTime: 45,
     category: 'system-design',
     tags: ['websockets', 'message-queues', 'real-time'],
-    objectives: [
+    requirements: [
       'Handle real-time message delivery',
       'Design message storage and retrieval',
       'Implement user presence tracking',
@@ -78,7 +80,7 @@ export const mockChallenges: ExtendedChallenge[] = [
     estimatedTime: 60,
     category: 'architecture',
     tags: ['microservices', 'transactions', 'search', 'payments'],
-    objectives: [
+    requirements: [
       'Design microservices architecture',
       'Handle payment processing',
       'Implement product search and recommendations',
@@ -112,7 +114,7 @@ export const mockChallenges: ExtendedChallenge[] = [
     estimatedTime: 40,
     category: 'scaling',
     tags: ['mobile', 'queues', 'third-party-apis'],
-    objectives: [
+    requirements: [
       'Handle high throughput notification sending',
       'Manage different notification channels (push, email, SMS)',
       'Implement retry mechanisms and failure handling',

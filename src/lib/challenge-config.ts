@@ -807,12 +807,18 @@ export class ChallengeManager {
       }
 
       // Validate optional arrays if present
-      const optionalArrays = ['tags', 'prerequisites', 'learningObjectives', 'requirements'];
+      const optionalArrays = ['tags', 'prerequisites', 'learningObjectives', 'requirements', 'keyConcepts'];
       for (const field of optionalArrays) {
         if (challenge[field] !== undefined && !Array.isArray(challenge[field])) {
           console.warn(`Challenge ${field} must be an array if present`);
           return false;
         }
+      }
+
+      // Validate optional transcript fields
+      if (challenge.referenceTranscript !== undefined && typeof challenge.referenceTranscript !== 'string') {
+        console.warn('Challenge referenceTranscript must be a string if present');
+        return false;
       }
 
       // Basic value validation

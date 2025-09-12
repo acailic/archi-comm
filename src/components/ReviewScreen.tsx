@@ -27,7 +27,8 @@ import { Progress } from './ui/progress';
 import { SidebarProvider } from './ui/sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { CanvasComponent } from './CanvasComponent';
-import type { Challenge, DesignData, AudioData } from '@/shared/contracts';
+import { compareTranscripts } from '../lib/transcript-comparison';
+import type { Challenge, DesignData, AudioData, TranscriptFeedback } from '@/shared/contracts';
 
 interface ReviewScreenProps {
   challenge: Challenge;
@@ -98,6 +99,14 @@ export function ReviewScreen({
     link.click();
     URL.revokeObjectURL(url);
   };
+
+  // Transcript comparison analysis
+  const transcriptFeedback: TranscriptFeedback | null = useMemo(() => {
+    if (!challenge.referenceTranscript || !challenge.keyConcepts) {
+      return null;
+    }
+    return compareTranscripts(audioData.transcript, challenge);
+  }, [audioData.transcript, challenge]);
 
   // Enhanced solution analysis
   const designAnalysis = useMemo(() => {
@@ -402,6 +411,59 @@ export function ReviewScreen({
               </CardContent>
             </Card>
           </div>
+
+          {/* Transcript Analysis Card - only show if reference transcript exists */}
+          {transcriptFeedback && (
+            <Card className='mt-6'>
+              <CardHeader>
+                <CardTitle>Transcript Analysis</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-4'>
+                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>Word Accuracy</div>
+                    <Progress value={transcriptFeedback.wordAccuracy} className='h-2' />
+                    <div className='text-xs text-muted-foreground'>
+                      {transcriptFeedback.wordAccuracy.toFixed(1)}%
+                    </div>
+                  </div>
+                  
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>Key Concepts Coverage</div>
+                    <div className='text-lg font-semibold'>
+                      {transcriptFeedback.keyConceptsCovered}/{transcriptFeedback.totalKeyConcepts}
+                    </div>
+                    <div className='text-xs text-muted-foreground'>concepts covered</div>
+                  </div>
+                  
+                  <div className='space-y-2'>
+                    <div className='text-sm font-medium'>Length Comparison</div>
+                    <div className='text-lg font-semibold'>
+                      {transcriptFeedback.lengthDifference > 0 ? '+' : ''}{transcriptFeedback.lengthDifference}
+                    </div>
+                    <div className='text-xs text-muted-foreground'>words vs reference</div>
+                  </div>
+                </div>
+                
+                {transcriptFeedback.missingConcepts.length > 0 && (
+                  <div className='pt-4 border-t'>
+                    <div className='text-sm font-medium mb-2'>Missing Key Concepts:</div>
+                    <div className='flex flex-wrap gap-1'>
+                      {transcriptFeedback.missingConcepts.map(concept => (
+                        <Badge key={concept} variant='outline' className='text-xs'>
+                          {concept}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className='text-xs text-muted-foreground pt-2'>
+                  * Analysis compares your transcript with reference explanation for this challenge
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     );

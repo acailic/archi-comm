@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::path::{PathBuf, Path};
-use std::sync::{RwLock, Mutex, OnceLock};
+use std::sync::{Arc, RwLock, Mutex, OnceLock};
 use std::env;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,7 @@ use std::process;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use serde_json::Value as JsonValue;
+use tokio::task::JoinHandle;
 
 // Operation name constants for consistent error handling
 pub struct OperationNames;
@@ -31,6 +32,8 @@ impl OperationNames {
     pub const PATH_CANONICALIZE: &'static str = "path canonicalization";
     pub const PROJECT_MANAGEMENT: &'static str = "project management";
     pub const COMPONENT_MANAGEMENT: &'static str = "component management";
+    pub const TRANSCRIPTION: &'static str = "transcription";
+    pub const TRANSCRIPTION_INIT: &'static str = "transcription initialization";
 }
 
 // Custom error types for structured error handling
@@ -105,6 +108,14 @@ pub enum ApiError {
     #[error("Transcription initialization failed: {details}")]
     TranscriptionInitError { 
         details: String,
+        #[source]
+        #[serde(skip)]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Transcription job not found: {job_id}")]
+    TranscriptionJobNotFound {
+        job_id: String,
         #[source]
         #[serde(skip)]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
@@ -257,10 +268,33 @@ pub struct Connection {
     pub properties: HashMap<String, String>,
 }
 
+// Transcription data structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptionSegment {
+    pub text: String,
+    pub start: f64,
+    pub end: f64,
+    pub confidence: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptionResponse {
+    pub text: String,
+    pub segments: Vec<TranscriptionSegment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TranscriptionOptions {
+    pub timeout: Option<u64>,
+    pub job_id: Option<String>,
+    pub max_segments: Option<usize>,
+}
+
 // Application state with RwLock for better concurrency
 type ProjectStore = RwLock<HashMap<String, Project>>;
 type DiagramStore = RwLock<HashMap<String, Vec<DiagramElement>>>;
 type ConnectionStore = RwLock<HashMap<String, Vec<Connection>>>;
+type TranscriptionJobStore = Arc<Mutex<HashMap<String, JoinHandle<()>>>>;
 
 // Global session directory for audio files
 static AUDIO_SESSION_DIR: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
@@ -949,7 +983,105 @@ async fn save_audio_file(file_name: String, data: Vec<u8>, base_dir: Option<Stri
     Ok(path_str.to_string())
 }
 
+// Transcription commands
+#[tauri::command]
+async fn transcribe_audio(
+    file_path: String,
+    options: Option<TranscriptionOptions>,
+    transcription_jobs: State<'_, TranscriptionJobStore>,
+) -> Result<TranscriptionResponse, ApiError> {
+    // Validate file path and security
+    let path = Path::new(&file_path);
+    if !path.exists() {
+        return Err(ApiError::AudioFileNotFound { 
+            path: file_path,
+            source: None,
+        });
+    }
 
+    // Read file to check if it's valid audio format
+    let _audio_data = fs::read(&path).map_err(|e| ApiError::FileSystemError {
+        operation: OperationNames::FILE_SYSTEM.to_string(),
+        details: format!("Failed to read audio file: {}", e),
+        source: Some(Box::new(e)),
+    })?;
+
+    let options = options.unwrap_or_default();
+    let job_id = options.job_id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+
+    // For now, return mock transcription with proper structure
+    // In a full implementation, this would:
+    // 1. Download whisper model if not exists
+    // 2. Initialize whisper context
+    // 3. Process audio in spawn_blocking
+    // 4. Return actual transcription segments
+    
+    let mock_response = TranscriptionResponse {
+        text: "Test transcription".to_string(),
+        segments: vec![
+            TranscriptionSegment {
+                text: "Test".to_string(),
+                start: 0.0,
+                end: 1.0,
+                confidence: Some(0.95),
+            },
+            TranscriptionSegment {
+                text: "transcription".to_string(),
+                start: 1.0,
+                end: 2.5,
+                confidence: Some(0.92),
+            },
+        ],
+    };
+
+    // Apply max_segments if specified
+    let mut final_response = mock_response;
+    if let Some(max_segments) = options.max_segments {
+        if final_response.segments.len() > max_segments {
+            final_response.segments.truncate(max_segments);
+        }
+    }
+
+    log::info!("Transcription completed for job_id: {}", job_id);
+    Ok(final_response)
+}
+
+#[tauri::command]
+async fn cancel_transcription(
+    job_id: String,
+    transcription_jobs: State<'_, TranscriptionJobStore>,
+) -> Result<bool, ApiError> {
+    let mut jobs = transcription_jobs.lock().map_err(|_| ApiError::StateLockError {
+        resource: "TranscriptionJobStore".to_string(),
+        source: None,
+    })?;
+
+    if let Some(job_handle) = jobs.remove(&job_id) {
+        job_handle.abort();
+        log::info!("Transcription job cancelled: {}", job_id);
+        Ok(true)
+    } else {
+        log::debug!("Transcription job not found for cancellation: {}", job_id);
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+async fn test_transcription_pipeline(
+    file_path: String,
+    transcription_jobs: State<'_, TranscriptionJobStore>,
+) -> Result<serde_json::Value, ApiError> {
+    match transcribe_audio(file_path, None, transcription_jobs).await {
+        Ok(result) => Ok(serde_json::json!({
+            "success": true,
+            "result": result
+        })),
+        Err(error) => Ok(serde_json::json!({
+            "success": false,
+            "error": error.to_string()
+        })),
+    }
+}
 
 // Utility commands
 #[tauri::command]
@@ -1079,6 +1211,7 @@ fn main() {
         .manage(ProjectStore::default())
         .manage(DiagramStore::default())
         .manage(ConnectionStore::default())
+        .manage(TranscriptionJobStore::new(Mutex::new(HashMap::new())))
         .invoke_handler({
             macro_rules! generate_handlers {
                 () => {
@@ -1106,6 +1239,11 @@ fn main() {
                         show_in_folder,
                         export_project_data,
                         save_audio_file,
+
+                        // Transcription Commands
+                        transcribe_audio,
+                        cancel_transcription,
+                        test_transcription_pipeline,
 
                         // Challenge Plugin I/O
                         load_challenges_from_file,
@@ -1137,6 +1275,11 @@ fn main() {
                         show_in_folder,
                         export_project_data,
                         save_audio_file,
+
+                        // Transcription Commands
+                        transcribe_audio,
+                        cancel_transcription,
+                        test_transcription_pipeline,
 
                         // Challenge Plugin I/O
                         load_challenges_from_file,

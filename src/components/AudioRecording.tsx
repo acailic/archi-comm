@@ -1,9 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowLeft, Mic, Square, Play, Pause, FileText, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Mic, Square, Play, Pause, FileText, AlertTriangle, Wand2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import type { Challenge, DesignData, AudioData } from '@/shared/contracts/index';
+import { LoadingSpinner, useLoadingState } from './ui/LoadingSpinner';
+import { transcriptionUtils, audioUtils } from '../lib/tauri';
+import type { Challenge, DesignData, AudioData, TranscriptionResponse } from '@/shared/contracts/index';
+import { TranscriptEditor } from './TranscriptEditor';
 
 const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
@@ -30,17 +33,69 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showNoAudioWarning, setShowNoAudioWarning] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
+  const [transcriptionSegments, setTranscriptionSegments] = useState<TranscriptionResponse | null>(null);
+  
   // Track when user pressed Continue during an active recording
   const pendingContinueRef = useRef(false);
   // Keep latest values available inside async callbacks without stale closures
   const transcriptRef = useRef('');
   const durationRef = useRef(0);
 
+  // Loading state for transcription
+  const {
+    isLoading: isTranscribing,
+    message: transcriptionMessage,
+    startLoading: startTranscription,
+    finishLoading: finishTranscription,
+  } = useLoadingState();
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
+  // Transcription function
+  const transcribeAudio = useCallback(async (blob: Blob) => {
+    if (!blob) return;
+
+    try {
+      setTranscriptionError(null);
+      startTranscription('Saving audio file...');
+
+      // Save audio blob to temporary file
+      const filePath = await audioUtils.saveAudioBlob(blob);
+      
+      startTranscription('Transcribing audio...');
+      
+      // Transcribe the audio file
+      const transcriptionResponse = await transcriptionUtils.transcribeAudio(filePath);
+      
+      if (mountedRef.current) {
+        setTranscript(transcriptionResponse.text);
+        transcriptRef.current = transcriptionResponse.text;
+        setTranscriptionSegments(transcriptionResponse);
+      }
+
+      finishTranscription();
+      
+      // Optional: Cleanup the temporary file
+      setTimeout(() => {
+        audioUtils.cleanupAudioFile(filePath).catch(console.warn);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Transcription failed:', error);
+      const errorMessage = getErrorMessage(error);
+      setTranscriptionError(errorMessage);
+      finishTranscription();
+    }
+  }, [startTranscription, finishTranscription]);
+
   const startRecording = useCallback(async () => {
     try {
+      // Clear any previous transcription errors when starting new recording
+      setTranscriptionError(null);
+      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -70,14 +125,19 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         if (!mountedRef.current) return;
         const blob = new Blob(chunks, { type: 'audio/webm' });
         setAudioBlob(blob);
+        
+        // Automatically transcribe the audio
+        transcribeAudio(blob);
+        
         // If user clicked Continue while still recording, complete with this blob now
         if (pendingContinueRef.current) {
           pendingContinueRef.current = false;
           const audioData: AudioData = {
             blob,
-            transcript: transcriptRef.current,
+            transcript: transcriptRef.current.replace(/<[^>]*>/g, ''), // Strip HTML for storage
             duration: durationRef.current,
             wordCount: transcriptRef.current
+              .replace(/<[^>]*>/g, '')
               .split(' ')
               .filter(word => word.length > 0).length,
             businessValueTags: [],
@@ -93,7 +153,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
     } catch (error) {
       console.error('Error starting recording:', error);
     }
-  }, []);
+  }, [transcribeAudio]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -114,13 +174,23 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       audioElementRef.current = audio;
 
       audio.onended = () => {
-        if (mountedRef.current) setIsPlaying(false);
+        if (mountedRef.current) {
+          setIsPlaying(false);
+          setCurrentPlaybackTime(0);
+        }
       };
       audio.onpause = () => {
         if (mountedRef.current) setIsPlaying(false);
       };
       audio.onplay = () => {
         if (mountedRef.current) setIsPlaying(true);
+      };
+      
+      // Track playback time for word highlighting
+      audio.ontimeupdate = () => {
+        if (mountedRef.current) {
+          setCurrentPlaybackTime(audio.currentTime);
+        }
       };
     }
 
@@ -130,6 +200,14 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       audioElementRef.current.play();
     }
   }, [audioBlob, isPlaying]);
+
+  // Handle timestamp click from TranscriptEditor
+  const handleTimestampClick = useCallback((timestamp: number) => {
+    if (audioElementRef.current) {
+      audioElementRef.current.currentTime = timestamp;
+      setCurrentPlaybackTime(timestamp);
+    }
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -165,9 +243,9 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
     }
     const audioData: AudioData = {
       blob: audioBlob,
-      transcript,
+      transcript: transcript.replace(/<[^>]*>/g, ''), // Strip HTML for storage
       duration,
-      wordCount: transcript.split(' ').filter(word => word.length > 0).length,
+      wordCount: transcript.replace(/<[^>]*>/g, '').split(' ').filter(word => word.length > 0).length,
       businessValueTags: [],
       analysisMetrics: {
         clarityScore: 75,
@@ -266,31 +344,73 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                   <FileText className='w-5 h-5' />
                   Transcript
                 </CardTitle>
-                <Button onClick={() => setTranscript('')} size='sm' variant='ghost'>
-                  Clear
-                </Button>
+                <div className='flex items-center gap-2'>
+                  {audioBlob && !isTranscribing && (
+                    <Button onClick={() => transcribeAudio(audioBlob)} size='sm' variant='outline'>
+                      <Wand2 className='w-4 h-4 mr-2' />
+                      Transcribe Audio
+                    </Button>
+                  )}
+                  <Button onClick={() => setTranscript('')} size='sm' variant='ghost'>
+                    Clear
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className='space-y-4'>
+              {isTranscribing && (
+                <div className='flex items-center justify-center py-8'>
+                  <LoadingSpinner
+                    size='medium'
+                    variant='architecture'
+                    message={transcriptionMessage || 'Transcribing audio...'}
+                  />
+                </div>
+              )}
+              
+              {transcriptionError && (
+                <div className='p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm flex items-center gap-2'>
+                  <AlertTriangle className='w-4 h-4' />
+                  <span>Transcription failed: {transcriptionError}</span>
+                </div>
+              )}
+
               <div className='space-y-2'>
                 <label className='text-sm font-medium'>
-                  Manual transcript entry (community version)
+                  Enhanced Transcript Editor {audioBlob ? '(Auto-transcribed with rich text editing)' : '(Rich text entry)'}
                 </label>
-                <textarea
-                  className='w-full h-32 p-3 border rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                  placeholder='Type your system design explanation here...'
+                <TranscriptEditor
                   value={transcript}
-                  onChange={e => setTranscript(e.target.value)}
+                  onChange={setTranscript}
+                  onTimestampClick={handleTimestampClick}
+                  currentTime={currentPlaybackTime}
+                  segments={transcriptionSegments?.segments || []}
+                  placeholder={audioBlob 
+                    ? 'Audio will be transcribed automatically with enhanced editing features...'
+                    : 'Type your system design explanation with rich text formatting...'
+                  }
+                  className='min-h-[200px]'
+                  disabled={isTranscribing}
                 />
                 <p className='text-xs text-muted-foreground'>
-                  Manually enter your explanation for the system design. Automatic transcription is
-                  not available in the community version.
+                  {audioBlob 
+                    ? 'Enhanced transcript editor with formatting, highlighting, and timestamp features. Click timestamps to seek audio.'
+                    : 'Rich text editor with formatting options. Record audio for automatic transcription with timestamps.'
+                  }
                 </p>
               </div>
               <div className='flex items-center justify-between text-xs text-muted-foreground'>
                 <span>
-                  Word count: {transcript.split(' ').filter(word => word.length > 0).length}
+                  Word count: {transcript.replace(/<[^>]*>/g, '').split(' ').filter(word => word.length > 0).length}
                 </span>
+                <div className='flex items-center gap-2'>
+                  {transcriptionSegments && (
+                    <span className='text-blue-600'>⏱ {transcriptionSegments.segments.length} segments</span>
+                  )}
+                  {transcript && !isTranscribing && (
+                    <span className='text-green-600'>✓ Ready</span>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

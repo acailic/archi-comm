@@ -150,6 +150,8 @@ export interface Challenge {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   estimatedTime: number;
   category: 'system-design' | 'architecture' | 'scaling';
+  referenceTranscript?: string;
+  keyConcepts?: string[];
 }
 
 export interface AudioData {
@@ -170,4 +172,32 @@ export interface ReviewResp {
   summary: string;
   strengths: string[];
   risks: string[];
+}
+
+// Transcription types for offline speech-to-text functionality
+export interface TranscriptionSegment {
+  text: string;
+  start: number;
+  end: number;
+  confidence?: number;
+}
+
+export interface TranscriptionResponse {
+  text: string;
+  segments: TranscriptionSegment[];
+}
+
+export interface TranscriptionOptions {
+  timeout?: number;
+  jobId?: string;
+  maxSegments?: number;
+}
+
+// Transcript comparison types
+export interface TranscriptFeedback {
+  wordAccuracy: number;
+  keyConceptsCovered: number;
+  totalKeyConcepts: number;
+  lengthDifference: number;
+  missingConcepts: string[];
 }

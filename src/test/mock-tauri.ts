@@ -25,6 +25,7 @@ const mockTauri = {
         return Promise.resolve('/selected/directory');
       case 'transcribe_audio':
         return Promise.resolve({
+          text: 'Test transcription',
           segments: [
             {
               text: 'Test transcription',

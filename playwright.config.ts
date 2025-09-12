@@ -4,6 +4,7 @@ import os from 'os';
 // Centralized configuration values
 const IS_CI = !!process.env.CI;
 const OUTPUT_BASE = 'e2e/test-results';
+const OUTPUT_ARTIFACTS = `${OUTPUT_BASE}/artifacts`;
 const CPU_COUNT = os.cpus()?.length ?? 1;
 const WORKERS = IS_CI ? 1 : Math.max(2, Math.floor(CPU_COUNT / 2));
 
@@ -35,6 +36,7 @@ export default defineConfig({
     [
       'html',
       {
+        // Must not clash with Playwright's outputDir
         outputFolder: `${OUTPUT_BASE}/html-report`,
         open: 'never',
       },
@@ -158,8 +160,8 @@ export default defineConfig({
     },
   },
 
-  // Output directory configuration for visual artifacts
-  outputDir: OUTPUT_BASE,
+  // Output directory for test artifacts (must not contain the HTML report folder)
+  outputDir: OUTPUT_ARTIFACTS,
 
   // Test artifact retention
   preserveOutput: process.env.CI ? 'failures-only' : 'always',
