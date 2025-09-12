@@ -67,6 +67,8 @@ whisper-rs = "0.12"
 hf-hub = "0.3"
 tokio-util = "0.7"
 symphonia = { version = "0.5", features = ["all"] }
+cpal = "0.15"
+hound = "3.5"
 
 [dev-dependencies]
 

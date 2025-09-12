@@ -17,6 +17,7 @@ use std::process;
 use std::os::unix::fs::PermissionsExt;
 use serde_json::Value as JsonValue;
 use tokio::task::JoinHandle;
+use std::time::Instant;
 
 // Operation name constants for consistent error handling
 pub struct OperationNames;
@@ -30,6 +31,7 @@ impl OperationNames {
     pub const FILE_WRITE: &'static str = "file write";
     pub const FILE_PERSIST: &'static str = "file persistence";
     pub const PATH_CANONICALIZE: &'static str = "path canonicalization";
+    pub const AUDIO_RECORDING: &'static str = "audio recording";
     pub const PROJECT_MANAGEMENT: &'static str = "project management";
     pub const COMPONENT_MANAGEMENT: &'static str = "component management";
     pub const TRANSCRIPTION: &'static str = "transcription";
@@ -195,6 +197,221 @@ impl From<ApiError> for String {
 #[cfg(debug_assertions)]
 mod dev_utils;
 
+
+// ========= Native Audio Recording (CPAL + Hound) ==========
+use std::io::BufWriter;
+use std::sync::atomic::{AtomicBool, Ordering};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+// struct NativeRecorder {
+//     stream: Option<cpal::Stream>,
+//     writer_arc: Option<Arc<Mutex<Option<hound::WavWriter<BufWriter<std::fs::File>>>>>>,
+//     path: Option<PathBuf>,
+//     start: Option<Instant>,
+//     channels: u16,
+//     sample_rate: u32,
+//     is_active: AtomicBool,
+// }
+
+// impl NativeRecorder {
+//     fn new() -> Self {
+//         Self {
+//             stream: None,
+//             writer_arc: None,
+//             path: None,
+//             start: None,
+//             channels: 0,
+//             sample_rate: 0,
+//             is_active: AtomicBool::new(false),
+//         }
+//     }
+// }
+
+// type RecorderStore = Mutex<NativeRecorder>;
+
+/*
+#[tauri::command]
+async fn start_audio_recording(
+    base_dir: Option<String>,
+    recorder_store: State<'_, RecorderStore>,
+) -> Result<String, ApiError> {
+    let mut recorder = recorder_store.lock().map_err(|_| ApiError::StateLockError { 
+        resource: "NativeRecorder".to_string(),
+        source: None,
+    })?;
+
+    if recorder.is_active.load(Ordering::SeqCst) {
+        return Err(ApiError::Internal { 
+            details: "Recording already in progress".to_string(), 
+            source: None 
+        });
+    }
+
+    // Prepare directory and file path
+    let audio_dir = if let Some(dir) = base_dir {
+        create_audio_session_dir_with_base(&PathBuf::from(dir))?
+    } else {
+        get_audio_session_dir()?
+    };
+
+    let filename = format!("native_recording_{}.wav", Utc::now().timestamp());
+    let path = audio_dir.join(filename);
+
+    // Set up CPAL input stream
+    let host = cpal::default_host();
+    let device = host
+        .default_input_device()
+        .ok_or_else(|| ApiError::Internal { 
+            details: "No default input audio device available".into(),
+            source: None,
+        })?;
+    let config = device
+        .default_input_config()
+        .map_err(|e| ApiError::Internal {
+            details: format!("Failed to get default input config: {}", e),
+            source: Some(Box::new(e)),
+        })?;
+
+    let sample_rate = config.sample_rate().0;
+    let channels = config.channels();
+
+    // Create WAV writer
+    let spec = hound::WavSpec {
+        channels,
+        sample_rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let file = std::fs::File::create(&path).map_err(|e| ApiError::FileSystemError { 
+        operation: OperationNames::FILE_WRITE.to_string(),
+        details: format!("Failed to create wav file: {}", e),
+        source: Some(Box::new(e)),
+    })?;
+    let writer = hound::WavWriter::new(BufWriter::new(file), spec).map_err(|e| ApiError::FileSystemError {
+        operation: OperationNames::FILE_WRITE.to_string(),
+        details: format!("Failed to initialize wav writer: {}", e),
+        source: Some(Box::new(e)),
+    })?;
+
+    // Share writer via Arc<Mutex<_>> for callback
+    let writer_arc: Arc<Mutex<Option<hound::WavWriter<BufWriter<std::fs::File>>>>> = Arc::new(Mutex::new(Some(writer)));
+    let writer_arc_clone = writer_arc.clone();
+
+    // Build stream according to sample format
+    let build_stream = |config: cpal::StreamConfig, sample_format: cpal::SampleFormat| -> Result<cpal::Stream, ApiError> {
+        let err_fn = |err| log::error!("Audio input stream error: {}", err);
+
+        match sample_format {
+            cpal::SampleFormat::F32 => device
+                .build_input_stream(
+                    &config,
+                    move |data: &[f32], _| {
+                        if let Ok(mut wopt) = writer_arc_clone.lock() {
+                            if let Some(ref mut w) = *wopt {
+                                for &sample in data {
+                                    let s = (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
+                                    let _ = w.write_sample(s);
+                                }
+                            }
+                        }
+                    },
+                    err_fn,
+                    None,
+                )
+                .map_err(|e| ApiError::Internal { details: format!("Failed to build input stream (f32): {}", e), source: Some(Box::new(e)) }),
+            cpal::SampleFormat::I16 => device
+                .build_input_stream(
+                    &config,
+                    move |data: &[i16], _| {
+                        if let Ok(mut wopt) = writer_arc_clone.lock() {
+                            if let Some(ref mut w) = *wopt {
+                                for &sample in data {
+                                    let _ = w.write_sample(sample);
+                                }
+                            }
+                        }
+                    },
+                    err_fn,
+                    None,
+                )
+                .map_err(|e| ApiError::Internal { details: format!("Failed to build input stream (i16): {}", e), source: Some(Box::new(e)) }),
+            cpal::SampleFormat::U16 => device
+                .build_input_stream(
+                    &config,
+                    move |data: &[u16], _| {
+                        if let Ok(mut wopt) = writer_arc_clone.lock() {
+                            if let Some(ref mut w) = *wopt {
+                                for &sample in data {
+                                    // Convert unsigned to signed range
+                                    let s = (sample as i32 - 32768) as i16;
+                                    let _ = w.write_sample(s);
+                                }
+                            }
+                        }
+                    },
+                    err_fn,
+                    None,
+                )
+                .map_err(|e| ApiError::Internal { details: format!("Failed to build input stream (u16): {}", e), source: Some(Box::new(e)) }),
+            _ => Err(ApiError::Internal { details: format!("Unsupported sample format: {:?}", sample_format), source: None }),
+        }
+    };
+
+    let config_std = cpal::StreamConfig {
+        channels,
+        sample_rate: cpal::SampleRate(sample_rate),
+        buffer_size: cpal::BufferSize::Default,
+    };
+    let stream = build_stream(config_std, config.sample_format())?;
+    stream
+        .play()
+        .map_err(|e| ApiError::ProcessError { command: "audio_stream.play".into(), details: format!("Failed to start audio stream: {}", e), source: Some(Box::new(e)) })?;
+
+    recorder.stream = Some(stream);
+    recorder.writer_arc = Some(writer_arc);
+    recorder.path = Some(path.clone());
+    recorder.start = Some(Instant::now());
+    recorder.channels = channels;
+    recorder.sample_rate = sample_rate;
+    recorder.is_active.store(true, Ordering::SeqCst);
+
+    log::info!("Native audio recording started: {:?} ({} ch @ {} Hz)", path, channels, sample_rate);
+    let canonical_path = path.canonicalize().unwrap_or(path);
+    Ok(canonical_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn stop_audio_recording(recorder_store: State<'_, RecorderStore>) -> Result<String, ApiError> {
+    let mut recorder = recorder_store.lock().map_err(|_| ApiError::StateLockError { 
+        resource: "NativeRecorder".to_string(),
+        source: None,
+    })?;
+
+    if !recorder.is_active.load(Ordering::SeqCst) {
+        return Err(ApiError::Internal { details: "No active recording".into(), source: None });
+    }
+
+    // Stop stream
+    recorder.stream = None; // Drop stream to stop callback
+
+    // Finalize WAV writer
+    if let Some(writer_arc) = recorder.writer_arc.take() {
+        if let Ok(mut opt) = writer_arc.lock() {
+            if let Some(writer) = opt.take() {
+                // finalize updates WAV header sizes
+                if let Err(e) = writer.finalize() {
+                    log::error!("Failed to finalize WAV file: {}", e);
+                }
+            }
+        }
+    }
+
+    let path = recorder.path.clone().ok_or_else(|| ApiError::Internal { details: "Unknown recording path".into(), source: None })?;
+    recorder.is_active.store(false, Ordering::SeqCst);
+    log::info!("Native audio recording stopped: {}", path.display());
+    Ok(path.to_string_lossy().to_string())
+}
+*/
 
 // Data structures for the application
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1212,6 +1429,7 @@ fn main() {
         .manage(DiagramStore::default())
         .manage(ConnectionStore::default())
         .manage(TranscriptionJobStore::new(Mutex::new(HashMap::new())))
+        // .manage(Mutex::new(NativeRecorder::new()))
         .invoke_handler({
             macro_rules! generate_handlers {
                 () => {
@@ -1239,6 +1457,8 @@ fn main() {
                         show_in_folder,
                         export_project_data,
                         save_audio_file,
+                        // start_audio_recording,
+                        // stop_audio_recording,
 
                         // Transcription Commands
                         transcribe_audio,
@@ -1275,6 +1495,8 @@ fn main() {
                         show_in_folder,
                         export_project_data,
                         save_audio_file,
+                        // start_audio_recording,
+                        // stop_audio_recording,
 
                         // Transcription Commands
                         transcribe_audio,

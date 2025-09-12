@@ -6,14 +6,14 @@
  */
 
 import React, { useMemo, useId } from 'react';
-import { 
-  BaseEdge, 
-  EdgeProps, 
-  getBezierPath, 
-  getSmoothStepPath, 
+import {
+  BaseEdge,
+  EdgeProps,
+  getBezierPath,
+  getSmoothStepPath,
   getStraightPath,
-  EdgeLabelRenderer
-} from 'reactflow';
+  EdgeLabelRenderer,
+} from '@xyflow/react';
 import type { Connection } from '@/shared/contracts';
 
 interface CustomEdgeData {
@@ -38,27 +38,24 @@ export function CustomEdge({
   targetPosition,
   style = {},
   markerEnd,
-  data
+  data,
 }: CustomEdgeProps) {
   const uniqueId = useId();
   const arrowId = `arrow-${uniqueId}`;
   const glowId = `glow-${uniqueId}`;
 
-  const {
-    connection,
-    connectionStyle,
-    isSelected,
-    isStartConnection,
-    onConnectionSelect
-  } = data;
+  const { connection, connectionStyle, isSelected, isStartConnection, onConnectionSelect } = data;
 
   // Connection colors mapping
-  const connectionColors = useMemo(() => ({
-    data: 'hsl(var(--blue-500))',
-    control: 'hsl(var(--purple-500))',
-    sync: 'hsl(var(--green-500))',
-    async: 'hsl(var(--orange-500))'
-  }), []);
+  const connectionColors = useMemo(
+    () => ({
+      data: 'hsl(var(--blue-500))',
+      control: 'hsl(var(--purple-500))',
+      sync: 'hsl(var(--green-500))',
+      async: 'hsl(var(--orange-500))',
+    }),
+    []
+  );
 
   // Generate the appropriate path based on connection style
   const [edgePath, labelX, labelY] = useMemo(() => {
@@ -83,7 +80,8 @@ export function CustomEdge({
   }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, connectionStyle]);
 
   // Edge styling
-  const color = connectionColors[connection.type as keyof typeof connectionColors] || 'hsl(var(--primary))';
+  const color =
+    connectionColors[connection.type as keyof typeof connectionColors] || 'hsl(var(--primary))';
   const strokeDasharray = connection.type === 'async' ? '5,5' : undefined;
   const strokeWidth = isSelected ? 3 : 2;
   const opacity = isStartConnection ? 0.5 : 1;
@@ -100,22 +98,22 @@ export function CustomEdge({
       <defs>
         <marker
           id={arrowId}
-          viewBox="0 0 10 10"
-          refX="9"
-          refY="5"
-          markerUnits="strokeWidth"
-          markerWidth="10"
-          markerHeight="10"
-          orient="auto-start-reverse"
+          viewBox='0 0 10 10'
+          refX='9'
+          refY='5'
+          markerUnits='strokeWidth'
+          markerWidth='10'
+          markerHeight='10'
+          orient='auto-start-reverse'
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
+          <path d='M 0 0 L 10 5 L 0 10 z' fill={color} />
         </marker>
 
-        <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+        <filter id={glowId} x='-20%' y='-20%' width='140%' height='140%'>
+          <feGaussianBlur stdDeviation='2' result='coloredBlur' />
           <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
+            <feMergeNode in='coloredBlur' />
+            <feMergeNode in='SourceGraphic' />
           </feMerge>
         </filter>
       </defs>
@@ -131,7 +129,7 @@ export function CustomEdge({
           strokeDasharray,
           opacity,
           filter: isSelected ? `url(#${glowId})` : undefined,
-          cursor: 'pointer'
+          cursor: 'pointer',
         }}
         markerEnd={`url(#${arrowId})`}
         onClick={handleEdgeClick}
@@ -147,7 +145,7 @@ export function CustomEdge({
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: 'all',
             }}
-            className="cursor-pointer select-none"
+            className='cursor-pointer select-none'
             onClick={handleEdgeClick}
           >
             <div

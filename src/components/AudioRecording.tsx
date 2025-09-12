@@ -1,12 +1,28 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowLeft, Mic, Square, Play, Pause, FileText, AlertTriangle, Wand2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Mic,
+  Square,
+  Play,
+  Pause,
+  FileText,
+  AlertTriangle,
+  Wand2,
+  Info,
+} from 'lucide-react';
+import { transcriptionUtils, audioUtils } from '../lib/tauri';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { LoadingSpinner, useLoadingState } from './ui/LoadingSpinner';
-import { transcriptionUtils, audioUtils } from '../lib/tauri';
-import type { Challenge, DesignData, AudioData, TranscriptionResponse } from '@/shared/contracts/index';
 import { TranscriptEditor } from './TranscriptEditor';
+import type {
+  Challenge,
+  DesignData,
+  AudioData,
+  TranscriptionResponse,
+} from '@/shared/contracts/index';
+import { getLogger } from '@/lib/logger';
 
 const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
@@ -26,6 +42,7 @@ interface AudioRecordingProps {
 }
 
 export function AudioRecording({ challenge, designData, onComplete, onBack }: AudioRecordingProps) {
+  const log = getLogger('audio-recording');
   const mountedRef = useRef(true);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -35,8 +52,13 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   const [showNoAudioWarning, setShowNoAudioWarning] = useState(false);
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
-  const [transcriptionSegments, setTranscriptionSegments] = useState<TranscriptionResponse | null>(null);
-  
+  const [transcriptionSegments, setTranscriptionSegments] = useState<TranscriptionResponse | null>(
+    null
+  );
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [isRecordingSupported, setIsRecordingSupported] = useState<boolean>(true);
+  const [chosenMime, setChosenMime] = useState<string | null>(null);
+
   // Track when user pressed Continue during an active recording
   const pendingContinueRef = useRef(false);
   // Keep latest values available inside async callbacks without stale closures
@@ -55,49 +77,102 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   // Transcription function
-  const transcribeAudio = useCallback(async (blob: Blob) => {
-    if (!blob) return;
+  const transcribeAudio = useCallback(
+    async (blob: Blob) => {
+      if (!blob) return;
 
-    try {
-      setTranscriptionError(null);
-      startTranscription('Saving audio file...');
+      try {
+        setTranscriptionError(null);
+        startTranscription('Saving audio file...');
 
-      // Save audio blob to temporary file
-      const filePath = await audioUtils.saveAudioBlob(blob);
-      
-      startTranscription('Transcribing audio...');
-      
-      // Transcribe the audio file
-      const transcriptionResponse = await transcriptionUtils.transcribeAudio(filePath);
-      
-      if (mountedRef.current) {
-        setTranscript(transcriptionResponse.text);
-        transcriptRef.current = transcriptionResponse.text;
-        setTranscriptionSegments(transcriptionResponse);
+        // Save audio blob to temporary file (auto-detect filename/extension)
+        const filePath = await audioUtils.saveAudioBlob(blob);
+
+        startTranscription('Transcribing audio...');
+
+        // Transcribe the audio file
+        const transcriptionResponse = await transcriptionUtils.transcribeAudio(filePath);
+
+        if (mountedRef.current) {
+          setTranscript(transcriptionResponse.text);
+          transcriptRef.current = transcriptionResponse.text;
+          setTranscriptionSegments(transcriptionResponse);
+        }
+
+        finishTranscription();
+
+        // Optional: Cleanup the temporary file
+        setTimeout(() => {
+          audioUtils.cleanupAudioFile(filePath).catch(console.warn);
+        }, 1000);
+      } catch (error) {
+        console.error('Transcription failed:', error);
+        const errorMessage = getErrorMessage(error);
+        setTranscriptionError(errorMessage);
+        finishTranscription();
       }
-
-      finishTranscription();
-      
-      // Optional: Cleanup the temporary file
-      setTimeout(() => {
-        audioUtils.cleanupAudioFile(filePath).catch(console.warn);
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Transcription failed:', error);
-      const errorMessage = getErrorMessage(error);
-      setTranscriptionError(errorMessage);
-      finishTranscription();
-    }
-  }, [startTranscription, finishTranscription]);
+    },
+    [startTranscription, finishTranscription]
+  );
 
   const startRecording = useCallback(async () => {
     try {
-      // Clear any previous transcription errors when starting new recording
+      // Clear any previous errors when starting new recording
       setTranscriptionError(null);
-      
+      setRecordingError(null);
+
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error(
+          'Audio recording is not supported in this environment. Please use a modern web browser with microphone access.'
+        );
+      }
+
+      // Check MediaRecorder support
+      if (typeof (window as any).MediaRecorder === 'undefined') {
+        throw new Error(
+          'MediaRecorder API is not available in this environment. Recording is not supported.'
+        );
+      }
+
+      // Determine preferred MIME type
+      const preferred = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/wav',
+      ];
+      let supportedMime: string | null = null;
+      if (typeof (window as any).MediaRecorder !== 'undefined') {
+        for (const t of preferred) {
+          try {
+            if ((window as any).MediaRecorder.isTypeSupported?.(t)) {
+              supportedMime = t;
+              break;
+            }
+          } catch (_) {
+            // ignore
+          }
+        }
+      }
+
+      const hasMediaRecorder = typeof (window as any).MediaRecorder !== 'undefined';
+
+      log.debug('Starting audio recording', {
+        userAgent: navigator.userAgent,
+        isSecureContext: (window as any).isSecureContext,
+        isTauri: (window as any).__TAURI__ !== undefined,
+        hasMediaRecorder,
+        chosenMime: supportedMime,
+      });
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = supportedMime
+        ? new MediaRecorder(stream, { mimeType: supportedMime })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       const chunks: BlobPart[] = [];
@@ -108,6 +183,8 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       mediaRecorder.start();
       if (mountedRef.current) {
         setIsRecording(true);
+        setDuration(0);
+        setChosenMime(supportedMime);
       }
 
       // Start duration timer
@@ -123,12 +200,14 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       mediaRecorder.onstop = () => {
         clearInterval(timer);
         if (!mountedRef.current) return;
-        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const effectiveType =
+          (chunks[0] as any)?.type || mediaRecorder.mimeType || supportedMime || 'audio/webm';
+        const blob = new Blob(chunks, { type: effectiveType });
         setAudioBlob(blob);
-        
+
         // Automatically transcribe the audio
         transcribeAudio(blob);
-        
+
         // If user clicked Continue while still recording, complete with this blob now
         if (pendingContinueRef.current) {
           pendingContinueRef.current = false;
@@ -151,7 +230,9 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         }
       };
     } catch (error) {
-      console.error('Error starting recording:', error);
+      log.error('Error starting recording', error as any);
+      const errorMessage = getErrorMessage(error);
+      setRecordingError(errorMessage);
     }
   }, [transcribeAudio]);
 
@@ -185,7 +266,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       audio.onplay = () => {
         if (mountedRef.current) setIsPlaying(true);
       };
-      
+
       // Track playback time for word highlighting
       audio.ontimeupdate = () => {
         if (mountedRef.current) {
@@ -207,6 +288,45 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       audioElementRef.current.currentTime = timestamp;
       setCurrentPlaybackTime(timestamp);
     }
+  }, []);
+
+  // Check recording support on mount
+  useEffect(() => {
+    const checkRecordingSupport = async () => {
+      console.log('🎙️ Checking audio recording support...');
+      console.log('Navigator mediaDevices:', !!navigator.mediaDevices);
+      console.log('getUserMedia:', !!navigator.mediaDevices?.getUserMedia);
+      console.log('MediaRecorder:', typeof (window as any).MediaRecorder !== 'undefined');
+      console.log('Is Tauri:', (window as any).__TAURI__ !== undefined);
+      console.log('Is secure context:', (window as any).isSecureContext);
+
+      // Check if basic APIs exist
+      if (!navigator.mediaDevices?.getUserMedia) {
+        console.log('❌ MediaDevices API not available');
+        setIsRecordingSupported(false);
+        setRecordingError(
+          'Audio recording is not supported in this browser. Please use the transcript editor below.'
+        );
+        return;
+      }
+
+      // Check MediaRecorder support
+      if (typeof (window as any).MediaRecorder === 'undefined') {
+        console.log('❌ MediaRecorder API not available');
+        setIsRecordingSupported(false);
+        setRecordingError(
+          'Recording not supported: MediaRecorder API is unavailable in this environment. Use the transcript editor below.'
+        );
+        return;
+      }
+
+      // All APIs available - recording should work
+      console.log('✅ All recording APIs available');
+      setIsRecordingSupported(true);
+      setRecordingError(null);
+    };
+
+    checkRecordingSupport();
   }, []);
 
   // Cleanup on unmount
@@ -245,7 +365,10 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       blob: audioBlob,
       transcript: transcript.replace(/<[^>]*>/g, ''), // Strip HTML for storage
       duration,
-      wordCount: transcript.replace(/<[^>]*>/g, '').split(' ').filter(word => word.length > 0).length,
+      wordCount: transcript
+        .replace(/<[^>]*>/g, '')
+        .split(' ')
+        .filter(word => word.length > 0).length,
       businessValueTags: [],
       analysisMetrics: {
         clarityScore: 75,
@@ -294,6 +417,21 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
               <CardTitle>Audio Recording</CardTitle>
             </CardHeader>
             <CardContent className='space-y-4'>
+              {recordingError && (
+                <div className='p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm flex items-center gap-2'>
+                  <AlertTriangle className='w-4 h-4' />
+                  <span>Recording error: {recordingError}</span>
+                </div>
+              )}
+              {!isRecordingSupported && !recordingError && (
+                <div className='p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-sm flex items-center gap-2'>
+                  <Info className='w-4 h-4' />
+                  <span>
+                    Recording is not available in this environment. You can still type your
+                    explanation in the transcript editor below.
+                  </span>
+                </div>
+              )}
               <div className='text-center'>
                 <div className='text-4xl mb-4'>{formatDuration(duration)}</div>
 
@@ -303,9 +441,10 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                       onClick={startRecording}
                       size='lg'
                       className='bg-red-500 hover:bg-red-600'
+                      disabled={!isRecordingSupported}
                     >
                       <Mic className='w-5 h-5 mr-2' />
-                      Start Recording
+                      {isRecordingSupported ? 'Start Recording' : 'Recording Not Available'}
                     </Button>
                   ) : (
                     <Button onClick={stopRecording} size='lg' variant='outline'>
@@ -330,6 +469,11 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                   <div className='mt-4 flex items-center justify-center gap-2'>
                     <div className='w-3 h-3 bg-red-500 rounded-full animate-pulse' />
                     <span className='text-sm text-muted-foreground'>Recording...</span>
+                  </div>
+                )}
+                {!isRecording && chosenMime && (
+                  <div className='mt-2 text-xs text-muted-foreground'>
+                    Using format: {chosenMime}
                   </div>
                 )}
               </div>
@@ -367,7 +511,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                   />
                 </div>
               )}
-              
+
               {transcriptionError && (
                 <div className='p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm flex items-center gap-2'>
                   <AlertTriangle className='w-4 h-4' />
@@ -377,7 +521,8 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
 
               <div className='space-y-2'>
                 <label className='text-sm font-medium'>
-                  Enhanced Transcript Editor {audioBlob ? '(Auto-transcribed with rich text editing)' : '(Rich text entry)'}
+                  Enhanced Transcript Editor{' '}
+                  {audioBlob ? '(Auto-transcribed with rich text editing)' : '(Rich text entry)'}
                 </label>
                 <TranscriptEditor
                   value={transcript}
@@ -385,31 +530,37 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
                   onTimestampClick={handleTimestampClick}
                   currentTime={currentPlaybackTime}
                   segments={transcriptionSegments?.segments || []}
-                  placeholder={audioBlob 
-                    ? 'Audio will be transcribed automatically with enhanced editing features...'
-                    : 'Type your system design explanation with rich text formatting...'
+                  placeholder={
+                    audioBlob
+                      ? 'Audio will be transcribed automatically with enhanced editing features...'
+                      : 'Type your system design explanation with rich text formatting...'
                   }
                   className='min-h-[200px]'
                   disabled={isTranscribing}
                 />
                 <p className='text-xs text-muted-foreground'>
-                  {audioBlob 
+                  {audioBlob
                     ? 'Enhanced transcript editor with formatting, highlighting, and timestamp features. Click timestamps to seek audio.'
-                    : 'Rich text editor with formatting options. Record audio for automatic transcription with timestamps.'
-                  }
+                    : 'Rich text editor with formatting options. Record audio for automatic transcription with timestamps.'}
                 </p>
               </div>
               <div className='flex items-center justify-between text-xs text-muted-foreground'>
                 <span>
-                  Word count: {transcript.replace(/<[^>]*>/g, '').split(' ').filter(word => word.length > 0).length}
+                  Word count:{' '}
+                  {
+                    transcript
+                      .replace(/<[^>]*>/g, '')
+                      .split(' ')
+                      .filter(word => word.length > 0).length
+                  }
                 </span>
                 <div className='flex items-center gap-2'>
                   {transcriptionSegments && (
-                    <span className='text-blue-600'>⏱ {transcriptionSegments.segments.length} segments</span>
+                    <span className='text-blue-600'>
+                      ⏱ {transcriptionSegments.segments.length} segments
+                    </span>
                   )}
-                  {transcript && !isTranscribing && (
-                    <span className='text-green-600'>✓ Ready</span>
-                  )}
+                  {transcript && !isTranscribing && <span className='text-green-600'>✓ Ready</span>}
                 </div>
               </div>
             </CardContent>

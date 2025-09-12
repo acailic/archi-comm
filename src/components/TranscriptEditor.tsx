@@ -7,7 +7,11 @@ import React from 'react';
 import { Bold, Italic, List, ListOrdered, Clock, Highlighter, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from './ui/utils';
-import { loadTiptapReact, loadTiptapStarterKit, loadTiptapTranscriptExtensions } from '@/lib/lazy-imports/tiptap-loader';
+import {
+  loadTiptapReact,
+  loadTiptapStarterKit,
+  loadTiptapTranscriptExtensions,
+} from '@/lib/lazy-imports/tiptap-loader';
 import type { TranscriptionSegment } from '@/shared/contracts/index';
 
 interface TranscriptEditorProps {
@@ -36,7 +40,7 @@ type LoadedTiptapTranscript = {
 const createTimestampExtension = (onTimestampClick?: (timestamp: number) => void) => {
   return {
     name: 'timestamp',
-    
+
     addOptions() {
       return {
         HTMLAttributes: {},
@@ -57,25 +61,32 @@ const createTimestampExtension = (onTimestampClick?: (timestamp: number) => void
 
     addCommands() {
       return {
-        insertTimestamp: (timestamp: number) => ({ commands }: any) => {
-          const formattedTime = formatTimestamp(timestamp);
-          return commands.insertContent({
-            type: 'text',
-            marks: [
-              {
-                type: 'timestamp',
-                attrs: { 'data-timestamp': timestamp },
-              }
-            ],
-            text: `[${formattedTime}]`,
-          });
-        },
+        insertTimestamp:
+          (timestamp: number) =>
+          ({ commands }: any) => {
+            const formattedTime = formatTimestamp(timestamp);
+            return commands.insertContent({
+              type: 'text',
+              marks: [
+                {
+                  type: 'timestamp',
+                  attrs: { 'data-timestamp': timestamp },
+                },
+              ],
+              text: `[${formattedTime}]`,
+            });
+          },
       };
     },
 
     addProseMirrorPlugins() {
+      const ProseMirror = (window as any).ProseMirror;
+      if (!ProseMirror?.state?.Plugin) {
+        return [];
+      }
+
       return [
-        new (window as any).ProseMirror?.state?.Plugin({
+        new ProseMirror.state.Plugin({
           props: {
             handleClick(view: any, pos: any, event: any) {
               const { target } = event;
@@ -171,7 +182,7 @@ function TranscriptEditorInner(
       // Find and highlight the current segment text
       const content = editor.getHTML();
       const segmentText = currentSegment.text.trim();
-      
+
       if (content.includes(segmentText)) {
         // Simple highlighting - in a real implementation, this would be more sophisticated
         editor.commands.focus();
@@ -215,7 +226,7 @@ function TranscriptEditorInner(
       // Simple search and highlight - find all instances and highlight them
       const { from, to } = editor.state.selection;
       editor.commands.setTextSelection({ from: 0, to: editor.state.doc.content.size });
-      
+
       // Use the search term to highlight - this is a simplified version
       editor.chain().focus().toggleHighlight({ color: highlightColor }).run();
       editor.commands.setTextSelection({ from, to });
@@ -224,7 +235,7 @@ function TranscriptEditorInner(
 
   const colors = [
     '#ffff00', // Yellow
-    '#00ff00', // Green  
+    '#00ff00', // Green
     '#00ffff', // Cyan
     '#ff00ff', // Magenta
     '#ffa500', // Orange
@@ -270,10 +281,7 @@ function TranscriptEditorInner(
           <ListOrdered className='h-4 w-4' />
         </ToolbarButton>
         <div className='w-px h-4 bg-border mx-1' />
-        <ToolbarButton
-          onClick={insertCurrentTimestamp}
-          title='Insert Timestamp (Ctrl+T)'
-        >
+        <ToolbarButton onClick={insertCurrentTimestamp} title='Insert Timestamp (Ctrl+T)'>
           <Clock className='h-4 w-4' />
         </ToolbarButton>
         <ToolbarButton
@@ -283,10 +291,10 @@ function TranscriptEditorInner(
         >
           <Highlighter className='h-4 w-4' />
         </ToolbarButton>
-        
+
         {/* Color picker for highlights */}
         <div className='flex items-center gap-1 ml-2'>
-          {colors.map((color) => (
+          {colors.map(color => (
             <button
               key={color}
               className={cn(
@@ -313,9 +321,9 @@ function TranscriptEditorInner(
           type='text'
           placeholder='Search and highlight...'
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={e => setSearchTerm(e.target.value)}
           className='flex-1 text-sm bg-transparent border-none outline-none'
-          onKeyDown={(e) => {
+          onKeyDown={e => {
             if (e.key === 'Enter') {
               e.preventDefault();
               highlightSearchTerm();
@@ -347,11 +355,24 @@ function TranscriptEditorInner(
   );
 }
 
-const TranscriptEditorForward = React.forwardRef<HTMLDivElement, TranscriptEditorProps & { mods: LoadedTiptapTranscript }>(TranscriptEditorInner);
+const TranscriptEditorForward = React.forwardRef<
+  HTMLDivElement,
+  TranscriptEditorProps & { mods: LoadedTiptapTranscript }
+>(TranscriptEditorInner);
 
 const TranscriptEditor = React.forwardRef<HTMLDivElement, TranscriptEditorProps>(
   (
-    { value, onChange, onTimestampClick, currentTime, segments, placeholder = 'Enter transcript or record audio...', className, onFocus, onBlur },
+    {
+      value,
+      onChange,
+      onTimestampClick,
+      currentTime,
+      segments,
+      placeholder = 'Enter transcript or record audio...',
+      className,
+      onFocus,
+      onBlur,
+    },
     ref
   ) => {
     const [mods, setMods] = React.useState<LoadedTiptapTranscript | null>(null);
@@ -411,15 +432,25 @@ const TranscriptEditor = React.forwardRef<HTMLDivElement, TranscriptEditorProps>
 
     if (error) {
       return (
-        <div className={cn('text-xs text-destructive border border-destructive/20 bg-destructive/5 p-3 rounded-md', className)}>
+        <div
+          className={cn(
+            'text-xs text-destructive border border-destructive/20 bg-destructive/5 p-3 rounded-md',
+            className
+          )}
+        >
           Failed to load transcript editor. Please try refreshing or use basic text input.
         </div>
       );
     }
-    
+
     if (!mods) {
       return (
-        <div className={cn('text-xs text-muted-foreground border border-input p-3 rounded-md bg-input-background', className)}>
+        <div
+          className={cn(
+            'text-xs text-muted-foreground border border-input p-3 rounded-md bg-input-background',
+            className
+          )}
+        >
           Loading enhanced transcript editor...
         </div>
       );

@@ -6,13 +6,12 @@ import {
   requestPermission,
   sendNotification,
 } from '@tauri-apps/api/notification';
-import { writeTextFile, writeBinaryFile, createDir } from '@tauri-apps/api/fs';
+import { writeTextFile, writeBinaryFile, createDir, readBinaryFile } from '@tauri-apps/api/fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
 import type { Project, Component, DiagramElement, Connection } from '../services/tauri';
-import { isTauriEnvironment } from './environment';
 import type { TranscriptionResponse, TranscriptionOptions } from '../shared/contracts';
+import { isTauriEnvironment } from './environment';
 // Domain types are centralized in services/tauri
- 
 
 // Helper function to check if we're running in Tauri
 /**
@@ -263,21 +262,33 @@ export const transcriptionUtils = {
    * @param options - Optional transcription parameters
    * @returns Promise resolving to transcription response with text and segments
    */
-  async transcribeAudio(filePath: string, options?: TranscriptionOptions): Promise<TranscriptionResponse> {
+  async transcribeAudio(
+    filePath: string,
+    options?: TranscriptionOptions
+  ): Promise<TranscriptionResponse> {
     // Parameter validation
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('File path is required and must be a string');
     }
-    
-    if (options?.timeout !== undefined && (typeof options.timeout !== 'number' || options.timeout <= 0)) {
+
+    if (
+      options?.timeout !== undefined &&
+      (typeof options.timeout !== 'number' || options.timeout <= 0)
+    ) {
       throw new Error('Timeout must be a positive number');
     }
-    
-    if (options?.jobId !== undefined && (typeof options.jobId !== 'string' || options.jobId.trim() === '')) {
+
+    if (
+      options?.jobId !== undefined &&
+      (typeof options.jobId !== 'string' || options.jobId.trim() === '')
+    ) {
       throw new Error('Job ID must be a non-empty string');
     }
-    
-    if (options?.maxSegments !== undefined && (typeof options.maxSegments !== 'number' || options.maxSegments <= 0)) {
+
+    if (
+      options?.maxSegments !== undefined &&
+      (typeof options.maxSegments !== 'number' || options.maxSegments <= 0)
+    ) {
       throw new Error('Max segments must be a positive number');
     }
 
@@ -285,19 +296,21 @@ export const transcriptionUtils = {
     if (!isTauri()) {
       return {
         text: 'Mock transcription text',
-        segments: [{
-          text: 'Mock transcription text',
-          start: 0,
-          end: 5,
-          confidence: 0.95
-        }]
+        segments: [
+          {
+            text: 'Mock transcription text',
+            start: 0,
+            end: 5,
+            confidence: 0.95,
+          },
+        ],
       };
     }
 
     try {
       const response = await ipcUtils.invoke<TranscriptionResponse>('transcribe_audio', {
         file_path: filePath,
-        options: options || {}
+        options: options || {},
       });
 
       // Validate response structure
@@ -344,14 +357,16 @@ export const transcriptionUtils = {
    * @param filePath - Path to the audio file to test
    * @returns Promise resolving to test result object
    */
-  async testTranscriptionPipeline(filePath: string): Promise<{ success: boolean; error?: string; result?: TranscriptionResponse }> {
+  async testTranscriptionPipeline(
+    filePath: string
+  ): Promise<{ success: boolean; error?: string; result?: TranscriptionResponse }> {
     try {
       const result = await this.transcribeAudio(filePath);
       return { success: true, result };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error'
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   },
@@ -400,17 +415,33 @@ export const audioUtils = {
       // Convert blob to binary data
       const arrayBuffer = await blob.arrayBuffer();
       const binaryData = new Uint8Array(arrayBuffer);
-      
+      if (!binaryData || binaryData.length === 0) {
+        throw new Error('Audio blob is empty');
+      }
+
+      // Detect extension from blob.type if possible
+      const type = (blob as any)?.type as string | undefined;
+      const pickExtension = (mime?: string): string => {
+        if (!mime) return 'webm';
+        if (mime.includes('webm')) return 'webm';
+        if (mime.includes('ogg')) return 'ogg';
+        if (mime.includes('mp4') || mime.includes('m4a')) return 'm4a';
+        if (mime.includes('wav')) return 'wav';
+        if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+        return 'webm';
+      };
+      const ext = pickExtension(type);
+
       // Generate filename if not provided
-      const finalFilename = filename || `audio_${Date.now()}.webm`;
-      
+      const finalFilename = filename || `audio_${Date.now()}.${ext}`;
+
       // Get temp directory and create file path
       const tempDir = await this.getAudioTempDir();
       const filePath = await join(tempDir, finalFilename);
-      
+
       // Save binary data to file
       await writeBinaryFile(filePath, binaryData);
-      
+
       return filePath;
     } catch (error) {
       console.error('Failed to save audio blob:', error);
@@ -437,6 +468,43 @@ export const audioUtils = {
       console.error('Failed to cleanup audio file:', error);
       return false;
     }
+  },
+
+  /**
+   * Start native audio recording via Tauri backend (CPAL-based).
+   * Returns the file path that will be written to while recording.
+   */
+  async startNativeRecording(): Promise<string> {
+    if (!isTauri()) throw new Error('Native recording requires Tauri');
+    return ipcUtils.invoke<string>('start_audio_recording');
+  },
+
+  /**
+   * Stop native audio recording and return the finalized file path.
+   */
+  async stopNativeRecording(): Promise<string> {
+    if (!isTauri()) throw new Error('Native recording requires Tauri');
+    return ipcUtils.invoke<string>('stop_audio_recording');
+  },
+
+  /**
+   * Read a local audio file and return a Blob for playback/transcription.
+   */
+  async loadAudioBlob(filePath: string): Promise<Blob> {
+    if (!isTauri()) throw new Error('Loading local audio requires Tauri');
+    const data = await readBinaryFile(filePath);
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    const mime =
+      ext === 'wav'
+        ? 'audio/wav'
+        : ext === 'ogg'
+          ? 'audio/ogg'
+          : ext === 'm4a' || ext === 'mp4'
+            ? 'audio/mp4'
+            : ext === 'mp3'
+              ? 'audio/mpeg'
+              : 'audio/webm';
+    return new Blob([data], { type: mime });
   },
 };
 

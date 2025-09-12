@@ -51,7 +51,7 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@tauri-apps/api": "^1.5.3",
     "@tiptap/extension-color": "^2.1.13",
-    "@tiptap/extension-highlight": "^2.1.13",
+    "@tiptap/extension-highlight": "^2.26.1",
     "@tiptap/extension-list-item": "^2.1.13",
     "@tiptap/extension-text-style": "^2.1.13",
     "@tiptap/react": "^2.1.13",
@@ -74,7 +74,6 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.55.0",
     "react-resizable-panels": "^2.1.7",
-
     "recharts": "^2.15.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^2.3.0",
