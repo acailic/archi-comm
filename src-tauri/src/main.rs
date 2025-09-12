@@ -16,6 +16,7 @@ use std::process;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use serde_json::Value as JsonValue;
+use reqwest;
 
 // Operation name constants for consistent error handling
 pub struct OperationNames;
@@ -130,6 +131,28 @@ pub enum ApiError {
     #[error("External process error: {command} failed - {details}")]
     ProcessError { 
         command: String, 
+        details: String,
+        #[source]
+        #[serde(skip)]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("License validation error: {details}")]
+    LicenseValidationError {
+        details: String,
+        #[source]
+        #[serde(skip)]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    #[error("Invalid license key")]
+    InvalidLicenseKey,
+
+    #[error("License has expired")]
+    LicenseExpired,
+
+    #[error("Network error during license validation: {details}")]
+    LicenseNetworkError {
         details: String,
         #[source]
         #[serde(skip)]
@@ -255,6 +278,33 @@ pub struct Connection {
     pub target_id: String,
     pub connection_type: String,
     pub properties: HashMap<String, String>,
+}
+
+// License validation data structures
+#[derive(Serialize)]
+struct LicenseValidationRequest<'a> {
+    license_key: &'a str,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LicenseValidationResponse {
+    pub valid: bool,
+    pub message: String,
+    pub status: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct LemonSqueezyValidateResponse {
+    valid: bool,
+    error: Option<String>,
+    license_key: Option<LemonSqueezyLicenseDetails>,
+}
+
+#[derive(Deserialize, Debug)]
+struct LemonSqueezyLicenseDetails {
+    status: String,
+    key: String,
+    expires_at: Option<String>,
 }
 
 // Application state with RwLock for better concurrency
@@ -1048,6 +1098,89 @@ async fn export_project_data(
     Ok(json_string)
 }
 
+// Tauri command for license validation
+#[tauri::command]
+async fn validate_license_key(license_key: String) -> Result<LicenseValidationResponse, ApiError> {
+    if license_key.trim().is_empty() {
+        return Err(ApiError::InvalidLicenseKey);
+    }
+
+    let client = reqwest::Client::new();
+    let params = LicenseValidationRequest {
+        license_key: &license_key,
+    };
+
+    let res = client
+        .post("https://api.lemonsqueezy.com/v1/licenses/validate")
+        .form(&params)
+        .header("Accept", "application/json")
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .send()
+        .await
+        .map_err(|e| ApiError::LicenseNetworkError {
+            details: e.to_string(),
+            source: Some(Box::new(e)),
+        })?;
+
+    if !res.status().is_success() {
+        let status = res.status();
+        let error_text = match res.text().await {
+            Ok(text) => text,
+            Err(e) => format!("Failed to get error text: {}", e),
+        };
+        log::error!("LemonSqueezy API error: {} - {}", status, error_text);
+        return Err(ApiError::LicenseValidationError {
+            details: format!("API request failed with status {}: {}", status, error_text),
+            source: None,
+        });
+    }
+
+    let ls_response: LemonSqueezyValidateResponse = res.json().await.map_err(|e| ApiError::SerializationError {
+        operation: "license validation".to_string(),
+        details: format!("Failed to deserialize LemonSqueezy response: {}", e),
+        source: Some(Box::new(e)),
+    })?;
+
+    if !ls_response.valid {
+        log::warn!("Invalid license key provided: {}. Reason: {}", license_key, ls_response.error.as_deref().unwrap_or("Unknown"));
+        return Err(ApiError::InvalidLicenseKey);
+    }
+
+    if let Some(license_details) = ls_response.license_key {
+        match license_details.status.as_str() {
+            "active" => {
+                log::info!("License key is valid and active: {}", license_key);
+                Ok(LicenseValidationResponse {
+                    valid: true,
+                    message: "License key is valid and active.".to_string(),
+                    status: Some("active".to_string()),
+                })
+            },
+            "inactive" | "disabled" => {
+                log::warn!("License key is inactive/disabled: {}", license_key);
+                Err(ApiError::InvalidLicenseKey)
+            },
+            "expired" => {
+                log::warn!("License key has expired: {}", license_key);
+                Err(ApiError::LicenseExpired)
+            },
+            _ => {
+                log::error!("Unknown license status '{}' for key: {}", license_details.status, license_key);
+                Err(ApiError::LicenseValidationError {
+                    details: format!("Unknown license status: {}", license_details.status),
+                    source: None
+                })
+            }
+        }
+    } else {
+        log::error!("License validation response is 'valid' but contains no license details for key: {}", license_key);
+        Err(ApiError::LicenseValidationError {
+            details: "Inconsistent response from license server.".to_string(),
+            source: None
+        })
+    }
+}
+
 #[cfg(debug_assertions)]
 #[tauri::command]
 async fn populate_sample_data(
@@ -1109,7 +1242,10 @@ fn main() {
 
                         // Challenge Plugin I/O
                         load_challenges_from_file,
-                        save_challenges_to_file
+                        save_challenges_to_file,
+
+                        // License Validation
+                        validate_license_key
                     ]
                 };
                 (with_debug) => {
@@ -1141,6 +1277,9 @@ fn main() {
                         // Challenge Plugin I/O
                         load_challenges_from_file,
                         save_challenges_to_file,
+
+                        // License Validation
+                        validate_license_key,
                         
                         // Debug Commands
                         populate_sample_data
