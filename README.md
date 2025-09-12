@@ -15,7 +15,7 @@
 [![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=ncloc)](https://sonarcloud.io/dashboard?id=acailic_archicomm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 <img alt="Version" src="https://img.shields.io/badge/version-0.2.1-blue.svg">
-<img alt="Node >=18" src="https://img.shields.io/badge/node-%3E%3D18.0.0-339933?logo=node.js&logoColor=white">
+<img alt="Node >=18" src="https://img.shields.io/badge/node-%3E%3D18.0.0-339933?logo=nodedotjs&logoColor=white">
 <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
 <img alt="Prettier" src="https://img.shields.io/badge/code_style-Prettier-ff69b4?logo=prettier&logoColor=white">
 <a href="https://tauri.app"><img alt="Tauri" src="https://img.shields.io/badge/Desktop-Tauri-FFC131?logo=tauri&logoColor=white"></a>
