@@ -14,7 +14,11 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
 // MSW: mock network to stabilize tests
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  // Ensure dynamic mocks do not leak across tests
+  vi.resetModules();
+});
 afterAll(() => server.close());
 
 // Mock React Flow
@@ -96,4 +100,21 @@ vi.mock('@xyflow/react', () => ({
     Lines: 'lines',
   },
   Panel: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Tauri API ESM mocks for dialog/fs modules used by application code
+vi.mock('@tauri-apps/api/dialog', () => ({
+  save: vi.fn().mockResolvedValue('/mock/save/path.json'),
+  open: vi.fn().mockResolvedValue(['/mock/open/path.json']),
+  message: vi.fn().mockResolvedValue(undefined),
+  ask: vi.fn().mockResolvedValue(true),
+  confirm: vi.fn().mockResolvedValue(true),
+}));
+vi.mock('@tauri-apps/api/fs', () => ({
+  writeTextFile: vi.fn().mockResolvedValue(undefined),
+  readTextFile: vi.fn().mockResolvedValue('{"mock":"data"}'),
+  exists: vi.fn().mockResolvedValue(true),
+  createDir: vi.fn().mockResolvedValue(undefined),
+  removeFile: vi.fn().mockResolvedValue(undefined),
+  copyFile: vi.fn().mockResolvedValue(undefined),
 }));

@@ -49,12 +49,12 @@ export function WelcomeOverlay({ onComplete }: WelcomeOverlayProps) {
         {/* Action Buttons */}
         <div className='space-y-3 pt-4'>
           <Button onClick={handleGetStarted} size='lg' className='w-full'>
-            Take a Quick Tour
+            Start Your Journey
             <ArrowRight className='w-4 h-4 ml-2' />
           </Button>
 
           <Button variant='outline' onClick={handleSkipTour} className='w-full'>
-            Skip and Start Using
+            Skip Tutorial
           </Button>
         </div>
 

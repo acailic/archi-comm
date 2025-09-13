@@ -1,6 +1,7 @@
 import { toPng } from 'html-to-image';
 import type { DesignData } from '@/shared/contracts';
 import { isTauriEnvironment } from '@/lib/environment';
+import { storage } from '@/services/storage';
 import * as TauriClient from '@/lib/api/tauriClient';
 
 // Fallback compression utilities if lz-string is not available
@@ -75,6 +76,65 @@ export class CanvasPersistence {
   constructor(projectId?: string) {
     this.projectId = projectId;
     this.initializeBackupTracking();
+  }
+
+  // List available backups for this project from persisted metadata
+  public listBackups(): Array<{ key: string; timestamp: number; checksum: string }> {
+    try {
+      const raw = localStorage.getItem('archicomm-backup-metadata');
+      if (!raw) return [];
+      const metadataObj = JSON.parse(raw) as Record<string, BackupMetadata>;
+      const projectToken = this.projectId || 'default';
+      return Object.entries(metadataObj)
+        .filter(([key]) => key.includes(projectToken))
+        .map(([key, meta]) => ({ key, timestamp: meta.timestamp, checksum: meta.checksum }))
+        .sort((a, b) => b.timestamp - a.timestamp);
+    } catch {
+      return [];
+    }
+  }
+
+  // Restore a specific or latest valid backup
+  public async restoreFromBackup(timestampOrKey?: number | string): Promise<DesignData | null> {
+    try {
+      if (timestampOrKey == null) {
+        // Fallback to the latest valid backup
+        return await this.loadFromBackup();
+      }
+
+      const projectToken = this.projectId || 'default';
+      let backupKey: string | null = null;
+
+      if (typeof timestampOrKey === 'number') {
+        const needle = `archicomm-backup-${projectToken}-${timestampOrKey}`;
+        backupKey = needle;
+      } else if (typeof timestampOrKey === 'string') {
+        backupKey = timestampOrKey;
+      }
+
+      if (!backupKey) return null;
+
+      const backupData = localStorage.getItem(backupKey);
+      if (!backupData) return null;
+
+      // Verify checksum from metadata when available
+      const meta = this.backupStore.get(backupKey);
+      if (meta) {
+        const checksum = this.calculateChecksum(backupData);
+        if (checksum !== meta.checksum) {
+          console.warn(`Backup ${backupKey} checksum mismatch, aborting restore`);
+          return null;
+        }
+      }
+
+      const data = JSON.parse(backupData) as DesignData;
+      const validation = this.validateDesignData(data);
+      if (!validation.isValid) return null;
+      return data;
+    } catch (error) {
+      console.error('Failed to restore from backup:', error);
+      return null;
+    }
   }
 
   async saveDesign(data: DesignData, options: SaveOptions = {}): Promise<void> {
@@ -180,7 +240,7 @@ export class CanvasPersistence {
       };
       
       const key = this.projectId ? `archicomm-project-${this.projectId}` : 'archicomm-canvas-auto';
-      localStorage.setItem(key, JSON.stringify(saveData));
+      await storage.setItem(key, JSON.stringify(saveData));
       
     } catch (error) {
       if (error instanceof Error && error.name === 'QuotaExceededError') {
@@ -197,7 +257,7 @@ export class CanvasPersistence {
         };
         
         const key = this.projectId ? `archicomm-project-${this.projectId}` : 'archicomm-canvas-auto';
-        localStorage.setItem(key, JSON.stringify(saveData));
+        await storage.setItem(key, JSON.stringify(saveData));
       } else {
         throw error;
       }
@@ -220,7 +280,7 @@ export class CanvasPersistence {
       }
       
       const key = this.projectId ? `archicomm-project-${this.projectId}` : 'archicomm-canvas-auto';
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+      const raw = await storage.getItem(key);
       
       if (!raw) {
         // Try to load from backup
@@ -517,7 +577,7 @@ export class CanvasPersistence {
     }
   }
 
-  private async loadFromBackup(): Promise<DesignData | null> {
+  public async loadFromBackup(): Promise<DesignData | null> {
     try {
       const projectBackups = Array.from(this.backupStore.entries())
         .filter(([key]) => key.includes(this.projectId || 'default'))
@@ -645,4 +705,3 @@ export class CanvasPersistence {
     return hash.toString(36);
   }
 }
-

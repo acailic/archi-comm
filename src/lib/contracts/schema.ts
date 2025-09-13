@@ -52,6 +52,9 @@ export type Component = z.infer<typeof ComponentSchema>;
 export type DiagramElement = z.infer<typeof DiagramElementSchema>;
 export type Connection = z.infer<typeof ConnectionSchema>;
 
+// Runtime schema exports to match consumer imports
+export const Project = ProjectSchema;
+
 export const ReviewRespSchema = z.object({
   summary: z.string(),
   strengths: z.array(z.string()).default([]),
@@ -59,3 +62,4 @@ export const ReviewRespSchema = z.object({
   score: z.number().int().min(0).max(100).default(0),
 });
 export type ReviewResp = z.infer<typeof ReviewRespSchema>;
+export const ReviewResp = ReviewRespSchema;

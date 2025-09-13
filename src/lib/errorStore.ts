@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { isDevelopment } from './environment';
+import type { RecoveryResult } from './recovery/ErrorRecoverySystem';
 
 // Error types and interfaces
 export type ErrorCategory = 'react' | 'global' | 'performance' | 'network' | 'unknown';
@@ -24,6 +25,8 @@ export interface ErrorContext {
   sessionId?: string;
   timestamp?: number;
   additionalData?: Record<string, any>;
+  recoveryAttempted?: boolean;
+  recoveryResult?: RecoveryResult;
 }
 
 export interface AppError {
@@ -63,9 +66,17 @@ class ErrorStoreImpl {
   private maxErrorAge = 30 * 60 * 1000; // 30 minutes
   private cleanupTimer?: NodeJS.Timeout;
 
+  // Recovery system integration
+  private recoveryEnabled = true;
+  private recoverySystem?: any; // Dynamic import to avoid circular dependency
+  private recoveryRateLimit = new Map<string, number>();
+  private recoveryRateLimitWindow = 60 * 1000; // 1 minute
+  private maxRecoveryAttempts = 3;
+
   constructor() {
     if (isDevelopment()) {
       this.startCleanupTimer();
+      this.initializeRecoverySystem();
     }
   }
 
@@ -131,6 +142,9 @@ class ErrorStoreImpl {
 
     this.notifyListeners();
     this.notifyErrorAddListeners(appError);
+
+    // Trigger recovery if conditions are met
+    this.maybeTrigerRecovery(appError);
 
     return appError;
   }
@@ -388,6 +402,151 @@ class ErrorStoreImpl {
   }
 
   /**
+   * Recovery system integration methods
+   */
+
+  private async initializeRecoverySystem(): Promise<void> {
+    try {
+      // Dynamic import to avoid circular dependency
+      const { ErrorRecoverySystem } = await import('./recovery/ErrorRecoverySystem');
+      this.recoverySystem = ErrorRecoverySystem.getInstance();
+    } catch (error) {
+      console.warn('Failed to initialize recovery system:', error);
+      this.recoveryEnabled = false;
+    }
+  }
+
+  private maybeTrigerRecovery(error: AppError): void {
+    if (!this.recoveryEnabled || !this.recoverySystem) {
+      return;
+    }
+
+    // Check if error meets recovery criteria
+    if (!this.shouldTriggerRecovery(error)) {
+      return;
+    }
+
+    // Check rate limiting
+    if (this.isRecoveryRateLimited(error)) {
+      return;
+    }
+
+    // Trigger recovery asynchronously
+    this.triggerRecovery(error);
+  }
+
+  private shouldTriggerRecovery(error: AppError): boolean {
+    // Trigger recovery for critical and high severity errors
+    if (error.severity === 'critical' || error.severity === 'high') {
+      return true;
+    }
+
+    // Trigger recovery for specific categories
+    const recoverableCategories: ErrorCategory[] = ['react', 'global', 'performance'];
+    if (recoverableCategories.includes(error.category)) {
+      return true;
+    }
+
+    // Don't trigger recovery if already attempted
+    if (error.context.recoveryAttempted) {
+      return false;
+    }
+
+    return false;
+  }
+
+  private isRecoveryRateLimited(error: AppError): boolean {
+    const now = Date.now();
+    const rateKey = `${error.category}_${error.severity}`;
+    const lastAttempt = this.recoveryRateLimit.get(rateKey) || 0;
+
+    if (now - lastAttempt < this.recoveryRateLimitWindow) {
+      return true;
+    }
+
+    // Check global rate limit
+    const attempts = Array.from(this.recoveryRateLimit.values())
+      .filter(timestamp => now - timestamp < this.recoveryRateLimitWindow);
+
+    return attempts.length >= this.maxRecoveryAttempts;
+  }
+
+  private async triggerRecovery(error: AppError): Promise<void> {
+    try {
+      const rateKey = `${error.category}_${error.severity}`;
+      this.recoveryRateLimit.set(rateKey, Date.now());
+
+      // Mark error as having recovery attempted
+      error.context.recoveryAttempted = true;
+
+      // Trigger recovery
+      const recoveryResult = await this.recoverySystem.handleError(error);
+
+      // Update error context with recovery result
+      error.context.recoveryResult = recoveryResult;
+
+      // Notify listeners of the updated error
+      this.notifyListeners();
+    } catch (recoveryError) {
+      console.error('Recovery system failed:', recoveryError);
+
+      // Update error context with recovery failure
+      error.context.recoveryResult = {
+        success: false,
+        strategy: 'system',
+        message: 'Recovery system encountered an error'
+      };
+
+      this.notifyListeners();
+    }
+  }
+
+  /**
+   * Recovery system control methods
+   */
+
+  public enableRecovery(enabled: boolean): void {
+    this.recoveryEnabled = enabled;
+  }
+
+  public isRecoveryEnabled(): boolean {
+    return this.recoveryEnabled && !!this.recoverySystem;
+  }
+
+  public getRecoveryHistory(): any[] {
+    return this.recoverySystem?.getRecoveryHistory() || [];
+  }
+
+  public isRecoveryInProgress(): boolean {
+    return this.recoverySystem?.isRecoveryInProgress() || false;
+  }
+
+  /**
+   * Get recovery statistics
+   */
+  public getRecoveryStats() {
+    const errorsWithRecovery = this.state.errors.filter(e => e.context.recoveryAttempted);
+    const successfulRecoveries = errorsWithRecovery.filter(e => e.context.recoveryResult?.success);
+    const failedRecoveries = errorsWithRecovery.filter(e => e.context.recoveryResult && !e.context.recoveryResult.success);
+
+    const recoveryStrategies = errorsWithRecovery.reduce((acc, error) => {
+      const strategy = error.context.recoveryResult?.strategy || 'unknown';
+      acc[strategy] = (acc[strategy] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalAttempts: errorsWithRecovery.length,
+      successful: successfulRecoveries.length,
+      failed: failedRecoveries.length,
+      successRate: errorsWithRecovery.length > 0 ? (successfulRecoveries.length / errorsWithRecovery.length) * 100 : 0,
+      strategies: recoveryStrategies,
+      rateLimitActive: this.recoveryRateLimit.size > 0,
+      recoveryEnabled: this.recoveryEnabled
+    };
+  }
+
+  /**
    * Cleanup resources
    */
   destroy(): void {
@@ -397,6 +556,7 @@ class ErrorStoreImpl {
     }
     this.listeners = [];
     this.errorAddListeners = [];
+    this.recoveryRateLimit.clear();
   }
 }
 
@@ -491,9 +651,20 @@ if (isDevelopment()) {
         componentStack: 'TestComponent > App > Root',
       });
     },
+    addTestCriticalError: () => {
+      const error = new Error('Test critical error that should trigger recovery');
+      errorStore.addError(error, 'global', {
+        additionalData: { testCriticalError: true },
+      });
+    },
     clearAll: () => errorStore.clearErrors(),
     exportToConsole: () => console.log(errorStore.exportErrors()),
     getStats: () => errorStore.getStats(),
+    getRecoveryStats: () => errorStore.getRecoveryStats(),
+    isRecoveryEnabled: () => errorStore.isRecoveryEnabled(),
+    enableRecovery: (enabled: boolean) => errorStore.enableRecovery(enabled),
+    getRecoveryHistory: () => errorStore.getRecoveryHistory(),
+    isRecoveryInProgress: () => errorStore.isRecoveryInProgress(),
   };
 }
 

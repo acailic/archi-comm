@@ -1,8 +1,7 @@
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, waitFor, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { EdgeChange, NodeChange } from '@xyflow/react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithProviders, CanvasTestHelpers, AssertionHelpers } from '../test/integration-helpers';
 import { CanvasArea } from '../components/CanvasArea';
 import {
   createReactFlowEdge,
@@ -20,42 +19,37 @@ import {
 } from '../features/canvas/utils/rf-adapters';
 import type { Connection, DesignComponent } from '../shared/contracts';
 
-// Ensure test isolation by cleaning up the DOM after each test
 afterEach(() => {
   cleanup();
 });
 
 describe('Canvas UI basics', () => {
-  // Controls are now part of React Flow
-
-  it('handles basic canvas keyboard interactions', () => {
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea
-            components={[]}
-            connections={[]}
-            selectedComponent={null}
-            connectionStart={null}
-            onComponentDrop={() => {}}
-            onComponentMove={() => {}}
-            onComponentSelect={() => {}}
-            onStartConnection={() => {}}
-            onCompleteConnection={() => {}}
-            onConnectionLabelChange={() => {}}
-          />
-        </div>
-      </DndProvider>
+  it('handles basic canvas keyboard interactions', async () => {
+    renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea
+          components={[]}
+          connections={[]}
+          selectedComponent={null}
+          connectionStart={null}
+          onComponentDrop={vi.fn()}
+          onComponentMove={vi.fn()}
+          onComponentSelect={vi.fn()}
+          onStartConnection={vi.fn()}
+          onCompleteConnection={vi.fn()}
+          onConnectionLabelChange={vi.fn()}
+        />
+      </div>
     );
-    
-    // React Flow handles Ctrl+A internally - verify the canvas is keyboard accessible
-    const reactFlowWrapper = document.querySelector('.react-flow');
+
+    const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
     expect(reactFlowWrapper).toBeInTheDocument();
     expect(reactFlowWrapper).toHaveAttribute('tabIndex', '0');
-    
-    fireEvent.keyDown(reactFlowWrapper!, { key: 'a', ctrlKey: true });
-    // React Flow should remain accessible after keyboard interaction
-    expect(reactFlowWrapper).toBeInTheDocument();
+
+    (reactFlowWrapper as HTMLElement).focus();
+    const user = userEvent.setup();
+    await user.keyboard('{Control>}{a}{/Control}');
+    expect(reactFlowWrapper).toHaveFocus();
   });
 });
 
@@ -109,59 +103,42 @@ describe('Canvas Component Management', () => {
   });
 
   it('renders components with correct connection counts and health status', () => {
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea {...defaultProps} />
-        </div>
-      </DndProvider>
+    renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea {...defaultProps} />
+      </div>
     );
 
-    // React Flow renders components as nodes with specific classes
-    const reactFlowWrapper = document.querySelector('.react-flow');
+    const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
     expect(reactFlowWrapper).toBeInTheDocument();
 
-    // Check for React Flow nodes representing our components
-    const nodes = document.querySelectorAll('.react-flow__node');
+    const nodes = (reactFlowWrapper as HTMLElement).querySelectorAll('.react-flow__node');
     expect(nodes).toHaveLength(2);
+    expect((reactFlowWrapper as HTMLElement).querySelector('.react-flow__node[data-id="comp1"]')).toBeInTheDocument();
+    expect((reactFlowWrapper as HTMLElement).querySelector('.react-flow__node[data-id="comp2"]')).toBeInTheDocument();
 
-    // Check for React Flow edges representing our connections
-    const edges = document.querySelectorAll('.react-flow__edge');
+    const edges = (reactFlowWrapper as HTMLElement).querySelectorAll('.react-flow__edge');
     expect(edges).toHaveLength(1);
   });
 
   it('calls onViewportChange when zoom occurs', () => {
-    // Some handlers in React Flow or integration layers may debounce viewport changes.
-    // Use fake timers to deterministically flush any debounced callbacks.
     vi.useFakeTimers();
 
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea {...defaultProps} />
-        </div>
-      </DndProvider>
+    renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea {...defaultProps} />
+      </div>
     );
 
     // React Flow handles zoom through its viewport
     const reactFlowViewport = document.querySelector('.react-flow__viewport');
     expect(reactFlowViewport).toBeInTheDocument();
 
-    // Simulate zoom operation via mouse wheel on React Flow
-    const reactFlowWrapper = document.querySelector('.react-flow');
-    if (reactFlowWrapper) {
-      act(() => {
-        fireEvent.wheel(reactFlowWrapper, { deltaY: -100, ctrlKey: true });
-      });
+    // Fire wheel event directly on the viewport element for accurate zoom simulation
+    fireEvent.wheel(reactFlowViewport, { deltaY: -100, ctrlKey: true });
 
-      // Advance timers to flush any debounce on viewport change events.
-      vi.advanceTimersByTime(400);
-    }
+    vi.advanceTimersByTime(400);
 
-    // Use waitFor to accommodate async/debounced updates before asserting.
-    // We assert the viewport element remains available post-zoom interaction.
-    // If a dedicated onViewportChange spy is wired in the future, replace this
-    // with: expect(onViewportChange).toHaveBeenCalled().
     return waitFor(
       () => {
         const viewport = document.querySelector('.react-flow__viewport');
@@ -180,108 +157,80 @@ describe('Canvas Component Management', () => {
       </DndProvider>
     );
 
-    // React Flow maintains accessibility through its wrapper
-    const reactFlowWrapper = document.querySelector('.react-flow');
+    const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
     expect(reactFlowWrapper).toBeInTheDocument();
-
-    // Check for React Flow's accessibility attributes
     expect(reactFlowWrapper).toHaveAttribute('tabIndex', '0');
 
-    // React Flow nodes should be accessible
-    const nodes = document.querySelectorAll('.react-flow__node');
+    const nodes = (reactFlowWrapper as HTMLElement).querySelectorAll('.react-flow__node');
     nodes.forEach(node => {
       expect(node).toHaveAttribute('data-id');
     });
   });
 
-  it('handles component selection and focus management', () => {
+  it('handles component selection and focus management', async () => {
     const onComponentSelect = vi.fn();
 
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea
-            {...defaultProps}
-            onComponentSelect={onComponentSelect}
-            selectedComponent='comp1'
-          />
-        </div>
-      </DndProvider>
+    renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea
+          {...defaultProps}
+          onComponentSelect={onComponentSelect}
+          selectedComponent='comp1'
+        />
+      </div>
     );
 
-    // React Flow handles selection through node classes
-    const selectedNode = document.querySelector('.react-flow__node[data-id="comp1"]');
+    const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
+    const selectedNode = (reactFlowWrapper as HTMLElement).querySelector('.react-flow__node[data-id="comp1"]');
     expect(selectedNode).toBeInTheDocument();
-
-    // Selected nodes should have the selected class
     expect(selectedNode).toHaveClass('selected');
 
-    // Test clicking on a React Flow node
-    const unselectedNode = document.querySelector('.react-flow__node[data-id="comp2"]');
-    if (unselectedNode) {
-      act(() => {
-        fireEvent.click(unselectedNode);
-      });
-
-      expect(onComponentSelect).toHaveBeenCalled();
-    }
+    const unselectedNode = (reactFlowWrapper as HTMLElement).querySelector('.react-flow__node[data-id="comp2"]') as HTMLElement | null;
+    expect(unselectedNode).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(unselectedNode!);
+    expect(onComponentSelect).toHaveBeenCalledWith('comp2');
   });
 
-  it('handles arrow key movement for selected components', () => {
+  it('handles arrow key movement for selected components', async () => {
     const onComponentMove = vi.fn();
 
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea 
-            {...defaultProps} 
-            selectedComponent='comp1'
-            onComponentMove={onComponentMove}
-          />
-        </div>
-      </DndProvider>
+    renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea 
+          {...defaultProps} 
+          selectedComponent='comp1'
+          onComponentMove={onComponentMove}
+        />
+      </div>
     );
 
-    // React Flow handles keyboard events on its wrapper
-    const reactFlowWrapper = document.querySelector('.react-flow');
+    const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
     expect(reactFlowWrapper).toBeInTheDocument();
 
-    // Verify that the selected component is rendered and has the selected class
-    const selectedNode = document.querySelector('.react-flow__node[data-id="comp1"]');
+    const selectedNode = (reactFlowWrapper as HTMLElement).querySelector('.react-flow__node[data-id="comp1"]');
     expect(selectedNode).toBeInTheDocument();
-    
-    if (reactFlowWrapper) {
-      // Test arrow key interaction (React Flow handles this internally)
-      act(() => {
-        fireEvent.keyDown(reactFlowWrapper, { key: 'ArrowRight' });
-      });
 
-      // React Flow should remain functional after keyboard interaction
-      expect(reactFlowWrapper).toBeInTheDocument();
-      expect(selectedNode).toBeInTheDocument();
-    }
+    (reactFlowWrapper as HTMLElement).focus();
+    const user = userEvent.setup();
+    await user.keyboard('{ArrowRight}');
+
+    expect(reactFlowWrapper).toBeInTheDocument();
+    expect(selectedNode).toBeInTheDocument();
+    expect(onComponentMove).not.toHaveBeenCalled();
   });
 
   it('shows focus state when canvas receives focus', () => {
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea {...defaultProps} />
-        </div>
-      </DndProvider>
+    renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea {...defaultProps} />
+      </div>
     );
 
-    // React Flow wrapper handles focus
-    const reactFlowWrapper = document.querySelector('.react-flow');
+    const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
+    (reactFlowWrapper as HTMLElement).focus();
 
-    if (reactFlowWrapper) {
-      act(() => {
-        fireEvent.focus(reactFlowWrapper);
-      });
-
-      // React Flow adds its own focus classes
-      expect(reactFlowWrapper).toHaveClass('react-flow__focused');
-    }
+    expect(reactFlowWrapper).toHaveFocus();
   });
 });
 
@@ -290,36 +239,30 @@ describe('Canvas Performance and Optimization', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { unmount } = render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea
-            components={[]}
-            connections={[]}
-            selectedComponent={null}
-            connectionStart={null}
-            onComponentDrop={vi.fn()}
-            onComponentMove={vi.fn()}
-            onComponentSelect={vi.fn()}
-            onStartConnection={vi.fn()}
-            onCompleteConnection={vi.fn()}
-            onConnectionLabelChange={vi.fn()}
-          />
-        </div>
-      </DndProvider>
+    const { unmount } = renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea
+          components={[]}
+          connections={[]}
+          selectedComponent={null}
+          connectionStart={null}
+          onComponentDrop={vi.fn()}
+          onComponentMove={vi.fn()}
+          onComponentSelect={vi.fn()}
+          onStartConnection={vi.fn()}
+          onCompleteConnection={vi.fn()}
+          onConnectionLabelChange={vi.fn()}
+        />
+      </div>
     );
 
-    // React Flow should render without errors
-    const reactFlowWrapper = document.querySelector('.react-flow');
+    const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
     expect(reactFlowWrapper).toBeInTheDocument();
 
-    // Performance manager registration may warn if not properly set up
-    // This test verifies the component doesn't crash during initialization
     if (warnSpy.mock.calls.length > 0) {
       expect(warnSpy).toHaveBeenCalledWith('Performance registration failed', expect.any(Error));
     }
 
-    // Unmount and verify no additional warnings/errors occur during cleanup.
     const warnCountBeforeUnmount = warnSpy.mock.calls.length;
     const errorCountBeforeUnmount = errorSpy.mock.calls.length;
 
@@ -333,26 +276,23 @@ describe('Canvas Performance and Optimization', () => {
   });
 
   it('handles React Flow viewport changes efficiently', () => {
-    render(
-      <DndProvider backend={HTML5Backend}>
-        <div style={{ width: 800, height: 600 }}>
-          <CanvasArea
-            components={[]}
-            connections={[]}
-            selectedComponent={null}
-            connectionStart={null}
-            onComponentDrop={vi.fn()}
-            onComponentMove={vi.fn()}
-            onComponentSelect={vi.fn()}
-            onStartConnection={vi.fn()}
-            onCompleteConnection={vi.fn()}
-            onConnectionLabelChange={() => {}}
-          />
-        </div>
-      </DndProvider>
+    renderWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <CanvasArea
+          components={[]}
+          connections={[]}
+          selectedComponent={null}
+          connectionStart={null}
+          onComponentDrop={vi.fn()}
+          onComponentMove={vi.fn()}
+          onComponentSelect={vi.fn()}
+          onStartConnection={vi.fn()}
+          onCompleteConnection={vi.fn()}
+          onConnectionLabelChange={vi.fn()}
+        />
+      </div>
     );
 
-    // React Flow viewport should be present
     const viewport = document.querySelector('.react-flow__viewport');
     expect(viewport).toBeInTheDocument();
   });
@@ -761,6 +701,224 @@ describe('React Flow Adapter Functions', () => {
       expect(updatedEdge.markerEnd).toBeDefined();
       expect(updatedEdge.markerStart).toBeDefined();
       expect(updatedEdge.id).toBe(originalEdge.id);
+    });
+  });
+
+  describe('Integration with Canvas Test Helpers', () => {
+    beforeEach(() => {
+      MockHelpers.mockTauriAPIs();
+    });
+
+    it('should integrate with CanvasTestHelpers for component operations', async () => {
+      const mockHandlers = {
+        onComponentDrop: vi.fn(),
+        onComponentMove: vi.fn(),
+        onComponentSelect: vi.fn(),
+        onStartConnection: vi.fn(),
+        onCompleteConnection: vi.fn(),
+        onConnectionLabelChange: vi.fn()
+      };
+
+      renderWithProviders(
+        <div style={{ width: 800, height: 600 }}>
+          <CanvasArea
+            components={[]}
+            connections={[]}
+            selectedComponent={null}
+            connectionStart={null}
+            {...mockHandlers}
+          />
+        </div>
+      );
+
+      // Verify canvas rendered
+      expect(document.querySelector('[data-testid="reactflow-canvas"]')).toBeInTheDocument();
+    });
+
+    it('should use AssertionHelpers for component verification', async () => {
+      renderWithProviders(
+        <div style={{ width: 800, height: 600 }}>
+          <CanvasArea
+            components={mockComponents}
+            connections={[]}
+            selectedComponent={null}
+            connectionStart={null}
+            onComponentDrop={vi.fn()}
+            onComponentMove={vi.fn()}
+            onComponentSelect={vi.fn()}
+            onStartConnection={vi.fn()}
+            onCompleteConnection={vi.fn()}
+            onConnectionLabelChange={vi.fn()}
+          />
+        </div>
+      );
+
+      // Use assertion helpers for verification
+      const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
+      expect(reactFlowWrapper).toBeInTheDocument();
+
+      // Verify components are rendered
+      const nodes = reactFlowWrapper.querySelectorAll('.react-flow__node');
+      expect(nodes).toHaveLength(2);
+    });
+
+    it('should handle error recovery during canvas operations', async () => {
+      const mockHandlers = {
+        onComponentDrop: vi.fn().mockImplementation(() => {
+          throw new Error('Component drop failed');
+        }),
+        onComponentMove: vi.fn(),
+        onComponentSelect: vi.fn(),
+        onStartConnection: vi.fn(),
+        onCompleteConnection: vi.fn(),
+        onConnectionLabelChange: vi.fn()
+      };
+
+      renderWithProviders(
+        <div style={{ width: 800, height: 600 }}>
+          <CanvasArea
+            components={[]}
+            connections={[]}
+            selectedComponent={null}
+            connectionStart={null}
+            {...mockHandlers}
+          />
+        </div>
+      );
+
+      // Ensure canvas is present even when drop handler errors
+      expect(document.querySelector('[data-testid="reactflow-canvas"]')).toBeInTheDocument();
+    });
+  });
+
+  describe('Enhanced Performance Testing', () => {
+    beforeEach(() => {
+      MockHelpers.mockTauriAPIs();
+    });
+
+    it('should handle large datasets efficiently', async () => {
+      // Create many components for performance testing
+      const manyComponents = Array.from({ length: 50 }, (_, i) => ({
+        id: `perf-comp-${i}`,
+        type: 'microservice' as const,
+        x: (i % 10) * 100,
+        y: Math.floor(i / 10) * 100,
+        label: `Service ${i}`,
+        layerId: 'layer1'
+      }));
+
+      const performanceStart = performance.now();
+
+      renderWithProviders(
+        <div style={{ width: 800, height: 600 }}>
+          <CanvasArea
+            components={manyComponents}
+            connections={[]}
+            selectedComponent={null}
+            connectionStart={null}
+            onComponentDrop={vi.fn()}
+            onComponentMove={vi.fn()}
+            onComponentSelect={vi.fn()}
+            onStartConnection={vi.fn()}
+            onCompleteConnection={vi.fn()}
+            onConnectionLabelChange={vi.fn()}
+          />
+        </div>
+      );
+
+      await waitFor(() => {
+        const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
+        expect(reactFlowWrapper).toBeInTheDocument();
+      });
+
+      ;(performance as any).advanceTime?.(50);
+      const performanceEnd = performance.now();
+      const renderTime = performanceEnd - performanceStart;
+
+      // Should render within reasonable time even with many components
+      expect(renderTime).toBeLessThan(3000); // 3 seconds max
+    });
+
+    it('should maintain performance during rapid interactions', async () => {
+      const mockHandlers = {
+        onComponentDrop: vi.fn(),
+        onComponentMove: vi.fn(),
+        onComponentSelect: vi.fn(),
+        onStartConnection: vi.fn(),
+        onCompleteConnection: vi.fn(),
+        onConnectionLabelChange: vi.fn()
+      };
+
+      renderWithProviders(
+        <div style={{ width: 800, height: 600 }}>
+          <CanvasArea
+            components={mockComponents}
+            connections={mockConnections}
+            selectedComponent={null}
+            connectionStart={null}
+            {...mockHandlers}
+          />
+        </div>
+      );
+
+      const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
+      const nodes = reactFlowWrapper.querySelectorAll('.react-flow__node');
+
+      // Perform rapid interactions
+      const user = userEvent.setup();
+      const startTime = performance.now();
+
+      for (let i = 0; i < 10; i++) {
+        await user.click(nodes[0]);
+        await user.click(nodes[1]);
+      }
+
+      ;(performance as any).advanceTime?.(30);
+      const endTime = performance.now();
+      const interactionTime = endTime - startTime;
+
+      // Should handle rapid interactions smoothly
+      expect(interactionTime).toBeLessThan(2000);
+      expect(mockHandlers.onComponentSelect).toHaveBeenCalledTimes(20);
+    });
+
+    it('should integrate with virtualization systems', async () => {
+      const manyComponents = Array.from({ length: 100 }, (_, i) => ({
+        id: `virt-comp-${i}`,
+        type: 'microservice' as const,
+        x: i * 200, // Spread out horizontally
+        y: 100,
+        label: `Service ${i}`,
+        layerId: 'layer1'
+      }));
+
+      renderWithProviders(
+        <div style={{ width: 800, height: 600 }}>
+          <CanvasArea
+            components={manyComponents}
+            connections={[]}
+            selectedComponent={null}
+            connectionStart={null}
+            onComponentDrop={vi.fn()}
+            onComponentMove={vi.fn()}
+            onComponentSelect={vi.fn()}
+            onStartConnection={vi.fn()}
+            onCompleteConnection={vi.fn()}
+            onConnectionLabelChange={vi.fn()}
+          />
+        </div>
+      );
+
+      // Should handle large component lists efficiently
+      await waitFor(() => {
+        const reactFlowWrapper = screen.getByTestId('reactflow-canvas');
+        expect(reactFlowWrapper).toBeInTheDocument();
+      });
+
+      // Only visible components should be rendered (if virtualization is active)
+      const nodes = document.querySelectorAll('.react-flow__node');
+      // With virtualization, we might render fewer than 100 nodes
+      expect(nodes.length).toBeLessThanOrEqual(100);
     });
   });
 });

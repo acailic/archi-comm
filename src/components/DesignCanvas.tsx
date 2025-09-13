@@ -4,6 +4,7 @@
 // RELEVANT FILES: CanvasArea.tsx, PropertiesPanel.tsx, AssignmentPanel.tsx, SolutionHints.tsx
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { storage } from '@/services/storage';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ArrowLeft, Save, Download, Lightbulb, Search, Activity, Clock, Zap } from 'lucide-react';
@@ -174,7 +175,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
   const handleSave = useCallback(() => {
     const designData = { components, connections, infoCards };
-    localStorage.setItem('archicomm-design', JSON.stringify(designData));
+    void storage.setItem('archicomm-design', JSON.stringify(designData));
   }, [components, connections, infoCards]);
 
   const handleExport = useCallback(() => {
@@ -304,7 +305,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                 </TooltipContent>
               </Tooltip>
               
-              <Button onClick={handleContinue}>
+              <Button onClick={handleContinue} disabled={components.length === 0}>
                 Continue to Recording
               </Button>
             </div>

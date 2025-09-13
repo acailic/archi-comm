@@ -1,8 +1,13 @@
 import { StrictMode, Suspense } from 'react';
+import { ServiceProvider } from '@/lib/di/ServiceProvider';
+import { createApplicationContainer } from '@/lib/di/ServiceRegistry';
+import type { Container } from '@/lib/di/Container';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
 import { getLogger, logger, LogLevel } from './lib/logger';
 import { errorStore, addGlobalError } from './lib/errorStore';
+import type { AppError } from './lib/errorStore';
+import { ErrorRecoverySystem } from './lib/recovery/ErrorRecoverySystem';
 import { isDevelopment, isTauriEnvironment, isProduction } from './lib/environment';
 import './index.css';
 
@@ -10,63 +15,104 @@ import './index.css';
 const mainLogger = getLogger('main');
 
 // Enhanced global error handlers with centralized logging and error store integration
-window.addEventListener('unhandledrejection', event => {
-  const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+// These are attached only after the recovery system is initialized
+function attachGlobalErrorHandlers() {
+  window.addEventListener('unhandledrejection', async event => {
+    const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
 
-  // Log through centralized logger with full context
-  mainLogger.error('Unhandled promise rejection', error, {
-    type: 'unhandledrejection',
-    url: window.location.href,
-    userAgent: navigator.userAgent,
-    timestamp: Date.now(),
-    stack: error.stack,
-    reason: event.reason,
-  });
-
-  // Add to error store for development mode tracking
-  addGlobalError(error, {
-    userActions: ['Promise rejection occurred'],
-    additionalData: {
+    // Log through centralized logger with full context
+    mainLogger.error('Unhandled promise rejection', error, {
       type: 'unhandledrejection',
-      reason: event.reason,
       url: window.location.href,
-    },
+      userAgent: navigator.userAgent,
+      timestamp: Date.now(),
+      stack: error.stack,
+      reason: event.reason,
+    });
+
+    // Add to error store for development mode tracking (recovery will be triggered automatically)
+    const addedError = addGlobalError(error, {
+      userActions: ['Promise rejection occurred'],
+      additionalData: {
+        type: 'unhandledrejection',
+        reason: event.reason,
+        url: window.location.href,
+      },
+    });
+
+    // Trigger recovery in all envs
+    const ers = ErrorRecoverySystem.getInstance();
+    if (addedError) {
+      ers.handleError(addedError);
+    } else {
+      const appError: AppError = {
+        id: `global_${Date.now()}`,
+        message: error.message,
+        stack: error.stack,
+        category: 'global',
+        severity: 'high',
+        timestamp: Date.now(),
+        count: 1,
+        resolved: false,
+        context: { url: window.location.href, userAgent: navigator.userAgent, timestamp: Date.now() },
+        hash: btoa(error.message).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
+      };
+      ers.handleError(appError);
+    }
+
+    // Prevent default browser error handling
+    event.preventDefault();
   });
 
-  // Prevent default browser error handling
-  event.preventDefault();
-});
+  window.addEventListener('error', async event => {
+    const error = event.error || new Error(event.message || 'Unknown error');
 
-window.addEventListener('error', event => {
-  const error = event.error || new Error(event.message || 'Unknown error');
-
-  // Log through centralized logger with full context
-  mainLogger.error('Global error caught', error, {
-    type: 'global',
-    filename: event.filename,
-    lineno: event.lineno,
-    colno: event.colno,
-    url: window.location.href,
-    userAgent: navigator.userAgent,
-    timestamp: Date.now(),
-    message: event.message,
-  });
-
-  // Add to error store for development mode tracking
-  addGlobalError(error, {
-    userActions: ['Global error occurred'],
-    additionalData: {
+    // Log through centralized logger with full context
+    mainLogger.error('Global error caught', error, {
       type: 'global',
       filename: event.filename,
       lineno: event.lineno,
       colno: event.colno,
-      message: event.message,
       url: window.location.href,
-    },
-  });
+      userAgent: navigator.userAgent,
+      timestamp: Date.now(),
+      message: event.message,
+    });
 
-  // Don't prevent default for regular errors
-});
+    // Add to error store for development mode tracking (recovery will be triggered automatically)
+    const addedError = addGlobalError(error, {
+      userActions: ['Global error occurred'],
+      additionalData: {
+        type: 'global',
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        message: event.message,
+        url: window.location.href,
+      },
+    });
+
+    // Trigger recovery in all envs
+    const ers = ErrorRecoverySystem.getInstance();
+    if (addedError) {
+      ers.handleError(addedError);
+    } else {
+      const appError: AppError = {
+        id: `global_${Date.now()}`,
+        message: error.message,
+        stack: error.stack,
+        category: 'global',
+        severity: 'high',
+        timestamp: Date.now(),
+        count: 1,
+        resolved: false,
+        context: { url: window.location.href, userAgent: navigator.userAgent, timestamp: Date.now() },
+        hash: btoa(error.message).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
+      };
+      ers.handleError(appError);
+    }
+  });
+}
 
 // Safe App import with fallback
 // App is dynamically loaded later to avoid top-level await
@@ -187,6 +233,112 @@ const initializeLogging = () => {
 const loggingReady = initializeLogging();
 const environmentReady = initializeEnvironment();
 
+// Initialize recovery system with context provider
+const initializeRecoverySystem = async () => {
+  const recoveryLogger = getLogger('recovery');
+
+  try {
+    // Dynamic import to avoid circular dependency
+    const { ErrorRecoverySystem } = await import('./lib/recovery/ErrorRecoverySystem');
+    const { AutoSaveStrategy } = await import('./lib/recovery/strategies/AutoSaveStrategy');
+    const { ComponentResetStrategy } = await import('./lib/recovery/strategies/ComponentResetStrategy');
+    const { BackupRestoreStrategy } = await import('./lib/recovery/strategies/BackupRestoreStrategy');
+    const { SoftReloadStrategy } = await import('./lib/recovery/strategies/SoftReloadStrategy');
+    const { HardResetStrategy } = await import('./lib/recovery/strategies/HardResetStrategy');
+
+    const recoverySystem = ErrorRecoverySystem.getInstance();
+
+    // Register built-in recovery strategies
+    recoverySystem.registerStrategy(new AutoSaveStrategy());
+    // Component reset for controlled remounts
+    recoverySystem.registerStrategy(new ComponentResetStrategy());
+    recoverySystem.registerStrategy(new BackupRestoreStrategy());
+    recoverySystem.registerStrategy(new SoftReloadStrategy());
+    // Last resort hard reset
+    recoverySystem.registerStrategy(new HardResetStrategy());
+
+    // Set up context provider for recovery operations
+    recoverySystem.setContextProvider(async () => {
+      // This will be called when recovery is needed to gather current app state
+      try {
+        // Try to get current application state
+        const currentDesignData = (() => {
+          try {
+            const stored = localStorage.getItem('current_design');
+            return stored ? JSON.parse(stored) : undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+
+        const currentAudioData = (() => {
+          try {
+            const stored = localStorage.getItem('current_audio');
+            return stored ? JSON.parse(stored) : undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+
+        const userPreferences = (() => {
+          try {
+            const stored = localStorage.getItem('user_preferences');
+            return stored ? JSON.parse(stored) : undefined;
+          } catch {
+            return undefined;
+          }
+        })();
+
+        return {
+          currentDesignData,
+          currentAudioData,
+          userPreferences,
+          sessionId: `session_${Date.now()}`,
+          projectId: localStorage.getItem('current_project_id') || undefined,
+        };
+      } catch (error) {
+        recoveryLogger.warn('Failed to gather recovery context', error);
+        return {
+          sessionId: `fallback_${Date.now()}`,
+        };
+      }
+    });
+
+    // Check for recovery data from previous soft reload
+    const { SoftReloadStrategy: SoftReloadClass } = await import('./lib/recovery/strategies/SoftReloadStrategy');
+    const { hasRecovery, recoveryData } = await SoftReloadClass.checkForRecoveryData();
+
+    if (hasRecovery && recoveryData) {
+      recoveryLogger.info('Found recovery data from previous session, restoring...');
+      try {
+        await SoftReloadClass.restoreDataAfterReload(recoveryData);
+        recoveryLogger.info('Recovery data restored successfully');
+      } catch (restoreError) {
+        recoveryLogger.error('Failed to restore recovery data', restoreError);
+      }
+    }
+
+    recoveryLogger.info('Recovery system initialized successfully', {
+      strategies: recoverySystem.getStrategies().map(s => ({ name: s.name, priority: s.priority })),
+      hasRecoveryData: hasRecovery
+    });
+
+    return true;
+  } catch (error) {
+    recoveryLogger.error('Failed to initialize recovery system', error);
+    return false;
+  }
+};
+
+// Initialize recovery system BEFORE attaching global handlers
+let recoveryReady = false;
+try {
+  recoveryReady = await initializeRecoverySystem();
+  attachGlobalErrorHandlers();
+} catch (error) {
+  mainLogger.warn('Recovery system initialization failed', error);
+}
+
 // Root element validation
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -231,13 +383,13 @@ try {
   throw error;
 }
 
-const renderWith = (AppComponent: any) => {
+const renderWith = (AppComponent: any, container?: Container) => {
   const renderLogger = getLogger('render');
 
   try {
     renderLogger.time('app-render');
 
-    root.render(
+    const AppContent = () => (
       <StrictMode>
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
@@ -246,6 +398,19 @@ const renderWith = (AppComponent: any) => {
         </ErrorBoundary>
       </StrictMode>
     );
+
+    // Render with or without DI based on container availability
+    if (container) {
+      renderLogger.info('Rendering with dependency injection container');
+      root.render(
+        <ServiceProvider container={container}>
+          <AppContent />
+        </ServiceProvider>
+      );
+    } else {
+      renderLogger.info('Rendering without dependency injection (fallback mode)');
+      root.render(<AppContent />);
+    }
 
     renderLogger.timeEnd('app-render');
 
@@ -318,21 +483,70 @@ const renderWith = (AppComponent: any) => {
   }
 };
 
-// Load App dynamically with enhanced error handling and logging
+// Initialize dependency injection container
+async function initializeDIContainer(): Promise<Container | null> {
+  const diLogger = getLogger('dependency-injection');
+
+  try {
+    // Check if DI is enabled via environment variable or localStorage setting
+    const diEnabled =
+      process.env.REACT_APP_ENABLE_DI !== 'false' &&
+      localStorage.getItem('archicomm-disable-di') !== 'true';
+
+    if (!diEnabled) {
+      diLogger.info('Dependency injection disabled via configuration');
+      return null;
+    }
+
+    diLogger.time('di-container-init');
+    diLogger.info('Initializing dependency injection container');
+
+    const container = await createApplicationContainer();
+
+    diLogger.timeEnd('di-container-init');
+    diLogger.info('Dependency injection container initialized successfully', {
+      services: container.getRegisteredServices(),
+      dependencies: container.getDependencyGraph(),
+    });
+
+    return container;
+  } catch (error) {
+    const diError = error instanceof Error ? error : new Error(String(error));
+    diLogger.error('Failed to initialize DI container, falling back to direct instantiation', diError);
+
+    addGlobalError(diError, {
+      userActions: ['Dependency injection initialization'],
+      additionalData: {
+        phase: 'di-container-init',
+        fallbackMode: true,
+      },
+    });
+
+    return null; // Fall back to direct instantiation
+  }
+}
+
+// Load App dynamically with enhanced error handling and DI integration
 function loadAndRenderApp() {
   const loadLogger = getLogger('app-loader');
 
   loadLogger.time('app-load');
-  loadLogger.info('Starting dynamic App component import');
+  loadLogger.info('Starting application initialization with DI support');
 
+  // Load the App component, then try to initialize DI and render with provider
   import('./components/AppContainer')
-    .then(appModule => {
-      loadLogger.timeEnd('app-load');
-      loadLogger.info('App component loaded successfully', {
-        hasDefault: !!appModule.default,
-        exports: Object.keys(appModule),
-      });
-      renderWith(appModule.default);
+    .then((appModule) => {
+      const AppComponent = appModule.default;
+      return initializeDIContainer()
+        .then(container => {
+          loadLogger.timeEnd('app-load');
+          renderWith(AppComponent, container || undefined);
+        })
+        .catch(err => {
+          console.warn('DI initialization failed, rendering without DI:', err);
+          loadLogger.timeEnd('app-load');
+          renderWith(AppComponent);
+        });
     })
     .catch(error => {
       loadLogger.timeEnd('app-load');
@@ -396,6 +610,7 @@ startLogger.info('Starting ArchiComm application', {
   readiness: {
     logging: loggingReady,
     environment: environmentReady,
+    recovery: recoveryReady,
   },
 });
 
@@ -409,18 +624,54 @@ if (isDevelopment()) {
   debugLogger.info('🔧 Development mode active', {
     loggingReady,
     environmentReady,
+    recoveryReady,
     rootElement: !!rootElement,
     logLevel: logger.getLevel(),
     errorStoreStats: errorStore.getStats(),
+    recoveryStats: errorStore.getRecoveryStats(),
   });
 
-  // Enhanced debugging utilities with logging integration
+  // Enhanced debugging utilities with logging integration and DI support
   (window as any).ArchiCommDebug = {
     // Storage utilities
     clearStorage: () => {
       localStorage.clear();
       sessionStorage.clear();
       debugLogger.info('Storage cleared');
+    },
+
+    // Dependency injection utilities
+    dependencyInjection: {
+      isEnabled: () => {
+        return localStorage.getItem('archicomm-disable-di') !== 'true' &&
+               process.env.REACT_APP_ENABLE_DI !== 'false';
+      },
+      enable: () => {
+        localStorage.removeItem('archicomm-disable-di');
+        debugLogger.info('Dependency injection enabled (requires refresh)');
+      },
+      disable: () => {
+        localStorage.setItem('archicomm-disable-di', 'true');
+        debugLogger.info('Dependency injection disabled (requires refresh)');
+      },
+      refreshWithDI: () => {
+        localStorage.removeItem('archicomm-disable-di');
+        window.location.reload();
+      },
+      refreshWithoutDI: () => {
+        localStorage.setItem('archicomm-disable-di', 'true');
+        window.location.reload();
+      },
+      status: () => {
+        const enabled = (window as any).ArchiCommDebug.dependencyInjection.isEnabled();
+        const containerExists = !!(window as any).__ARCHICOMM_DI_CONTAINER__;
+        return {
+          configurationEnabled: enabled,
+          containerInitialized: containerExists,
+          servicesAvailable: containerExists ?
+            (window as any).__ARCHICOMM_DI_CONTAINER__.getRegisteredServices() : [],
+        };
+      },
     },
 
     // Performance utilities
@@ -458,6 +709,14 @@ if (isDevelopment()) {
     errorStore: {
       getState: () => errorStore.getState(),
       getStats: () => errorStore.getStats(),
+      getRecoveryStats: () => errorStore.getRecoveryStats(),
+      isRecoveryEnabled: () => errorStore.isRecoveryEnabled(),
+      enableRecovery: (enabled: boolean) => {
+        errorStore.enableRecovery(enabled);
+        debugLogger.info(`Recovery ${enabled ? 'enabled' : 'disabled'}`);
+      },
+      getRecoveryHistory: () => errorStore.getRecoveryHistory(),
+      isRecoveryInProgress: () => errorStore.isRecoveryInProgress(),
       clearErrors: () => {
         errorStore.clearErrors();
         debugLogger.info('Error store cleared');
@@ -469,6 +728,13 @@ if (isDevelopment()) {
           additionalData: { source: 'ArchiCommDebug' },
         });
         debugLogger.info('Test error added');
+      },
+      addTestCriticalError: () => {
+        addGlobalError('Critical test error that should trigger recovery', {
+          userActions: ['Critical debug test'],
+          additionalData: { source: 'ArchiCommDebug', critical: true },
+        });
+        debugLogger.info('Critical test error added (should trigger recovery)');
       },
     },
 
@@ -492,16 +758,26 @@ if (isDevelopment()) {
       isTauri: isTauriEnvironment(),
       loggingReady,
       environmentReady,
+      recoveryReady,
     },
   };
 
-  // Make logger and error store globally accessible for debugging
+  // Make logger, error store, and DI container globally accessible for debugging
   (window as any).__ARCHICOMM_LOGGER__ = logger;
   (window as any).__ARCHICOMM_ERROR_STORE__ = errorStore;
+
+  // DI container will be set when initialized
+  initializeDIContainer().then(container => {
+    if (container) {
+      (window as any).__ARCHICOMM_DI_CONTAINER__ = container;
+      debugLogger.info('DI container available globally as window.__ARCHICOMM_DI_CONTAINER__');
+    }
+  });
 
   debugLogger.info('🛠️ Enhanced debug utilities available', {
     ArchiCommDebug: 'window.ArchiCommDebug',
     logger: 'window.__ARCHICOMM_LOGGER__',
     errorStore: 'window.__ARCHICOMM_ERROR_STORE__',
+    diContainer: 'window.__ARCHICOMM_DI_CONTAINER__ (when initialized)',
   });
 }

@@ -1,7 +1,8 @@
 // src/features/canvas/components/ReactFlowCanvas.tsx
 // React Flow-based canvas component that replaces CanvasArea.tsx
-// Maintains the same props interface for drop-in compatibility
+// Maintains the same props interface for drop-in compatibility and includes optional virtualization support
 
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Edge,
   EdgeChange,
@@ -9,7 +10,6 @@ import type {
   NodeChange,
   Connection as ReactFlowConnection,
 } from '@xyflow/react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDrop } from 'react-dnd';
 
 import {
@@ -49,7 +49,14 @@ import { CustomNode } from './CustomNode';
 import { InfoCard as InfoCardComponent } from './InfoCard';
 import { computeLayout } from '../utils/auto-layout';
 
-interface ReactFlowCanvasProps {
+// Virtualization imports
+import { VirtualCanvas, VirtualCanvasProps } from './VirtualCanvas';
+import type { VirtualizationConfig, VirtualizationStats } from '../utils/virtualization';
+// import { CanvasPerformanceManager } from '../../../lib/performance/CanvasPerformanceManager';
+import { Switch } from '../../../components/ui/switch';
+import { Badge } from '../../../components/ui/badge';
+
+export interface ReactFlowCanvasProps {
   components: DesignComponent[];
   connections: Connection[];
   infoCards?: InfoCard[];
@@ -75,6 +82,11 @@ interface ReactFlowCanvasProps {
   // Optional auto-layout options
   autoLayout?: boolean;
   layoutDirection?: 'RIGHT' | 'DOWN' | 'LEFT' | 'UP';
+  // Virtualization options
+  virtualization?: Partial<VirtualizationConfig>;
+  enableSpatialIndex?: boolean;
+  maxVisibleComponents?: number;
+  onVirtualizationStats?: (stats: VirtualizationStats) => void;
 }
 
 type ConnectionStyle = 'straight' | 'curved' | 'stepped';
@@ -88,16 +100,22 @@ const ConnectionStyleSelectTrigger = memo(function ConnectionStyleSelectTrigger(
   );
 });
 
-// Memoized Panel content for selecting connection style
+// Memoized Panel content for selecting connection style and virtualization
 const ConnectionStylePanel = memo(function ConnectionStylePanel({
   value,
   onChange,
+  virtualizationEnabled,
+  onVirtualizationToggle,
+  virtualizationStats,
 }: {
   value: ConnectionStyle;
   onChange: (value: ConnectionStyle) => void;
+  virtualizationEnabled: boolean;
+  onVirtualizationToggle: (enabled: boolean) => void;
+  virtualizationStats?: VirtualizationStats;
 }) {
   return (
-    <Panel position='top-left' className='flex gap-2'>
+    <Panel position='top-left' className='flex gap-2 items-center'>
       <Select value={value} onValueChange={onChange}>
         <ConnectionStyleSelectTrigger />
         <SelectContent>
@@ -106,6 +124,20 @@ const ConnectionStylePanel = memo(function ConnectionStylePanel({
           <SelectItem value='stepped'>Stepped</SelectItem>
         </SelectContent>
       </Select>
+
+      <div className='flex items-center gap-2 px-2 py-1 bg-card/95 backdrop-blur-sm border border-border/50 rounded'>
+        <Switch
+          checked={virtualizationEnabled}
+          onCheckedChange={onVirtualizationToggle}
+          size='sm'
+        />
+        <span className='text-xs font-medium'>Virtualization</span>
+        {virtualizationEnabled && virtualizationStats && (
+          <Badge variant='secondary' className='text-xs px-1 py-0'>
+            {virtualizationStats.visibleComponents}/{virtualizationStats.totalComponents}
+          </Badge>
+        )}
+      </div>
     </Panel>
   );
 });
@@ -136,11 +168,34 @@ function ReactFlowCanvasInternal({
   showConnectors = true,
   autoLayout = false,
   layoutDirection = 'RIGHT',
+  virtualization,
+  enableSpatialIndex = false,
+  maxVisibleComponents = 1000,
+  onVirtualizationStats,
 }: ReactFlowCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useReactFlow();
   const [connectionStyle, setConnectionStyle] = useState<ConnectionStyle>('curved');
   const [layoutPositions, setLayoutPositions] = useState<Record<string, { x: number; y: number }>>({});
+
+  // Virtualization state
+  const [virtualizationEnabled, setVirtualizationEnabled] = useState(virtualization?.enabled ?? false);
+  const [virtualizationStats, setVirtualizationStats] = useState<VirtualizationStats | undefined>();
+  // const performanceManager = useMemo(() => CanvasPerformanceManager.getInstance(), []);
+
+  // Merged virtualization configuration
+  const virtualizationConfig = useMemo(
+    () => ({
+      enabled: virtualizationEnabled,
+      bufferZone: 200,
+      maxVisibleItems: maxVisibleComponents,
+      enableSpatialIndex,
+      enablePerformanceMonitoring: true,
+      debugMode: process.env.NODE_ENV === 'development',
+      ...virtualization,
+    }),
+    [virtualizationEnabled, maxVisibleComponents, enableSpatialIndex, virtualization]
+  );
 
   // Convert domain objects to React Flow format with proper CustomNode data
   const createEnhancedNodes = useCallback(
@@ -156,7 +211,7 @@ function ReactFlowCanvasInternal({
             isSelected: selectedComponent === component.id,
             isConnectionStart: connectionStart === component.id,
             onSelect: onComponentSelect,
-            onStartConnection: onStartConnection,
+            onStartConnection: (id: string, _position?: 'top' | 'bottom' | 'left' | 'right') => onStartConnection(id),
             onLabelChange: onComponentLabelChange || (() => {}),
           },
           draggable: true,
@@ -481,21 +536,96 @@ function ReactFlowCanvasInternal({
     setConnectionStyle(value);
   }, []);
 
+  // Handle virtualization toggle
+  const handleVirtualizationToggle = useCallback((enabled: boolean) => {
+    setVirtualizationEnabled(enabled);
+
+    // TODO: Re-enable performance manager once import issues are resolved
+    // Register/unregister canvas with performance manager
+    // if (enabled && canvasRef.current) {
+    //   performanceManager.registerCanvasSystem(
+    //     'main-canvas',
+    //     canvasRef.current,
+    //     'reactflow',
+    //     reactFlowInstance
+    //   );
+    // } else {
+    //   performanceManager.unregisterCanvasSystem('main-canvas');
+    // }
+  }, []);
+
+  // Handle virtualization stats updates
+  const handleVirtualizationStatsChange = useCallback(
+    (stats: VirtualizationStats) => {
+      setVirtualizationStats(stats);
+      if (onVirtualizationStats) {
+        onVirtualizationStats(stats);
+      }
+    },
+    [onVirtualizationStats]
+  );
+
   // Memoize the panel JSX to stabilize ReactFlow children
   const connectionStylePanel = useMemo(
-    () => <ConnectionStylePanel value={connectionStyle} onChange={handleConnectionStyleChange} />,
-    [connectionStyle]
+    () => (
+      <ConnectionStylePanel
+        value={connectionStyle}
+        onChange={handleConnectionStyleChange}
+        virtualizationEnabled={virtualizationEnabled}
+        onVirtualizationToggle={handleVirtualizationToggle}
+        virtualizationStats={virtualizationStats}
+      />
+    ),
+    [connectionStyle, virtualizationEnabled, handleVirtualizationToggle, virtualizationStats]
   );
 
   // Background pattern based on grid style
   const backgroundVariant = gridStyle === 'dots' ? 'dots' : 'lines';
 
+  // Conditional rendering: use VirtualCanvas if virtualization is enabled
+  if (virtualizationEnabled) {
+    return (
+      <VirtualCanvas
+        {...{
+          components,
+          connections,
+          infoCards,
+          selectedComponent,
+          connectionStart,
+          onComponentDrop,
+          onComponentMove,
+          onComponentSelect,
+          onComponentLabelChange,
+          onConnectionLabelChange,
+          onConnectionDelete,
+          onConnectionTypeChange,
+          onStartConnection,
+          onCompleteConnection,
+          onInfoCardAdd,
+          onInfoCardUpdate,
+          onInfoCardDelete,
+          onInfoCardColorChange,
+          gridStyle,
+          snapToGrid,
+          gridSpacing,
+          showConnectors,
+          autoLayout,
+          layoutDirection,
+        }}
+        virtualizationConfig={virtualizationConfig}
+        onVirtualizationStatsChange={handleVirtualizationStatsChange}
+      />
+    );
+  }
+
+  // Default non-virtualized rendering
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           ref={setCanvasRef}
           className='relative w-full h-full bg-muted/10'
+          data-testid='canvas-root'
           style={{ height: '100%' }}
         >
           {/* Drop zone indicator */}
@@ -508,6 +638,7 @@ function ReactFlowCanvasInternal({
           )}
 
           <ReactFlow
+            data-testid="canvas"
             nodes={nodes}
             edges={edgeTypes}
             onNodesChange={handleNodesChange}
@@ -536,8 +667,10 @@ function ReactFlowCanvasInternal({
             maxZoom={2}
             attributionPosition='bottom-left'
             proOptions={{ hideAttribution: true }}
+            className='archicomm-reactflow'
+            data-testid='reactflow-canvas'
           >
-            {/* Connection style controls */}
+            {/* Connection style and virtualization controls */}
             {connectionStylePanel}
 
             {/* Background grid */}
@@ -594,11 +727,44 @@ function ReactFlowCanvasInternal({
   );
 }
 
-// Main component wrapped with ReactFlowProvider
+// Error boundary for virtualization fallback
+class VirtualizationErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(_error: Error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Virtualization error, falling back to standard rendering:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+
+    return this.props.children;
+  }
+}
+
+// Main component wrapped with ReactFlowProvider and error boundary
 export function ReactFlowCanvas(props: ReactFlowCanvasProps) {
+  const fallbackProps = { ...props, virtualization: { enabled: false } };
+
   return (
     <ReactFlowProvider>
-      <ReactFlowCanvasInternal {...props} />
+      <VirtualizationErrorBoundary
+        fallback={<ReactFlowCanvasInternal {...fallbackProps} />}
+      >
+        <ReactFlowCanvasInternal {...props} />
+      </VirtualizationErrorBoundary>
     </ReactFlowProvider>
   );
 }

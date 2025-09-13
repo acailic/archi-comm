@@ -2,6 +2,9 @@ import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { CanvasPersistence } from './CanvasPersistence';
 import { useCanvasTelemetry } from './CanvasTelemetry';
 import { TemplateEngine } from './TemplateEngine';
+import { useService } from '@/lib/di/ServiceProvider';
+import { CANVAS_SERVICE, PERSISTENCE_SERVICE } from '@/lib/di/ServiceRegistry';
+import type { ICanvasService, IPersistenceService } from '@/lib/di/ServiceInterfaces';
 import type {
   Connection,
   DesignComponent,
@@ -70,7 +73,11 @@ export interface CanvasActions {
   batchUpdateConnections: (updates: Array<{ id: string; patch: Partial<Connection> }>) => void;
 }
 
-export interface CanvasOrchestratorValue extends CanvasState, CanvasActions {}
+export interface CanvasOrchestratorValue extends CanvasState, CanvasActions {
+  // DI service bridge methods
+  getDIServices?: () => { canvas: ICanvasService; persistence: IPersistenceService } | null;
+  isDIEnabled?: () => boolean;
+}
 
 const CanvasOrchestratorContext = createContext<CanvasOrchestratorValue | null>(null);
 
@@ -78,9 +85,14 @@ export interface CanvasOrchestratorProviderProps {
   initialData: DesignData;
   projectId?: string;
   children: React.ReactNode;
+  useDependencyInjection?: boolean;
 }
 
-export function CanvasOrchestratorProvider({ initialData, projectId, children }: CanvasOrchestratorProviderProps) {
+export function CanvasOrchestratorProvider({ initialData, projectId, children, useDependencyInjection = false }: CanvasOrchestratorProviderProps) {
+  // Resolve DI services when enabled
+  const diEnabled = !!useDependencyInjection;
+  const diCanvasService = diEnabled ? (useService(CANVAS_SERVICE) as ICanvasService) : null;
+  const diPersistenceService = diEnabled ? (useService(PERSISTENCE_SERVICE) as IPersistenceService) : null;
   // Create the state object for undo/redo management
   const createStateSnapshot = useCallback((data: {
     components: DesignComponent[];
@@ -134,7 +146,13 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
   }, [currentState, pushState]);
 
   const telemetry = useCanvasTelemetry();
-  const persistence = useMemo(() => new CanvasPersistence(projectId), [projectId]);
+  // Base persistence (non-DI) for fallback
+  const basePersistence = useMemo(() => new CanvasPersistence(projectId), [projectId]);
+  // Select DI persistence when enabled, otherwise use base
+  const persistence = useMemo(
+    () => (diEnabled && diPersistenceService ? diPersistenceService : basePersistence),
+    [diEnabled, diPersistenceService, basePersistence]
+  );
   const templates = useMemo(() => new TemplateEngine(), []);
 
   // Auto-save functionality
@@ -154,11 +172,68 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     await persistence.saveDesign(designData);
   }, [persistence, initialData.metadata]);
 
-  const { isSaving, forceSave, status: saveStatus, lastSavedAt } = useAutoSave(
+  const { isSaving, forceSave: forceSaveInternal, status: saveStatus, lastSavedAt } = useAutoSave(
     currentState,
     saveDesignData,
     { delay: 2000, enabled: true }
   );
+
+  // Bridge functions for DI service integration
+  const getDIServices = useCallback(() => {
+    if (diEnabled && diCanvasService && diPersistenceService) {
+      return {
+        canvas: diCanvasService,
+        persistence: diPersistenceService,
+      };
+    }
+    return null;
+  }, [diEnabled, diCanvasService, diPersistenceService]);
+
+  const isDIEnabled = useCallback(() => {
+    return diEnabled && !!diCanvasService && !!diPersistenceService;
+  }, [diEnabled, diCanvasService, diPersistenceService]);
+
+  // Sync orchestrator state with DI services
+  const syncWithDIServices = useCallback(() => {
+    if (diCanvasService && diEnabled) {
+      try {
+        // Sync orchestrator state to DI service
+        const designData: DesignData = {
+          components,
+          connections,
+          layers,
+          gridConfig,
+          activeTool,
+          metadata: {
+            lastModified: new Date().toISOString(),
+          },
+        };
+
+        // Update DI service state (this is a bridge function)
+        if (diCanvasService.importDesign) {
+          diCanvasService.importDesign(designData);
+        }
+      } catch (error) {
+        console.warn('Failed to sync with DI services:', error);
+      }
+    }
+  }, [diCanvasService, diEnabled, components, connections, layers, gridConfig, activeTool]);
+
+  // Force save wrapper that works with both DI and direct services
+  const forceSave = useCallback(() => {
+    forceSaveInternal();
+    // Also sync with DI services if enabled
+    if (diEnabled) {
+      syncWithDIServices();
+    }
+  }, [forceSaveInternal, diEnabled, syncWithDIServices]);
+
+  // Sync with DI services when state changes
+  React.useEffect(() => {
+    if (diEnabled) {
+      syncWithDIServices();
+    }
+  }, [diEnabled, syncWithDIServices, currentState]);
 
   const setGridConfig = useCallback((cfg: GridConfig) => {
     updateState({ gridConfig: { ...cfg } });
@@ -389,7 +464,10 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     moveMultipleComponents,
     duplicateComponent,
     batchUpdateComponents,
-    batchUpdateConnections
+    batchUpdateConnections,
+    // DI service bridge methods
+    getDIServices,
+    isDIEnabled
   }), [
     components,
     connections,
@@ -428,8 +506,17 @@ export function CanvasOrchestratorProvider({ initialData, projectId, children }:
     moveMultipleComponents,
     duplicateComponent,
     batchUpdateComponents,
-    batchUpdateConnections
+    batchUpdateConnections,
+    getDIServices,
+    isDIEnabled
   ]);
+
+  // Bridge orchestrator to DI canvas service
+  React.useEffect(() => {
+    if (diEnabled && (diCanvasService as any)?.setOrchestrator) {
+      (diCanvasService as any).setOrchestrator(value as any);
+    }
+  }, [diEnabled, diCanvasService, value]);
 
   return (
     <CanvasOrchestratorContext.Provider value={value}>{children}</CanvasOrchestratorContext.Provider>
@@ -441,4 +528,3 @@ export function useCanvas() {
   if (!ctx) throw new Error('useCanvas must be used within CanvasOrchestratorProvider');
   return ctx;
 }
-
