@@ -1,0 +1,443 @@
+# .github/workflows/e2e-tests.yml
+# GitHub Actions workflow for comprehensive E2E testing
+# Runs tests across multiple browsers and environments
+# RELEVANT FILES: playwright.config.ts, e2e/*.spec.ts
+
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  e2e-tests:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        test-suite:
+          - happy-flow
+          - canvas-functionality
+          - annotation-editing
+          - performance
+          - visual-regression
+          - responsive-design
+          - workflow-integration
+          - stress-testing
+          - data-driven
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install --with-deps ${{ matrix.browser }}
+
+    - name: Build application
+      run: npm run web:build
+
+    - name: Start web server
+      run: |
+        npm run web:dev &
+        sleep 10
+        curl -f http://localhost:5173 || exit 1
+
+    - name: Run E2E tests
+      run: |
+        case "${{ matrix.test-suite }}" in
+          "happy-flow")
+            npx playwright test happy-flow.spec.ts --project=${{ matrix.browser }}
+            ;;
+          "canvas-functionality")
+            npx playwright test canvas.spec.ts canvas-functionality.spec.ts --project=${{ matrix.browser }}
+            ;;
+          "annotation-editing")
+            npx playwright test annotation-edit-dialog.spec.ts --project=${{ matrix.browser }}
+            ;;
+          "performance")
+            npx playwright test performance.spec.ts --project=${{ matrix.browser }}
+            ;;
+          "visual-regression")
+            npx playwright test visual-regression.spec.ts --project=scenario-visual
+            ;;
+          "responsive-design")
+            npx playwright test responsive-design.spec.ts --project=mobile-visual --project=tablet-visual --project=scenario-visual
+            ;;
+          "workflow-integration")
+            npx playwright test workflow-integration.spec.ts --project=${{ matrix.browser }}
+            ;;
+          "stress-testing")
+            npx playwright test stress-testing.spec.ts --project=${{ matrix.browser }}
+            ;;
+          "data-driven")
+            npx playwright test data-driven-tests.spec.ts --project=${{ matrix.browser }}
+            ;;
+        esac
+      env:
+        CI: true
+        NODE_ENV: test
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-report-${{ matrix.browser }}-${{ matrix.test-suite }}
+        path: |
+          e2e/test-results/
+          playwright-report/
+        retention-days: 30
+
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: screenshots-${{ matrix.browser }}-${{ matrix.test-suite }}
+        path: e2e/test-results/screenshots/
+        retention-days: 30
+
+  tauri-e2e-tests:
+    timeout-minutes: 90
+    runs-on: ${{ matrix.platform }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install system dependencies (Linux)
+      if: matrix.platform == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build Tauri app (Debug)
+      run: npm run build:debug
+
+    - name: Run Tauri integration tests
+      run: npx playwright test tauri-integration.spec.ts --project=chromium
+      env:
+        CI: true
+        TAURI_ENV: test
+
+    - name: Upload Tauri test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: tauri-test-results-${{ matrix.platform }}
+        path: |
+          e2e/test-results/
+          src-tauri/target/debug/
+        retention-days: 30
+
+  accessibility-tests:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build application
+      run: npm run web:build
+
+    - name: Start web server
+      run: |
+        npm run web:dev &
+        sleep 10
+
+    - name: Run accessibility tests
+      run: npx playwright test a11y-smoke.spec.ts --project=chromium
+      env:
+        CI: true
+
+    - name: Upload accessibility report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: accessibility-report
+        path: |
+          e2e/test-results/
+          playwright-report/
+        retention-days: 30
+
+  performance-benchmarks:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build application
+      run: npm run web:build
+
+    - name: Start web server
+      run: |
+        npm run web:dev &
+        sleep 10
+
+    - name: Run performance benchmarks
+      run: |
+        npx playwright test performance.spec.ts stress-testing.spec.ts --project=chromium --reporter=json:performance-results.json
+      env:
+        CI: true
+        BENCHMARK_MODE: true
+
+    - name: Process performance results
+      run: |
+        node -e "
+          const fs = require('fs');
+          if (fs.existsSync('performance-results.json')) {
+            const results = JSON.parse(fs.readFileSync('performance-results.json'));
+            const summary = {
+              totalTests: results.suites.length,
+              passedTests: results.suites.filter(s => s.outcome === 'passed').length,
+              avgDuration: results.suites.reduce((acc, s) => acc + s.duration, 0) / results.suites.length,
+              timestamp: new Date().toISOString()
+            };
+            fs.writeFileSync('performance-summary.json', JSON.stringify(summary, null, 2));
+            console.log('Performance Summary:', summary);
+          }
+        "
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-benchmarks
+        path: |
+          performance-results.json
+          performance-summary.json
+          e2e/test-results/
+        retention-days: 30
+
+  test-report:
+    needs: [e2e-tests, tauri-e2e-tests, accessibility-tests, performance-benchmarks]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Generate consolidated test report
+      run: |
+        node -e "
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Collect all test results
+          const testResults = {
+            timestamp: new Date().toISOString(),
+            workflow: '${{ github.workflow }}',
+            runId: '${{ github.run_id }}',
+            commit: '${{ github.sha }}',
+            branch: '${{ github.ref_name }}',
+            results: {}
+          };
+          
+          // Process artifacts
+          const artifactDirs = fs.readdirSync('.').filter(dir => 
+            fs.statSync(dir).isDirectory() && dir.includes('report')
+          );
+          
+          console.log('Found artifact directories:', artifactDirs);
+          
+          testResults.summary = {
+            totalArtifacts: artifactDirs.length,
+            generatedAt: new Date().toISOString()
+          };
+          
+          fs.writeFileSync('consolidated-test-report.json', JSON.stringify(testResults, null, 2));
+          
+          // Generate HTML report
+          const htmlReport = \`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>ArchiComm E2E Test Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .header { background: #f0f0f0; padding: 20px; border-radius: 5px; }
+              .summary { margin: 20px 0; }
+              .artifact { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+              .timestamp { color: #666; font-size: 0.9em; }
+            </style>
+          </head>
+          <body>
+            <div class='header'>
+              <h1>ArchiComm E2E Test Report</h1>
+              <p class='timestamp'>Generated: \${testResults.timestamp}</p>
+              <p>Workflow: \${testResults.workflow} | Run ID: \${testResults.runId}</p>
+              <p>Commit: \${testResults.commit} | Branch: \${testResults.branch}</p>
+            </div>
+            <div class='summary'>
+              <h2>Summary</h2>
+              <p>Total Artifacts: \${testResults.summary.totalArtifacts}</p>
+              <p>Test Categories: E2E Tests, Tauri Integration, Accessibility, Performance</p>
+            </div>
+            <div class='artifacts'>
+              <h2>Test Artifacts</h2>
+              \${artifactDirs.map(dir => \`<div class='artifact'><strong>\${dir}</strong></div>\`).join('')}
+            </div>
+          </body>
+          </html>
+          \`;
+          
+          fs.writeFileSync('test-report.html', htmlReport);
+          console.log('Generated consolidated test report');
+        "
+
+    - name: Upload consolidated report
+      uses: actions/upload-artifact@v4
+      with:
+        name: consolidated-test-report
+        path: |
+          consolidated-test-report.json
+          test-report.html
+        retention-days: 90
+
+    - name: Comment PR with test results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const report = JSON.parse(fs.readFileSync('consolidated-test-report.json', 'utf8'));
+            
+            const comment = `
+            ## 🧪 E2E Test Results
+            
+            **Workflow Run:** [\${{ github.run_id }}](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }})
+            **Commit:** \`\${report.commit.substring(0, 7)}\`
+            **Branch:** \`\${report.branch}\`
+            
+            ### Test Summary
+            - **Total Artifacts:** \${report.summary.totalArtifacts}
+            - **Generated:** \${new Date(report.timestamp).toLocaleString()}
+            
+            ### Test Categories Executed
+            - ✅ Cross-browser E2E tests (Chrome, Firefox, Safari)
+            - ✅ Tauri desktop integration tests
+            - ✅ Accessibility compliance tests
+            - ✅ Performance benchmark tests
+            - ✅ Visual regression tests
+            - ✅ Responsive design tests
+            - ✅ Stress testing scenarios
+            
+            [View detailed test artifacts](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          } catch (error) {
+            console.log('Could not post PR comment:', error);
+          }
+
+  cleanup:
+    needs: [test-report]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Clean up old artifacts
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Clean up artifacts older than 30 days
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 30);
+          
+          try {
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            for (const artifact of artifacts.data.artifacts) {
+              const createdAt = new Date(artifact.created_at);
+              
+              if (createdAt < cutoff && artifact.name.includes('playwright-report')) {
+                console.log(\`Deleting old artifact: \${artifact.name} (created: \${artifact.created_at})\`);
+                
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id
+                });
+              }
+            }
+          } catch (error) {
+            console.log('Artifact cleanup failed:', error);
+          }

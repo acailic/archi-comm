@@ -1,0 +1,599 @@
+# .github/workflows/test-matrix.yml
+# Comprehensive test matrix for different environments and configurations
+# Tests various browser combinations, OS platforms, and feature flags
+# RELEVANT FILES: .github/workflows/e2e-tests.yml, playwright.config.ts
+
+name: Test Matrix
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      test_level:
+        description: 'Test level to run'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - full
+          - performance
+          - visual
+
+env:
+  NODE_VERSION: '18'
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      e2e-changed: ${{ steps.changes.outputs.e2e }}
+      config-changed: ${{ steps.changes.outputs.config }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - name: Detect changes
+      id: changes
+      run: |
+        if git diff --name-only HEAD~1 | grep -E '^(src/|public/|index\.html|vite\.config)'; then
+          echo "frontend=true" >> $GITHUB_OUTPUT
+        else
+          echo "frontend=false" >> $GITHUB_OUTPUT
+        fi
+        
+        if git diff --name-only HEAD~1 | grep -E '^(src-tauri/|Cargo)'; then
+          echo "backend=true" >> $GITHUB_OUTPUT
+        else
+          echo "backend=false" >> $GITHUB_OUTPUT
+        fi
+        
+        if git diff --name-only HEAD~1 | grep -E '^(e2e/|playwright\.config)'; then
+          echo "e2e=true" >> $GITHUB_OUTPUT
+        else
+          echo "e2e=false" >> $GITHUB_OUTPUT
+        fi
+        
+        if git diff --name-only HEAD~1 | grep -E '^(package\.json|package-lock\.json|\.github/)'; then
+          echo "config=true" >> $GITHUB_OUTPUT
+        else
+          echo "config=false" >> $GITHUB_OUTPUT
+        fi
+
+  smoke-tests:
+    needs: detect-changes
+    if: always() && (needs.detect-changes.outputs.frontend-changed == 'true' || needs.detect-changes.outputs.config-changed == 'true' || github.event.inputs.test_level == 'smoke')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build application
+      run: npm run web:build
+
+    - name: Run smoke tests
+      run: |
+        npm run web:dev &
+        sleep 10
+        npx playwright test happy-flow.spec.ts a11y-smoke.spec.ts --project=chromium
+      env:
+        CI: true
+
+    - name: Upload smoke test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: smoke-test-results
+        path: |
+          e2e/test-results/
+          playwright-report/
+        retention-days: 7
+
+  cross-browser-matrix:
+    needs: [detect-changes, smoke-tests]
+    if: always() && (needs.smoke-tests.result == 'success' || github.event.inputs.test_level == 'full')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        browser: [chromium, firefox]
+        include:
+          # Safari only on macOS
+          - os: macos-latest
+            browser: webkit
+          # Edge on Windows
+          - os: windows-latest
+            browser: msedge
+        exclude:
+          # Skip Firefox on Windows for faster builds
+          - os: windows-latest
+            browser: firefox
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install ${{ matrix.browser }}
+
+    - name: Build application
+      run: npm run web:build
+
+    - name: Start web server (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        npm run web:dev &
+        sleep 10
+        curl -f http://localhost:5173 || exit 1
+
+    - name: Start web server (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        Start-Process npm -ArgumentList "run", "web:dev" -NoNewWindow
+        Start-Sleep 15
+        try { Invoke-WebRequest -Uri http://localhost:5173 } catch { exit 1 }
+      shell: powershell
+
+    - name: Run core E2E tests
+      run: |
+        npx playwright test \
+          happy-flow.spec.ts \
+          canvas.spec.ts \
+          annotation-edit-dialog.spec.ts \
+          --project=${{ matrix.browser }}
+      env:
+        CI: true
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: cross-browser-results-${{ matrix.os }}-${{ matrix.browser }}
+        path: |
+          e2e/test-results/
+          playwright-report/
+        retention-days: 14
+
+  visual-regression-matrix:
+    needs: [detect-changes, smoke-tests]
+    if: always() && (needs.smoke-tests.result == 'success' || github.event.inputs.test_level == 'visual')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        viewport:
+          - name: desktop
+            width: 1920
+            height: 1080
+          - name: tablet
+            width: 768
+            height: 1024
+          - name: mobile
+            width: 375
+            height: 667
+        theme: [light, dark]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build application
+      run: npm run web:build
+
+    - name: Start web server
+      run: |
+        npm run web:dev &
+        sleep 10
+
+    - name: Run visual regression tests
+      run: |
+        npx playwright test visual-regression.spec.ts \
+          --project=scenario-visual \
+          --grep "${{ matrix.viewport.name }}" \
+          --reporter=html
+      env:
+        CI: true
+        VIEWPORT_WIDTH: ${{ matrix.viewport.width }}
+        VIEWPORT_HEIGHT: ${{ matrix.viewport.height }}
+        COLOR_SCHEME: ${{ matrix.theme }}
+
+    - name: Upload visual test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: visual-results-${{ matrix.viewport.name }}-${{ matrix.theme }}
+        path: |
+          e2e/test-results/screenshots/
+          playwright-report/
+        retention-days: 30
+
+  performance-matrix:
+    needs: [detect-changes, smoke-tests]
+    if: always() && (needs.smoke-tests.result == 'success' || github.event.inputs.test_level == 'performance')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - name: baseline
+            components: 10
+            annotations: 5
+          - name: medium-load
+            components: 50
+            annotations: 25
+          - name: high-load
+            components: 100
+            annotations: 50
+          - name: stress-test
+            components: 200
+            annotations: 100
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build application (production)
+      run: npm run web:build
+
+    - name: Start web server
+      run: |
+        npm run web:dev &
+        sleep 10
+
+    - name: Run performance tests
+      run: |
+        npx playwright test performance.spec.ts stress-testing.spec.ts \
+          --project=chromium \
+          --reporter=json:performance-${{ matrix.scenario.name }}.json
+      env:
+        CI: true
+        PERFORMANCE_SCENARIO: ${{ matrix.scenario.name }}
+        COMPONENT_COUNT: ${{ matrix.scenario.components }}
+        ANNOTATION_COUNT: ${{ matrix.scenario.annotations }}
+
+    - name: Process performance metrics
+      run: |
+        node -e "
+          const fs = require('fs');
+          const results = JSON.parse(fs.readFileSync('performance-${{ matrix.scenario.name }}.json'));
+          
+          const metrics = {
+            scenario: '${{ matrix.scenario.name }}',
+            componentCount: ${{ matrix.scenario.components }},
+            annotationCount: ${{ matrix.scenario.annotations }},
+            testResults: results.suites.map(suite => ({
+              title: suite.title,
+              duration: suite.duration,
+              outcome: suite.outcome
+            })),
+            totalDuration: results.suites.reduce((acc, s) => acc + s.duration, 0),
+            passRate: results.suites.filter(s => s.outcome === 'passed').length / results.suites.length,
+            timestamp: new Date().toISOString()
+          };
+          
+          fs.writeFileSync('performance-metrics-${{ matrix.scenario.name }}.json', JSON.stringify(metrics, null, 2));
+          console.log('Performance metrics for ${{ matrix.scenario.name }}:', {
+            totalDuration: metrics.totalDuration,
+            passRate: metrics.passRate,
+            testCount: metrics.testResults.length
+          });
+        "
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-results-${{ matrix.scenario.name }}
+        path: |
+          performance-*.json
+          e2e/test-results/
+        retention-days: 30
+
+  tauri-matrix:
+    needs: [detect-changes, smoke-tests]
+    if: always() && (needs.detect-changes.outputs.backend-changed == 'true' || github.event.inputs.test_level == 'full')
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 90
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.platform.target }}
+
+    - name: Install system dependencies (Linux)
+      if: matrix.platform.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgtk-3-dev \
+          libwebkit2gtk-4.0-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build Tauri app
+      run: npm run build:debug
+      env:
+        RUST_TARGET: ${{ matrix.platform.target }}
+
+    - name: Run Tauri E2E tests
+      run: |
+        npx playwright test tauri-integration.spec.ts \
+          --project=chromium \
+          --reporter=json:tauri-results-${{ matrix.platform.os }}.json
+      env:
+        CI: true
+        TAURI_PLATFORM: ${{ matrix.platform.os }}
+
+    - name: Upload Tauri test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: tauri-results-${{ matrix.platform.os }}-${{ matrix.platform.target }}
+        path: |
+          tauri-results-*.json
+          e2e/test-results/
+          src-tauri/target/debug/
+        retention-days: 14
+
+  accessibility-matrix:
+    needs: [detect-changes, smoke-tests]
+    if: always() && (needs.smoke-tests.result == 'success' || github.event.inputs.test_level == 'full')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        a11y-standard: [wcag2a, wcag2aa, wcag21aa, section508]
+        device-type: [desktop, mobile]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npx playwright install chromium
+
+    - name: Build application
+      run: npm run web:build
+
+    - name: Start web server
+      run: |
+        npm run web:dev &
+        sleep 10
+
+    - name: Run accessibility tests
+      run: |
+        npx playwright test a11y-smoke.spec.ts \
+          --project=chromium \
+          --reporter=json:a11y-results-${{ matrix.a11y-standard }}-${{ matrix.device-type }}.json
+      env:
+        CI: true
+        A11Y_STANDARD: ${{ matrix.a11y-standard }}
+        DEVICE_TYPE: ${{ matrix.device-type }}
+
+    - name: Upload accessibility results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: a11y-results-${{ matrix.a11y-standard }}-${{ matrix.device-type }}
+        path: |
+          a11y-results-*.json
+          e2e/test-results/
+        retention-days: 30
+
+  test-matrix-summary:
+    needs: [
+      smoke-tests,
+      cross-browser-matrix,
+      visual-regression-matrix,
+      performance-matrix,
+      tauri-matrix,
+      accessibility-matrix
+    ]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Generate test matrix summary
+      run: |
+        node -e "
+          const fs = require('fs');
+          const path = require('path');
+          
+          const summary = {
+            workflow: 'Test Matrix',
+            runId: '${{ github.run_id }}',
+            commit: '${{ github.sha }}',
+            branch: '${{ github.ref_name }}',
+            trigger: '${{ github.event_name }}',
+            timestamp: new Date().toISOString(),
+            results: {
+              smoke: '${{ needs.smoke-tests.result }}',
+              crossBrowser: '${{ needs.cross-browser-matrix.result }}',
+              visual: '${{ needs.visual-regression-matrix.result }}',
+              performance: '${{ needs.performance-matrix.result }}',
+              tauri: '${{ needs.tauri-matrix.result }}',
+              accessibility: '${{ needs.accessibility-matrix.result }}'
+            },
+            artifacts: {}
+          };
+          
+          // Count artifacts by category
+          const dirs = fs.readdirSync('.').filter(d => fs.statSync(d).isDirectory());
+          
+          summary.artifacts = {
+            total: dirs.length,
+            byCategory: {
+              smoke: dirs.filter(d => d.includes('smoke')).length,
+              crossBrowser: dirs.filter(d => d.includes('cross-browser')).length,
+              visual: dirs.filter(d => d.includes('visual')).length,
+              performance: dirs.filter(d => d.includes('performance')).length,
+              tauri: dirs.filter(d => d.includes('tauri')).length,
+              accessibility: dirs.filter(d => d.includes('a11y')).length
+            }
+          };
+          
+          // Calculate overall success rate
+          const results = Object.values(summary.results);
+          const successCount = results.filter(r => r === 'success').length;
+          const totalCount = results.filter(r => r !== 'skipped').length;
+          summary.successRate = totalCount > 0 ? successCount / totalCount : 0;
+          
+          fs.writeFileSync('test-matrix-summary.json', JSON.stringify(summary, null, 2));
+          
+          console.log('Test Matrix Summary:');
+          console.log('- Overall Success Rate:', (summary.successRate * 100).toFixed(1) + '%');
+          console.log('- Total Artifacts:', summary.artifacts.total);
+          console.log('- Results:', summary.results);
+          
+          // Generate status badge data
+          const badgeColor = summary.successRate >= 0.9 ? 'brightgreen' : 
+                           summary.successRate >= 0.7 ? 'yellow' : 'red';
+          const badgeText = (summary.successRate * 100).toFixed(0) + '%25 passing';
+          
+          fs.writeFileSync('badge-data.txt', \`tests-\${badgeText}-\${badgeColor}\`);
+        "
+
+    - name: Upload test matrix summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-matrix-summary
+        path: |
+          test-matrix-summary.json
+          badge-data.txt
+        retention-days: 90
+
+    - name: Create status check
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const summary = JSON.parse(fs.readFileSync('test-matrix-summary.json', 'utf8'));
+            
+            const state = summary.successRate >= 0.9 ? 'success' : 
+                         summary.successRate >= 0.7 ? 'pending' : 'failure';
+            
+            const description = \`\${(summary.successRate * 100).toFixed(1)}% tests passing (\${summary.artifacts.total} artifacts)\`;
+            
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: state,
+              target_url: \`\${context.payload.repository.html_url}/actions/runs/\${context.runId}\`,
+              description: description,
+              context: 'E2E Test Matrix'
+            });
+          } catch (error) {
+            console.log('Could not create status check:', error);
+          }
