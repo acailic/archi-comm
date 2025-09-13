@@ -196,7 +196,9 @@ export function useReactFlowIntegration({
     }
 
     // Generate unique ID for the new connection
-    const connectionId = `connection-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const connectionId = require('../../lib/utils').generateId
+      ? require('../../lib/utils').generateId('connection')
+      : `connection-${Math.random().toString(36).substr(2, 9)}`;
     
     // Create new connection object
     const newConnection: Connection = {

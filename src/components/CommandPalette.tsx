@@ -261,14 +261,44 @@ export function CommandPalette({
 
   // Comment 5: Precompute lower-case trimmed query for filtering
   const filteredCommands = useMemo(() => {
-    const availableCommands = commands.filter(cmd => cmd.available !== false);
+    const available = commands.filter(cmd => cmd.available !== false);
     const q = query.trim().toLowerCase();
-    if (!q) {
-      return availableCommands;
-    }
-    return availableCommands.filter(
-      cmd => cmd.title.toLowerCase().includes(q) || cmd.description.toLowerCase().includes(q)
-    );
+    if (!q) return available;
+
+    // Lightweight fuzzy ranking without external deps
+    const score = (text: string, query: string) => {
+      text = text.toLowerCase();
+      if (text.includes(query)) return 0; // best
+      // simple subsequence match score
+      let ti = 0, qi = 0, gaps = 0;
+      while (ti < text.length && qi < query.length) {
+        if (text[ti] === query[qi]) {
+          qi++;
+        } else {
+          gaps++;
+        }
+        ti++;
+      }
+      return qi === query.length ? gaps + (text.length - query.length) : Infinity;
+    };
+
+    const weighted = available
+      .map(cmd => {
+        const sTitle = score(cmd.title, q);
+        const sDesc = score(cmd.description, q);
+        const s = Math.min(sTitle, sDesc + 2); // description slightly less important
+        return { cmd, s };
+      })
+      .filter(r => r.s !== Infinity)
+      .sort((a, b) => a.s - b.s)
+      .map(r => r.cmd);
+
+    // Fallback to basic filtering if fuzzy yields nothing
+    return weighted.length
+      ? weighted
+      : available.filter(
+          c => c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
+        );
   }, [commands, query]);
 
   const groupedCommands = useMemo(() => {

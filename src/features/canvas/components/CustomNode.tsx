@@ -231,7 +231,7 @@ function CustomNodeInner({ data, selected }: NodeProps) {
               )}
 
               {/* Connection count indicator */}
-              {isHovered && (
+              {isHovered && connectionCount > 0 && (
                 <div className="absolute bottom-0 left-1 text-[8px] text-muted-foreground flex items-center gap-1">
                   <div className="w-1 h-1 rounded-full bg-current" />
                   <span>{connectionCount}</span>

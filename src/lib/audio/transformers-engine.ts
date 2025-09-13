@@ -3,7 +3,8 @@
 // Fully offline, privacy-focused transcription without backend dependencies
 // RELEVANT FILES: src/lib/audio/transcription-engines.ts, src/lib/audio/audio-processor.ts
 
-import { pipeline, AutomaticSpeechRecognitionPipeline, env } from '@xenova/transformers';
+// Note: avoid static import of '@xenova/transformers' to prevent Vite import-analysis errors
+// when the package is not installed. We dynamically import it at runtime if available.
 import { TranscriptionEngine, TranscriptionEngineOptions } from './transcription-engines';
 import type { TranscriptionResponse, TranscriptionSegment, TranscriptionOptions } from '../../shared/contracts';
 
@@ -11,21 +12,15 @@ export class TransformersJSEngine implements TranscriptionEngine {
   name = 'Transformers.js';
   type: 'offline' = 'offline';
   
-  private pipeline: AutomaticSpeechRecognitionPipeline | null = null;
+  private pipeline: any | null = null;
   private modelName = 'microsoft/speecht5_asr';
   private isInitialized = false;
   private supportsChunking = false;
+  private transformersMod: any | null = null;
   
   async isAvailable(): Promise<boolean> {
-    try {
-      // Check if we're in a browser environment
-      if (typeof window === 'undefined') return false;
-      
-      // Check if Transformers.js is available
-      return typeof pipeline !== 'undefined';
-    } catch {
-      return false;
-    }
+    // Available only in browser; dynamic import performed later.
+    return typeof window !== 'undefined';
   }
   
   async initialize(options: TranscriptionEngineOptions = {}): Promise<void> {
@@ -37,15 +32,18 @@ export class TransformersJSEngine implements TranscriptionEngine {
       this.modelName = this.selectModel(modelSize);
       this.supportsChunking = /whisper/i.test(this.modelName);
       
+      // Load transformers module dynamically (optional dependency)
+      const mod = await this.loadTransformersModule();
+
       // Allow loading models from CDN/remote if needed
       try {
-        env.allowRemoteModels = true;
-      } catch (e) {
-        // Non-fatal; proceed without changing env if unavailable
-      }
-      
+        if (mod?.env) mod.env.allowRemoteModels = true;
+      } catch {}
+
       // Initialize Transformers.js pipeline with error handling
-      this.pipeline = await pipeline('automatic-speech-recognition', this.modelName, {
+      const pipelineFn = mod?.pipeline;
+      if (!pipelineFn) throw new Error('Transformers.js pipeline unavailable');
+      this.pipeline = await pipelineFn('automatic-speech-recognition', this.modelName, {
         // Configure pipeline options
         device: 'cpu', // Force CPU for compatibility
         progress_callback: (data: any) => {
@@ -58,6 +56,35 @@ export class TransformersJSEngine implements TranscriptionEngine {
       console.error('Failed to initialize Transformers.js engine:', error);
       throw new Error(`TransformersJS initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  private async loadTransformersModule(): Promise<any> {
+    if (this.transformersMod) return this.transformersMod;
+    // Check for global (if loaded via script tag)
+    if ((window as any).transformers) {
+      this.transformersMod = (window as any).transformers;
+      return this.transformersMod;
+    }
+    // As a last resort, attempt to load from CDN dynamically (no local import to avoid Vite analysis)
+    try {
+      await this.injectScript('https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js');
+      if ((window as any).transformers) {
+        this.transformersMod = (window as any).transformers;
+        return this.transformersMod;
+      }
+    } catch {}
+    throw new Error('Transformers.js module not found');
+  }
+
+  private injectScript(src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      // Use standard script to ensure global is exposed
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(`Failed to load script ${src}`));
+      document.head.appendChild(s);
+    });
   }
   
   async transcribe(audio: Blob | ArrayBuffer, options?: TranscriptionOptions): Promise<TranscriptionResponse> {

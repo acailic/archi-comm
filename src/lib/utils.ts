@@ -6,6 +6,7 @@
  */
 
 import { type ClassValue, clsx } from 'clsx';
+import { nanoid } from 'nanoid';
 import { twMerge } from 'tailwind-merge';
 
 /**
@@ -19,7 +20,7 @@ export function cn(...inputs: ClassValue[]) {
  * Simple unique ID generator
  */
 export function generateId(prefix = 'id'): string {
-  return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
+  return `${prefix}-${nanoid(10)}`;
 }
 
 type AnyFunction = (...args: unknown[]) => unknown;

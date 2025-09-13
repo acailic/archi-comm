@@ -134,7 +134,7 @@ function ReactFlowCanvasInternal({
   snapToGrid = false,
   gridSpacing = 20,
   showConnectors = true,
-  autoLayout = true,
+  autoLayout = false,
   layoutDirection = 'RIGHT',
 }: ReactFlowCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -205,9 +205,24 @@ function ReactFlowCanvasInternal({
     [onInfoCardUpdate, onInfoCardDelete, onInfoCardColorChange]
   );
 
+  // Memoize initial nodes using only direct inputs to reduce unnecessary recalculations
   const initialNodes = useMemo(
     () => [...createEnhancedNodes(components), ...createInfoCardNodes(infoCards)],
-    [createEnhancedNodes, components, createInfoCardNodes, infoCards]
+    [
+      // Inputs for enhanced component nodes
+      components,
+      layoutPositions,
+      selectedComponent,
+      connectionStart,
+      onComponentSelect,
+      onStartConnection,
+      onComponentLabelChange,
+      // Inputs for info card nodes
+      infoCards,
+      onInfoCardUpdate,
+      onInfoCardDelete,
+      onInfoCardColorChange,
+    ]
   );
   const initialEdges = useMemo(() => toReactFlowEdges(connections), [connections]);
 
@@ -216,9 +231,22 @@ function ReactFlowCanvasInternal({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   // Sync external data changes with React Flow state
+  // Keep ReactFlow state in sync with external data; depend on the same direct inputs
   const syncedNodes = useMemo(
     () => [...createEnhancedNodes(components), ...createInfoCardNodes(infoCards)],
-    [createEnhancedNodes, components, createInfoCardNodes, infoCards]
+    [
+      components,
+      layoutPositions,
+      selectedComponent,
+      connectionStart,
+      onComponentSelect,
+      onStartConnection,
+      onComponentLabelChange,
+      infoCards,
+      onInfoCardUpdate,
+      onInfoCardDelete,
+      onInfoCardColorChange,
+    ]
   );
   const syncedEdges = useMemo(() => toReactFlowEdges(connections), [connections]);
 
@@ -244,7 +272,16 @@ function ReactFlowCanvasInternal({
         setLayoutPositions(map);
         try {
           reactFlowInstance?.fitView?.({ padding: 0.2 });
-        } catch {}
+        } catch (error) {
+          // Log details to avoid silent failures and aid debugging
+          console.error('ReactFlowCanvas: failed to fit view after auto-layout', {
+            error,
+            autoLayout,
+            layoutDirection,
+            nodeCount: components?.length,
+            edgeCount: connections?.length,
+          });
+        }
       }
     };
     run();
@@ -268,11 +305,13 @@ function ReactFlowCanvasInternal({
 
         if (offset) {
           // Convert screen coordinates to React Flow coordinates
-          const position = reactFlowInstance.screenToFlowPosition({
-            x: offset.x - canvasRect.left,
-            y: offset.y - canvasRect.top,
-          });
-          onComponentDrop(item.type, position.x, position.y);
+          const localPoint = { x: offset.x - canvasRect.left, y: offset.y - canvasRect.top };
+          const position = reactFlowInstance?.screenToFlowPosition
+            ? reactFlowInstance.screenToFlowPosition(localPoint)
+            : null;
+          if (position) {
+            onComponentDrop(item.type, position.x, position.y);
+          }
         }
       },
       collect: monitor => ({
@@ -405,7 +444,7 @@ function ReactFlowCanvasInternal({
   }, []);
 
   const handleAddInfoCard = useCallback(() => {
-    if (contextMenu && onInfoCardAdd && reactFlowInstance) {
+    if (contextMenu && onInfoCardAdd && reactFlowInstance?.screenToFlowPosition) {
       // Context menu coordinates are already relative to canvas
       const position = reactFlowInstance.screenToFlowPosition({
         x: contextMenu.x,
@@ -445,7 +484,7 @@ function ReactFlowCanvasInternal({
   // Memoize the panel JSX to stabilize ReactFlow children
   const connectionStylePanel = useMemo(
     () => <ConnectionStylePanel value={connectionStyle} onChange={handleConnectionStyleChange} />,
-    [connectionStyle, handleConnectionStyleChange]
+    [connectionStyle]
   );
 
   // Background pattern based on grid style

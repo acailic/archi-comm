@@ -3,18 +3,16 @@
 // Provides additional features like pause/resume and format conversion
 // RELEVANT FILES: src/lib/audio/recording-engines.ts
 
-import RecordRTC from 'recordrtc';
 import { RecordingEngine, RecordingOptions } from '../recording-engines';
 
 export class RecordRTCEngine implements RecordingEngine {
   name = 'RecordRTC';
-  private recorder: RecordRTC | null = null;
+  private recorder: any | null = null;
   private stream: MediaStream | null = null;
+  private RecordRTCRef: any | null = null;
   
   async isSupported(): Promise<boolean> {
-    return !!(navigator.mediaDevices && 
-             navigator.mediaDevices.getUserMedia && 
-             typeof RecordRTC !== 'undefined');
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
   }
   
   async startRecording(options: RecordingOptions = {}): Promise<void> {
@@ -35,6 +33,8 @@ export class RecordRTCEngine implements RecordingEngine {
       
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
       
+      const RecordRTC = await this.getRecordRTC();
+
       const recordRTCOptions = {
         type: 'audio',
         mimeType: options.mimeType || 'audio/wav',
@@ -108,5 +108,31 @@ export class RecordRTCEngine implements RecordingEngine {
       }
       this.recorder = null;
     }
+  }
+
+  private async getRecordRTC(): Promise<any> {
+    if (this.RecordRTCRef) return this.RecordRTCRef;
+    // Check global first
+    if ((window as any).RecordRTC) {
+      this.RecordRTCRef = (window as any).RecordRTC;
+      return this.RecordRTCRef;
+    }
+    // Inject CDN script (UMD exposes window.RecordRTC)
+    await this.injectScript('https://cdn.jsdelivr.net/npm/recordrtc/RecordRTC.min.js');
+    if ((window as any).RecordRTC) {
+      this.RecordRTCRef = (window as any).RecordRTC;
+      return this.RecordRTCRef;
+    }
+    throw new Error('RecordRTC library not found');
+  }
+
+  private injectScript(src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(`Failed to load script ${src}`));
+      document.head.appendChild(s);
+    });
   }
 }
