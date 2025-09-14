@@ -3,7 +3,7 @@
 // Displays full challenge information including examples, constraints, and solution hints
 // RELEVANT FILES: DesignCanvas.tsx, LeetCodeStylePanel.tsx, SolutionHints.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BookOpen,
   Target,
@@ -16,6 +16,32 @@ import {
 } from 'lucide-react';
 import type { Challenge, DesignComponent } from '../shared/contracts';
 import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
+
+// Type guard function to verify ExtendedChallenge shape
+function isValidExtendedChallenge(obj: any): obj is ExtendedChallenge {
+  if (!obj || typeof obj !== 'object') return false;
+
+  // Check required Challenge fields
+  if (typeof obj.id !== 'string' || !obj.id) return false;
+  if (typeof obj.title !== 'string' || !obj.title) return false;
+  if (typeof obj.description !== 'string') return false;
+  if (!['easy', 'medium', 'hard', 'beginner', 'intermediate', 'advanced'].includes(obj.difficulty))
+    return false;
+  if (typeof obj.estimatedTime !== 'number' || obj.estimatedTime <= 0) return false;
+  if (typeof obj.category !== 'string' || !obj.category) return false;
+  if (!Array.isArray(obj.requirements)) return false;
+
+  // Check optional ExtendedChallenge fields if they exist
+  if (obj.solutionHints !== undefined && !Array.isArray(obj.solutionHints)) return false;
+  if (obj.architectureTemplate !== undefined && typeof obj.architectureTemplate !== 'object')
+    return false;
+  if (obj.tags !== undefined && !Array.isArray(obj.tags)) return false;
+  if (obj.prerequisites !== undefined && !Array.isArray(obj.prerequisites)) return false;
+  if (obj.learningObjectives !== undefined && !Array.isArray(obj.learningObjectives)) return false;
+  if (obj.resources !== undefined && !Array.isArray(obj.resources)) return false;
+
+  return true;
+}
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
@@ -40,9 +66,18 @@ export function AssignmentPanel({ challenge, progress, currentComponents }: Assi
     hints: false,
   });
 
-  // Get extended challenge data
-  const extendedChallenge =
-    (challengeManager.getChallengeById(challenge.id) as ExtendedChallenge) || challenge;
+  // Get extended challenge data with proper type guarding and memoization
+  const extendedChallenge = useMemo(() => {
+    const retrieved = challengeManager.getChallengeById(challenge.id);
+
+    // Only use retrieved data if it passes type guard validation
+    if (retrieved && isValidExtendedChallenge(retrieved)) {
+      return retrieved;
+    }
+
+    // Safe fallback to original challenge
+    return challenge;
+  }, [challenge.id]);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -51,17 +86,18 @@ export function AssignmentPanel({ challenge, progress, currentComponents }: Assi
     }));
   };
 
+  // Difficulty color mapping for consistent styling
+  const DIFFICULTY_COLORS = {
+    easy: 'bg-green-500/10 text-green-700 border-green-200',
+    medium: 'bg-yellow-500/10 text-yellow-700 border-yellow-200',
+    hard: 'bg-red-500/10 text-red-700 border-red-200',
+  } as const;
+
   const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case 'easy':
-        return 'bg-green-500/10 text-green-700 border-green-200';
-      case 'medium':
-        return 'bg-yellow-500/10 text-yellow-700 border-yellow-200';
-      case 'hard':
-        return 'bg-red-500/10 text-red-700 border-red-200';
-      default:
-        return 'bg-gray-500/10 text-gray-700 border-gray-200';
-    }
+    return (
+      DIFFICULTY_COLORS[difficulty.toLowerCase() as keyof typeof DIFFICULTY_COLORS] ||
+      'bg-gray-500/10 text-gray-700 border-gray-200'
+    );
   };
 
   return (
@@ -95,8 +131,8 @@ export function AssignmentPanel({ challenge, progress, currentComponents }: Assi
         {/* Tags */}
         {extendedChallenge.tags && extendedChallenge.tags.length > 0 && (
           <div className='flex flex-wrap gap-1 mt-2'>
-            {extendedChallenge.tags.map((tag, index) => (
-              <Badge key={index} variant='secondary' className='text-xs'>
+            {extendedChallenge.tags.map(tag => (
+              <Badge key={tag} variant='secondary' className='text-xs'>
                 {tag}
               </Badge>
             ))}

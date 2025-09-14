@@ -30,7 +30,7 @@ export function getComponentVisualState({
   isSelected,
   isMultiSelected,
   isConnectionStart,
-  isDragPreview
+  isDragPreview,
 }: ComponentVisualState): string {
   return cn(
     'transition-all duration-200',
@@ -45,45 +45,94 @@ export function getComponentVisualState({
 /**
  * Get component type specific styling
  */
-export function getArchitecturalStyling(componentType: DesignComponent['type']): ArchitecturalStyling {
+export function getArchitecturalStyling(
+  componentType: DesignComponent['type']
+): ArchitecturalStyling {
   const styles: Record<string, ArchitecturalStyling> = {
     'load-balancer': {
       borderColor: 'border-purple-500',
       iconColor: 'text-purple-600',
-      gradient: 'from-purple-500 to-purple-700'
+      gradient: 'from-purple-600 to-purple-800',
     },
     'api-gateway': {
       borderColor: 'border-blue-500',
       iconColor: 'text-blue-600',
-      gradient: 'from-blue-500 to-blue-700'
+      gradient: 'from-blue-600 to-blue-800',
     },
-    'database': {
+    database: {
       borderColor: 'border-green-500',
       iconColor: 'text-green-600',
-      gradient: 'from-green-500 to-green-700'
+      gradient: 'from-green-600 to-green-800',
     },
-    'cache': {
+    cache: {
       borderColor: 'border-orange-500',
       iconColor: 'text-orange-600',
-      gradient: 'from-orange-500 to-orange-700'
+      gradient: 'from-orange-600 to-orange-800',
     },
-    'microservice': {
+    microservice: {
       borderColor: 'border-indigo-500',
       iconColor: 'text-indigo-600',
-      gradient: 'from-indigo-500 to-indigo-700'
+      gradient: 'from-indigo-600 to-indigo-800',
     },
     'message-queue': {
       borderColor: 'border-yellow-500',
       iconColor: 'text-yellow-600',
-      gradient: 'from-yellow-500 to-yellow-700'
-    }
+      gradient: 'from-yellow-600 to-yellow-800',
+    },
+    server: {
+      borderColor: 'border-slate-500',
+      iconColor: 'text-slate-600',
+      gradient: 'from-slate-600 to-slate-800',
+    },
+    client: {
+      borderColor: 'border-cyan-500',
+      iconColor: 'text-cyan-600',
+      gradient: 'from-cyan-600 to-cyan-800',
+    },
+    monitoring: {
+      borderColor: 'border-pink-500',
+      iconColor: 'text-pink-600',
+      gradient: 'from-pink-600 to-pink-800',
+    },
+    storage: {
+      borderColor: 'border-emerald-500',
+      iconColor: 'text-emerald-600',
+      gradient: 'from-emerald-600 to-emerald-800',
+    },
+    'edge-computing': {
+      borderColor: 'border-violet-500',
+      iconColor: 'text-violet-600',
+      gradient: 'from-violet-600 to-violet-800',
+    },
+    'ai-ml': {
+      borderColor: 'border-rose-500',
+      iconColor: 'text-rose-600',
+      gradient: 'from-rose-600 to-rose-800',
+    },
+    'search-engine': {
+      borderColor: 'border-amber-500',
+      iconColor: 'text-amber-600',
+      gradient: 'from-amber-600 to-amber-800',
+    },
+    'external-service': {
+      borderColor: 'border-teal-500',
+      iconColor: 'text-teal-600',
+      gradient: 'from-teal-600 to-teal-800',
+    },
+    'rest-api': {
+      borderColor: 'border-lime-500',
+      iconColor: 'text-lime-600',
+      gradient: 'from-lime-600 to-lime-800',
+    },
   };
 
-  return styles[componentType] || {
-    borderColor: 'border-gray-300',
-    iconColor: 'text-gray-600',
-    gradient: 'from-gray-500 to-gray-700'
-  };
+  return (
+    styles[componentType] || {
+      borderColor: 'border-gray-400',
+      iconColor: 'text-gray-600',
+      gradient: 'from-gray-600 to-gray-800',
+    }
+  );
 }
 
 /**
@@ -93,7 +142,7 @@ export function getHealthIndicator(healthStatus: 'healthy' | 'warning' | 'error'
   const indicators = {
     healthy: '🟢',
     warning: '🟡',
-    error: '🔴'
+    error: '🔴',
   };
   return indicators[healthStatus];
 }
