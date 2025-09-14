@@ -106,8 +106,7 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
                 'w-full h-9 rounded-t-xl flex items-center justify-between px-2 text-white shadow-sm',
                 'border-b border-white/10',
                 'bg-gradient-to-br',
-                computed.gradient,
-                subtleHeaderBg
+                computed.gradient
               )}
             >
               <Suspense fallback={<div className='w-5 h-5 rounded-md bg-white/40' />}>

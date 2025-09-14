@@ -105,7 +105,7 @@ export function AssignmentPanel({ challenge, progress, currentComponents }: Assi
       </div>
 
       {/* Scrollable Content */}
-      <ScrollArea className='flex-1 pr-4'>
+      <ScrollArea className='flex-1'>
         <div className='p-4 space-y-4'>
           {/* Description */}
           <Card className='border-l-4 border-l-primary'>
