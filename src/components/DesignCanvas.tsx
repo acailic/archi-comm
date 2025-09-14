@@ -4,7 +4,6 @@
 // RELEVANT FILES: CanvasArea.tsx, PropertiesPanel.tsx, AssignmentPanel.tsx, SolutionHints.tsx
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { storage } from '@/services/storage';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ArrowLeft, Save, Download, Lightbulb, Search, Activity, Clock, Zap } from 'lucide-react';
@@ -24,6 +23,7 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { SolutionHints } from './SolutionHints';
 import { CommandPalette } from './CommandPalette';
 import { ResizablePanel } from './ui/ResizablePanel';
+import { storage } from '@/services/storage';
 
 interface DesignCanvasProps {
   challenge: Challenge;

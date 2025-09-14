@@ -3,11 +3,11 @@
 // Provides automatic engine selection and fallback mechanisms
 // RELEVANT FILES: src/components/AudioRecording.tsx, src/lib/audio/recording-engines.ts, src/lib/audio/transcription-engines.ts
 
+import type { TranscriptionResponse } from '../../shared/contracts';
 import { RecordingEngine, RecordingOptions } from './recording-engines';
-import { TranscriptionEngine, TranscriptionEngineOptions } from './transcription-engines';
-import { RealtimeTranscriptionManager, RealtimeTranscriptionOptions } from './realtime-transcription';
+import { TranscriptionEngine } from './transcription-engines';
+import { RealtimeTranscriptionManager } from './realtime-transcription';
 import { AudioProcessor, AudioProcessingOptions } from './audio-processor';
-import type { TranscriptionResponse, TranscriptionOptions } from '../../shared/contracts';
 
 export interface AudioManagerOptions {
   preferredRecordingEngine?: string;

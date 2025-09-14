@@ -1,7 +1,10 @@
-import { cleanup, fireEvent, waitFor, screen } from '@testing-library/react';
+import { cleanup, fireEvent, waitFor, screen, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import type { EdgeChange, NodeChange } from '@xyflow/react';
-import { renderWithProviders, CanvasTestHelpers, AssertionHelpers } from '../test/integration-helpers';
+import { renderWithProviders } from '../test/integration-helpers';
 import { CanvasArea } from '../components/CanvasArea';
 import {
   createReactFlowEdge,
@@ -135,7 +138,7 @@ describe('Canvas Component Management', () => {
     expect(reactFlowViewport).toBeInTheDocument();
 
     // Fire wheel event directly on the viewport element for accurate zoom simulation
-    fireEvent.wheel(reactFlowViewport, { deltaY: -100, ctrlKey: true });
+    fireEvent.wheel(reactFlowViewport!, { deltaY: -100, ctrlKey: true });
 
     vi.advanceTimersByTime(400);
 
@@ -488,6 +491,16 @@ describe('React Flow Adapter Functions', () => {
         type: 'custom',
         position: { x: 400, y: 300 },
         data: {
+          component: {
+            id: 'comp3',
+            type: 'cache',
+            x: 400,
+            y: 300,
+            label: 'Redis Cache',
+            description: 'In-memory cache',
+            properties: { type: 'redis', ttl: 3600 },
+            layerId: 'layer1',
+          },
           type: 'cache',
           label: 'Redis Cache',
           description: 'In-memory cache',
@@ -706,7 +719,7 @@ describe('React Flow Adapter Functions', () => {
 
   describe('Integration with Canvas Test Helpers', () => {
     beforeEach(() => {
-      MockHelpers.mockTauriAPIs();
+      // MockHelpers.mockTauriAPIs();
     });
 
     it('should integrate with CanvasTestHelpers for component operations', async () => {
@@ -793,7 +806,7 @@ describe('React Flow Adapter Functions', () => {
 
   describe('Enhanced Performance Testing', () => {
     beforeEach(() => {
-      MockHelpers.mockTauriAPIs();
+      // MockHelpers.mockTauriAPIs();
     });
 
     it('should handle large datasets efficiently', async () => {
@@ -831,7 +844,7 @@ describe('React Flow Adapter Functions', () => {
         expect(reactFlowWrapper).toBeInTheDocument();
       });
 
-      ;(performance as any).advanceTime?.(50);
+      vi.advanceTimersByTime(50);
       const performanceEnd = performance.now();
       const renderTime = performanceEnd - performanceStart;
 
@@ -873,7 +886,7 @@ describe('React Flow Adapter Functions', () => {
         await user.click(nodes[1]);
       }
 
-      ;(performance as any).advanceTime?.(30);
+      vi.advanceTimersByTime(30);
       const endTime = performance.now();
       const interactionTime = endTime - startTime;
 

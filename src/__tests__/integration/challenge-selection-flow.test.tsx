@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, AssertionHelpers, MockHelpers } from '../../test/integration-helpers';
+import { renderWithProviders, MockHelpers } from '../../test/integration-helpers';
 import { ChallengeSelection } from '../../components/ChallengeSelection';
 import * as env from '../../lib/environment';
 

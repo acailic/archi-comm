@@ -3,8 +3,8 @@
 // Higher performance than Transformers.js while remaining offline
 // RELEVANT FILES: src/lib/audio/transcription-engines.ts, src/lib/audio/audio-processor.ts
 
-import { TranscriptionEngine, TranscriptionEngineOptions } from './transcription-engines';
 import type { TranscriptionResponse, TranscriptionSegment, TranscriptionOptions } from '../../shared/contracts';
+import { TranscriptionEngine, TranscriptionEngineOptions } from './transcription-engines';
 
 export class WhisperWasmEngine implements TranscriptionEngine {
   name = 'Whisper.cpp WASM';

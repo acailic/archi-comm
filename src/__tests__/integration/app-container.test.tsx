@@ -3,7 +3,7 @@ import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import AppContainer from '@/components/AppContainer';
 import * as env from '@/lib/environment';
-import { renderWithProviders, WorkflowTestHelpers } from '@/test/integration-helpers';
+import { renderWithProviders } from '@/test/integration-helpers';
 
 describe('AppContainer integration', () => {
   beforeEach(() => {

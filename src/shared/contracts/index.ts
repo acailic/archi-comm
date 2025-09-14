@@ -201,3 +201,38 @@ export interface TranscriptFeedback {
   lengthDifference: number;
   missingConcepts: string[];
 }
+
+// Design validation types
+export interface ComponentMatch {
+  templateComponent: string;
+  userComponent?: string;
+  userComponentId?: string;
+  userComponentLabel?: string;
+  matched: boolean;
+  reason?: string;
+}
+
+export interface ConnectionMatch {
+  expected: string;
+  found: boolean;
+  reason?: string;
+}
+
+export interface ValidationFeedback {
+  category: 'component' | 'connection' | 'architecture';
+  type: 'missing' | 'extra' | 'incorrect' | 'positive';
+  message: string;
+  suggestion?: string;
+}
+
+export interface DesignValidationResult {
+  score: number;
+  maxScore: number;
+  percentage: number;
+  componentMatches: ComponentMatch[];
+  connectionMatches: ConnectionMatch[];
+  feedback: ValidationFeedback[];
+  missingComponents: string[];
+  extraComponents: string[];
+  incorrectConnections: string[];
+}

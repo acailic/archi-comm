@@ -5,8 +5,8 @@
 
 // Note: avoid static import of '@xenova/transformers' to prevent Vite import-analysis errors
 // when the package is not installed. We dynamically import it at runtime if available.
-import { TranscriptionEngine, TranscriptionEngineOptions } from './transcription-engines';
 import type { TranscriptionResponse, TranscriptionSegment, TranscriptionOptions } from '../../shared/contracts';
+import { TranscriptionEngine, TranscriptionEngineOptions } from './transcription-engines';
 
 export class TransformersJSEngine implements TranscriptionEngine {
   name = 'Transformers.js';

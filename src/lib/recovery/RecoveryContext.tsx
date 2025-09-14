@@ -4,9 +4,9 @@
 // RELEVANT FILES: src/lib/recovery/ErrorRecoverySystem.ts, src/lib/errorStore.ts
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { ErrorRecoverySystem, RecoveryResult, RecoveryProgress } from './ErrorRecoverySystem';
 import { AppError } from '../errorStore';
 import { logger } from '../logger';
+import { ErrorRecoverySystem, RecoveryResult, RecoveryProgress } from './ErrorRecoverySystem';
 
 // Recovery attempt history item
 export interface RecoveryAttempt {

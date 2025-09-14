@@ -173,55 +173,116 @@ export const defaultChallengeConfig: ChallengeConfig = {
         },
       ],
       architectureTemplate: {
-        name: 'Basic URL Shortener',
-        description: 'A simple architecture for a URL shortening service',
+        name: 'Scalable URL Shortener',
+        description: 'A comprehensive architecture for a high-performance URL shortening service with analytics and monitoring',
         components: [
           {
             type: 'api-gateway',
             label: 'API Gateway',
-            description: 'Handles rate limiting and routing',
-            position: { x: 100, y: 100 },
+            description: 'Handles rate limiting, authentication, and routing',
+            position: { x: 100, y: 150 },
           },
           {
             type: 'server',
             label: 'URL Service',
-            description: 'Core URL shortening logic',
-            position: { x: 300, y: 100 },
+            description: 'Core URL shortening and retrieval logic',
+            position: { x: 300, y: 150 },
+          },
+          {
+            type: 'server',
+            label: 'Analytics Service',
+            description: 'Processes click events and generates analytics',
+            position: { x: 300, y: 300 },
           },
           {
             type: 'database',
             label: 'Primary DB',
-            description: 'Stores URL mappings',
-            position: { x: 500, y: 200 },
+            description: 'Stores URL mappings and metadata',
+            position: { x: 500, y: 150 },
+          },
+          {
+            type: 'database',
+            label: 'Analytics DB',
+            description: 'Stores click data and analytics',
+            position: { x: 500, y: 300 },
           },
           {
             type: 'cache',
             label: 'Redis Cache',
-            description: 'Caches popular URLs',
-            position: { x: 300, y: 300 },
+            description: 'Caches popular URLs and reduces DB load',
+            position: { x: 300, y: 50 },
+          },
+          {
+            type: 'message-queue',
+            label: 'Event Queue',
+            description: 'Handles async click event processing',
+            position: { x: 150, y: 300 },
+          },
+          {
+            type: 'monitoring',
+            label: 'Monitoring',
+            description: 'System health and performance monitoring',
+            position: { x: 100, y: 50 },
           },
         ],
         connections: [
           {
             from: 'API Gateway',
             to: 'URL Service',
-            label: 'HTTP',
+            label: 'REST API',
             type: 'sync',
-            protocol: 'REST',
+            protocol: 'HTTPS',
+            description: 'Handles URL shortening and retrieval requests'
           },
           {
             from: 'URL Service',
             to: 'Primary DB',
-            label: 'Query',
+            label: 'SQL Query',
             type: 'sync',
+            description: 'Stores and retrieves URL mappings'
           },
           {
             from: 'URL Service',
             to: 'Redis Cache',
-            label: 'Cache',
+            label: 'Cache Check',
             type: 'sync',
+            description: 'Fast retrieval of popular URLs'
+          },
+          {
+            from: 'API Gateway',
+            to: 'Event Queue',
+            label: 'Click Events',
+            type: 'async',
+            description: 'Publishes click events for analytics'
+          },
+          {
+            from: 'Event Queue',
+            to: 'Analytics Service',
+            label: 'Process Events',
+            type: 'async',
+            description: 'Consumes and processes click events'
+          },
+          {
+            from: 'Analytics Service',
+            to: 'Analytics DB',
+            label: 'Store Analytics',
+            type: 'sync',
+            description: 'Persists processed analytics data'
+          },
+          {
+            from: 'Monitoring',
+            to: 'URL Service',
+            label: 'Health Check',
+            type: 'sync',
+            description: 'Monitors service health and performance'
           },
         ],
+        notes: [
+          'Use consistent hashing for database sharding as scale increases',
+          'Implement circuit breakers between services for resilience',
+          'Consider CDN for global URL redirection performance',
+          'Analytics can be processed in batches for better performance'
+        ]
       },
       resources: [
         {
@@ -273,35 +334,483 @@ export const defaultChallengeConfig: ChallengeConfig = {
         },
       ],
       architectureTemplate: {
-        name: 'Simple Chat System',
-        description: 'Basic chat server with WebSocket connections and message storage',
+        name: 'Real-time Chat System',
+        description: 'Scalable chat system with real-time messaging, presence tracking, and file sharing',
         components: [
+          {
+            type: 'api-gateway',
+            label: 'API Gateway',
+            description: 'Handles HTTP and WebSocket connections',
+            position: { x: 100, y: 150 },
+          },
           {
             type: 'server',
             label: 'Chat Server',
-            description: 'WebSocket server',
-            position: { x: 200, y: 100 },
+            description: 'Real-time message handling with WebSocket',
+            position: { x: 300, y: 150 },
+          },
+          {
+            type: 'server',
+            label: 'Notification Service',
+            description: 'Handles push notifications and presence updates',
+            position: { x: 300, y: 300 },
           },
           {
             type: 'database',
             label: 'Message DB',
-            description: 'Store messages and users',
-            position: { x: 200, y: 250 },
+            description: 'Persistent storage for chat messages and history',
+            position: { x: 500, y: 150 },
+          },
+          {
+            type: 'database',
+            label: 'User DB',
+            description: 'User profiles and authentication data',
+            position: { x: 500, y: 50 },
           },
           {
             type: 'cache',
             label: 'Session Store',
-            description: 'Active user sessions',
-            position: { x: 400, y: 100 },
+            description: 'Active user sessions and presence status',
+            position: { x: 300, y: 50 },
+          },
+          {
+            type: 'storage',
+            label: 'File Storage',
+            description: 'Stores uploaded files and media',
+            position: { x: 100, y: 300 },
           },
         ],
         connections: [
-          { from: 'Chat Server', to: 'Message DB', label: 'Store/Retrieve', type: 'sync' },
-          { from: 'Chat Server', to: 'Session Store', label: 'Sessions', type: 'sync' },
+          {
+            from: 'API Gateway',
+            to: 'Chat Server',
+            label: 'WebSocket',
+            type: 'sync',
+            description: 'Real-time bidirectional communication'
+          },
+          {
+            from: 'Chat Server',
+            to: 'Message DB',
+            label: 'Store Messages',
+            type: 'async',
+            description: 'Persist chat messages for history'
+          },
+          {
+            from: 'Chat Server',
+            to: 'Session Store',
+            label: 'Presence Updates',
+            type: 'sync',
+            description: 'Track user online/offline status'
+          },
+          {
+            from: 'API Gateway',
+            to: 'User DB',
+            label: 'Authentication',
+            type: 'sync',
+            description: 'User login and profile management'
+          },
+          {
+            from: 'Chat Server',
+            to: 'Notification Service',
+            label: 'Push Notifications',
+            type: 'async',
+            description: 'Send notifications to offline users'
+          },
+          {
+            from: 'API Gateway',
+            to: 'File Storage',
+            label: 'File Upload',
+            type: 'sync',
+            description: 'Handle media and file sharing'
+          },
         ],
+        notes: [
+          'Use Redis pub/sub for real-time message broadcasting',
+          'Implement message queuing for offline users',
+          'Consider WebRTC for peer-to-peer file transfer',
+          'Add rate limiting to prevent spam and abuse'
+        ]
       },
     },
-    // Community edition includes these basic educational challenges
+    {
+      id: 'ecommerce-catalog',
+      title: 'E-commerce Product Catalog',
+      description: 'Design a scalable product catalog system with search, recommendations, and inventory management for an e-commerce platform.',
+      requirements: [
+        'Handle 10M+ products with complex filtering',
+        'Real-time inventory tracking and updates',
+        'Personalized product recommendations',
+        'Full-text search with autocomplete',
+        'Support for multiple currencies and regions',
+        'High availability during peak shopping periods',
+      ],
+      difficulty: 'intermediate',
+      estimatedTime: 60,
+      category: 'system-design',
+      tags: ['e-commerce', 'search', 'recommendations', 'inventory', 'scaling'],
+      learningObjectives: [
+        'Design search and indexing systems',
+        'Implement recommendation algorithms',
+        'Handle real-time inventory updates',
+        'Design for multi-regional deployment',
+      ],
+      solutionHints: [
+        {
+          id: 'ecommerce-search-hint',
+          title: 'Search Architecture',
+          content: 'Use Elasticsearch for full-text search with Redis for autocomplete suggestions. Consider search relevance scoring and faceted search.',
+          type: 'architecture',
+          difficulty: 'intermediate',
+        },
+        {
+          id: 'ecommerce-inventory-hint',
+          title: 'Real-time Inventory',
+          content: 'Implement event-driven architecture with message queues to handle inventory updates. Use eventual consistency for non-critical data.',
+          type: 'architecture',
+          difficulty: 'advanced',
+        },
+        {
+          id: 'ecommerce-recommendations-hint',
+          title: 'Recommendation System',
+          content: 'Combine collaborative filtering with content-based filtering. Pre-compute recommendations and cache them for fast retrieval.',
+          type: 'optimization',
+          difficulty: 'advanced',
+        },
+      ],
+      architectureTemplate: {
+        name: 'E-commerce Product Catalog',
+        description: 'Scalable product catalog with search, recommendations, and inventory management',
+        components: [
+          {
+            type: 'api-gateway',
+            label: 'API Gateway',
+            description: 'Routes requests and handles authentication',
+            position: { x: 100, y: 200 },
+          },
+          {
+            type: 'server',
+            label: 'Catalog Service',
+            description: 'Core product catalog operations',
+            position: { x: 300, y: 150 },
+          },
+          {
+            type: 'server',
+            label: 'Search Service',
+            description: 'Full-text search and filtering',
+            position: { x: 300, y: 50 },
+          },
+          {
+            type: 'server',
+            label: 'Recommendation Engine',
+            description: 'Personalized product recommendations',
+            position: { x: 300, y: 250 },
+          },
+          {
+            type: 'server',
+            label: 'Inventory Service',
+            description: 'Real-time inventory tracking',
+            position: { x: 300, y: 350 },
+          },
+          {
+            type: 'database',
+            label: 'Product DB',
+            description: 'Product information and metadata',
+            position: { x: 500, y: 150 },
+          },
+          {
+            type: 'database',
+            label: 'Search Index',
+            description: 'Elasticsearch for product search',
+            position: { x: 500, y: 50 },
+          },
+          {
+            type: 'database',
+            label: 'User Analytics DB',
+            description: 'User behavior and recommendation data',
+            position: { x: 500, y: 250 },
+          },
+          {
+            type: 'database',
+            label: 'Inventory DB',
+            description: 'Stock levels and warehouse data',
+            position: { x: 500, y: 350 },
+          },
+          {
+            type: 'cache',
+            label: 'Redis Cache',
+            description: 'Caches product data and recommendations',
+            position: { x: 150, y: 50 },
+          },
+          {
+            type: 'message-queue',
+            label: 'Event Queue',
+            description: 'Handles inventory updates and user events',
+            position: { x: 150, y: 350 },
+          },
+        ],
+        connections: [
+          {
+            from: 'API Gateway',
+            to: 'Catalog Service',
+            label: 'Product Requests',
+            type: 'sync',
+            description: 'Handle product browse and detail requests'
+          },
+          {
+            from: 'API Gateway',
+            to: 'Search Service',
+            label: 'Search Queries',
+            type: 'sync',
+            description: 'Process search and filter requests'
+          },
+          {
+            from: 'Catalog Service',
+            to: 'Product DB',
+            label: 'Product Data',
+            type: 'sync',
+            description: 'Retrieve product information'
+          },
+          {
+            from: 'Search Service',
+            to: 'Search Index',
+            label: 'Search Queries',
+            type: 'sync',
+            description: 'Execute full-text search'
+          },
+          {
+            from: 'Catalog Service',
+            to: 'Redis Cache',
+            label: 'Cache Check',
+            type: 'sync',
+            description: 'Fast product data retrieval'
+          },
+          {
+            from: 'Recommendation Engine',
+            to: 'User Analytics DB',
+            label: 'User Data',
+            type: 'sync',
+            description: 'Generate personalized recommendations'
+          },
+          {
+            from: 'Inventory Service',
+            to: 'Inventory DB',
+            label: 'Stock Updates',
+            type: 'sync',
+            description: 'Track inventory levels'
+          },
+          {
+            from: 'Event Queue',
+            to: 'Inventory Service',
+            label: 'Inventory Events',
+            type: 'async',
+            description: 'Process inventory change events'
+          },
+        ],
+        notes: [
+          'Use CDN for product images and static content',
+          'Implement search result caching with TTL',
+          'Consider database sharding for very large product catalogs',
+          'Use ML pipelines for recommendation model training'
+        ]
+      },
+    },
+    {
+      id: 'video-streaming',
+      title: 'Video Streaming Platform',
+      description: 'Design a video streaming platform like Netflix or YouTube with content delivery, user management, and analytics.',
+      requirements: [
+        'Stream video to millions of concurrent users',
+        'Multiple video qualities and adaptive bitrate',
+        'Content upload and transcoding pipeline',
+        'User authentication and subscription management',
+        'Real-time viewing analytics and recommendations',
+        'Global content distribution with low latency',
+      ],
+      difficulty: 'advanced',
+      estimatedTime: 90,
+      category: 'system-design',
+      tags: ['video', 'streaming', 'CDN', 'transcoding', 'analytics', 'global-scale'],
+      learningObjectives: [
+        'Design global content distribution networks',
+        'Implement video transcoding and adaptive streaming',
+        'Handle massive concurrent user loads',
+        'Design real-time analytics at scale',
+      ],
+      solutionHints: [
+        {
+          id: 'video-cdn-hint',
+          title: 'Content Delivery Network',
+          content: 'Use a multi-tier CDN strategy with edge servers globally. Implement cache warming for popular content.',
+          type: 'architecture',
+          difficulty: 'advanced',
+        },
+        {
+          id: 'video-transcoding-hint',
+          title: 'Video Processing Pipeline',
+          content: 'Design an asynchronous transcoding pipeline with multiple quality outputs. Use cloud functions for scalable processing.',
+          type: 'scaling',
+          difficulty: 'advanced',
+        },
+        {
+          id: 'video-analytics-hint',
+          title: 'Real-time Analytics',
+          content: 'Use streaming analytics with event sourcing. Implement data pipelines for both real-time and batch processing.',
+          type: 'architecture',
+          difficulty: 'advanced',
+        },
+      ],
+      architectureTemplate: {
+        name: 'Video Streaming Platform',
+        description: 'Global video streaming architecture with CDN, transcoding, and analytics',
+        components: [
+          {
+            type: 'api-gateway',
+            label: 'API Gateway',
+            description: 'Global API gateway with load balancing',
+            position: { x: 100, y: 200 },
+          },
+          {
+            type: 'server',
+            label: 'Video Service',
+            description: 'Video metadata and streaming logic',
+            position: { x: 300, y: 150 },
+          },
+          {
+            type: 'server',
+            label: 'User Service',
+            description: 'Authentication and user management',
+            position: { x: 300, y: 50 },
+          },
+          {
+            type: 'server',
+            label: 'Transcoding Service',
+            description: 'Video processing and encoding',
+            position: { x: 300, y: 250 },
+          },
+          {
+            type: 'server',
+            label: 'Analytics Service',
+            description: 'Real-time viewing analytics',
+            position: { x: 300, y: 350 },
+          },
+          {
+            type: 'edge-computing',
+            label: 'CDN Edge Servers',
+            description: 'Global content distribution network',
+            position: { x: 500, y: 150 },
+          },
+          {
+            type: 'storage',
+            label: 'Video Storage',
+            description: 'Raw and transcoded video files',
+            position: { x: 500, y: 250 },
+          },
+          {
+            type: 'database',
+            label: 'Video Metadata DB',
+            description: 'Video information and catalog',
+            position: { x: 150, y: 150 },
+          },
+          {
+            type: 'database',
+            label: 'User DB',
+            description: 'User profiles and preferences',
+            position: { x: 150, y: 50 },
+          },
+          {
+            type: 'database',
+            label: 'Analytics DB',
+            description: 'Viewing data and metrics',
+            position: { x: 150, y: 350 },
+          },
+          {
+            type: 'message-queue',
+            label: 'Processing Queue',
+            description: 'Video processing job queue',
+            position: { x: 100, y: 350 },
+          },
+          {
+            type: 'cache',
+            label: 'Redis Cache',
+            description: 'User sessions and hot data',
+            position: { x: 100, y: 50 },
+          },
+        ],
+        connections: [
+          {
+            from: 'API Gateway',
+            to: 'Video Service',
+            label: 'Video API',
+            type: 'sync',
+            description: 'Handle video requests and metadata'
+          },
+          {
+            from: 'API Gateway',
+            to: 'User Service',
+            label: 'Auth API',
+            type: 'sync',
+            description: 'User authentication and management'
+          },
+          {
+            from: 'Video Service',
+            to: 'CDN Edge Servers',
+            label: 'Video Stream',
+            type: 'sync',
+            description: 'Deliver video content to users'
+          },
+          {
+            from: 'Video Service',
+            to: 'Video Metadata DB',
+            label: 'Metadata',
+            type: 'sync',
+            description: 'Video catalog and information'
+          },
+          {
+            from: 'User Service',
+            to: 'User DB',
+            label: 'User Data',
+            type: 'sync',
+            description: 'Store user profiles and preferences'
+          },
+          {
+            from: 'Processing Queue',
+            to: 'Transcoding Service',
+            label: 'Transcoding Jobs',
+            type: 'async',
+            description: 'Process video upload jobs'
+          },
+          {
+            from: 'Transcoding Service',
+            to: 'Video Storage',
+            label: 'Store Video',
+            type: 'async',
+            description: 'Save transcoded video files'
+          },
+          {
+            from: 'Analytics Service',
+            to: 'Analytics DB',
+            label: 'Viewing Data',
+            type: 'async',
+            description: 'Store viewing analytics and metrics'
+          },
+          {
+            from: 'CDN Edge Servers',
+            to: 'Video Storage',
+            label: 'Origin Pull',
+            type: 'sync',
+            description: 'Cache miss fallback to origin'
+          },
+        ],
+        notes: [
+          'Implement adaptive bitrate streaming (HLS/DASH)',
+          'Use machine learning for content recommendation',
+          'Consider multi-region deployment for global reach',
+          'Implement DRM for premium content protection',
+          'Use event streaming for real-time analytics'
+        ]
+      },
+    },
+    // Community edition includes these educational challenges
     // Additional challenges can be added through the challenge manager
   ],
   settings: {

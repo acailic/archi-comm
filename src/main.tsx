@@ -1,7 +1,4 @@
 import { StrictMode, Suspense } from 'react';
-import { ServiceProvider } from '@/lib/di/ServiceProvider';
-import { createApplicationContainer } from '@/lib/di/ServiceRegistry';
-import type { Container } from '@/lib/di/Container';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
 import { getLogger, logger, LogLevel } from './lib/logger';
@@ -9,6 +6,9 @@ import { errorStore, addGlobalError } from './lib/errorStore';
 import type { AppError } from './lib/errorStore';
 import { ErrorRecoverySystem } from './lib/recovery/ErrorRecoverySystem';
 import { isDevelopment, isTauriEnvironment, isProduction } from './lib/environment';
+import type { Container } from '@/lib/di/Container';
+import { createApplicationContainer } from '@/lib/di/ServiceRegistry';
+import { ServiceProvider } from '@/lib/di/ServiceProvider';
 import './index.css';
 
 // Initialize logger early in the application lifecycle

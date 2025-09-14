@@ -3,12 +3,12 @@
  * Ultra-optimized comment and annotation system for canvas
  */
 
+import RBush from 'rbush';
 import {
   CanvasOptimizer,
   PerformanceMonitor,
   MemoryOptimizer,
 } from '../performance/PerformanceOptimizer';
-import RBush from 'rbush';
 
 export interface CanvasAnnotation {
   id: string;

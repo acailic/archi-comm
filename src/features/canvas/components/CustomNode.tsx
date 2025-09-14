@@ -4,23 +4,23 @@ import { useNodePresenter } from '../hooks/useNodePresenter';
 import type { CustomNodeData } from '../types';
 import { CustomNodeView } from './CustomNodeView';
 
-// Comment 1: Update prop type and add guard clause
-function CustomNodeInner({ data, selected }: NodeProps<CustomNodeData | undefined>) {
-  // Comment 1: Add a guard clause to handle missing data
+/**
+ * Custom node component for rendering nodes in the canvas.
+ * Uses useNodePresenter for memoization and rendering logic.
+ * @param data - The node data containing component information
+ * @param selected - Whether the node is currently selected
+ * @returns JSX element representing the custom node
+ */
+function CustomNodeInner({ data, selected }: NodeProps<CustomNodeData | undefined>): JSX.Element | null {
+  // Add a guard clause to handle missing data
   if (!data) {
     // Render nothing or a fallback UI if data is not available
     return null;
   }
 
-  const nodeData = data;
-  // Comment 2: Add a check to ensure nodeData is not undefined before calling the hook
-  if (!nodeData) {
-    return null; // Or a placeholder component
-  }
+  const presenter = useNodePresenter(data, selected);
 
-  const presenter = useNodePresenter(nodeData, selected);
-
-  return <CustomNodeView presenter={presenter} nodeData={nodeData} selected={selected} />;
+  return <CustomNodeView presenter={presenter} nodeData={data} selected={selected} />;
 }
 
 export const CustomNode = memo(CustomNodeInner);

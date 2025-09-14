@@ -110,7 +110,7 @@ export class RTree<T> {
   }
 
   insert(item: SpatialItem<T>): void {
-    if (!item || !item.bounds || !item.id) {
+    if (!item?.bounds || !item.id) {
       throw new Error('Invalid item: must have id and bounds');
     }
 

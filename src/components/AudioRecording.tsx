@@ -11,12 +11,12 @@ import {
   Info,
 } from 'lucide-react';
 import { transcriptionUtils, audioUtils } from '../lib/tauri';
+import { AudioManager, AudioManagerOptions, getDefaultAudioManagerOptions } from '../lib/audio';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { LoadingSpinner, useLoadingState } from './ui/LoadingSpinner';
 import { TranscriptEditor } from './TranscriptEditor';
-import { AudioManager, AudioManagerOptions, getDefaultAudioManagerOptions } from '../lib/audio';
 import type {
   Challenge,
   DesignData,

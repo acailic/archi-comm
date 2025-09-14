@@ -20,6 +20,8 @@ import {
   GitBranch,
 } from 'lucide-react';
 import { useAIReview } from '../hooks/useAIReview';
+import { compareTranscripts } from '../lib/transcript-comparison';
+import { useDesignValidation } from '../hooks/useDesignValidation';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -27,11 +29,12 @@ import { Progress } from './ui/progress';
 import { SidebarProvider } from './ui/sidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { CanvasComponent } from './CanvasComponent';
-import { compareTranscripts } from '../lib/transcript-comparison';
-import type { Challenge, DesignData, AudioData, TranscriptFeedback } from '@/shared/contracts';
+import { SolutionValidationCard } from './SolutionValidationCard';
+import type { DesignData, AudioData, TranscriptFeedback } from '@/shared/contracts';
+import type { ExtendedChallenge } from '@/lib/challenge-config';
 
 interface ReviewScreenProps {
-  challenge: Challenge;
+  challenge: ExtendedChallenge;
   designData: DesignData;
   audioData: AudioData;
   onStartOver: () => void;
@@ -50,6 +53,12 @@ export function ReviewScreen({
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [reviewMode, setReviewMode] = useState<'overview' | 'detailed'>('overview');
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Design validation hook
+  const { validationResult, isValidationAvailable, hasTemplate } = useDesignValidation({
+    designData,
+    challenge
+  });
   const {
     loading: aiLoading,
     error: aiError,
@@ -359,6 +368,14 @@ export function ReviewScreen({
               )}
             </CardContent>
           </Card>
+
+          {/* Solution Validation Card */}
+          {hasTemplate && validationResult && (
+            <SolutionValidationCard
+              validationResult={validationResult}
+              template={challenge.architectureTemplate!}
+            />
+          )}
 
           <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
             <Card>

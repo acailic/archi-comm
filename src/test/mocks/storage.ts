@@ -54,7 +54,7 @@ export class ExtendedMockStorage extends MockStorage {
     this._quota = quota;
   }
 
-  setItem(key: string, value: string): void {
+  override setItem(key: string, value: string): void {
     if (this._shouldFail) {
       const error = new Error('Storage operation failed');
       error.name = 'StorageFailureError'; // Comment 25
@@ -81,7 +81,7 @@ export class ExtendedMockStorage extends MockStorage {
     this._usage = newUsage; // Comment 1, 21
   }
 
-  removeItem(key: string): void { // Comment 2, 22
+  override removeItem(key: string): void { // Comment 2, 22
     const oldValue = this.getItem(key);
     if (oldValue) {
       const oldLength = byteLength(oldValue);
@@ -90,7 +90,7 @@ export class ExtendedMockStorage extends MockStorage {
     super.removeItem(key);
   }
 
-  clear(): void { // Comment 22
+  override clear(): void { // Comment 22
     super.clear();
     this._usage = 0;
   }

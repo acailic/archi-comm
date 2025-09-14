@@ -12,7 +12,6 @@ import { RTree, SpatialItem, BoundingBoxImpl } from '../../../lib/spatial/RTree'
 import { CanvasPerformanceManager } from '../../../lib/performance/CanvasPerformanceManager';
 import type { DesignComponent, Connection } from '../../../shared/contracts';
 import type {
-  VirtualizationConfig,
   VirtualizationStats,
   LODThreshold,
   LODLevel,

@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, WorkflowTestHelpers, AssertionHelpers, MockHelpers, TestErrorScenario } from '../../test/integration-helpers';
+import { renderWithProviders, AssertionHelpers, MockHelpers } from '../../test/integration-helpers';
 import { errorStore, addError, addReactError, addNetworkError, addPerformanceError } from '../../lib/errorStore';
 import { DesignCanvas } from '../../components/DesignCanvas';
 import { ChallengeSelection } from '../../components/ChallengeSelection';

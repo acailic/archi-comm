@@ -3,8 +3,7 @@
 // Handles the integration between the domain layer and React Flow
 // RELEVANT FILES: ReactFlowCanvas.tsx, DesignCanvas.tsx, CanvasOrchestrator.tsx
 
-import type { DesignComponent } from '../shared/contracts/index';
-import type { Connection } from '../shared/contracts/index';
+import type { DesignComponent , Connection } from '../shared/contracts/index';
 import { ReactFlowCanvas } from '@/features/canvas/components/ReactFlowCanvas';
 
 interface CanvasAreaProps {

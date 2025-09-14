@@ -5,11 +5,11 @@
 
 import React from 'react';
 import { X, RefreshCw, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { RecoveryProgress, RecoveryResult } from '../lib/recovery/ErrorRecoverySystem';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Card, CardContent } from './ui/card';
-import { RecoveryProgress, RecoveryResult } from '../lib/recovery/ErrorRecoverySystem';
 
 interface RecoveryOverlayProps {
   isVisible: boolean;

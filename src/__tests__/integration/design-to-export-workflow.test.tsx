@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderWithProviders, CanvasTestHelpers, AssertionHelpers, MockHelpers, TestDesignData } from '../../test/integration-helpers';
+import { renderWithProviders, CanvasTestHelpers, AssertionHelpers, MockHelpers } from '../../test/integration-helpers';
 import { DesignCanvas } from '../../components/DesignCanvas';
 import type { DesignData, Challenge } from '../../shared/contracts';
 

@@ -5,9 +5,9 @@
  * RELEVANT FILES: CanvasArea.tsx, ConnectionSvgLayer.tsx, design-system.ts
  */
 
+import { getBoxToBoxArrow } from 'perfect-arrows';
 import type { Connection, DesignComponent } from '@/shared/contracts';
 import type { ConnectionPoint, Point } from '@/shared/types';
-import { getBoxToBoxArrow } from 'perfect-arrows';
 
 export interface ConnectionEndpoints {
   from: Point;

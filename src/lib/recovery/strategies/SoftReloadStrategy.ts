@@ -198,7 +198,7 @@ export class SoftReloadStrategy implements RecoveryStrategy {
         }
       }
 
-      if (recoveryData && recoveryFlag && recoveryFlag.shouldRestore) {
+      if (recoveryData && recoveryFlag?.shouldRestore) {
         logger.info('Recovery data found on startup', {
           timestamp: recoveryData.timestamp,
           sessionId: recoveryData.sessionId

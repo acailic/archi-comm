@@ -4,7 +4,7 @@
 // RELEVANT FILES: src/components/ui/rich-text-editor.tsx, src/lib/lazy-imports/tiptap-loader.ts, src/shared/contracts/index.ts
 
 import React from 'react';
-import { Bold, Italic, List, ListOrdered, Clock, Highlighter, Search, ChevronUp, ChevronDown, Wand2 } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Clock, Highlighter, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { cn } from './ui/utils';

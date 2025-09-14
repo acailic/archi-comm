@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
@@ -55,7 +54,6 @@ export default defineConfig({
     // Produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
     cssCodeSplit: true,
-    treeshake: true,
     rollupOptions: {
       input: 'index.html',
       output: {

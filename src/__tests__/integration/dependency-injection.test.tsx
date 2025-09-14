@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, MockHelpers } from '../../test/integration-helpers';
-import { storage, designsStore } from '../../services/storage';
+import { storage } from '../../services/storage';
 
 // Mock service interfaces for testing DI patterns
 interface IStorageService {
@@ -98,7 +98,7 @@ class MockCanvasService implements ICanvasService {
   }
 
   validateDesign(designData: any): boolean {
-    return Boolean(designData && designData.components && Array.isArray(designData.components));
+    return Boolean(designData?.components && Array.isArray(designData.components));
   }
 }
 

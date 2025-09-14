@@ -5,21 +5,14 @@
  * RELEVANT FILES: src/features/canvas/components/ReactFlowCanvas.tsx, src/features/canvas/hooks/useVirtualization.ts, src/features/canvas/utils/virtualization.ts, src/lib/performance/CanvasPerformanceManager.ts
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import type { Edge, Node } from '@xyflow/react';
-import { ReactFlow, ReactFlowProvider, useReactFlow, Background, BackgroundVariant, Controls, MiniMap } from '@xyflow/react';
-import { Panel } from '@xyflow/react';
+import { ReactFlow, useReactFlow, Background, BackgroundVariant, Controls, MiniMap , Panel } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import type { DesignComponent, Connection, InfoCard } from '../../../shared/contracts';
 import { useConnectionEditor } from '../hooks/useConnectionEditor';
 import { toReactFlowEdges } from '../utils/rf-adapters';
-import { ConnectionEditorPopover } from './ConnectionEditorPopover';
-import { CustomEdge } from './CustomEdge';
-import { CustomNode } from './CustomNode';
-import { InfoCard as InfoCardComponent } from './InfoCard';
-
-// Virtualization imports
 import {
   useViewportTracking,
   useSpatialIndex,
@@ -35,6 +28,12 @@ import {
   logVirtualizationStats,
 } from '../utils/virtualization';
 import { CanvasPerformanceManager } from '../../../lib/performance/CanvasPerformanceManager';
+import { ConnectionEditorPopover } from './ConnectionEditorPopover';
+import { CustomEdge } from './CustomEdge';
+import { CustomNode } from './CustomNode';
+import { InfoCard as InfoCardComponent } from './InfoCard';
+
+// Virtualization imports
 
 // Extended props interface that includes virtualization options
 export interface VirtualCanvasProps {
