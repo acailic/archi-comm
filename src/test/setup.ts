@@ -44,7 +44,8 @@ const mockConsole = {
   ...console,
   error: vi.fn((...args: any[]) => {
     const firstArg = args[0];
-    if (firstArg instanceof Error) { // Comment 12
+    if (firstArg instanceof Error) {
+      // Comment 12
       testErrorHandlers.errors.push({
         error: firstArg,
         timestamp: Date.now(),
@@ -64,7 +65,9 @@ const mockConsole = {
 
 // rAF Mocks (Comment 7, 35, 6, 36)
 const rAFCallbacks = new Map<ReturnType<typeof setTimeout>, FrameRequestCallback>();
-const mockRequestAnimationFrame = (callback: FrameRequestCallback): ReturnType<typeof setTimeout> => {
+const mockRequestAnimationFrame = (
+  callback: FrameRequestCallback
+): ReturnType<typeof setTimeout> => {
   const handle = setTimeout(() => {
     // advance time inside callback
     if (typeof (performance as any).advanceTime === 'function') {
@@ -85,19 +88,46 @@ const mockCancelAnimationFrame = (id: ReturnType<typeof setTimeout>) => {
 // Mock FileList and DataTransferItemList (Comment 18)
 class MockFileList {
   private files: File[] = [];
-  get length(): number { return this.files.length; }
-  item(index: number): File | null { return this.files[index] || null; }
-  [Symbol.iterator]() { return this.files[Symbol.iterator](); }
+  get length(): number {
+    return this.files.length;
+  }
+  item(index: number): File | null {
+    return this.files[index] || null;
+  }
+  [Symbol.iterator]() {
+    return this.files[Symbol.iterator]();
+  }
   [index: number]: File;
 }
 
 class MockDataTransferItemList {
   private items: DataTransferItem[] = [];
-  get length(): number { return this.items.length; }
-  add(_data: string | File, _type?: string): DataTransferItem | null { return null; }
-  clear(): void { this.items = []; }
-  remove(index: number): void { this.items.splice(index, 1); }
-  [Symbol.iterator]() { return this.items[Symbol.iterator](); }
+  get length(): number {
+    return this.items.length;
+  }
+  add(data: string | File, type?: string): DataTransferItem | null {
+    const item: DataTransferItem = {
+      kind: data instanceof File ? 'file' : 'string',
+      type: type || (data instanceof File ? data.type : 'text/plain'),
+      getAsFile: () => (data instanceof File ? data : null),
+      getAsString: (callback: (data: string) => void) => {
+        if (typeof data === 'string') {
+          callback(data);
+        }
+      },
+    };
+    this.items.push(item);
+    return item;
+  }
+  clear(): void {
+    this.items = [];
+  }
+  remove(index: number): void {
+    this.items.splice(index, 1);
+  }
+  [Symbol.iterator]() {
+    return this.items[Symbol.iterator]();
+  }
   [index: number]: DataTransferItem;
 }
 
@@ -107,11 +137,15 @@ class MockDragEvent extends Event {
   constructor(type: string, options?: EventInit) {
     super(type, options);
     this.dataTransfer = {
-      dropEffect: 'none', effectAllowed: 'none',
+      dropEffect: 'none',
+      effectAllowed: 'none',
       files: new MockFileList() as unknown as FileList,
       items: new MockDataTransferItemList() as unknown as DataTransferItemList,
       types: [],
-      clearData: vi.fn(), getData: vi.fn(), setData: vi.fn(), setDragImage: vi.fn(),
+      clearData: vi.fn(),
+      getData: vi.fn(),
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
     };
   }
 }
@@ -122,11 +156,19 @@ const extendedSessionStorage = new ExtendedMockStorage();
 
 const mockWindow = {
   __TAURI__: tauriMocks,
-  __TAURI_METADATA__: { __windows: [], __currentWindow: {} },
-  ResizeObserver: class { observe() {} unobserve() {} disconnect() {} },
+  __TAURI_METADATA__: { __windows: [], __currentWindow: { label: '', title: '', url: '' } },
+  ResizeObserver: class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
   matchMedia: () => ({
-    matches: false, addEventListener() {}, removeEventListener() {},
-    addListener() {}, removeListener() {}, dispatchEvent: () => false,
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+    dispatchEvent: () => false,
   }),
   requestAnimationFrame: vi.fn(mockRequestAnimationFrame),
   cancelAnimationFrame: vi.fn(mockCancelAnimationFrame),
@@ -167,111 +209,127 @@ vi.mock('@xyflow/react', () => {
   const React = require('react'); // require inside mock factory
   const { useState } = React;
 
-  const ReactFlow = React.forwardRef((
-    { children, nodes = [], edges = [], onFocus, ...props }: any,
-    ref: React.Ref<HTMLDivElement>
-  ) => {
-    const classNames = [
-      'react-flow',
-      props.className,
-    ].filter(Boolean).join(' ');
+  const ReactFlow = React.forwardRef(
+    (
+      { children, nodes = [], edges = [], onFocus, ...props }: any,
+      ref: React.Ref<HTMLDivElement>
+    ) => {
+      const classNames = ['react-flow', props.className].filter(Boolean).join(' ');
 
-    return React.createElement(
-      'div',
-      {
-        ref,
-        className: classNames,
-        tabIndex: 0,
-        'data-testid': 'react-flow',
-        onFocus: (e: React.FocusEvent<HTMLDivElement>) => {
-          e.currentTarget.classList.add('react-flow__focused'); // Comment 30
-          if (onFocus) onFocus(e);
-        },
-        ...props,
-      },
-      React.createElement(
+      return React.createElement(
         'div',
-        { className: 'react-flow__viewport' },
-        ...nodes.map((node: any) =>
-          React.createElement('div', {
-            key: node.id,
-            // Comment 16, 31
-            className: [
-              'react-flow__node',
-              (node.data?.isSelected || (node.data?.component?.id === props.selectedComponent)) ? 'selected' : ''
-            ].filter(Boolean).join(' '),
-            'data-id': node.id,
-          })
-        ),
-        ...edges.map((edge: any) =>
-          React.createElement('div', {
-            key: edge.id,
-            className: 'react-flow__edge',
-            'data-id': edge.id,
-          })
-        ),
-        children
-      )
-    );
-  });
+        {
+          ref,
+          className: classNames,
+          tabIndex: 0,
+          'data-testid': 'react-flow',
+          onFocus: (e: React.FocusEvent<HTMLDivElement>) => {
+            e.currentTarget.classList.add('react-flow__focused'); // Comment 30
+            if (onFocus) onFocus(e);
+          },
+          ...props,
+        },
+        React.createElement(
+          'div',
+          { className: 'react-flow__viewport' },
+          ...nodes.map((node: any) =>
+            React.createElement('div', {
+              key: node.id,
+              // Comment 16, 31
+              className: [
+                'react-flow__node',
+                node.data?.isSelected || node.data?.component?.id === props.selectedComponent
+                  ? 'selected'
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' '),
+              'data-id': node.id,
+            })
+          ),
+          ...edges.map((edge: any) =>
+            React.createElement('div', {
+              key: edge.id,
+              className: 'react-flow__edge',
+              'data-id': edge.id,
+            })
+          ),
+          children
+        )
+      );
+    }
+  );
   ReactFlow.displayName = 'ReactFlow';
 
   return {
     ReactFlow,
     ReactFlowProvider: ({ children }: { children: React.ReactNode }) => children,
     // Comment 17, 32
-    useNodesState: vi.fn((initialNodes) => {
+    useNodesState: vi.fn(initialNodes => {
       const [nodes, setNodes] = useState(initialNodes);
       const onNodesChange = vi.fn(); // Mock implementation if needed
       return [nodes, setNodes, onNodesChange];
     }),
-    useEdgesState: vi.fn((initialEdges) => {
+    useEdgesState: vi.fn(initialEdges => {
       const [edges, setEdges] = useState(initialEdges);
       const onEdgesChange = vi.fn(); // Mock implementation if needed
       return [edges, setEdges, onEdgesChange];
     }),
     useReactFlow: vi.fn(() => ({
-      getNode: vi.fn(), getEdge: vi.fn(), getNodes: vi.fn(() => []), getEdges: vi.fn(() => []),
-      setNodes: vi.fn(), setEdges: vi.fn(), addNodes: vi.fn(), addEdges: vi.fn(),
-      deleteElements: vi.fn(), project: vi.fn((p: any) => p), getIntersectingNodes: vi.fn(() => []),
-      screenToFlowPosition: vi.fn(() => ({ x: 0, y: 0 })), fitView: vi.fn(),
+      getNode: vi.fn(),
+      getEdge: vi.fn(),
+      getNodes: vi.fn(() => []),
+      getEdges: vi.fn(() => []),
+      setNodes: vi.fn(),
+      setEdges: vi.fn(),
+      addNodes: vi.fn(),
+      addEdges: vi.fn(),
+      deleteElements: vi.fn(),
+      project: vi.fn((p: any) => p),
+      getIntersectingNodes: vi.fn(() => []),
+      screenToFlowPosition: vi.fn(() => ({ x: 0, y: 0 })),
+      fitView: vi.fn(),
     })),
     Handle: vi.fn(() => null),
     Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
     MarkerType: { Arrow: 'arrow', ArrowClosed: 'arrowclosed' },
-    NodeTypes: {}, EdgeTypes: {}, Controls: vi.fn(() => null), MiniMap: vi.fn(() => null),
-    Background: vi.fn(() => null), BackgroundVariant: { Dots: 'dots', Lines: 'lines' },
+    NodeTypes: {},
+    EdgeTypes: {},
+    Controls: vi.fn(() => null),
+    MiniMap: vi.fn(() => null),
+    Background: vi.fn(() => null),
+    BackgroundVariant: { Dots: 'dots', Lines: 'lines' },
     Panel: ({ children }: { children: React.ReactNode }) => children,
   };
 });
 
 // 6. Cleanup hooks
 beforeEach(() => {
-    // Reset mocks that need resetting before each test
-    vi.clearAllMocks();
-    
-    // Reset extended storage
-    extendedLocalStorage.clear();
-    extendedLocalStorage.simulateFailure(false);
-    
-    extendedSessionStorage.clear();
-    extendedSessionStorage.simulateFailure(false);
-    
-    // Reset performance mock
-    enhancedPerformanceMock.resetTime();
-    
-    // Clear test errors
-    testErrorHandlers.clearTestErrors();
-    
-    // Reset console
-    mockConsole.error.mockClear();
-    mockConsole.warn.mockClear();
+  // Reset mocks that need resetting before each test
+  vi.clearAllMocks();
+
+  // Reset extended storage
+  extendedLocalStorage.clear();
+  extendedLocalStorage.simulateFailure(false);
+
+  extendedSessionStorage.clear();
+  extendedSessionStorage.simulateFailure(false);
+
+  // Reset performance mock
+  enhancedPerformanceMock.resetTime();
+
+  // Clear test errors
+  testErrorHandlers.clearTestErrors();
+
+  // Reset console
+  mockConsole.error.mockClear();
+  mockConsole.warn.mockClear();
 });
 
 afterEach(() => {
   // Comment 28: Restore original console
   vi.stubGlobal('console', originalConsole);
-  
+
   // Comment 13: Move resetModules to the end
   vi.resetModules();
 });

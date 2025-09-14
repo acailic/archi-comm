@@ -6,7 +6,7 @@
  */
 
 import { Handle, Position } from '@xyflow/react';
-import { Suspense } from 'react';
+import { Suspense, memo } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -15,13 +15,7 @@ import {
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from '../../../components/ui/context-menu';
-import { Input } from '../../../components/ui/input';
-import {
-  animations,
-  cx,
-  designSystem,
-  getElevation,
-} from '../../../lib/design-system';
+import { animations, cx, designSystem, getElevation } from '../../../lib/design-system';
 import { getComponentIcon } from '../../../lib/component-icons';
 import { getHealthIndicator } from '../utils/component-styles';
 import type { CustomNodeData } from '../types';
@@ -29,13 +23,17 @@ import type { UseNodePresenterResult } from '../hooks/useNodePresenter';
 import type { DesignComponent } from '../../../shared/contracts';
 
 // Component Icon utility - keeping it local as it's simple
-const ComponentIcon = ({ type, className }: { type: DesignComponent['type']; className?: string }) => {
+const ComponentIcon = ({
+  type,
+  className,
+}: {
+  type: DesignComponent['type'];
+  className?: string;
+}) => {
   const iconMapping = getComponentIcon(type);
   const IconComponent = iconMapping.icon;
 
-  return (
-    <IconComponent className={className} />
-  );
+  return <IconComponent className={className} />;
 };
 
 interface CustomNodeViewProps {
@@ -44,7 +42,7 @@ interface CustomNodeViewProps {
   selected: boolean;
 }
 
-export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeViewProps) {
+function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewProps) {
   const { state, actions, computed } = presenter;
   const {
     component,
@@ -66,6 +64,20 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
     return null;
   }
 
+  // Get icon info for background color
+  const iconInfo = getComponentIcon(component.type);
+  // Create visible background color class based on icon color
+  const getSubtleBackgroundColor = (colorClass: string) => {
+    // Extract color name and create a more visible variant
+    const colorMatch = colorClass.match(/bg-(\w+)-(\d+)/);
+    if (colorMatch) {
+      const [, color, intensity] = colorMatch;
+      return `bg-${color}-100/60`; // More visible background with higher opacity
+    }
+    return 'bg-gray-100/60'; // fallback
+  };
+  const subtleHeaderBg = getSubtleBackgroundColor(iconInfo.color);
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -73,7 +85,7 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
           className={cx(
             'w-44 h-28 cursor-move group canvas-component touch-friendly',
             computed.visualStateClasses,
-            getElevation((selected || state.visualState.isSelected) ? 4 : 2),
+            getElevation(selected || state.visualState.isSelected ? 4 : 2),
             animations.hoverRaise,
             animations.pulseGlow,
             computed.architecturalStyling.borderColor
@@ -85,7 +97,8 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
             className={cx(
               'w-full h-full rounded-xl border',
               designSystem.glass.surface,
-              'bg-[var(--component-bg)]'
+              'bg-[var(--component-bg)]',
+              subtleHeaderBg
             )}
           >
             <div
@@ -93,17 +106,20 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
                 'w-full h-9 rounded-t-xl flex items-center justify-between px-2 text-white shadow-sm',
                 'border-b border-white/10',
                 'bg-gradient-to-br',
-                computed.gradient
+                computed.gradient,
+                subtleHeaderBg
               )}
             >
               <Suspense fallback={<div className='w-5 h-5 rounded-md bg-white/40' />}>
-                <div className={`w-5 h-5 rounded-md ${computed.iconInfo.color} flex items-center justify-center shadow-sm`}>
+                <div
+                  className={`w-5 h-5 rounded-md ${computed.iconInfo.color} flex items-center justify-center shadow-sm`}
+                >
                   <ComponentIcon type={component.type} className='w-3 h-3 text-white' />
                 </div>
               </Suspense>
 
               {/* Health status indicator */}
-              <div className="text-xs opacity-90">
+              <div className='text-xs opacity-90'>
                 {getHealthIndicator(healthStatusProp || state.healthStatus)}
               </div>
 
@@ -113,27 +129,18 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
               </div> */}
             </div>
             <div className='px-2.5 py-1.5 text-center relative'>
-              {(component.properties?.showLabel !== false) && (
+              {component.properties?.showLabel !== false && (
                 <div className='relative'>
-                  {state.isEditingLabel ? (
-                    <Input
-                      autoFocus
-                      value={state.labelDraft}
-                      onChange={(e) => actions.handleLabelInput(e.target.value)}
-                      onBlur={actions.commitEdit}
-                      onKeyDown={actions.handleKeyDown}
-                      className='h-7 text-[13px] px-2 py-1'
-                      placeholder='Name this component'
-                    />
-                  ) : (
-                    <button
-                      className='w-full text-[13px] font-semibold truncate text-foreground/90 leading-tight hover:underline'
-                      title={component.label || 'Click to name'}
-                      onClick={actions.startEdit}
-                    >
-                      {component.label || <span className='text-muted-foreground'>Click to name</span>}
-                    </button>
-                  )}
+                  <div
+                    className='w-full text-[13px] font-semibold truncate text-foreground/90 leading-tight'
+                    title={
+                      component.label ||
+                      `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, ' ')}`
+                    }
+                  >
+                    {component.label ||
+                      `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, ' ')}`}
+                  </div>
                 </div>
               )}
 
@@ -146,15 +153,15 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
 
               {/* Architecture-specific metadata */}
               {component.properties?.version && (
-                <div className="absolute bottom-0 right-1 text-[8px] text-muted-foreground opacity-75">
+                <div className='absolute bottom-0 right-1 text-[8px] text-muted-foreground opacity-75'>
                   v{component.properties.version}
                 </div>
               )}
 
               {/* Connection count indicator */}
               {state.isHovered && connectionCount > 0 && (
-                <div className="absolute bottom-0 left-1 text-[8px] text-muted-foreground flex items-center gap-1">
-                  <div className="w-1 h-1 rounded-full bg-current" />
+                <div className='absolute bottom-0 left-1 text-[8px] text-muted-foreground flex items-center gap-1'>
+                  <div className='w-1 h-1 rounded-full bg-current' />
                   <span>{connectionCount}</span>
                 </div>
               )}
@@ -163,61 +170,61 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
 
           {/* React Flow Handles for connection points */}
           <Handle
-            type="target"
+            type='target'
             position={Position.Top}
-            id="top"
+            id='top'
             className={cx(
-              "w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag",
+              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-80 scale-110"
-                : "opacity-30 group-hover:opacity-100 group-hover:scale-110"
+                ? 'opacity-80 scale-110'
+                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
             )}
-            onMouseDown={(e) => {
+            onMouseDown={e => {
               e.stopPropagation();
               actions.handleStartConnection('top');
             }}
           />
           <Handle
-            type="source"
+            type='source'
             position={Position.Bottom}
-            id="bottom"
+            id='bottom'
             className={cx(
-              "w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag",
+              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-80 scale-110"
-                : "opacity-30 group-hover:opacity-100 group-hover:scale-110"
+                ? 'opacity-80 scale-110'
+                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
             )}
-            onMouseDown={(e) => {
+            onMouseDown={e => {
               e.stopPropagation();
               actions.handleStartConnection('bottom');
             }}
           />
           <Handle
-            type="target"
+            type='target'
             position={Position.Left}
-            id="left"
+            id='left'
             className={cx(
-              "w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag",
+              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-80 scale-110"
-                : "opacity-30 group-hover:opacity-100 group-hover:scale-110"
+                ? 'opacity-80 scale-110'
+                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
             )}
-            onMouseDown={(e) => {
+            onMouseDown={e => {
               e.stopPropagation();
               actions.handleStartConnection('left');
             }}
           />
           <Handle
-            type="source"
+            type='source'
             position={Position.Right}
-            id="right"
+            id='right'
             className={cx(
-              "w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag",
+              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-80 scale-110"
-                : "opacity-30 group-hover:opacity-100 group-hover:scale-110"
+                ? 'opacity-80 scale-110'
+                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
             )}
-            onMouseDown={(e) => {
+            onMouseDown={e => {
               e.stopPropagation();
               actions.handleStartConnection('right');
             }}
@@ -258,3 +265,33 @@ export function CustomNodeView({ presenter, nodeData, selected }: CustomNodeView
     </ContextMenu>
   );
 }
+
+// Shallow comparison function to prevent unnecessary re-renders
+const arePropsEqual = (prevProps: CustomNodeViewProps, nextProps: CustomNodeViewProps): boolean => {
+  // Compare basic props
+  if (prevProps.selected !== nextProps.selected) return false;
+
+  // Compare nodeData shallow
+  const prevData = prevProps.nodeData;
+  const nextData = nextProps.nodeData;
+  if (
+    prevData.component.id !== nextData.component.id ||
+    prevData.component.label !== nextData.component.label ||
+    prevData.component.type !== nextData.component.type ||
+    prevData.isSelected !== nextData.isSelected ||
+    prevData.isMultiSelected !== nextData.isMultiSelected ||
+    prevData.isConnectionStart !== nextData.isConnectionStart ||
+    prevData.healthStatus !== nextData.healthStatus
+  ) {
+    return false;
+  }
+
+  // For presenter, we rely on the useMemo optimization in useNodePresenter
+  // to provide stable references, so we can do reference equality check
+  return prevProps.presenter === nextProps.presenter;
+};
+
+export const CustomNodeView = memo(CustomNodeViewInner, arePropsEqual);
+
+// Set displayName for better debugging
+CustomNodeView.displayName = 'CustomNodeView';

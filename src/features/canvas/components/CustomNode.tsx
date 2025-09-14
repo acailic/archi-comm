@@ -1,8 +1,8 @@
 import { NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 import { useNodePresenter } from '../hooks/useNodePresenter';
-import { CustomNodeView } from './CustomNodeView';
 import type { CustomNodeData } from '../types';
+import { CustomNodeView } from './CustomNodeView';
 
 // Comment 1: Update prop type and add guard clause
 function CustomNodeInner({ data, selected }: NodeProps<CustomNodeData | undefined>) {
@@ -17,16 +17,13 @@ function CustomNodeInner({ data, selected }: NodeProps<CustomNodeData | undefine
   if (!nodeData) {
     return null; // Or a placeholder component
   }
-  
+
   const presenter = useNodePresenter(nodeData, selected);
 
-  return (
-    <CustomNodeView
-      presenter={presenter}
-      nodeData={nodeData}
-      selected={selected}
-    />
-  );
+  return <CustomNodeView presenter={presenter} nodeData={nodeData} selected={selected} />;
 }
 
 export const CustomNode = memo(CustomNodeInner);
+
+// Set displayName for better debugging
+CustomNode.displayName = 'CustomNode';

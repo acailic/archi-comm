@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo } from 'react';
+import React, { Suspense, useEffect, useMemo, useCallback } from 'react';
 import { isDevelopment, isTauriEnvironment } from '@/lib/environment';
 import { ChallengeSelection } from '@/components/ChallengeSelection';
 import { DesignCanvas } from '@/components/DesignCanvas';
@@ -27,7 +27,8 @@ export interface FeatureConfig {
 
 function detectVariant(): AppVariant {
   const env = (import.meta as any).env || {};
-  const variant = (env.VITE_APP_VARIANT as AppVariant) || (isTauriEnvironment() ? 'complex' : 'basic');
+  const variant =
+    (env.VITE_APP_VARIANT as AppVariant) || (isTauriEnvironment() ? 'complex' : 'basic');
   return variant;
 }
 
@@ -52,63 +53,58 @@ function AppContent() {
   // Recovery system integration
   const recovery = useRecovery();
   const { actions } = useAppStore();
-  const {
-    selectedChallenge,
-    designData,
-    audioData,
-    phase,
-    availableChallenges,
-    showCommandPalette,
-    currentScreen,
-    showDevScenarios,
-    isDemoMode,
-    showWelcome,
-  } = useAppStoreSelector((s) => ({
-    selectedChallenge: s.selectedChallenge,
-    designData: s.designData,
-    audioData: s.audioData,
-    phase: s.phase,
-    availableChallenges: s.availableChallenges,
-    showCommandPalette: s.showCommandPalette,
-    currentScreen: s.currentScreen,
-    showDevScenarios: s.showDevScenarios,
-    isDemoMode: s.isDemoMode,
-    showWelcome: s.showWelcome,
-  }));
+  const selectedChallenge = useAppStoreSelector(s => s.selectedChallenge);
+  const designData = useAppStoreSelector(s => s.designData);
+  const audioData = useAppStoreSelector(s => s.audioData);
+  const phase = useAppStoreSelector(s => s.phase);
+  const availableChallenges = useAppStoreSelector(s => s.availableChallenges);
+  const showCommandPalette = useAppStoreSelector(s => s.showCommandPalette);
+  const currentScreen = useAppStoreSelector(s => s.currentScreen);
+  const showDevScenarios = useAppStoreSelector(s => s.showDevScenarios);
+  const isDemoMode = useAppStoreSelector(s => s.isDemoMode);
+  const showWelcome = useAppStoreSelector(s => s.showWelcome);
 
   // Set up recovery context provider to give current app state to recovery system
-  useEffect(() => {
-    // Update the recovery system's context provider with current app state
-    const updateRecoveryContext = () => {
-      try {
-        // Save current app state for recovery
-        if (designData && Object.keys(designData).length > 0) {
-          localStorage.setItem('current_design', JSON.stringify(designData));
-        }
-        if (audioData) {
-          localStorage.setItem('current_audio', JSON.stringify(audioData));
-        }
-        if (selectedChallenge) {
-          localStorage.setItem('current_project_id', selectedChallenge.id);
-        }
-
-        // Save user preferences
-        const userPreferences = {
-          variant,
-          features,
-          currentScreen,
-          phase,
-          isDemoMode,
-        };
-        localStorage.setItem('user_preferences', JSON.stringify(userPreferences));
-      } catch (error) {
-        logger.warn('Failed to update recovery context', error);
+  const updateRecoveryContext = useCallback(() => {
+    try {
+      // Save current app state for recovery
+      if (designData && Object.keys(designData).length > 0) {
+        localStorage.setItem('current_design', JSON.stringify(designData));
       }
-    };
+      if (audioData) {
+        localStorage.setItem('current_audio', JSON.stringify(audioData));
+      }
+      if (selectedChallenge) {
+        localStorage.setItem('current_project_id', selectedChallenge.id);
+      }
 
+      // Save user preferences
+      const userPreferences = {
+        variant,
+        features,
+        currentScreen,
+        phase,
+        isDemoMode,
+      };
+      localStorage.setItem('user_preferences', JSON.stringify(userPreferences));
+    } catch (error) {
+      logger.warn('Failed to update recovery context', error);
+    }
+  }, [
+    designData,
+    audioData,
+    selectedChallenge,
+    variant,
+    features,
+    currentScreen,
+    phase,
+    isDemoMode,
+  ]);
+
+  useEffect(() => {
     // Update context whenever state changes
     updateRecoveryContext();
-  }, [designData, audioData, selectedChallenge, variant, features, currentScreen, phase, isDemoMode]);
+  }, [updateRecoveryContext]);
 
   useEffect(() => {
     try {
@@ -125,9 +121,9 @@ function AppContent() {
         const pathname = window.location.pathname || '';
         actions.setShowDevScenarios(pathname.includes('/dev/scenarios'));
       };
-      
+
       checkDevRoute();
-      
+
       // Listen for navigation changes
       window.addEventListener('popstate', checkDevRoute);
       return () => window.removeEventListener('popstate', checkDevRoute);
@@ -162,7 +158,7 @@ function AppContent() {
           actions.setCurrentScreen('challenge-selection');
           actions.setShowDevScenarios(false);
         }
-      }
+      },
     },
     currentScreen,
     selectedChallenge,
@@ -295,8 +291,8 @@ function AppContent() {
   };
 
   return (
-    <div className="w-full h-full">
-      <Suspense fallback={<div className="p-4">Loading…</div>}>
+    <div className='w-full h-full'>
+      <Suspense fallback={<div className='p-4'>Loading…</div>}>
         <Screen />
       </Suspense>
 
@@ -306,7 +302,7 @@ function AppContent() {
           isOpen={showCommandPalette}
           onClose={() => actions.setShowCommandPalette(false)}
           currentScreen={selectedChallenge ? currentScreen : 'challenge-selection'}
-          onNavigate={(screen) => {
+          onNavigate={screen => {
             if (screen === 'challenge-selection') {
               actions.setSelectedChallenge(null);
               actions.setPhase('design');
@@ -333,25 +329,26 @@ function AppContent() {
         recoveryResult={recovery.lastRecoveryResult}
         onCancel={recovery.cancelRecovery}
         onDismiss={recovery.dismissRecovery}
-        onRetry={recovery.lastRecoveryResult && !recovery.lastRecoveryResult.success
-          ? () => {
-            if (recovery.lastRecoveryResult) {
-              // Create an error to retry recovery
-              const retryError = {
-                id: `retry_${Date.now()}`,
-                message: 'Manual retry requested',
-                category: 'unknown' as const,
-                severity: 'high' as const,
-                timestamp: Date.now(),
-                count: 1,
-                resolved: false,
-                context: { userActions: ['Manual retry'], additionalData: { retry: true } },
-                hash: `retry_${Date.now()}`,
-              };
-              recovery.triggerRecovery(retryError);
-            }
-          }
-          : undefined
+        onRetry={
+          recovery.lastRecoveryResult && !recovery.lastRecoveryResult.success
+            ? () => {
+                if (recovery.lastRecoveryResult) {
+                  // Create an error to retry recovery
+                  const retryError = {
+                    id: `retry_${Date.now()}`,
+                    message: 'Manual retry requested',
+                    category: 'unknown' as const,
+                    severity: 'high' as const,
+                    timestamp: Date.now(),
+                    count: 1,
+                    resolved: false,
+                    context: { userActions: ['Manual retry'], additionalData: { retry: true } },
+                    hash: `retry_${Date.now()}`,
+                  };
+                  recovery.triggerRecovery(retryError);
+                }
+              }
+            : undefined
         }
       />
 

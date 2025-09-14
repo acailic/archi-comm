@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Clock, Database, PlayCircle, Search, Target, TrendingUp } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { ExtendedChallenge } from '../lib/challenge-config';
+import { challengeManager } from '../lib/challenge-config';
 import { isTauriEnvironment } from '../lib/environment';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -15,7 +16,6 @@ type Category = 'system-design' | 'architecture' | 'scaling';
 // Error handling utility that only logs in development
 const handleError = (context: string, error: unknown) => {
   if (process.env.NODE_ENV === 'development') {
-     
     console.error(`[ChallengeSelection] ${context}:`, error);
   }
 };
@@ -37,88 +37,8 @@ interface ChallengeSelectionProps {
   onNavigateToPro?: () => void;
 }
 
-
-
-// ArchiComm Community Edition - Basic Educational Challenges
-// Focused on fundamental system design concepts for learning
-const challenges: Challenge[] = [
-  {
-    id: 'todo-app',
-    title: 'Todo List Application',
-    description:
-      'Design a simple todo list application with user accounts and basic CRUD operations.',
-    requirements: [
-      'User registration and authentication',
-      'Create, read, update, delete todos',
-      'Mark todos as complete/incomplete',
-      'Basic data persistence',
-      'Simple user interface',
-    ],
-    difficulty: 'beginner',
-    estimatedTime: 20,
-    category: 'system-design',
-  },
-  {
-    id: 'blog-platform',
-    title: 'Simple Blog Platform',
-    description: 'Create a basic blogging platform where users can write and publish articles.',
-    requirements: [
-      'User authentication and profiles',
-      'Create and edit blog posts',
-      'View published articles',
-      'Basic commenting system',
-      'Simple search functionality',
-    ],
-    difficulty: 'beginner',
-    estimatedTime: 25,
-    category: 'system-design',
-  },
-  {
-    id: 'url-shortener',
-    title: 'URL Shortener Service',
-    description: 'Design a scalable URL shortening service like bit.ly with basic analytics.',
-    requirements: [
-      'Shorten long URLs to unique short codes',
-      'Redirect short URLs to original URLs',
-      'Basic click tracking and analytics',
-      'Custom alias support',
-      'Simple rate limiting',
-    ],
-    difficulty: 'intermediate',
-    estimatedTime: 45,
-    category: 'system-design',
-  },
-  {
-    id: 'chat-system',
-    title: 'Real-time Chat System',
-    description: 'Design a basic messaging platform with real-time communication features.',
-    requirements: [
-      'Real-time message delivery',
-      'User authentication and profiles',
-      'Basic group chat functionality',
-      'Message history storage',
-      'Online presence indicators',
-    ],
-    difficulty: 'intermediate',
-    estimatedTime: 40,
-    category: 'system-design',
-  },
-  {
-    id: 'ride-sharing',
-    title: 'Real-time Ride-sharing Platform',
-    description: 'Design a simplified ride-sharing application with basic matching and tracking.',
-    requirements: [
-      'Driver and rider registration',
-      'Basic location tracking',
-      'Simple ride matching algorithm',
-      'Trip booking and management',
-      'Basic rating system',
-    ],
-    difficulty: 'intermediate',
-    estimatedTime: 50,
-    category: 'system-design',
-  },
-];
+// Load challenges dynamically from challenge manager
+// This replaces static challenges with real data from challenge-config.ts
 
 const difficultyColors = {
   beginner: 'from-green-500 to-green-600',
@@ -134,13 +54,26 @@ const categoryIcons = {
 
 export function ChallengeSelection({
   onChallengeSelect,
-  availableChallenges
+  availableChallenges,
 }: ChallengeSelectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [importedChallenges, setImportedChallenges] = useState<ExtendedChallenge[]>([]);
+  const [loadedChallenges, setLoadedChallenges] = useState<ExtendedChallenge[]>([]);
+
+  // Load challenges from challenge manager
+  useEffect(() => {
+    try {
+      const challenges = challengeManager.getAllChallenges();
+      setLoadedChallenges(challenges);
+    } catch (error) {
+      handleError('Failed to load challenges from manager', error);
+      // Fallback to empty array if loading fails
+      setLoadedChallenges([]);
+    }
+  }, []);
 
   // Previously used to gate premium challenges. All challenges are available in the community build.
   const proChallenges: Challenge[] = [
@@ -184,7 +117,7 @@ export function ChallengeSelection({
       const baseChallenges =
         availableChallenges && Array.isArray(availableChallenges) && availableChallenges.length > 0
           ? availableChallenges
-          : challenges;
+          : loadedChallenges;
 
       // Validate challenges structure with proper fallbacks
       const validBaseChallenges = baseChallenges
@@ -202,7 +135,7 @@ export function ChallengeSelection({
             requirements: ['No requirements specified'],
             difficulty: 'beginner' as Difficulty,
             estimatedTime: 30,
-            category: 'system-design' as Category
+            category: 'system-design' as Category,
           };
           return {
             ...baseChallenge,
@@ -211,10 +144,19 @@ export function ChallengeSelection({
             id: challenge.id || baseChallenge.id,
             title: challenge.title || baseChallenge.title,
             description: challenge.description || baseChallenge.description,
-            requirements: Array.isArray(challenge.requirements) ? challenge.requirements : baseChallenge.requirements,
-            difficulty: ['beginner', 'intermediate', 'advanced'].includes(challenge.difficulty) ? challenge.difficulty as Difficulty : baseChallenge.difficulty,
-            estimatedTime: typeof challenge.estimatedTime === 'number' ? challenge.estimatedTime : baseChallenge.estimatedTime,
-            category: ['system-design', 'architecture', 'scaling'].includes(challenge.category) ? challenge.category as Category : baseChallenge.category
+            requirements: Array.isArray(challenge.requirements)
+              ? challenge.requirements
+              : baseChallenge.requirements,
+            difficulty: ['beginner', 'intermediate', 'advanced'].includes(challenge.difficulty)
+              ? (challenge.difficulty as Difficulty)
+              : baseChallenge.difficulty,
+            estimatedTime:
+              typeof challenge.estimatedTime === 'number'
+                ? challenge.estimatedTime
+                : baseChallenge.estimatedTime,
+            category: ['system-design', 'architecture', 'scaling'].includes(challenge.category)
+              ? (challenge.category as Category)
+              : baseChallenge.category,
           };
         })
         .filter(challenge => challenge !== null);
@@ -222,9 +164,9 @@ export function ChallengeSelection({
       if (validBaseChallenges.length === 0) {
         // Only log warning in development mode to reduce noise
         if (process.env.NODE_ENV === 'development') {
-          // Silent fallback to default challenges
+          // Silent fallback to default challenges from manager
         }
-        return [...challenges, ...proChallenges];
+        return [...challengeManager.getDefaultChallenges(), ...proChallenges];
       }
 
       return [...validBaseChallenges, ...importedChallenges, ...proChallenges];
@@ -233,9 +175,9 @@ export function ChallengeSelection({
       if (process.env.NODE_ENV === 'development') {
         handleError('Error processing challenges', error);
       }
-      return [...challenges, ...importedChallenges, ...proChallenges];
+      return [...challengeManager.getDefaultChallenges(), ...importedChallenges, ...proChallenges];
     }
-  }, [availableChallenges, importedChallenges]);
+  }, [availableChallenges, importedChallenges, loadedChallenges]);
 
   const filteredChallenges = useMemo(() => {
     try {
@@ -495,7 +437,9 @@ export function ChallengeSelection({
                       onHoverEnd={() => setHoveredCard(null)}
                       className='group'
                     >
-                      <Card className={`h-full transition-all duration-300 hover:shadow-2xl border border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden cursor-pointer`}>
+                      <Card
+                        className={`h-full transition-all duration-300 hover:shadow-2xl border border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden cursor-pointer`}
+                      >
                         {/* Card Header with gradient */}
                         <div
                           className={`h-2 bg-gradient-to-r ${difficultyColors[challenge.difficulty] || difficultyColors.beginner}`}
@@ -579,7 +523,10 @@ export function ChallengeSelection({
                                 // Validate challenge has required ID before selection
                                 if (!challenge.id) {
                                   if (process.env.NODE_ENV === 'development') {
-                                    handleError('Challenge missing required ID field', new Error('Missing ID'));
+                                    handleError(
+                                      'Challenge missing required ID field',
+                                      new Error('Missing ID')
+                                    );
                                   }
                                   return;
                                 }

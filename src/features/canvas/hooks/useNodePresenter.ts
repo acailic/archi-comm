@@ -64,7 +64,10 @@ export function useNodePresenter(
   const [labelDraft, setLabelDraft] = useState(component.label || '');
 
   // Computed values
-  const architecturalStyling = useMemo(() => getArchitecturalStyling(component.type), [component.type]);
+  const architecturalStyling = useMemo(
+    () => getArchitecturalStyling(component.type),
+    [component.type]
+  );
   const gradient = useMemo(() => getComponentGradient(component.type), [component.type]);
   const iconInfo = useMemo(() => getComponentIcon(component.type), [component.type]);
 
@@ -92,11 +95,14 @@ export function useNodePresenter(
     setIsHovered(false);
   }, []);
 
-  const startEdit = useCallback((e?: MouseEvent) => {
-    e?.stopPropagation();
-    setIsEditingLabel(true);
-    setLabelDraft(component.label || '');
-  }, [component.label]);
+  const startEdit = useCallback(
+    (e?: MouseEvent) => {
+      e?.stopPropagation();
+      setIsEditingLabel(true);
+      setLabelDraft(component.label || '');
+    },
+    [component.label]
+  );
 
   const commitEdit = useCallback(() => {
     setIsEditingLabel(false);
@@ -106,24 +112,30 @@ export function useNodePresenter(
     }
   }, [labelDraft, onLabelChange, component.id]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitEdit();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setIsEditingLabel(false);
-      setLabelDraft(component.label || '');
-    }
-  }, [commitEdit, component.label]);
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitEdit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsEditingLabel(false);
+        setLabelDraft(component.label || '');
+      }
+    },
+    [commitEdit, component.label]
+  );
 
   const handleLabelInput = useCallback((value: string) => {
     setLabelDraft(value);
   }, []);
 
-  const handleStartConnection = useCallback((position: 'top' | 'bottom' | 'left' | 'right') => {
-    onStartConnection(component.id, position);
-  }, [onStartConnection, component.id]);
+  const handleStartConnection = useCallback(
+    (position: 'top' | 'bottom' | 'left' | 'right') => {
+      onStartConnection(component.id, position);
+    },
+    [onStartConnection, component.id]
+  );
 
   // Effect for label synchronization
   useEffect(() => {
@@ -132,15 +144,38 @@ export function useNodePresenter(
     }
   }, [component.label, isEditingLabel]);
 
-  return {
-    state: {
+  return useMemo(
+    () => ({
+      state: {
+        isHovered,
+        isEditingLabel,
+        labelDraft,
+        healthStatus,
+        visualState,
+      },
+      actions: {
+        handleClick,
+        handleMouseEnter,
+        handleMouseLeave,
+        startEdit,
+        commitEdit,
+        handleKeyDown,
+        handleLabelInput,
+        handleStartConnection,
+      },
+      computed: {
+        visualStateClasses,
+        architecturalStyling,
+        gradient,
+        iconInfo,
+      },
+    }),
+    [
       isHovered,
       isEditingLabel,
       labelDraft,
       healthStatus,
       visualState,
-    },
-    actions: {
       handleClick,
       handleMouseEnter,
       handleMouseLeave,
@@ -149,12 +184,10 @@ export function useNodePresenter(
       handleKeyDown,
       handleLabelInput,
       handleStartConnection,
-    },
-    computed: {
       visualStateClasses,
       architecturalStyling,
       gradient,
       iconInfo,
-    },
-  };
+    ]
+  );
 }

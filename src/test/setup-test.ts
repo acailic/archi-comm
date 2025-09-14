@@ -1,61 +1,75 @@
 import '@testing-library/jest-dom';
-import { vi, beforeAll, afterAll, afterEach } from 'vitest';
+import { vi, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import './mock-tauri';
 import { setupServer } from 'msw/node';
 import { handlers } from './msw-handlers';
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+// Store original ResizeObserver to restore after tests
+const originalResizeObserver = global.ResizeObserver;
 
 // MSW: mock network to stabilize tests
 const server = setupServer(...handlers);
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+
+beforeEach(() => {
+  // Set up ResizeObserver mock for each test to prevent interference
+  global.ResizeObserver = vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
+});
+
 afterEach(() => {
   server.resetHandlers();
+  // Restore original ResizeObserver after each test
+  global.ResizeObserver = originalResizeObserver;
   // Ensure dynamic mocks do not leak across tests
   vi.resetModules();
 });
+
 afterAll(() => server.close());
 
 // Mock React Flow
 vi.mock('@xyflow/react', () => ({
   ReactFlow: vi.fn(({ children, nodes = [], edges = [], onFocus, ...props }: any) => {
     const React = require('react');
-    
+
     // Create mock nodes
-    const mockNodes = nodes.map((node: any) => 
+    const mockNodes = nodes.map((node: any) =>
       React.createElement('div', {
         key: node.id,
-        className: `react-flow__node ${node.data?.isSelected || (node.data?.component?.id === props.selectedComponent) ? 'selected' : ''}`,
+        className: `react-flow__node ${node.data?.isSelected || node.data?.component?.id === props.selectedComponent ? 'selected' : ''}`,
         'data-id': node.id,
       })
     );
-    
-    // Create mock edges  
+
+    // Create mock edges
     const mockEdges = edges.map((edge: any) =>
       React.createElement('div', {
-        key: edge.id, 
+        key: edge.id,
         className: 'react-flow__edge',
         'data-id': edge.id,
       })
     );
-    
-    return React.createElement('div', {
-      className: 'react-flow',
-      tabIndex: 0,
-      'data-testid': 'react-flow',
-      onFocus: (e: any) => {
-        // Add focused class on focus
-        e.target.classList.add('react-flow__focused');
-        onFocus && onFocus(e);
+
+    return React.createElement(
+      'div',
+      {
+        className: 'react-flow',
+        tabIndex: 0,
+        'data-testid': 'react-flow',
+        onFocus: (e: any) => {
+          // Add focused class on focus
+          e.target.classList.add('react-flow__focused');
+          onFocus?.(e);
+        },
+        ...props,
       },
-      ...props
-    }, 
-      React.createElement('div', { className: 'react-flow__viewport' }, 
+      React.createElement(
+        'div',
+        { className: 'react-flow__viewport' },
         ...mockNodes,
         ...mockEdges,
         children
