@@ -29,13 +29,6 @@ import '@xyflow/react/dist/style.css';
 
 import { MessageSquare } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../../components/ui/select';
-import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -46,8 +39,6 @@ import { useConnectionEditor } from '../hooks/useConnectionEditor';
 import { toReactFlowEdges } from '../utils/rf-adapters';
 import { computeLayout } from '../utils/auto-layout';
 import type { VirtualizationConfig, VirtualizationStats } from '../utils/virtualization';
-import { Switch } from '../../../components/ui/switch';
-import { Badge } from '../../../components/ui/badge';
 import { ConnectionEditorPopover } from './ConnectionEditorPopover';
 import { CustomEdge } from './CustomEdge';
 import { CustomNode } from './CustomNode';
@@ -92,58 +83,8 @@ export interface ReactFlowCanvasProps {
   onVirtualizationStats?: (stats: VirtualizationStats) => void;
 }
 
-type ConnectionStyle = 'straight' | 'curved' | 'stepped';
 
-// Memoized SelectTrigger used by the connection style selector
-const ConnectionStyleSelectTrigger = memo(function ConnectionStyleSelectTrigger() {
-  return (
-    <SelectTrigger className='w-32 bg-card/95 backdrop-blur-sm border-border/50'>
-      <SelectValue />
-    </SelectTrigger>
-  );
-});
 
-// Memoized Panel content for selecting connection style and virtualization
-const ConnectionStylePanel = memo(function ConnectionStylePanel({
-  value,
-  onChange,
-  virtualizationEnabled,
-  onVirtualizationToggle,
-  virtualizationStats,
-}: {
-  value: ConnectionStyle;
-  onChange: (value: ConnectionStyle) => void;
-  virtualizationEnabled: boolean;
-  onVirtualizationToggle: (enabled: boolean) => void;
-  virtualizationStats?: VirtualizationStats;
-}) {
-  return (
-    <Panel position='top-left' className='flex gap-2 items-center'>
-      <Select value={value} onValueChange={onChange}>
-        <ConnectionStyleSelectTrigger />
-        <SelectContent>
-          <SelectItem value='straight'>Straight</SelectItem>
-          <SelectItem value='curved'>Curved</SelectItem>
-          <SelectItem value='stepped'>Stepped</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <div className='flex items-center gap-2 px-2 py-1 bg-card/95 backdrop-blur-sm border border-border/50 rounded'>
-        <Switch
-          checked={virtualizationEnabled}
-          onCheckedChange={onVirtualizationToggle}
-          size='sm'
-        />
-        <span className='text-xs font-medium'>Virtualization</span>
-        {virtualizationEnabled && virtualizationStats && (
-          <Badge variant='secondary' className='text-xs px-1 py-0'>
-            {virtualizationStats.visibleComponents}/{virtualizationStats.totalComponents}
-          </Badge>
-        )}
-      </div>
-    </Panel>
-  );
-});
 
 // Internal component that uses React Flow hooks
 function ReactFlowCanvasInternal({
@@ -194,7 +135,6 @@ function ReactFlowCanvasInternal({
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useReactFlow();
-  const [connectionStyle, setConnectionStyle] = useState<ConnectionStyle>('curved');
   const [layoutPositions, setLayoutPositions] = useState<Record<string, { x: number; y: number }>>(
     {}
   );
@@ -623,24 +563,6 @@ function ReactFlowCanvasInternal({
 
   // No longer needed - CustomEdge handles styling internally based on connectionStyle
 
-  // Stable handler for connection style change
-  const handleConnectionStyleChange = useCallback((value: ConnectionStyle) => {
-    setConnectionStyle(value);
-  }, []);
-
-  // Memoize the panel JSX to stabilize ReactFlow children
-  const connectionStylePanel = useMemo(
-    () => (
-      <ConnectionStylePanel
-        value={connectionStyle}
-        onChange={handleConnectionStyleChange}
-        virtualizationEnabled={virtualizationEnabled}
-        onVirtualizationToggle={onVirtualizationToggle}
-        virtualizationStats={virtualizationStats}
-      />
-    ),
-    [connectionStyle, virtualizationEnabled, onVirtualizationToggle, virtualizationStats]
-  );
 
   // Background pattern based on grid style
   const backgroundVariant = gridStyle === 'dots' ? 'dots' : 'lines';
@@ -736,8 +658,6 @@ function ReactFlowCanvasInternal({
             className='archicomm-reactflow'
             data-testid='reactflow-canvas'
           >
-            {/* Connection style and virtualization controls */}
-            {connectionStylePanel}
 
             {/* Background grid */}
             <Background

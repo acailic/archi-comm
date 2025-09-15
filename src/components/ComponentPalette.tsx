@@ -539,6 +539,110 @@ const componentTypes: ComponentType[] = [
   },
 ];
 
+// Tag-to-component mapping for smarter challenge-driven filtering.
+// Keys are normalized lower-case tags. Values list matching component types.
+const TAG_TO_TYPES: Record<string, Array<ComponentType['type']>> = {
+  // Data + Databases
+  database: ['database', 'postgresql', 'mysql', 'mongodb'],
+  databases: ['database', 'postgresql', 'mysql', 'mongodb'],
+  db: ['database', 'postgresql', 'mysql', 'mongodb'],
+  sql: ['postgresql', 'mysql'],
+  nosql: ['mongodb', 'redis'],
+  redis: ['redis'],
+
+  // Caching
+  cache: ['cache', 'redis'],
+  caching: ['cache', 'redis'],
+
+  // Messaging
+  messaging: ['message-queue', 'producer', 'consumer', 'broker', 'dead-letter-queue'],
+  queue: ['message-queue', 'producer', 'consumer', 'broker', 'dead-letter-queue'],
+  pubsub: ['message-queue', 'producer', 'consumer', 'broker', 'dead-letter-queue'],
+  kafka: ['message-queue', 'producer', 'consumer', 'broker', 'dead-letter-queue'],
+  rabbitmq: ['message-queue', 'producer', 'consumer', 'broker', 'dead-letter-queue'],
+
+  // Realtime
+  realtime: ['websocket', 'grpc'],
+  'real-time': ['websocket', 'grpc'],
+  websocket: ['websocket'],
+  grpc: ['grpc'],
+
+  // APIs
+  api: ['rest-api', 'api-gateway', 'graphql', 'webhook'],
+  apis: ['rest-api', 'api-gateway', 'graphql', 'webhook'],
+  rest: ['rest-api'],
+  graphql: ['graphql'],
+  webhook: ['webhook'],
+  gateway: ['api-gateway'],
+
+  // Networking
+  cdn: ['cdn'],
+  'load balancer': ['load-balancer'],
+  'load-balancer': ['load-balancer'],
+  loadbalancer: ['load-balancer'],
+
+  // Security/Auth
+  security: ['security', 'firewall', 'authentication', 'authorization', 'oauth', 'jwt'],
+  auth: ['authentication', 'authorization', 'oauth', 'jwt'],
+  authentication: ['authentication'],
+  authorization: ['authorization'],
+  oauth: ['oauth'],
+  jwt: ['jwt'],
+  firewall: ['firewall'],
+
+  // Observability/Analytics
+  observability: ['monitoring', 'logging', 'metrics', 'alerting', 'elasticsearch', 'kibana'],
+  monitoring: ['monitoring', 'logging', 'metrics', 'alerting'],
+  logging: ['logging'],
+  metrics: ['metrics'],
+  alerting: ['alerting'],
+  search: ['elasticsearch'],
+  analytics: ['elasticsearch', 'kibana', 'data-warehouse', 'data-lake', 'etl', 'stream-processing'],
+
+  // Data processing
+  etl: ['etl'],
+  'data lake': ['data-lake'],
+  datalake: ['data-lake'],
+  'data warehouse': ['data-warehouse'],
+  warehouse: ['data-warehouse'],
+  streaming: ['stream-processing', 'cdn'],
+
+  // Storage
+  storage: ['storage', 's3', 'blob-storage', 'file-system'],
+  s3: ['s3'],
+  blob: ['blob-storage'],
+  'blob storage': ['blob-storage'],
+  filesystem: ['file-system'],
+  'file system': ['file-system'],
+
+  // Compute & containers
+  compute: ['server', 'microservice', 'serverless', 'lambda', 'cloud-function'],
+  server: ['server'],
+  microservice: ['microservice'],
+  serverless: ['serverless', 'lambda', 'cloud-function'],
+  lambda: ['lambda'],
+  'cloud function': ['cloud-function'],
+  container: ['container', 'docker', 'kubernetes'],
+  containers: ['container', 'docker', 'kubernetes'],
+  docker: ['docker'],
+  kubernetes: ['kubernetes'],
+
+  // Edge and emerging
+  edge: ['edge-computing', 'cdn'],
+  'edge computing': ['edge-computing'],
+  blockchain: ['blockchain'],
+  ai: ['ai-ml'],
+  ml: ['ai-ml'],
+  'ai/ml': ['ai-ml'],
+
+  // Clients
+  client: ['client', 'web-app', 'mobile-app', 'desktop-app', 'iot-device'],
+  web: ['web-app', 'rest-api', 'api-gateway', 'graphql'],
+  mobile: ['mobile-app'],
+  desktop: ['desktop-app'],
+  iot: ['iot-device'],
+};
+
 const categories = [
   { id: 'all', label: 'All Components', count: componentTypes.length },
   {
@@ -641,16 +745,114 @@ function DraggableComponent({
   );
 }
 
-export function ComponentPalette() {
+interface ComponentPaletteProps {
+  // Optional: pre-seed the library filter with challenge tags
+  defaultTags?: string[];
+}
+
+export function ComponentPalette({ defaultTags }: ComponentPaletteProps = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
 
+  // When defaultTags are provided (e.g., from a selected challenge),
+  // prefill the search with space-separated tags if the user hasn't typed yet.
+  React.useEffect(() => {
+    if (defaultTags && defaultTags.length > 0) {
+      // Only auto-apply when the user hasn't typed a custom search
+      setSearchQuery(prev => (prev?.trim().length ? prev : defaultTags.join(' ').trim()));
+    }
+  }, [defaultTags]);
+
+  // Build recommended component types from challenge tags using explicit mapping + heuristics
+  const recommendedTypes = React.useMemo(() => {
+    const set = new Set<ComponentType['type']>();
+    const tags = (defaultTags || []).map(t => t.toLowerCase().trim()).filter(Boolean);
+
+    const addTypes = (types?: Array<ComponentType['type']>) => {
+      types?.forEach(t => set.add(t));
+    };
+
+    for (const tag of tags) {
+      // Direct map
+      addTypes(TAG_TO_TYPES[tag]);
+
+      // Heuristics and synonyms
+      if (/db|database/.test(tag)) addTypes(['database', 'postgresql', 'mysql', 'mongodb']);
+      if (/sql/.test(tag)) addTypes(['postgresql', 'mysql']);
+      if (/nosql/.test(tag)) addTypes(['mongodb', 'redis']);
+      if (/cache/.test(tag)) addTypes(['cache', 'redis']);
+      if (/websocket|web\s*socket/.test(tag)) addTypes(['websocket']);
+      if (/grpc/.test(tag)) addTypes(['grpc']);
+      if (/queue|messag|pub\s*sub|kafka|rabbit/.test(tag)) {
+        addTypes(['message-queue', 'producer', 'consumer', 'broker', 'dead-letter-queue']);
+      }
+      if (/api|rest|graphql|webhook|gateway/.test(tag)) {
+        addTypes(['rest-api', 'api-gateway', 'graphql', 'webhook']);
+      }
+      if (/cdn/.test(tag)) addTypes(['cdn']);
+      if (/load\s*balanc/.test(tag)) addTypes(['load-balancer']);
+      if (/auth|oauth|jwt|security|firewall/.test(tag)) {
+        addTypes(['authentication', 'authorization', 'oauth', 'jwt', 'security', 'firewall']);
+      }
+      if (/observab|monitor|logg|metric|alert/.test(tag)) {
+        addTypes(['monitoring', 'logging', 'metrics', 'alerting']);
+      }
+      if (/search/.test(tag)) addTypes(['elasticsearch']);
+      if (/analytic|warehouse|lake|etl|stream/i.test(tag)) {
+        addTypes(['elasticsearch', 'kibana', 'data-warehouse', 'data-lake', 'etl', 'stream-processing']);
+      }
+      if (/storage|s3|blob|file/.test(tag)) {
+        addTypes(['storage', 's3', 'blob-storage', 'file-system']);
+      }
+      if (/serverless|lambda|cloud\s*function/.test(tag)) {
+        addTypes(['serverless', 'lambda', 'cloud-function']);
+      }
+      if (/container|docker|kubern/.test(tag)) {
+        addTypes(['container', 'docker', 'kubernetes']);
+      }
+      if (/edge/.test(tag)) addTypes(['edge-computing', 'cdn']);
+      if (/ai|ml/.test(tag)) addTypes(['ai-ml']);
+      if (/client|web|mobile|desktop|iot/.test(tag)) {
+        addTypes(['client', 'web-app', 'mobile-app', 'desktop-app', 'iot-device']);
+      }
+
+      // Exact type name matches (e.g., tag 'redis', 'kubernetes')
+      const directType = componentTypes.find(ct => ct.type === tag);
+      if (directType) set.add(directType.type);
+    }
+    return set;
+  }, [defaultTags]);
+
   const filteredComponents = componentTypes.filter(component => {
-    const matchesSearch =
-      component.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      component.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const hasTagRecommendations = recommendedTypes.size > 0;
+
+    // When we have tag recommendations, prefer them over free-text search
+    const matchesTags = hasTagRecommendations ? recommendedTypes.has(component.type) : true;
+
+    // Tokenize free-text search as a fallback/complement
+    let tokens = searchQuery
+      .toLowerCase()
+      .split(/\s+/)
+      .map(t => t.trim())
+      .filter(Boolean);
+
+    // If search is only from default tags and produced no recommendations,
+    // don't over-filter by text — show full library with category filter.
+    if ((defaultTags?.length ?? 0) > 0 && recommendedTypes.size === 0) {
+      tokens = [];
+    }
+
+    const matchesText =
+      tokens.length === 0 ||
+      tokens.some(token =>
+        component.label.toLowerCase().includes(token) ||
+        component.description.toLowerCase().includes(token)
+      );
+
     const matchesCategory = activeCategory === 'all' || component.category === activeCategory;
-    return matchesSearch && matchesCategory;
+
+    // If we have tag recommendations, require tag match; otherwise, use text search
+    return (hasTagRecommendations ? matchesTags : matchesText) && matchesCategory;
   });
 
   return (

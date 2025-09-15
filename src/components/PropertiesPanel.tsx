@@ -30,6 +30,8 @@ interface PropertiesPanelProps {
   onLabelChange: (id: string, label: string) => void;
   onDelete: (id: string) => void;
   onShowLabelToggle?: (id: string, visible: boolean) => void;
+  // Optional: tags from the selected challenge to prefilter the component library
+  challengeTags?: string[];
 }
 
 export function PropertiesPanel({
@@ -38,6 +40,7 @@ export function PropertiesPanel({
   onLabelChange,
   onDelete,
   onShowLabelToggle,
+  challengeTags,
 }: PropertiesPanelProps) {
   const [activeTab, setActiveTab] = useState('components');
 
@@ -90,7 +93,7 @@ export function PropertiesPanel({
         <Tabs value={activeTab} className="h-full flex flex-col">
           {/* Component Library Tab */}
           <TabsContent value="components" className="flex-1 m-0 overflow-hidden">
-            <ComponentPalette />
+            <ComponentPalette defaultTags={challengeTags} />
           </TabsContent>
 
           {/* Properties Tab */}

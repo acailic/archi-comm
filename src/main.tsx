@@ -490,7 +490,7 @@ async function initializeDIContainer(): Promise<Container | null> {
   try {
     // Check if DI is enabled via environment variable or localStorage setting
     const diEnabled =
-      process.env.REACT_APP_ENABLE_DI !== 'false' &&
+      import.meta.env.VITE_ENABLE_DI !== 'false' &&
       localStorage.getItem('archicomm-disable-di') !== 'true';
 
     if (!diEnabled) {
@@ -644,7 +644,7 @@ if (isDevelopment()) {
     dependencyInjection: {
       isEnabled: () => {
         return localStorage.getItem('archicomm-disable-di') !== 'true' &&
-               process.env.REACT_APP_ENABLE_DI !== 'false';
+               import.meta.env.VITE_ENABLE_DI !== 'false';
       },
       enable: () => {
         localStorage.removeItem('archicomm-disable-di');

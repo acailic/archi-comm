@@ -6858,3 +6858,81 @@ body.resizing-panel .resize-handle * {
 .h-full.overflow-hidden > .flex-1.overflow-hidden::-webkit-scrollbar-thumb:active {
   background-color: hsl(var(--muted-foreground) / 0.8) !important;
 }
+
+/* Radix ScrollArea Component Scrollbar Styling */
+/* Target ScrollArea components directly for sidebar scrollbars */
+[data-radix-scroll-area-viewport] {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.4) hsl(var(--background));
+}
+
+/* Webkit scrollbar for ScrollArea */
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  width: 12px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+  border-radius: 6px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.4);
+  border-radius: 6px;
+  border: 2px solid hsl(var(--background));
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.6);
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:active {
+  background-color: hsl(var(--muted-foreground) / 0.8);
+}
+
+/* Enhanced Radix ScrollArea scrollbar visibility */
+[data-radix-scroll-area-scrollbar] {
+  opacity: 1 !important;
+  background: hsl(var(--muted) / 0.1) !important;
+  border-radius: 6px !important;
+  padding: 2px !important;
+}
+
+[data-radix-scroll-area-scrollbar][data-orientation="vertical"] {
+  width: 14px !important;
+}
+
+[data-radix-scroll-area-scrollbar][data-orientation="horizontal"] {
+  height: 14px !important;
+}
+
+[data-radix-scroll-area-thumb] {
+  background-color: hsl(var(--muted-foreground) / 0.5) !important;
+  border-radius: 4px !important;
+  transition: background-color 150ms ease !important;
+}
+
+[data-radix-scroll-area-thumb]:hover {
+  background-color: hsl(var(--muted-foreground) / 0.7) !important;
+}
+
+[data-radix-scroll-area-thumb]:active {
+  background-color: hsl(var(--muted-foreground) / 0.9) !important;
+}
+
+/* Specific targeting for sidebar ScrollArea components */
+.h-full.bg-card\/50 [data-radix-scroll-area-scrollbar],
+.h-full.bg-card\/30 [data-radix-scroll-area-scrollbar] {
+  opacity: 1 !important;
+  background: hsl(var(--primary) / 0.05) !important;
+}
+
+.h-full.bg-card\/50 [data-radix-scroll-area-thumb],
+.h-full.bg-card\/30 [data-radix-scroll-area-thumb] {
+  background-color: hsl(var(--primary) / 0.6) !important;
+}
+
+.h-full.bg-card\/50 [data-radix-scroll-area-thumb]:hover,
+.h-full.bg-card\/30 [data-radix-scroll-area-thumb]:hover {
+  background-color: hsl(var(--primary) / 0.8) !important;
+}

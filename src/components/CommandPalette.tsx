@@ -191,6 +191,16 @@ export function CommandPalette({
         shortcut: getShortcutDisplay('review'),
         available: !!selectedChallenge,
       },
+      {
+        id: 'nav-config',
+        title: 'Configuration',
+        description: 'Adjust canvas and app settings',
+        icon: Settings,
+        action: () => onNavigate('config'),
+        section: 'navigation',
+        shortcut: undefined,
+        available: true,
+      },
 
       // Action Commands
       {

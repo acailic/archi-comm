@@ -85,7 +85,7 @@ export async function setupServices(container: Container): Promise<void> {
     // Pre-resolve all services to ensure they're available synchronously
     await preResolveServices(container);
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('Service registry setup complete:', {
         registeredServices: container.getRegisteredServices(),
         dependencyGraph: container.getDependencyGraph(),
@@ -107,7 +107,7 @@ async function preResolveServices(container: Container): Promise<void> {
     await container.resolve(CANVAS_SERVICE);
     await container.resolve(AUDIO_SERVICE);
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('All services pre-resolved successfully');
     }
   } catch (error) {
@@ -157,7 +157,7 @@ export async function validateServiceSetup(container: Container): Promise<boolea
       }
     }
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('All services validated successfully');
     }
 
@@ -179,7 +179,7 @@ export function getServiceDependencyGraph(container: Container): Record<string, 
  * Benchmark service resolution performance
  */
 export async function benchmarkServiceResolution(container: Container): Promise<Record<string, number>> {
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return {};
   }
 
@@ -209,7 +209,7 @@ export function inspectContainer(container: Container): {
   dependencies: Record<string, string[]>;
   isHealthy: boolean;
 } {
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return { services: [], dependencies: {}, isHealthy: false };
   }
 
@@ -226,7 +226,7 @@ export function inspectContainer(container: Container): {
  * Create container with development debugging features
  */
 export async function createDevelopmentContainer(): Promise<Container> {
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return createApplicationContainer();
   }
 
@@ -323,7 +323,7 @@ function getProjectIdFromEnvironment(): string | undefined {
   }
 
   // Check environment variables
-  return process.env.REACT_APP_PROJECT_ID;
+  return import.meta.env.VITE_PROJECT_ID;
 }
 
 /**
@@ -331,11 +331,11 @@ function getProjectIdFromEnvironment(): string | undefined {
  */
 export function getServiceConfiguration() {
   return {
-    development: process.env.NODE_ENV === 'development',
-    enableDependencyInjection: process.env.REACT_APP_ENABLE_DI !== 'false',
-    enableServiceLogging: process.env.REACT_APP_SERVICE_LOGGING === 'true',
+    development: import.meta.env.DEV,
+    enableDependencyInjection: import.meta.env.VITE_ENABLE_DI !== 'false',
+    enableServiceLogging: import.meta.env.VITE_SERVICE_LOGGING === 'true',
     defaultProjectId: getProjectIdFromEnvironment(),
-    audioServiceEnabled: process.env.REACT_APP_AUDIO_SERVICE !== 'false',
+    audioServiceEnabled: import.meta.env.VITE_AUDIO_SERVICE !== 'false',
   };
 }
 
@@ -346,9 +346,9 @@ export function getServiceFeatureFlags() {
   return {
     canvasService: true, // Always enabled
     persistenceService: true, // Always enabled
-    audioService: process.env.REACT_APP_AUDIO_SERVICE !== 'false',
-    realtimeTranscription: process.env.REACT_APP_REALTIME_TRANSCRIPTION === 'true',
-    experimentalFeatures: process.env.REACT_APP_EXPERIMENTAL === 'true',
+    audioService: import.meta.env.VITE_AUDIO_SERVICE !== 'false',
+    realtimeTranscription: import.meta.env.VITE_REALTIME_TRANSCRIPTION === 'true',
+    experimentalFeatures: import.meta.env.VITE_EXPERIMENTAL === 'true',
   };
 }
 

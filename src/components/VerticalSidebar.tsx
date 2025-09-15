@@ -122,7 +122,7 @@ export function VerticalSidebar({ challenge }: VerticalSidebarProps) {
                 <div className='text-xs text-muted-foreground p-2'>Loading components…</div>
               }
             >
-              <ComponentPalette />
+              <ComponentPalette defaultTags={Array.isArray(challenge?.tags) ? challenge?.tags : undefined} />
             </Suspense>
           </div>
         </SidebarGroup>

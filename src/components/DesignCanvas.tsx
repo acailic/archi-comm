@@ -505,6 +505,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               onLabelChange={handleComponentLabelChange}
               onDelete={handleDeleteComponent}
               onShowLabelToggle={handleShowLabelToggle}
+              challengeTags={Array.isArray((extendedChallenge as any)?.tags) ? (extendedChallenge as any).tags : undefined}
             />
           </ResizablePanel>
         </div>

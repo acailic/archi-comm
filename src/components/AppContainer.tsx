@@ -9,6 +9,7 @@ import type { DesignData, Challenge, AudioData } from '@/shared/contracts/index'
 import { AudioRecording } from '@/components/AudioRecording';
 import { ReviewScreen } from '@/components/ReviewScreen';
 import { WelcomeOverlay } from '@/components/WelcomeOverlay';
+import { ConfigPage } from '@/components/ConfigPage';
 import { ScenarioViewer } from '@/dev';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
 import { useDevShortcuts } from '@/dev/DevShortcuts';
@@ -275,6 +276,17 @@ function AppContent() {
       );
     }
 
+    // Show config page if requested
+    if (currentScreen === 'config') {
+      return (
+        <ConfigPage
+          onBack={() => {
+            actions.setCurrentScreen('design-canvas');
+          }}
+        />
+      );
+    }
+
     // Default to design canvas
     return (
       <DesignCanvas
@@ -315,6 +327,9 @@ function AppContent() {
             if (screen === 'review' && selectedChallenge && audioData) {
               actions.setPhase('review');
               actions.setCurrentScreen('review');
+            }
+            if (screen === 'config') {
+              actions.setCurrentScreen('config');
             }
             actions.setShowCommandPalette(false);
           }}
