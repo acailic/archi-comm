@@ -355,3 +355,15 @@ dev.config.*
 *.local.*
 
 ideas/
+e2e/demo-videos/
+e2e/processed-videos/
+e2e/session-states/
+
+
+# Scripts
+scripts/generate-demo-videos.js
+e2e/utils/video-helpers.ts
+e2e/utils/video-processor.ts
+e2e/utils/demo-scenarios.ts
+e2e/utils/global-setup.ts
+e2e/scripts/generate-demo-videos.ts
