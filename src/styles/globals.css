@@ -109,6 +109,12 @@
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
+
+  /* Enhanced minimap variables */
+  --minimap-width: 180px;
+  --minimap-height: 120px;
+  --minimap-border-radius: var(--radius);
+  --minimap-backdrop-blur: var(--glass-blur);
 }
 
 .dark {
@@ -787,5 +793,244 @@ html {
     .hints-panel-width {
       width: var(--hints-panel-width-lg);
     }
+  }
+}
+
+/* Enhanced minimap styles */
+@layer utilities {
+  /* Base styling for enhanced minimap container */
+  .enhanced-minimap {
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--minimap-backdrop-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--minimap-border-radius);
+    box-shadow: var(--elevation-3);
+    width: var(--minimap-width);
+    height: var(--minimap-height);
+    overflow: hidden;
+    transition: all var(--transition-medium) ease-in-out;
+  }
+
+  .enhanced-minimap:hover {
+    box-shadow: var(--elevation-4);
+    border-color: var(--primary);
+  }
+
+  /* Enhanced minimap controls styling */
+  .enhanced-minimap-controls {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    z-index: 10;
+  }
+
+  .enhanced-minimap-control-button {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast) ease-in-out;
+    cursor: pointer;
+    box-shadow: var(--elevation-1);
+  }
+
+  .enhanced-minimap-control-button:hover {
+    background: var(--hover-overlay);
+    box-shadow: var(--elevation-2);
+    transform: translateY(-1px);
+  }
+
+  .enhanced-minimap-control-button:active {
+    transform: translateY(0);
+    box-shadow: var(--elevation-1);
+  }
+
+  .enhanced-minimap-control-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Enhanced viewport indicator styling */
+  .enhanced-minimap-viewport {
+    stroke: var(--primary);
+    stroke-width: 2;
+    stroke-dasharray: 4 4;
+    fill: none;
+    opacity: 0.8;
+    animation: minimapViewportPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes minimapViewportPulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+  }
+
+  /* Enhanced node styling within minimap */
+  .enhanced-minimap-node {
+    transition: all var(--transition-fast) ease-in-out;
+    cursor: pointer;
+  }
+
+  .enhanced-minimap-node:hover {
+    opacity: 0.9;
+    stroke-width: 1;
+  }
+
+  /* Zoom level display */
+  .enhanced-minimap-zoom {
+    position: absolute;
+    bottom: var(--space-sm);
+    left: var(--space-sm);
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: calc(var(--radius) - 2px);
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 11px;
+    font-weight: var(--font-weight-medium);
+    color: var(--muted-foreground);
+    pointer-events: none;
+    text-shadow: var(--text-shadow-subtle);
+  }
+
+  /* Responsive minimap behavior */
+  .enhanced-minimap-responsive {
+    transition:
+      width var(--transition-medium) ease-in-out,
+      height var(--transition-medium) ease-in-out,
+      transform var(--transition-medium) ease-in-out;
+  }
+
+  /* Mobile-specific minimap styles */
+  @media (max-width: 767px) {
+    .enhanced-minimap {
+      width: calc(var(--minimap-width) * 0.7);
+      height: calc(var(--minimap-height) * 0.7);
+    }
+
+    .enhanced-minimap-controls {
+      top: var(--space-xs);
+      right: var(--space-xs);
+      gap: 2px;
+    }
+
+    .enhanced-minimap-control-button {
+      width: 20px;
+      height: 20px;
+    }
+
+    .enhanced-minimap-zoom {
+      bottom: var(--space-xs);
+      left: var(--space-xs);
+      padding: 2px var(--space-xs);
+      font-size: 10px;
+    }
+  }
+
+  /* Tablet-specific styles */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .enhanced-minimap {
+      width: calc(var(--minimap-width) * 0.8);
+      height: calc(var(--minimap-height) * 0.8);
+    }
+  }
+
+  /* Large screen enhancements */
+  @media (min-width: 1280px) {
+    .enhanced-minimap {
+      width: calc(var(--minimap-width) * 1.2);
+      height: calc(var(--minimap-height) * 1.2);
+    }
+  }
+
+  /* Touch-friendly interactions */
+  @media (hover: none) and (pointer: coarse) {
+    .enhanced-minimap-control-button {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      min-height: 28px;
+    }
+
+    .enhanced-minimap-controls {
+      gap: var(--space-sm);
+    }
+
+    .enhanced-minimap:hover {
+      box-shadow: var(--elevation-3);
+      border-color: var(--glass-border);
+    }
+  }
+
+  /* Accessibility improvements */
+  .enhanced-minimap-control-button:focus-visible {
+    outline: 2px solid var(--focus-overlay);
+    outline-offset: 2px;
+  }
+
+  .enhanced-minimap[aria-hidden="true"] {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.9);
+  }
+
+  /* Performance optimizations */
+  .enhanced-minimap-gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+  }
+
+  .enhanced-minimap-static {
+    will-change: auto;
+    transform: none;
+  }
+
+  /* Interactive state indicators */
+  .enhanced-minimap-interactive {
+    cursor: crosshair;
+  }
+
+  .enhanced-minimap-interactive:active {
+    cursor: grabbing;
+  }
+
+  /* Smooth fade-in animation */
+  .enhanced-minimap-enter {
+    animation: minimapFadeIn var(--transition-medium) ease-out;
+  }
+
+  @keyframes minimapFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Connection lines within minimap */
+  .enhanced-minimap-connection {
+    stroke: var(--muted-foreground);
+    stroke-width: 0.5;
+    opacity: 0.6;
+    transition: opacity var(--transition-fast) ease-in-out;
+  }
+
+  .enhanced-minimap:hover .enhanced-minimap-connection {
+    opacity: 0.8;
   }
 }

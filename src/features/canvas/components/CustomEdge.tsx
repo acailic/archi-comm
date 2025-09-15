@@ -57,6 +57,17 @@ export function CustomEdge({
     []
   );
 
+  // Visual style colors for queue message flows
+  const visualStyleColors = useMemo(
+    () => ({
+      default: null, // Use connection type color
+      ack: 'hsl(var(--green-500))',
+      retry: 'hsl(var(--orange-500))',
+      error: 'hsl(var(--red-500))',
+    }),
+    []
+  );
+
   // Generate the appropriate path based on connection style
   const [edgePath, labelX, labelY] = useMemo(() => {
     const pathParams = {
@@ -80,9 +91,23 @@ export function CustomEdge({
   }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, connectionStyle]);
 
   // Edge styling
-  const color =
-    connectionColors[connection.type as keyof typeof connectionColors] || 'hsl(var(--primary))';
-  const strokeDasharray = connection.type === 'async' ? '5,5' : undefined;
+  const visualStyleColor = connection.visualStyle
+    ? visualStyleColors[connection.visualStyle as keyof typeof visualStyleColors]
+    : null;
+
+  const color = visualStyleColor ||
+    connectionColors[connection.type as keyof typeof connectionColors] ||
+    'hsl(var(--primary))';
+
+  // Determine stroke dash array based on visual style and connection type
+  const getStrokeDashArray = () => {
+    if (connection.visualStyle && connection.visualStyle !== 'default') {
+      return '8,4'; // Dashed lines for queue message flows (ACK, retry, error)
+    }
+    return connection.type === 'async' ? '5,5' : undefined;
+  };
+
+  const strokeDasharray = getStrokeDashArray();
   const strokeWidth = isSelected ? 3 : 2;
   const opacity = isStartConnection ? 0.5 : 1;
 

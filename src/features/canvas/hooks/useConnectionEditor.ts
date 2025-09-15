@@ -6,12 +6,13 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Connection } from '@/shared/contracts';
+import type { Connection, VisualStyle } from '@/shared/contracts';
 
 interface UseConnectionEditorProps {
   connections: Connection[];
   onConnectionLabelChange: (id: string, label: string) => void;
   onConnectionTypeChange: (id: string, type: Connection['type']) => void;
+  onConnectionVisualStyleChange?: (id: string, visualStyle: VisualStyle) => void;
   onConnectionDelete: (id: string) => void;
 }
 
@@ -22,6 +23,7 @@ interface UseConnectionEditorResult {
   handleConnectionUpdate: {
     onLabelChange: (id: string, label: string) => void;
     onTypeChange: (id: string, type: Connection['type']) => void;
+    onVisualStyleChange: (id: string, visualStyle: VisualStyle) => void;
     onDelete: (id: string) => void;
   };
   closeEditor: () => void;
@@ -31,6 +33,7 @@ export function useConnectionEditor({
   connections,
   onConnectionLabelChange,
   onConnectionTypeChange,
+  onConnectionVisualStyleChange,
   onConnectionDelete
 }: UseConnectionEditorProps): UseConnectionEditorResult {
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
@@ -85,6 +88,12 @@ export function useConnectionEditor({
     onTypeChange: useCallback((id: string, type: Connection['type']) => {
       onConnectionTypeChange(id, type);
     }, [onConnectionTypeChange]),
+
+    onVisualStyleChange: useCallback((id: string, visualStyle: VisualStyle) => {
+      if (onConnectionVisualStyleChange) {
+        onConnectionVisualStyleChange(id, visualStyle);
+      }
+    }, [onConnectionVisualStyleChange]),
 
     onDelete: useCallback((id: string) => {
       onConnectionDelete(id);

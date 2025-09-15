@@ -21,10 +21,16 @@ export interface ArchiCommNodeData {
 
 export interface ArchiCommEdgeData {
   [key: string]: unknown;
+  connection: Connection;
+  connectionStyle: 'straight' | 'curved' | 'stepped';
+  isSelected: boolean;
+  isStartConnection: boolean;
+  onConnectionSelect: (id: string | null, x?: number, y?: number) => void;
   label: string;
   type: string;
   protocol?: string;
   direction?: string;
+  visualStyle?: string;
 }
 
 // Type aliases for our specific React Flow types
@@ -65,12 +71,18 @@ export function toReactFlowEdges(connections: Connection[]): ArchiCommEdge[] {
     id: connection.id,
     source: connection.from,
     target: connection.to,
-    type: getReactFlowEdgeType(connection.type),
+    type: 'custom', // Use custom edge type for CustomEdge component
     data: {
+      connection: connection,
+      connectionStyle: getConnectionStyle(connection.type),
+      isSelected: false,
+      isStartConnection: false,
+      onConnectionSelect: () => {}, // Will be overridden by parent
       label: connection.label,
       type: connection.type,
       protocol: connection.protocol,
       direction: connection.direction,
+      visualStyle: connection.visualStyle,
     },
     // React Flow specific properties
     deletable: true,
@@ -117,6 +129,7 @@ export function fromReactFlowEdges(edges: ArchiCommEdge[]): Connection[] {
     type: edge.data.type as any, // Cast to ConnectionType
     protocol: edge.data.protocol,
     direction: edge.data.direction as any, // Cast to ConnectionDirection
+    visualStyle: edge.data.visualStyle as any, // Cast to VisualStyle
   }));
 }
 
@@ -224,6 +237,7 @@ export function fromEdgeChanges(
             type: change.item.data.type as any, // Cast to ConnectionType
             protocol: change.item.data.protocol,
             direction: change.item.data.direction as any, // Cast to ConnectionDirection
+            visualStyle: change.item.data.visualStyle as any, // Cast to VisualStyle
           };
           updatedConnections.push(newConnection);
         }
@@ -247,6 +261,7 @@ export function fromEdgeChanges(
                   type: change.item.data.type as any, // Cast to ConnectionType
                   protocol: change.item.data.protocol,
                   direction: change.item.data.direction as any, // Cast to ConnectionDirection
+                  visualStyle: change.item.data.visualStyle as any, // Cast to VisualStyle
                 }
               : connection
           );
@@ -281,6 +296,23 @@ function getReactFlowEdgeType(connectionType: string): string {
       return 'smoothstep'; // Curved line
     default:
       return 'default';
+  }
+}
+
+/**
+ * Maps connection types to CustomEdge connectionStyle based on getReactFlowEdgeType mapping
+ */
+function getConnectionStyle(connectionType: string): 'straight' | 'curved' | 'stepped' {
+  const reactFlowType = getReactFlowEdgeType(connectionType);
+  switch (reactFlowType) {
+    case 'default':
+      return 'straight';
+    case 'step':
+      return 'stepped';
+    case 'smoothstep':
+      return 'curved';
+    default:
+      return 'straight';
   }
 }
 
@@ -333,12 +365,18 @@ export function createReactFlowEdge(connection: Connection): ArchiCommEdge {
     id: connection.id,
     source: connection.from,
     target: connection.to,
-    type: getReactFlowEdgeType(connection.type),
+    type: 'custom', // Use custom edge type for CustomEdge component
     data: {
+      connection: connection,
+      connectionStyle: getConnectionStyle(connection.type),
+      isSelected: false,
+      isStartConnection: false,
+      onConnectionSelect: () => {}, // Will be overridden by parent
       label: connection.label,
       type: connection.type,
       protocol: connection.protocol,
       direction: connection.direction,
+      visualStyle: connection.visualStyle,
     },
     deletable: true,
     selectable: true,
@@ -393,13 +431,16 @@ export function updateReactFlowEdge(
     ...edge,
     source: connection.from,
     target: connection.to,
-    type: getReactFlowEdgeType(connection.type),
+    type: 'custom', // Use custom edge type for CustomEdge component
     data: {
       ...edge.data,
+      connection: connection,
+      connectionStyle: getConnectionStyle(connection.type),
       label: connection.label,
       type: connection.type,
       protocol: connection.protocol,
       direction: connection.direction,
+      visualStyle: connection.visualStyle,
     },
     markerEnd: shouldShowEndMarker(connection.direction) ? {
       type: 'arrowclosed',

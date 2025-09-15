@@ -49,6 +49,7 @@ export interface VirtualCanvasProps {
   onConnectionLabelChange: (id: string, label: string) => void;
   onConnectionDelete?: (id: string) => void;
   onConnectionTypeChange?: (id: string, type: Connection['type']) => void;
+  onConnectionVisualStyleChange?: (id: string, visualStyle: Connection['visualStyle']) => void;
   onStartConnection: (id: string) => void;
   onCompleteConnection: (fromId: string, toId: string) => void;
   onInfoCardAdd?: (x: number, y: number) => void;
@@ -160,12 +161,13 @@ const VirtualCanvasInternal: React.FC<VirtualCanvasProps> = ({
   const { metrics, recommendations } = useVirtualizationPerformance('virtual-canvas');
 
   // Connection editor hook
-  const { selectedConnection, connectionPopoverData, handleConnectionSelect, handleConnectionLabelChange } =
+  const { selectedConnection, popoverPosition, handleConnectionSelect, handleConnectionUpdate, closeEditor } =
     useConnectionEditor({
       connections,
       onConnectionLabelChange,
-      onConnectionDelete,
-      onConnectionTypeChange,
+      onConnectionTypeChange: onConnectionTypeChange ?? (() => {}),
+      onConnectionVisualStyleChange: undefined, // VirtualCanvas doesn't handle this yet
+      onConnectionDelete: onConnectionDelete ?? (() => {}),
     });
 
   // Create React Flow nodes from visible components and info cards
@@ -499,15 +501,18 @@ const VirtualCanvasInternal: React.FC<VirtualCanvasProps> = ({
       </ReactFlow>
 
       {/* Connection editor popover */}
-      <ConnectionEditorPopover
-        isOpen={!!connectionPopoverData}
-        onClose={() => handleConnectionSelect(null)}
-        connection={selectedConnection}
-        position={connectionPopoverData?.position || { x: 0, y: 0 }}
-        onLabelChange={handleConnectionLabelChange}
-        onDelete={onConnectionDelete}
-        onTypeChange={onConnectionTypeChange}
-      />
+      {selectedConnection && popoverPosition && (
+        <ConnectionEditorPopover
+          selectedConnection={selectedConnection}
+          x={popoverPosition.x}
+          y={popoverPosition.y}
+          onLabelChange={handleConnectionUpdate.onLabelChange}
+          onTypeChange={handleConnectionUpdate.onTypeChange}
+          onVisualStyleChange={handleConnectionUpdate.onVisualStyleChange}
+          onDelete={handleConnectionUpdate.onDelete}
+          onClose={closeEditor}
+        />
+      )}
     </div>
   );
 };

@@ -41,7 +41,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '../../../components/ui/context-menu';
-import type { Connection, DesignComponent, InfoCard } from '../../../shared/contracts';
+import type { Connection, DesignComponent, InfoCard, VisualStyle } from '../../../shared/contracts';
 import { useConnectionEditor } from '../hooks/useConnectionEditor';
 import { toReactFlowEdges } from '../utils/rf-adapters';
 import { computeLayout } from '../utils/auto-layout';
@@ -52,6 +52,7 @@ import { ConnectionEditorPopover } from './ConnectionEditorPopover';
 import { CustomEdge } from './CustomEdge';
 import { CustomNode } from './CustomNode';
 import { InfoCard as InfoCardComponent } from './InfoCard';
+import { EnhancedMiniMap } from './EnhancedMiniMap';
 
 // Virtualization imports
 import { VirtualCanvas } from './VirtualCanvas';
@@ -70,6 +71,7 @@ export interface ReactFlowCanvasProps {
   onConnectionLabelChange: (id: string, label: string) => void;
   onConnectionDelete?: (id: string) => void;
   onConnectionTypeChange?: (id: string, type: Connection['type']) => void;
+  onConnectionVisualStyleChange?: (id: string, visualStyle: VisualStyle) => void;
   onStartConnection: (id: string) => void;
   onCompleteConnection: (fromId: string, toId: string) => void;
   onInfoCardAdd?: (x: number, y: number) => void;
@@ -157,6 +159,7 @@ function ReactFlowCanvasInternal({
   onConnectionLabelChange,
   onConnectionDelete,
   onConnectionTypeChange,
+  onConnectionVisualStyleChange,
   onStartConnection,
   onCompleteConnection,
   onInfoCardAdd,
@@ -195,6 +198,29 @@ function ReactFlowCanvasInternal({
   const [layoutPositions, setLayoutPositions] = useState<Record<string, { x: number; y: number }>>(
     {}
   );
+
+  // Calculate canvas size for enhanced minimap
+  const canvasSize = useMemo(() => {
+    if (components.length === 0) {
+      return { width: 1000, height: 600 };
+    }
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    components.forEach(component => {
+      const x = component.x;
+      const y = component.y;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + 200); // Component width
+      maxY = Math.max(maxY, y + 120); // Component height
+    });
+
+    return {
+      width: Math.max(1000, maxX - minX + 400), // Add padding
+      height: Math.max(600, maxY - minY + 300),
+    };
+  }, [components]);
 
   // Memoize stringified versions of components and connections to stabilize useEffect dependencies
   const componentsStr = useMemo(() => JSON.stringify(components), [components]);
@@ -314,11 +340,11 @@ function ReactFlowCanvasInternal({
       onInfoCardColorChange,
     ]
   );
-  const initialEdges = useMemo(() => toReactFlowEdges(connections), [connections]);
+  // Initial edges will be set after useConnectionEditor hook
 
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   // Sync external data changes with React Flow state
   // Keep ReactFlow state in sync with external data; depend on the same direct inputs
@@ -338,16 +364,14 @@ function ReactFlowCanvasInternal({
       onInfoCardColorChange,
     ]
   );
-  const syncedEdges = useMemo(() => toReactFlowEdges(connections), [connections]);
+  // syncedEdges will be defined after useConnectionEditor hook
 
   // Update React Flow state when external data changes
   useEffect(() => {
     setNodes(syncedNodes);
   }, [syncedNodes, setNodes]);
 
-  useEffect(() => {
-    setEdges(syncedEdges);
-  }, [syncedEdges, setEdges]);
+  // useEffect for edges will be defined after useConnectionEditor hook
 
   // Compute ELK auto-layout positions when enabled
   useEffect(() => {
@@ -435,8 +459,32 @@ function ReactFlowCanvasInternal({
     connections,
     onConnectionLabelChange,
     onConnectionTypeChange: onConnectionTypeChange ?? (() => {}),
+    onConnectionVisualStyleChange: onConnectionVisualStyleChange,
     onConnectionDelete: onConnectionDelete ?? (() => {}),
   });
+
+  // Convert connections to React Flow edges with proper CustomEdge data
+  const createEnhancedEdges = useCallback(
+    (connections: Connection[]) => {
+      return toReactFlowEdges(connections).map(edge => ({
+        ...edge,
+        data: {
+          ...edge.data,
+          // connectionStyle is now set automatically based on connection.type in toReactFlowEdges
+          isSelected: selectedConnection?.id === edge.id,
+          onConnectionSelect: handleConnectionSelect,
+        },
+      }));
+    },
+    [selectedConnection, handleConnectionSelect]
+  );
+
+  const syncedEdges = useMemo(() => createEnhancedEdges(connections), [createEnhancedEdges, connections]);
+
+  // Update React Flow edges when external data changes
+  useEffect(() => {
+    setEdges(syncedEdges);
+  }, [syncedEdges, setEdges]);
 
   // Handle React Flow node changes
   const handleNodesChange = useCallback(
@@ -549,19 +597,31 @@ function ReactFlowCanvasInternal({
     setContextMenu(null);
   }, []);
 
-  // Map connection style to React Flow edge types
-  const edgeTypes = useMemo(() => {
-    const baseEdges = edges.map(edge => ({
-      ...edge,
-      type:
-        connectionStyle === 'straight'
-          ? 'default'
-          : connectionStyle === 'stepped'
-            ? 'step'
-            : 'smoothstep',
-    }));
-    return baseEdges;
-  }, [edges, connectionStyle]);
+  // Enhanced minimap handlers
+  const handleMinimapZoomChange = useCallback(
+    (zoom: number, centerX?: number, centerY?: number) => {
+      if (!reactFlowInstance) return;
+      if (centerX != null && centerY != null) {
+        reactFlowInstance.setCenter(centerX, centerY, { zoom });
+      } else {
+        const current = reactFlowInstance.getViewport();
+        reactFlowInstance.setViewport({ ...current, zoom });
+      }
+      onViewportChange(reactFlowInstance.getViewport());
+    },
+    [reactFlowInstance, onViewportChange]
+  );
+
+  const handleMinimapPanTo = useCallback(
+    (x: number, y: number) => {
+      if (!reactFlowInstance) return;
+      reactFlowInstance.setCenter(x, y);
+      onViewportChange(reactFlowInstance.getViewport());
+    },
+    [reactFlowInstance, onViewportChange]
+  );
+
+  // No longer needed - CustomEdge handles styling internally based on connectionStyle
 
   // Stable handler for connection style change
   const handleConnectionStyleChange = useCallback((value: ConnectionStyle) => {
@@ -644,9 +704,8 @@ function ReactFlowCanvasInternal({
           )}
 
           <ReactFlow
-            data-testid='canvas'
             nodes={nodes}
-            edges={edgeTypes}
+            edges={edges}
             onNodesChange={handleNodesChange}
             onEdgesChange={handleEdgesChange}
             onConnect={handleConnect}
@@ -698,15 +757,16 @@ function ReactFlowCanvasInternal({
               showInteractive={true}
             />
 
-            {/* Minimap */}
-            <MiniMap
+            {/* Enhanced Minimap */}
+            <EnhancedMiniMap
+              components={components}
               position='bottom-left'
-              nodeColor='hsl(var(--primary))'
-              maskColor='hsl(var(--muted) / 0.1)'
-              style={{
-                backgroundColor: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-              }}
+              canvasSize={canvasSize}
+              onZoomChange={handleMinimapZoomChange}
+              onPanTo={handleMinimapPanTo}
+              showZoomControls={true}
+              showVisibilityToggle={false}
+              interactive={true}
             />
           </ReactFlow>
 
@@ -718,6 +778,7 @@ function ReactFlowCanvasInternal({
               y={popoverPosition.y}
               onLabelChange={handleConnectionUpdate.onLabelChange}
               onTypeChange={handleConnectionUpdate.onTypeChange}
+              onVisualStyleChange={handleConnectionUpdate.onVisualStyleChange}
               onDelete={handleConnectionUpdate.onDelete}
               onClose={closeEditor}
             />

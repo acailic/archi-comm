@@ -31,6 +31,7 @@ import {
   Network,
   Radio,
   Search,
+  Send,
   Server,
   Shield,
   Smartphone,
@@ -82,6 +83,10 @@ export const componentIconMap: Record<DesignComponent['type'], ComponentIconMapp
 
   // Messaging & Communication
   'message-queue': { type: 'message-queue', icon: MessageSquare, color: 'bg-amber-500' },
+  'producer': { type: 'producer', icon: Send, color: 'bg-green-500' },
+  'consumer': { type: 'consumer', icon: Zap, color: 'bg-blue-500' },
+  'broker': { type: 'broker', icon: Server, color: 'bg-purple-500' },
+  'dead-letter-queue': { type: 'dead-letter-queue', icon: AlertTriangle, color: 'bg-red-500' },
   'websocket': { type: 'websocket', icon: Radio, color: 'bg-green-400' },
   'grpc': { type: 'grpc', icon: Network, color: 'bg-blue-500' },
 

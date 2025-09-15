@@ -6,7 +6,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { ArrowLeft, Save, Download, Lightbulb, Search, Activity, Clock, Zap } from 'lucide-react';
+import { ArrowLeft, Save, Download, Lightbulb, Search, Activity, Clock, Zap, Upload } from 'lucide-react';
 import { ExtendedChallenge, challengeManager } from '../lib/challenge-config';
 import type {
   Connection,
@@ -24,6 +24,10 @@ import { SolutionHints } from './SolutionHints';
 import { CommandPalette } from './CommandPalette';
 import { ResizablePanel } from './ui/ResizablePanel';
 import { storage } from '@/services/storage';
+import { ImportExportDropdown, useImportExportShortcuts } from './ImportExportDropdown';
+import { DesignSerializer } from '@/lib/import-export/DesignSerializer';
+import type { CanvasConfig } from '@/lib/import-export/types';
+import { toast } from 'sonner';
 
 interface DesignCanvasProps {
   challenge: Challenge;
@@ -42,6 +46,24 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [sessionStartTime] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [canvasConfig, setCanvasConfig] = useState<CanvasConfig>({
+    viewport: { x: 0, y: 0, zoom: 1 },
+    gridConfig: {
+      visible: true,
+      spacing: 20,
+      snapToGrid: false,
+      style: 'dots',
+    },
+    theme: 'light',
+    virtualizationEnabled: false,
+  });
+
+  // Initialize design serializer with session timing
+  const serializer = React.useMemo(() => {
+    const s = new DesignSerializer();
+    s.setSessionStartTime(sessionStartTime);
+    return s;
+  }, [sessionStartTime]);
 
   // Update current time every second for status bar
   useEffect(() => {
@@ -126,8 +148,14 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   }, []);
 
   const handleConnectionTypeChange = useCallback((id: string, type: Connection['type']) => {
-    setConnections(prev => prev.map(conn => 
+    setConnections(prev => prev.map(conn =>
       conn.id === id ? { ...conn, type } : conn
+    ));
+  }, []);
+
+  const handleConnectionVisualStyleChange = useCallback((id: string, visualStyle: Connection['visualStyle']) => {
+    setConnections(prev => prev.map(conn =>
+      conn.id === id ? { ...conn, visualStyle } : conn
     ));
   }, []);
 
@@ -173,44 +201,138 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     ));
   }, []);
 
-  const handleSave = useCallback(() => {
-    const designData = { components, connections, infoCards };
-    void storage.setItem('archicomm-design', JSON.stringify(designData));
-  }, [components, connections, infoCards]);
+  // Create current design data
+  const currentDesignData: DesignData = React.useMemo(() => ({
+    components,
+    connections,
+    infoCards,
+    layers: [],
+    metadata: {
+      created: initialData.metadata?.created || new Date().toISOString(),
+      lastModified: new Date().toISOString(),
+      version: '1.0'
+    }
+  }), [components, connections, infoCards, initialData.metadata?.created]);
 
-  const handleExport = useCallback(() => {
-    const designData = { components, connections, infoCards };
-    const dataStr = JSON.stringify(designData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${challenge.id}-design.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, [components, connections, infoCards, challenge.id]);
+  // Handle import result (doesn't depend on currentDesignData)
+  const handleImport = useCallback((result: any) => {
+    if (result.success && result.data) {
+      setComponents(result.data.components || []);
+      setConnections(result.data.connections || []);
+      setInfoCards(result.data.infoCards || []);
+
+      // Update canvas config if imported
+      if (result.canvas) {
+        setCanvasConfig(result.canvas);
+      }
+
+      // Reset selections
+      setSelectedComponent(null);
+      setConnectionStart(null);
+
+      toast.success('Design imported successfully!', {
+        description: `Imported ${result.statistics.componentsImported} components and ${result.statistics.connectionsImported} connections`,
+      });
+    }
+  }, []);
+
+  const handleImportFromClipboard = useCallback(async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+
+      if (!clipboardText.trim()) {
+        toast.error('Clipboard is empty', {
+          description: 'Please copy a design JSON first',
+        });
+        return;
+      }
+
+      const result = await serializer.importDesign(clipboardText, {
+        mode: 'replace',
+        handleConflicts: 'auto',
+        preserveIds: false,
+        preservePositions: true,
+        validateComponents: true,
+        importCanvas: true,
+        importAnalytics: true,
+      });
+
+      if (result.success) {
+        handleImport(result);
+      } else {
+        toast.error('Import failed', {
+          description: result.errors.join('; '),
+        });
+      }
+    } catch (error) {
+      toast.error('Import failed', {
+        description: error instanceof Error ? error.message : 'Clipboard read failed',
+      });
+    }
+  }, [serializer, handleImport]);
+
+  const handleSave = useCallback(() => {
+    void storage.setItem('archicomm-design', JSON.stringify(currentDesignData));
+    toast.success('Design saved locally');
+  }, [currentDesignData]);
+
+  // Quick export handler
+  const handleQuickExport = useCallback(async () => {
+    try {
+      const filename = challenge?.title ? `${challenge.title}-design` : 'archicomm-design';
+      const content = await serializer.exportDesign(currentDesignData, challenge, canvasConfig);
+      await DesignSerializer.downloadFile(content, `${filename}.json`, 'application/json');
+
+      toast.success('Design exported successfully!', {
+        description: `Saved as ${filename}.json`,
+      });
+    } catch (error) {
+      toast.error('Export failed', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    }
+  }, [currentDesignData, challenge, canvasConfig, serializer]);
+
+  const handleQuickSave = useCallback(async () => {
+    // Save to local storage
+    void storage.setItem('archicomm-design', JSON.stringify(currentDesignData));
+
+    // Also trigger quick export
+    await handleQuickExport();
+  }, [currentDesignData, handleQuickExport]);
+
+  const handleCopyToClipboard = useCallback(async () => {
+    try {
+      const content = await serializer.exportDesign(currentDesignData, challenge, canvasConfig);
+      await navigator.clipboard.writeText(content);
+
+      toast.success('Design copied to clipboard!', {
+        description: 'You can now paste it anywhere',
+      });
+    } catch (error) {
+      toast.error('Copy failed', {
+        description: error instanceof Error ? error.message : 'Clipboard not available',
+      });
+    }
+  }, [currentDesignData, challenge, canvasConfig, serializer]);
 
   const handleContinue = useCallback(() => {
-    const designData: DesignData = {
-      components,
-      connections,
-      infoCards,
-      layers: [],
-      metadata: {
-        created: initialData.metadata?.created || new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-        version: '1.0'
-      }
-    };
-    onComplete(designData);
-  }, [components, connections, infoCards, initialData.metadata?.created, onComplete]);
+    onComplete(currentDesignData);
+  }, [currentDesignData, onComplete]);
 
   // Status bar calculations
   const timeElapsed = Math.floor((currentTime.getTime() - sessionStartTime.getTime()) / 1000 / 60);
   const componentTypes = Array.from(new Set(components.map(c => c.type))).length;
   const selectedComponentData = selectedComponent ? components.find(c => c.id === selectedComponent) : null;
+
+  // Setup keyboard shortcuts for import/export
+  useImportExportShortcuts({
+    onQuickExport: handleQuickExport,
+    onQuickSave: handleQuickSave,
+    onImport: () => {}, // Will trigger modal from dropdown
+    onCopyToClipboard: handleCopyToClipboard,
+    onImportFromClipboard: handleImportFromClipboard,
+  });
 
   return (
     <TooltipProvider>
@@ -288,22 +410,13 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
                   Save Design
                 </TooltipContent>
               </Tooltip>
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleExport}
-                    className="px-3"
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Export Design
-                </TooltipContent>
-              </Tooltip>
+
+              <ImportExportDropdown
+                designData={currentDesignData}
+                challenge={challenge}
+                canvasConfig={canvasConfig}
+                onImport={handleImport}
+              />
               
               <Button onClick={handleContinue} disabled={components.length === 0}>
                 Continue to Recording
@@ -346,6 +459,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
             onConnectionLabelChange={handleConnectionLabelChange}
             onConnectionDelete={handleConnectionDelete}
             onConnectionTypeChange={handleConnectionTypeChange}
+            onConnectionVisualStyleChange={handleConnectionVisualStyleChange}
             onStartConnection={(id: string) => setConnectionStart(id)}
             onCompleteConnection={(fromId: string, toId: string) => {
                 if (fromId !== toId) {

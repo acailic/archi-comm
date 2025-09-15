@@ -15,6 +15,10 @@ export type ComponentType =
   | 'load-balancer'
   | 'microservice'
   | 'message-queue'
+  | 'producer'
+  | 'consumer'
+  | 'broker'
+  | 'dead-letter-queue'
   | 'client'
   | 'monitoring'
   | 'storage'
@@ -24,6 +28,7 @@ export type ComponentType =
 // Connection unions
 export type ConnectionType = 'data' | 'control' | 'sync' | 'async';
 export type ConnectionDirection = 'none' | 'end' | 'both';
+export type VisualStyle = 'default' | 'ack' | 'retry' | 'error';
 
 // Strict property groups
 export interface DatabaseProperties {
@@ -92,6 +97,7 @@ export interface Connection {
   type: ConnectionType;
   protocol?: string;
   direction?: ConnectionDirection;
+  visualStyle?: VisualStyle;
 }
 
 export interface Layer {

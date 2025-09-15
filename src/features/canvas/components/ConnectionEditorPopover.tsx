@@ -7,9 +7,12 @@
 
 import * as Popover from '@radix-ui/react-popover';
 import {
+    AlertTriangle,
     ArrowRight,
+    CheckCircle,
     LinkIcon,
     Loader2,
+    RefreshCw,
     Trash2Icon,
     Zap
 } from 'lucide-react';
@@ -19,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { Connection } from '@/shared/contracts';
+import type { Connection, VisualStyle } from '@/shared/contracts';
 
 interface ConnectionEditorPopoverProps {
   selectedConnection: Connection;
@@ -27,6 +30,7 @@ interface ConnectionEditorPopoverProps {
   y: number;
   onLabelChange: (id: string, label: string) => void;
   onTypeChange: (id: string, type: Connection['type']) => void;
+  onVisualStyleChange: (id: string, visualStyle: VisualStyle) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
@@ -37,6 +41,7 @@ export function ConnectionEditorPopover({
   y,
   onLabelChange,
   onTypeChange,
+  onVisualStyleChange,
   onDelete,
   onClose
 }: ConnectionEditorPopoverProps) {
@@ -45,6 +50,13 @@ export function ConnectionEditorPopover({
     { value: 'control', label: 'Control Flow', icon: <Zap className="w-4 h-4" /> },
     { value: 'sync', label: 'Synchronous', icon: <LinkIcon className="w-4 h-4" /> },
     { value: 'async', label: 'Asynchronous', icon: <Loader2 className="w-4 h-4" /> }
+  ];
+
+  const visualStyles: Array<{ value: VisualStyle; label: string; icon: React.ReactNode }> = [
+    { value: 'default', label: 'Default', icon: <ArrowRight className="w-4 h-4" /> },
+    { value: 'ack', label: 'ACK', icon: <CheckCircle className="w-4 h-4 text-green-500" /> },
+    { value: 'retry', label: 'Retry', icon: <RefreshCw className="w-4 h-4 text-orange-500" /> },
+    { value: 'error', label: 'Error', icon: <AlertTriangle className="w-4 h-4 text-red-500" /> }
   ];
 
   return (
@@ -87,6 +99,28 @@ export function ConnectionEditorPopover({
                 </SelectTrigger>
                 <SelectContent>
                   {connectionTypes.map(({ value, label, icon }) => (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex items-center gap-2">
+                        {icon}
+                        <span>{label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="visualStyle">Visual Style</Label>
+              <Select
+                value={selectedConnection.visualStyle || 'default'}
+                onValueChange={value => onVisualStyleChange(selectedConnection.id, value as VisualStyle)}
+              >
+                <SelectTrigger id="visualStyle">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {visualStyles.map(({ value, label, icon }) => (
                     <SelectItem key={value} value={value}>
                       <div className="flex items-center gap-2">
                         {icon}
