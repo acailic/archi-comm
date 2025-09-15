@@ -85,7 +85,8 @@ export default defineConfig({
   // Web Worker configuration
   worker: {
     format: 'es',
-    plugins: [
+    // In Vite 6, worker.plugins must be a function returning an array
+    plugins: () => [
       react({
         devTarget: 'esnext'
       })
@@ -104,17 +105,53 @@ export default defineConfig({
     rollupOptions: {
       input: 'index.html',
       output: {
-        // Simplified chunk strategy for better caching
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'ui-vendor': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-tooltip'
-          ],
-          'animation-vendor': ['framer-motion'],
-          'tauri-vendor': ['@tauri-apps/api']
+        // Fine-grained chunk strategy for better caching and smaller app chunks
+        manualChunks(id) {
+          if (!id) return undefined;
+          // Core vendors
+          if (id.includes('/node_modules/react/')) return 'react-vendor';
+          if (id.includes('/node_modules/react-dom/')) return 'react-vendor';
+          if (id.includes('/node_modules/@radix-ui/')) return 'ui-vendor';
+          if (id.includes('/node_modules/framer-motion')) return 'animation-vendor';
+          if (id.includes('/node_modules/@tauri-apps/')) return 'tauri-vendor';
+
+          // Canvas and graph libs
+          if (
+            id.includes('/node_modules/@xyflow/react') ||
+            id.includes('/node_modules/perfect-arrows') ||
+            id.includes('/node_modules/elkjs') ||
+            id.includes('/node_modules/rbush') ||
+            id.includes('/node_modules/html-to-image')
+          ) {
+            return 'canvas-vendor';
+          }
+
+          // Charts and visuals
+          if (id.includes('/node_modules/recharts')) return 'charts-vendor';
+
+          // Audio / ML heavy deps
+          if (
+            id.includes('/node_modules/recordrtc') ||
+            id.includes('/node_modules/web-audio-api') ||
+            id.includes('/node_modules/microphone-stream') ||
+            id.includes('/node_modules/audiobuffer-to-wav') ||
+            id.includes('/node_modules/lamejs')
+          ) {
+            return 'audio-vendor';
+          }
+          if (
+            id.includes('/node_modules/@xenova/transformers') ||
+            id.includes('/node_modules/@huggingface/transformers')
+          ) {
+            return 'ml-vendor';
+          }
+
+          // Group challenge and template data into a separate chunk
+          if (id.includes('/src/lib/challenge-config.ts') || id.includes('/src/lib/task-system/')) {
+            return 'challenges';
+          }
+
+          return undefined;
         },
         // Optimize asset naming
         assetFileNames: (assetInfo) => {

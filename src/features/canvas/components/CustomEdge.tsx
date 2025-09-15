@@ -47,12 +47,13 @@ export function CustomEdge({
   const { connection, connectionStyle, isSelected, isStartConnection, onConnectionSelect } = data;
 
   // Connection colors mapping
+  // Use robust color mapping (avoid undefined CSS vars inside SVG)
   const connectionColors = useMemo(
     () => ({
-      data: 'hsl(var(--blue-500))',
-      control: 'hsl(var(--purple-500))',
-      sync: 'hsl(var(--green-500))',
-      async: 'hsl(var(--orange-500))',
+      data: '#3b82f6',    // blue-500
+      control: '#a855f7', // purple-500
+      sync: '#22c55e',    // green-500
+      async: '#f97316',   // orange-500
     }),
     []
   );
@@ -61,9 +62,9 @@ export function CustomEdge({
   const visualStyleColors = useMemo(
     () => ({
       default: null, // Use connection type color
-      ack: 'hsl(var(--green-500))',
-      retry: 'hsl(var(--orange-500))',
-      error: 'hsl(var(--red-500))',
+      ack: '#22c55e',    // green-500
+      retry: '#f97316',  // orange-500
+      error: '#ef4444',  // red-500
     }),
     []
   );
@@ -97,7 +98,7 @@ export function CustomEdge({
 
   const color = visualStyleColor ||
     connectionColors[connection.type as keyof typeof connectionColors] ||
-    'hsl(var(--primary))';
+    '#3b82f6';
 
   // Determine stroke dash array based on visual style and connection type
   const getStrokeDashArray = () => {
@@ -120,28 +121,30 @@ export function CustomEdge({
   return (
     <>
       {/* SVG Definitions for markers and filters */}
-      <defs>
-        <marker
-          id={arrowId}
-          viewBox='0 0 10 10'
-          refX='9'
-          refY='5'
-          markerUnits='strokeWidth'
-          markerWidth='10'
-          markerHeight='10'
-          orient='auto-start-reverse'
-        >
-          <path d='M 0 0 L 10 5 L 0 10 z' fill={color} />
-        </marker>
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <marker
+            id={arrowId}
+            viewBox='0 0 10 10'
+            refX='9'
+            refY='5'
+            markerUnits='strokeWidth'
+            markerWidth='10'
+            markerHeight='10'
+            orient='auto-start-reverse'
+          >
+            <path d='M 0 0 L 10 5 L 0 10 z' fill={color} />
+          </marker>
 
-        <filter id={glowId} x='-20%' y='-20%' width='140%' height='140%'>
-          <feGaussianBlur stdDeviation='2' result='coloredBlur' />
-          <feMerge>
-            <feMergeNode in='coloredBlur' />
-            <feMergeNode in='SourceGraphic' />
-          </feMerge>
-        </filter>
-      </defs>
+          <filter id={glowId} x='-20%' y='-20%' width='140%' height='140%'>
+            <feGaussianBlur stdDeviation='2' result='coloredBlur' />
+            <feMerge>
+              <feMergeNode in='coloredBlur' />
+              <feMergeNode in='SourceGraphic' />
+            </feMerge>
+          </filter>
+        </defs>
+      </svg>
 
       {/* Main edge path */}
       <BaseEdge
@@ -153,6 +156,9 @@ export function CustomEdge({
           strokeWidth,
           strokeDasharray,
           opacity,
+          strokeOpacity: 1,
+          fill: 'none',
+          vectorEffect: 'non-scaling-stroke',
           filter: isSelected ? `url(#${glowId})` : undefined,
           cursor: 'pointer',
         }}

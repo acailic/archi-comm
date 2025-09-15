@@ -3,23 +3,34 @@
 // Provides common operations, assertions, and setup functions
 // RELEVANT FILES: e2e/*.spec.ts, e2e/utils/test-data-manager.ts
 
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator, expect, BrowserContext, Browser } from '@playwright/test';
 import { testDataManager, DesignData } from './test-data-manager';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class CanvasHelpers {
   constructor(private page: Page) {}
 
   async navigateToCanvas(): Promise<void> {
     await this.page.goto('/');
-    await this.page.getByRole('button', { name: /start your journey/i }).click();
-    await this.page
-      .getByRole('button', { name: /start challenge/i })
-      .first()
-      .click();
 
-    // Wait for canvas to be ready
-    const canvas = this.page.locator('[data-testid="canvas"]');
-    await canvas.waitFor({ state: 'visible' });
+    // Some builds have a landing CTA; click if present, otherwise continue
+    try {
+      const cta = this.page.getByRole('button', { name: /start your journey/i });
+      await cta.waitFor({ state: 'visible', timeout: 1000 });
+      await cta.click();
+    } catch {
+      // Ignore if not present
+    }
+
+    // Click first Start Challenge button on the challenge selection screen
+    const startBtn = this.page.getByRole('button', { name: /start challenge/i }).first();
+    await startBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await startBtn.click();
+
+    // Wait for canvas to be ready (support multiple test ids)
+    const canvas = this.page.locator('[data-testid="canvas"], [data-testid="reactflow-canvas"], [data-testid="canvas-root"]');
+    await canvas.first().waitFor({ state: 'visible', timeout: 10000 });
     await this.page.waitForTimeout(1000); // Allow for initialization
   }
 
@@ -124,6 +135,33 @@ export class CanvasHelpers {
     await canvas.click();
     await this.page.keyboard.press('Control+0');
     await this.page.waitForTimeout(300);
+  }
+
+  async simulateNetworkDisruption(): Promise<void> {
+    // Simulate network disruption by intercepting and failing requests
+    await this.page.route('**/api/**', route => route.abort('failed'));
+    await this.page.waitForTimeout(1000);
+  }
+
+  async triggerMemoryPressure(): Promise<void> {
+    // Create memory pressure by allocating large arrays
+    await this.page.evaluate(() => {
+      (window as any).memoryStress = [];
+      for (let i = 0; i < 2000; i++) {
+        (window as any).memoryStress.push(new Array(10000).fill('stress-test'));
+      }
+    });
+  }
+
+  async createLargeDesign(componentCount: number): Promise<void> {
+    // Create a design with many components for scalability testing
+    for (let i = 0; i < componentCount; i++) {
+      const componentTypes = ['server', 'database', 'cache', 'api-gateway', 'load-balancer'];
+      const type = componentTypes[i % componentTypes.length];
+      const x = 100 + (i % 10) * 150;
+      const y = 100 + Math.floor(i / 10) * 150;
+      await this.addComponent(type, { x, y });
+    }
   }
 
   async panCanvas(deltaX: number, deltaY: number): Promise<void> {
@@ -352,6 +390,57 @@ export class AssertionHelpers {
       await expect(selectTool).toHaveAttribute('aria-pressed', 'true');
     }
   }
+
+  async assertRecoveryOverlayVisible(): Promise<void> {
+    const recoveryOverlay = this.page.locator('[data-testid="recovery-overlay"]');
+    await expect(recoveryOverlay).toBeVisible();
+  }
+
+  async assertNoRecoveryOverlay(): Promise<void> {
+    const recoveryOverlay = this.page.locator('[data-testid="recovery-overlay"]');
+    await expect(recoveryOverlay).not.toBeVisible();
+  }
+
+  async assertConflictResolved(): Promise<void> {
+    // Verify no error banners are present
+    const errorBanners = this.page.locator('[data-testid="error-banner"], .error-banner');
+    await expect(errorBanners).toHaveCount(0);
+
+    // Verify canvas is still functional
+    const canvas = this.page.locator('[data-testid="canvas"]');
+    await expect(canvas).toBeVisible();
+  }
+
+  async assertSessionPersisted(expectedData: any): Promise<void> {
+    // Verify design state matches expected data
+    const componentCount = await this.page.locator('.react-flow__node').count();
+    expect(componentCount).toBe(expectedData.componentCount);
+
+    if (expectedData.annotations) {
+      const annotationCount = await this.page.locator('[data-testid*="annotation"], .annotation').count();
+      expect(annotationCount).toBe(expectedData.annotations.length);
+    }
+  }
+
+  async assertCrossPlatformConsistency(baseline: any): Promise<void> {
+    const componentCount = await this.page.locator('.react-flow__node').count();
+    const annotationCount = await this.page.locator('[data-testid*="annotation"], .annotation').count();
+
+    expect(componentCount).toBe(baseline.componentCount);
+    expect(annotationCount).toBe(baseline.annotationCount);
+
+    // Verify component positions are roughly consistent (allow for small browser differences)
+    const components = await this.page.locator('.react-flow__node').all();
+    for (let i = 0; i < Math.min(components.length, baseline.componentPositions?.length || 0); i++) {
+      const box = await components[i].boundingBox();
+      if (box && baseline.componentPositions[i]) {
+        const deltaX = Math.abs(box.x - baseline.componentPositions[i].x);
+        const deltaY = Math.abs(box.y - baseline.componentPositions[i].y);
+        expect(deltaX).toBeLessThan(50); // Allow 50px tolerance
+        expect(deltaY).toBeLessThan(50);
+      }
+    }
+  }
 }
 
 export class MockHelpers {
@@ -432,6 +521,58 @@ export class MockHelpers {
       return (window as any).performanceLog || [];
     });
   }
+
+  async advanceTimeBy(days: number): Promise<void> {
+    // Override Date.now() and performance.now() for time travel simulation
+    const advanceMs = days * 24 * 60 * 60 * 1000;
+    await this.page.addInitScript((ms) => {
+      const originalDateNow = Date.now;
+      const originalPerfNow = performance.now;
+
+      Date.now = () => originalDateNow() + ms;
+      performance.now = () => originalPerfNow() + ms;
+    }, advanceMs);
+  }
+
+  async openPeerContext(url: string, browser: Browser): Promise<BrowserContext> {
+    // Create second browser context for collaboration testing
+    const peerContext = await browser.newContext();
+    const peerPage = await peerContext.newPage();
+    await peerPage.goto(url);
+    return peerContext;
+  }
+
+  async simulateConflict(type: string, data: any): Promise<void> {
+    // Dispatch synthetic conflict events
+    await this.page.evaluate(({ type, data }) => {
+      const event = new CustomEvent('collaboration-conflict', {
+        detail: { type, data }
+      });
+      window.dispatchEvent(event);
+    }, { type, data });
+  }
+
+  async mockShareService(): Promise<void> {
+    // Mock collaboration backend if needed
+    await this.page.route('**/api/share/**', async route => {
+      const url = route.request().url();
+      if (url.includes('/create')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ shareId: 'test-share-123', url: 'http://localhost:3000/share/test-share-123' })
+        });
+      } else if (url.includes('/test-share-123')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ design: { components: [], annotations: [] } })
+        });
+      } else {
+        await route.continue();
+      }
+    });
+  }
 }
 
 export class DebugHelpers {
@@ -488,6 +629,74 @@ export class DebugHelpers {
   }
 }
 
+export class TestStateManager {
+  private sessionStatesDir = path.join(process.cwd(), 'e2e', 'session-states');
+
+  constructor() {
+    // Ensure session states directory exists
+    if (!fs.existsSync(this.sessionStatesDir)) {
+      fs.mkdirSync(this.sessionStatesDir, { recursive: true });
+    }
+  }
+
+  async saveStorageState(name: string, context: BrowserContext): Promise<string> {
+    const filePath = path.join(this.sessionStatesDir, `${name}.json`);
+    await context.storageState({ path: filePath });
+    return filePath;
+  }
+
+  loadStorageState(name: string): string {
+    return path.join(this.sessionStatesDir, `${name}.json`);
+  }
+
+  async createMultiDaySession(designData: any, dayOffset: number): Promise<string> {
+    // Create session state with design created days ago
+    const sessionName = `day${dayOffset}-${designData.name}`;
+    const filePath = path.join(this.sessionStatesDir, `${sessionName}.json`);
+
+    // Create mock storage state with adjusted timestamps
+    const baseTime = Date.now() - (dayOffset * 24 * 60 * 60 * 1000);
+    const storageState = {
+      cookies: [],
+      origins: [{
+        origin: 'http://localhost:3000',
+        localStorage: [
+          {
+            name: 'archicomm-design',
+            value: JSON.stringify({
+              ...designData,
+              createdAt: baseTime,
+              lastModified: baseTime
+            })
+          },
+          {
+            name: 'archicomm-session',
+            value: JSON.stringify({
+              sessionId: `session-${baseTime}`,
+              startTime: baseTime
+            })
+          }
+        ]
+      }]
+    };
+
+    fs.writeFileSync(filePath, JSON.stringify(storageState, null, 2));
+    return filePath;
+  }
+
+  storageStateExists(name: string): boolean {
+    const filePath = path.join(this.sessionStatesDir, `${name}.json`);
+    return fs.existsSync(filePath);
+  }
+
+  deleteStorageState(name: string): void {
+    const filePath = path.join(this.sessionStatesDir, `${name}.json`);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+}
+
 // Factory function to create helper instances
 export function createHelpers(page: Page) {
   return {
@@ -497,5 +706,6 @@ export function createHelpers(page: Page) {
     assert: new AssertionHelpers(page),
     mock: new MockHelpers(page),
     debug: new DebugHelpers(page),
+    state: new TestStateManager(),
   };
 }

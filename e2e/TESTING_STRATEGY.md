@@ -30,6 +30,10 @@ ArchiComm's E2E testing strategy focuses on **user-centric quality assurance** t
 | Export Functionality | 85%             | ✅ Complete    |
 | Tauri Integration    | 80%             | ✅ Complete    |
 | Error Scenarios      | 75%             | ✅ Complete    |
+| Multi-Day Sessions   | 90%             | ✅ Complete    |
+| Collaboration        | 85%             | ✅ Complete    |
+| Error Recovery       | 80%             | ✅ Complete    |
+| Cross-Platform       | 95%             | ✅ Complete    |
 
 ### Browser Coverage
 
@@ -172,6 +176,206 @@ ArchiComm's E2E testing strategy focuses on **user-centric quality assurance** t
 - **Theme Variations**: Light/dark mode consistency
 - **Responsive Layouts**: Mobile, tablet, desktop
 - **Animation States**: Before/after transitions
+
+## Multi-Session Testing Strategy
+
+### Session Persistence Testing
+
+Multi-session testing validates that user workflows function correctly across multiple browser sessions, days, and collaboration scenarios.
+
+#### Test Categories
+
+1. **Multi-Day Sessions** - Design state preservation across browser restarts and time gaps
+2. **Collaboration** - Multi-user editing scenarios and conflict resolution
+3. **Error Recovery** - Graceful degradation and recovery from various failure modes
+4. **Cross-Platform** - Consistent behavior across browsers and devices
+
+#### Session State Management
+
+- **Storage Location**: `e2e/session-states/` directory
+- **State Files**: Playwright storageState JSON files for test scenarios
+- **Baseline States**: Pre-created states for common test scenarios
+- **Cleanup**: Automatic cleanup after test runs
+
+#### Multi-Day Session Tests
+
+Tests design state preservation across extended time periods:
+
+- **Day 1 Tests**: Create complex designs with auto-save verification
+- **Day 2+ Tests**: Restore designs from previous sessions using storageState
+- **Long-term Persistence**: Test design restoration after simulated week gaps
+- **Edge Cases**: Corrupted session recovery, storage quota exceeded
+
+#### Collaboration Tests
+
+Tests multi-user editing scenarios:
+
+- **Basic Collaboration**: Share design link generation and peer access
+- **Conflict Resolution**: Concurrent component addition, annotation conflicts
+- **Real-time Sync**: Peer sees owner changes instantly
+- **Merge Strategies**: User choice between "keep mine", "keep theirs", "merge both"
+
+#### Error Recovery Tests
+
+Tests application resilience under failure conditions:
+
+- **Rendering Errors**: Canvas rendering failure recovery
+- **Network Errors**: Offline mode graceful degradation
+- **Data Corruption**: localStorage corruption recovery
+- **Performance Issues**: Memory pressure and cleanup
+
+#### Cross-Platform Tests
+
+Tests consistent behavior across browsers and devices:
+
+- **Browser Consistency**: Identical rendering across Chrome, Firefox, Safari
+- **Mobile vs Desktop**: Design state preservation across viewport changes
+- **Performance Parity**: Consistent performance across platforms
+- **Feature Parity**: Auto-save, undo/redo, annotation editing consistency
+
+### Test Data Management Guidelines
+
+#### Storage State Files
+
+Located in `e2e/session-states/` directory:
+
+- `day1-simple-design.json` - Basic design after day 1
+- `day1-complex-design.json` - Complex multi-component design
+- `collaboration-owner.json` - Design owner state
+- `collaboration-peer.json` - Collaborating user state
+- `error-recovery-baseline.json` - Clean state before triggering errors
+
+#### Test Sequencing
+
+- Use `test.describe.configure({ mode: 'serial' })` for sequential tests
+- Multi-day tests must run in order to maintain session continuity
+- Storage state files enable resuming from specific application states
+
+#### Environment Variables
+
+- `MULTI_SESSION_TESTS=true` - Enable/disable long-running tests
+- `COLLABORATION_TESTS=true` - Enable tests requiring multiple browser contexts
+
+### Cross-Platform Testing Guidelines
+
+#### Browser Project Configuration
+
+Tests run across multiple Playwright projects automatically:
+
+```typescript
+projects: [
+  { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+  { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
+  { name: 'mobile-safari', use: { ...devices['iPhone 12'] } }
+]
+```
+
+#### Viewport Testing Strategy
+
+- **Desktop**: 1920x1080 (Chrome, Firefox, Safari)
+- **Tablet**: 768x1024 (Chrome mobile emulation)
+- **Mobile**: 375x667 (Chrome mobile emulation)
+
+#### Performance Benchmarking
+
+Cross-platform validation includes performance consistency:
+
+- Canvas performance across browsers (component addition timing)
+- Memory usage consistency (heap size monitoring)
+- Rendering performance parity (frame rate measurement)
+
+### Debugging Guidelines
+
+#### Multi-Session Test Failures
+
+- Inspect storageState files in `e2e/session-states/` for corruption
+- Verify session metadata exists in localStorage
+- Check auto-save functionality with network monitoring
+- Use `test.step()` for granular failure isolation
+
+#### Collaboration Test Failures
+
+- Monitor synthetic conflict events in browser console
+- Verify share URL generation and peer context creation
+- Check conflict resolution UI elements with `data-testid` selectors
+- Use browser context isolation for peer simulation
+
+#### Error Recovery Test Failures
+
+- Enable `debugHelpers.logPageConsole()` for error capture
+- Monitor recovery overlay visibility with `data-testid="recovery-overlay"`
+- Verify error boundary functionality with React DevTools
+- Test memory pressure simulation with `performance.memory` API
+
+#### Cross-Platform Test Failures
+
+- Compare baseline data across browser projects
+- Use screenshot comparison for visual regression detection
+- Monitor performance metrics for consistency validation
+- Verify component positions with bounding box tolerance
+
+### Test Execution Guidelines
+
+#### Running Specific Test Suites
+
+```bash
+# Multi-session tests only
+npx playwright test --project=multi-session
+
+# Collaboration tests
+npx playwright test --project=collaboration
+
+# Cross-platform consistency
+npx playwright test --grep="cross-platform"
+
+# All new test categories
+npx playwright test multi-day-session.spec.ts collaboration-conflict.spec.ts error-recovery.spec.ts cross-platform-consistency.spec.ts
+```
+
+#### Environment Configuration
+
+```bash
+# Enable multi-session tests
+MULTI_SESSION_TESTS=true npx playwright test
+
+# Enable collaboration tests
+COLLABORATION_TESTS=true npx playwright test
+
+# Run with visual comparisons
+npx playwright test --project=scenario-visual
+```
+
+#### CI/CD Integration
+
+Multi-session tests require special consideration in CI/CD:
+
+- **Sequential Execution**: Use `workers: 1` for multi-session tests
+- **Longer Timeouts**: Increase timeout for browser restart scenarios
+- **Storage Cleanup**: Ensure session state cleanup between CI runs
+- **Retry Logic**: Reduce retries for sequential tests to avoid flakiness
+
+### Test Naming Conventions
+
+#### Multi-Session Tests
+
+- `day X: [action]` - Sequential tests spanning multiple days
+- `[feature] recovery` - Error recovery scenarios
+- `cross-browser [feature]` - Cross-platform consistency tests
+
+#### Collaboration Tests
+
+- `share [feature]` - Design sharing functionality
+- `conflict [scenario]` - Conflict resolution scenarios
+- `peer [action]` - Multi-user collaboration features
+
+#### Test Organization
+
+- **Test Groups**: Use `test.describe()` for logical grouping
+- **Test Tags**: Use test names for filtering (e.g., `@multi-session`)
+- **File Naming**: `[category]-[feature].spec.ts` pattern
+- **Result Organization**: Separate directories for each test category
 
 ## Data Management Strategy
 

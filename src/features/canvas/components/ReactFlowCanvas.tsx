@@ -614,6 +614,8 @@ function ReactFlowCanvasInternal({
           ref={setCanvasRef}
           className='relative w-full h-full bg-muted/10'
           data-testid='canvas-root'
+          data-testid-canvas='true'
+          data-testid='canvas'
           style={{ height: '100%' }}
         >
           {/* Drop zone indicator */}

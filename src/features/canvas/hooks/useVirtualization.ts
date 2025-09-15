@@ -318,6 +318,9 @@ export function useVisibleItems<T>(
     let visibleComponents = allVisible.filter(item => item.type === 'component') as SpatialItem<DesignComponent>[];
     let visibleConnections = allVisible.filter(item => item.type === 'connection') as SpatialItem<Connection>[];
 
+    // Use a mutable copy for any dynamic adjustments
+    let effectiveMaxItems = maxItems;
+
     // Apply LOD filtering if enabled
     if (lodConfig.enabled && lodConfig.thresholds.length > 0) {
       // Get current zoom level from visible bounds (approximated)
@@ -330,9 +333,9 @@ export function useVisibleItems<T>(
 
       // Optionally reduce max items based on LOD level
       if (currentLOD === LODLevel.LOW) {
-        maxItems = Math.floor(maxItems * 0.3);
+        effectiveMaxItems = Math.floor(effectiveMaxItems * 0.3);
       } else if (currentLOD === LODLevel.MEDIUM) {
-        maxItems = Math.floor(maxItems * 0.7);
+        effectiveMaxItems = Math.floor(effectiveMaxItems * 0.7);
       }
     }
 
@@ -342,7 +345,7 @@ export function useVisibleItems<T>(
     let isLimited = false;
 
     const totalVisible = visibleComponents.length + visibleConnections.length;
-    if (totalVisible > maxItems) {
+    if (totalVisible > effectiveMaxItems) {
       isLimited = true;
 
       // Calculate viewport center for priority sorting
@@ -369,8 +372,8 @@ export function useVisibleItems<T>(
 
       // Maintain proportional representation
       const componentRatio = visibleComponents.length / totalVisible;
-      const maxComponents = Math.floor(maxItems * componentRatio);
-      const maxConnections = maxItems - maxComponents;
+      const maxComponents = Math.floor(effectiveMaxItems * componentRatio);
+      const maxConnections = effectiveMaxItems - maxComponents;
 
       limitedComponents = sortedComponents.slice(0, maxComponents);
       limitedConnections = sortedConnections.slice(0, maxConnections);

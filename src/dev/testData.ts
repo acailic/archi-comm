@@ -150,21 +150,24 @@ export const mockCanvasStates = {
       {
         id: 'comp-1',
         type: 'server',
-        position: { x: 200, y: 150 },
+        x: 200,
+        y: 150,
         label: 'Web Server',
         properties: { instances: 2, memory: '4GB' }
       },
       {
         id: 'comp-2',
         type: 'database',
-        position: { x: 400, y: 150 },
+        x: 400,
+        y: 150,
         label: 'PostgreSQL',
         properties: { storage: '100GB', replicas: 1 }
       },
       {
         id: 'comp-3',
         type: 'cache',
-        position: { x: 200, y: 50 },
+        x: 200,
+        y: 50,
         label: 'Redis Cache',
         properties: { memory: '2GB', ttl: '1h' }
       }
@@ -172,19 +175,17 @@ export const mockCanvasStates = {
     connections: [
       {
         id: 'conn-1',
-        source: 'comp-1',
-        target: 'comp-2',
+        from: 'comp-1',
+        to: 'comp-2',
         type: 'sync',
-        label: 'SQL Queries',
-        properties: { protocol: 'TCP', port: 5432 }
+        label: 'SQL Queries'
       },
       {
         id: 'conn-2',
-        source: 'comp-1',
-        target: 'comp-3',
+        from: 'comp-1',
+        to: 'comp-3',
         type: 'sync',
-        label: 'Cache Operations',
-        properties: { protocol: 'TCP', port: 6379 }
+        label: 'Cache Operations'
       }
     ] as Connection[]
   },
@@ -263,18 +264,18 @@ export const mockCanvasStates = {
       }
     ] as DesignComponent[],
     connections: [
-      { id: 'conn-1', source: 'lb-1', target: 'api-1', type: 'sync', label: 'HTTP Requests' },
-      { id: 'conn-2', source: 'api-1', target: 'auth-1', type: 'sync', label: 'Auth Check' },
-      { id: 'conn-3', source: 'api-1', target: 'user-1', type: 'sync', label: 'User API' },
-      { id: 'conn-4', source: 'api-1', target: 'order-1', type: 'sync', label: 'Order API' },
-      { id: 'conn-5', source: 'order-1', target: 'payment-1', type: 'async', label: 'Payment Events' },
-      { id: 'conn-6', source: 'user-1', target: 'db-1', type: 'sync', label: 'User Data' },
-      { id: 'conn-7', source: 'order-1', target: 'db-1', type: 'sync', label: 'Order Data' },
-      { id: 'conn-8', source: 'auth-1', target: 'cache-1', type: 'sync', label: 'Session Cache' },
-      { id: 'conn-9', source: 'user-1', target: 'cache-1', type: 'sync', label: 'User Cache' },
-      { id: 'conn-10', source: 'order-1', target: 'queue-1', type: 'async', label: 'Order Events' },
-      { id: 'conn-11', source: 'payment-1', target: 'queue-1', type: 'async', label: 'Payment Events' },
-      { id: 'conn-12', source: 'order-1', target: 'search-1', type: 'sync', label: 'Search Indexing' }
+      { id: 'conn-1', from: 'lb-1', to: 'api-1', type: 'sync', label: 'HTTP Requests' },
+      { id: 'conn-2', from: 'api-1', to: 'auth-1', type: 'sync', label: 'Auth Check' },
+      { id: 'conn-3', from: 'api-1', to: 'user-1', type: 'sync', label: 'User API' },
+      { id: 'conn-4', from: 'api-1', to: 'order-1', type: 'sync', label: 'Order API' },
+      { id: 'conn-5', from: 'order-1', to: 'payment-1', type: 'async', label: 'Payment Events' },
+      { id: 'conn-6', from: 'user-1', to: 'db-1', type: 'sync', label: 'User Data' },
+      { id: 'conn-7', from: 'order-1', to: 'db-1', type: 'sync', label: 'Order Data' },
+      { id: 'conn-8', from: 'auth-1', to: 'cache-1', type: 'sync', label: 'Session Cache' },
+      { id: 'conn-9', from: 'user-1', to: 'cache-1', type: 'sync', label: 'User Cache' },
+      { id: 'conn-10', from: 'order-1', to: 'queue-1', type: 'async', label: 'Order Events' },
+      { id: 'conn-11', from: 'payment-1', to: 'queue-1', type: 'async', label: 'Payment Events' },
+      { id: 'conn-12', from: 'order-1', to: 'search-1', type: 'sync', label: 'Search Indexing' }
     ] as Connection[]
   },
 
@@ -324,13 +325,13 @@ export const mockCanvasStates = {
       }
     ] as DesignComponent[],
     connections: [
-      { id: 'conn-1', source: 'client-1', target: 'lb-1', type: 'sync', label: 'HTTPS' },
-      { id: 'conn-2', source: 'lb-1', target: 'app-1', type: 'sync', label: 'HTTP' },
-      { id: 'conn-3', source: 'lb-1', target: 'app-2', type: 'sync', label: 'HTTP' },
-      { id: 'conn-4', source: 'app-1', target: 'cache-1', type: 'sync', label: 'Cache Check' },
-      { id: 'conn-5', source: 'app-2', target: 'cache-1', type: 'sync', label: 'Cache Check' },
-      { id: 'conn-6', source: 'app-1', target: 'db-1', type: 'sync', label: 'URL Lookup' },
-      { id: 'conn-7', source: 'app-2', target: 'db-1', type: 'sync', label: 'URL Lookup' }
+      { id: 'conn-1', from: 'client-1', to: 'lb-1', type: 'sync', label: 'HTTPS' },
+      { id: 'conn-2', from: 'lb-1', to: 'app-1', type: 'sync', label: 'HTTP' },
+      { id: 'conn-3', from: 'lb-1', to: 'app-2', type: 'sync', label: 'HTTP' },
+      { id: 'conn-4', from: 'app-1', to: 'cache-1', type: 'sync', label: 'Cache Check' },
+      { id: 'conn-5', from: 'app-2', to: 'cache-1', type: 'sync', label: 'Cache Check' },
+      { id: 'conn-6', from: 'app-1', to: 'db-1', type: 'sync', label: 'URL Lookup' },
+      { id: 'conn-7', from: 'app-2', to: 'db-1', type: 'sync', label: 'URL Lookup' }
     ] as Connection[]
   },
 
@@ -394,14 +395,14 @@ export const mockCanvasStates = {
       }
     ] as DesignComponent[],
     connections: [
-      { id: 'conn-1', source: 'client-1', target: 'ws-1', type: 'sync', label: 'WebSocket' },
-      { id: 'conn-2', source: 'client-2', target: 'ws-1', type: 'sync', label: 'WebSocket' },
-      { id: 'conn-3', source: 'ws-1', target: 'chat-1', type: 'sync', label: 'Message API' },
-      { id: 'conn-4', source: 'ws-1', target: 'presence-1', type: 'sync', label: 'Presence API' },
-      { id: 'conn-5', source: 'chat-1', target: 'queue-1', type: 'async', label: 'Message Events' },
-      { id: 'conn-6', source: 'chat-1', target: 'db-1', type: 'sync', label: 'Store Messages' },
-      { id: 'conn-7', source: 'presence-1', target: 'cache-1', type: 'sync', label: 'User Status' },
-      { id: 'conn-8', source: 'queue-1', target: 'ws-1', type: 'async', label: 'Message Delivery' }
+      { id: 'conn-1', from: 'client-1', to: 'ws-1', type: 'sync', label: 'WebSocket' },
+      { id: 'conn-2', from: 'client-2', to: 'ws-1', type: 'sync', label: 'WebSocket' },
+      { id: 'conn-3', from: 'ws-1', to: 'chat-1', type: 'sync', label: 'Message API' },
+      { id: 'conn-4', from: 'ws-1', to: 'presence-1', type: 'sync', label: 'Presence API' },
+      { id: 'conn-5', from: 'chat-1', to: 'queue-1', type: 'async', label: 'Message Events' },
+      { id: 'conn-6', from: 'chat-1', to: 'db-1', type: 'sync', label: 'Store Messages' },
+      { id: 'conn-7', from: 'presence-1', to: 'cache-1', type: 'sync', label: 'User Status' },
+      { id: 'conn-8', from: 'queue-1', to: 'ws-1', type: 'async', label: 'Message Delivery' }
     ] as Connection[]
   }
 };

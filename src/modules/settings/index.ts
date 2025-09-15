@@ -36,6 +36,17 @@ export const defaultSettings = {
     showWorkflowOptimizations: true,
     trackUsageAnalytics: true,
   },
+  audio: {
+    preferredRecordingEngine: 'auto' as 'auto' | 'media-recorder' | 'recordrtc' | 'native',
+    preferredTranscriptionEngine: 'auto' as 'auto' | 'whisper-rs' | 'whisper-wasm' | 'web-speech' | 'transformers',
+    realtimeTranscription: false,
+    quality: 'medium' as 'low' | 'medium' | 'high',
+  },
+  telemetry: {
+    enabled: true,
+    errorReporting: true,
+    performanceMetrics: true,
+  },
   onboarding: {
     showWelcomeOnStartup: true,
     completedFlows: [] as string[],
@@ -79,6 +90,30 @@ export const validateSettings = (settings: any): boolean => {
         typeof autoSaveInterval !== 'number' ||
         typeof showWorkflowOptimizations !== 'boolean' ||
         typeof trackUsageAnalytics !== 'boolean'
+      ) {
+        return false;
+      }
+    }
+
+    // Validate audio settings
+    if (settings.audio) {
+      const { preferredRecordingEngine, preferredTranscriptionEngine, realtimeTranscription, quality } =
+        settings.audio;
+      const recOk = ['auto', 'media-recorder', 'recordrtc', 'native'].includes(preferredRecordingEngine);
+      const sttOk = ['auto', 'whisper-rs', 'whisper-wasm', 'web-speech', 'transformers'].includes(preferredTranscriptionEngine);
+      const qualOk = ['low', 'medium', 'high'].includes(quality);
+      if (!recOk || !sttOk || typeof realtimeTranscription !== 'boolean' || !qualOk) {
+        return false;
+      }
+    }
+
+    // Validate telemetry settings
+    if (settings.telemetry) {
+      const { enabled, errorReporting, performanceMetrics } = settings.telemetry;
+      if (
+        typeof enabled !== 'boolean' ||
+        typeof errorReporting !== 'boolean' ||
+        typeof performanceMetrics !== 'boolean'
       ) {
         return false;
       }
@@ -147,6 +182,8 @@ export const loadSettings = (): typeof defaultSettings => {
       // Ensure nested objects are merged properly
       accessibility: { ...defaultSettings.accessibility, ...parsed.accessibility },
       workflow: { ...defaultSettings.workflow, ...parsed.workflow },
+      audio: { ...defaultSettings.audio, ...parsed.audio },
+      telemetry: { ...defaultSettings.telemetry, ...parsed.telemetry },
       onboarding: { ...defaultSettings.onboarding, ...parsed.onboarding },
       shortcuts: { ...defaultSettings.shortcuts, ...parsed.shortcuts },
     };

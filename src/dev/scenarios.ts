@@ -814,7 +814,7 @@ export const scenarios: EnhancedScenarioDefinition = {
         id: 'button-playground',
         name: 'Button Playground',
         description: 'Interactive button with all customizable props',
-        component: Button,
+        component: () => React.createElement(Button, { children: 'Interactive Button' }),
         controls: buttonControls,
         defaultProps: {
           variant: 'default',
@@ -1370,7 +1370,7 @@ export const scenarios: EnhancedScenarioDefinition = {
         id: 'input-playground',
         name: 'Input Playground',
         description: 'Interactive input with all customizable props',
-        component: Input,
+        component: () => React.createElement(Input, { placeholder: 'Enter text...' }),
         controls: inputControls,
         defaultProps: {
           type: 'text',
@@ -1857,7 +1857,7 @@ export const scenarios: EnhancedScenarioDefinition = {
         id: 'button-playground-advanced',
         name: 'Advanced Button Playground',
         description: 'Comprehensive button testing with all variants, sizes, and states',
-        component: Button,
+        component: () => React.createElement(Button, { children: 'Playground Button' }),
         controls: {
           ...buttonControls,
           loading: {

@@ -1,0 +1,19 @@
+{
+  "tauri": {
+    "bundle": {
+      "macOS": {
+        "signingIdentity": null,
+        "providerShortName": null,
+        "entitlements": null
+      },
+      "windows": {
+        "certificateThumbprint": null,
+        "timestampUrl": null
+      }
+    },
+    "updater": {
+      "active": false
+    }
+  }
+}
+

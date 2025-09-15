@@ -170,8 +170,74 @@ export const defaultChallengeConfig: ChallengeConfig = {
             'Analytics data can be processed asynchronously. Consider using a message queue to handle click events and batch process analytics.',
           type: 'architecture',
           difficulty: 'advanced',
-        },
+    },
+    {
+      id: 'ad-click-aggregation',
+      title: 'Ad Click Aggregation Pipeline',
+      description:
+        'Design a pipeline to ingest ad click events at scale, aggregate in near real-time, and serve analytics via OLAP/BI.',
+      requirements: [
+        'Handle millions of click events per minute globally',
+        'Durable ingestion with replay (exactly-once or at-least-once semantics)',
+        'Real-time aggregates for dashboards under 10s latency',
+        'Cold storage for raw events and batch ETL to warehouse',
+        'Backpressure handling and dead-letter strategy',
       ],
+      difficulty: 'advanced',
+      estimatedTime: 60,
+      tags: ['kafka', 'stream-processing', 'data-lake', 'data-warehouse', 'olap', 'etl'],
+      solutionHints: [
+        {
+          id: 'ad-1',
+          title: 'Partition Strategy',
+          content: 'Partition by campaign or user to balance throughput and enable parallelism.',
+          type: 'scaling',
+          difficulty: 'intermediate'
+        },
+        {
+          id: 'ad-2',
+          title: 'Idempotency',
+          content: 'Use event ids and dedupe windows to ensure idempotent processing.',
+          type: 'technology',
+          difficulty: 'advanced'
+        }
+      ],
+      architectureTemplate: {
+        name: 'Ad Click Aggregation',
+        description: 'Producers → Ingestion API → Broker/Topic → Stream Processing/ETL → Lake/Warehouse → OLAP/BI',
+        components: [
+          { type: 'web-app', label: 'Web Client', description: 'Ad click producer', position: { x: 200, y: 140 } },
+          { type: 'mobile-app', label: 'Mobile Client', description: 'Ad click producer', position: { x: 200, y: 220 } },
+          { type: 'api-gateway', label: 'Ingestion API', description: 'HTTP ingestion', position: { x: 420, y: 180 } },
+          { type: 'broker', label: 'Kafka Broker', description: 'Event broker', position: { x: 640, y: 180 } },
+          { type: 'message-queue', label: 'Click Events Topic', description: 'Topic/Queue', position: { x: 820, y: 180 } },
+          { type: 'stream-processing', label: 'Stream Processor', description: 'Aggregations', position: { x: 1020, y: 140 } },
+          { type: 'etl', label: 'ETL/Enrichment', description: 'Batch ETL', position: { x: 1020, y: 240 } },
+          { type: 'data-lake', label: 'Data Lake', description: 'Raw storage', position: { x: 1240, y: 140 } },
+          { type: 'data-warehouse', label: 'Data Warehouse', description: 'Analytical store', position: { x: 1240, y: 240 } },
+          { type: 'elasticsearch', label: 'OLAP Store', description: 'OLAP/Serving', position: { x: 1460, y: 160 } },
+          { type: 'kibana', label: 'BI Dashboard', description: 'Analytics UI', position: { x: 1640, y: 160 } },
+        ],
+        connections: [
+          { from: 'Web Client', to: 'Ingestion API', label: 'HTTP', type: 'sync', protocol: 'REST' },
+          { from: 'Mobile Client', to: 'Ingestion API', label: 'HTTP', type: 'sync', protocol: 'REST' },
+          { from: 'Ingestion API', to: 'Kafka Broker', label: 'Produce', type: 'async', protocol: 'Kafka' },
+          { from: 'Kafka Broker', to: 'Click Events Topic', label: 'Topic', type: 'async', protocol: 'Kafka' },
+          { from: 'Click Events Topic', to: 'Stream Processor', label: 'Consume', type: 'async', protocol: 'Kafka' },
+          { from: 'Stream Processor', to: 'ETL/Enrichment', label: 'Aggregates/Batch', type: 'async', protocol: 'Batch' },
+          { from: 'ETL/Enrichment', to: 'Data Warehouse', label: 'ETL', type: 'async', protocol: 'Batch' },
+          { from: 'Stream Processor', to: 'Data Lake', label: 'Raw Events', type: 'async', protocol: 'Batch' },
+          { from: 'Data Warehouse', to: 'OLAP Store', label: 'Serving', type: 'sync', protocol: 'SQL' },
+          { from: 'OLAP Store', to: 'BI Dashboard', label: 'Queries', type: 'sync', protocol: 'HTTP' },
+        ],
+        notes: [
+          'Consider schema registry and versioning',
+          'Use DLQ for poison messages',
+          'Backpressure and consumer groups for scaling'
+        ]
+      }
+    },
+  ],
       architectureTemplate: {
         name: 'Scalable URL Shortener',
         description: 'A comprehensive architecture for a high-performance URL shortening service with analytics and monitoring',

@@ -330,14 +330,16 @@ const initializeRecoverySystem = async () => {
   }
 };
 
-// Initialize recovery system BEFORE attaching global handlers
+// Initialize recovery system BEFORE attaching global handlers (no top-level await)
 let recoveryReady = false;
-try {
-  recoveryReady = await initializeRecoverySystem();
-  attachGlobalErrorHandlers();
-} catch (error) {
-  mainLogger.warn('Recovery system initialization failed', error);
-}
+initializeRecoverySystem()
+  .then((ready) => {
+    recoveryReady = ready;
+    attachGlobalErrorHandlers();
+  })
+  .catch((error) => {
+    mainLogger.warn('Recovery system initialization failed', error);
+  });
 
 // Root element validation
 const rootElement = document.getElementById('root');
