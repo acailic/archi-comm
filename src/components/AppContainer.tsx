@@ -257,6 +257,13 @@ function AppContent() {
     }
   }, [actions]);
 
+  // Listen for toolbar navigation events (e.g., settings/config)
+  useEffect(() => {
+    const toConfig = () => actions.setCurrentScreen('config');
+    window.addEventListener('navigate:config', toConfig as EventListener);
+    return () => window.removeEventListener('navigate:config', toConfig as EventListener);
+  }, [actions]);
+
   // Global shortcuts integration
   const globalShortcuts = useGlobalShortcuts({
     handlers: {

@@ -23,6 +23,9 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { EmojiPicker } from './ui/emoji-picker';
+import { ColorPicker } from './ui/color-picker';
+import { WhatIfPanel } from './WhatIfPanel';
 
 interface PropertiesPanelProps {
   selectedComponent: string | null;
@@ -30,6 +33,10 @@ interface PropertiesPanelProps {
   onLabelChange: (id: string, label: string) => void;
   onDelete: (id: string) => void;
   onShowLabelToggle?: (id: string, visible: boolean) => void;
+  onStickerToggle?: (id: string, enabled: boolean) => void;
+  onStickerEmojiChange?: (id: string, emoji: string) => void;
+  onBgColorChange?: (id: string, color: string) => void;
+  onNodeBgChange?: (id: string, color: string) => void;
   // Optional: tags from the selected challenge to prefilter the component library
   challengeTags?: string[];
 }
@@ -40,6 +47,10 @@ export function PropertiesPanel({
   onLabelChange,
   onDelete,
   onShowLabelToggle,
+  onStickerToggle,
+  onStickerEmojiChange,
+  onBgColorChange,
+  onNodeBgChange,
   challengeTags,
 }: PropertiesPanelProps) {
   const [activeTab, setActiveTab] = useState('components');
@@ -160,6 +171,57 @@ export function PropertiesPanel({
                           </Button>
                         </div>
 
+                        {/* Playful Sticker Toggle */}
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Sticker
+                          </label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onStickerToggle?.(
+                              selectedComponentData.id,
+                              !(selectedComponentData.properties as any)?.sticker
+                            )}
+                            className="h-6 px-2"
+                          >
+                            {((selectedComponentData.properties as any)?.sticker) ? (
+                              <span className="text-sm">⭐</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Off</span>
+                            )}
+                          </Button>
+                        </div>
+
+                        {/* Sticker Emoji Picker */}
+                        <div>
+                          <label className="text-xs font-medium block mb-1 text-muted-foreground">Choose Sticker</label>
+                          <EmojiPicker
+                            value={(selectedComponentData.properties as any)?.stickerEmoji || '⭐'}
+                            onChange={(e) => onStickerEmojiChange?.(selectedComponentData.id, e)}
+                          />
+                        </div>
+
+                        {/* Background Color Picker */}
+                        <div>
+                          <label className="text-xs font-medium block mb-1 text-muted-foreground">Background Accent</label>
+                          <ColorPicker
+                            value={(selectedComponentData.properties as any)?.bgHex || '#3b82f6'}
+                            onChange={(hex) => onBgColorChange?.(selectedComponentData.id, hex)}
+                          />
+                          <p className="text-[11px] text-muted-foreground mt-1">Overrides node header accent color.</p>
+                        </div>
+
+                        {/* Node Body Background */}
+                        <div>
+                          <label className="text-xs font-medium block mb-1 text-muted-foreground">Node Background</label>
+                          <ColorPicker
+                            value={(selectedComponentData.properties as any)?.bodyBgHex || '#ffffff'}
+                            onChange={(hex) => onNodeBgChange?.(selectedComponentData.id, hex)}
+                          />
+                          <p className="text-[11px] text-muted-foreground mt-1">Sets the card body background on the canvas.</p>
+                        </div>
+
                         {/* Position */}
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -207,6 +269,11 @@ export function PropertiesPanel({
                             <Trash2 className="w-3 h-3 mr-2" />
                             Delete Component
                           </Button>
+                        </div>
+
+                        {/* Inline What-if Playground */}
+                        <div className="pt-2 border-t border-border/30">
+                          <WhatIfPanel component={selectedComponentData} />
                         </div>
                       </CardContent>
                     </Card>

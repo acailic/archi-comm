@@ -18,6 +18,7 @@ export interface CustomNodeData extends Record<string, unknown> {
   isVisible?: boolean;
   connectionCount?: number;
   healthStatus?: 'healthy' | 'warning' | 'error';
+  visualTheme?: 'serious' | 'playful';
   onSelect: (id: string) => void;
   onStartConnection: (id: string, position?: 'top' | 'bottom' | 'left' | 'right') => void;
   onDuplicate?: (componentId: string) => void;

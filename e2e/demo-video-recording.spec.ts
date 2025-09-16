@@ -190,6 +190,10 @@ test.describe('Demo Video Recording', () => {
       await videoHelpers.smoothPause(600);
     }
 
+    // Connect initial services
+    await videoHelpers.tryConnectByLabels('API Gateway', 'Server');
+    await videoHelpers.tryConnectByLabels('Server', 'Database');
+
     // 3. Share design
     const shareButton = page.getByRole('button', { name: /share/i }).first();
     if (await shareButton.isVisible()) {
@@ -213,6 +217,7 @@ test.describe('Demo Video Recording', () => {
 
     // Main user adds component
     await videoHelpers.smoothDragComponent('cache', 400, 100, 'Designer adds cache');
+    await videoHelpers.tryConnectByLabels('Cache', 'Server');
 
     // Simulate peer adding component (for demo purposes)
     await videoHelpers.addAnnotation('Peer adds monitoring', { x: 1400, y: 300 }, 1500);
@@ -259,6 +264,7 @@ test.describe('Demo Video Recording', () => {
 
     // 5. Mobile interaction demo
     await videoHelpers.addAnnotation('Touch-optimized interface', { x: 187, y: 100 }, 2000);
+    await videoHelpers.drawRegion(20, 60, 340, 560, 'Mobile View', 1500);
 
     // Simulate touch interactions
     await videoHelpers.simulateTouchDrag('cache', 180, 250);

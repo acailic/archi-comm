@@ -55,6 +55,7 @@ export interface ReactFlowCanvasProps {
   infoCards?: InfoCard[];
   selectedComponent: string | null;
   connectionStart: string | null;
+  visualTheme?: 'serious' | 'playful';
   onComponentDrop: (type: DesignComponent['type'], x: number, y: number) => void;
   onComponentMove: (id: string, x: number, y: number) => void;
   onComponentSelect: (id: string) => void;
@@ -93,6 +94,7 @@ function ReactFlowCanvasInternal({
   infoCards = [],
   selectedComponent,
   connectionStart,
+  visualTheme,
   onComponentDrop,
   onComponentMove,
   onComponentSelect,
@@ -210,6 +212,7 @@ function ReactFlowCanvasInternal({
             component,
             isSelected: selectedComponent === component.id,
             isConnectionStart: connectionStart === component.id,
+            visualTheme,
             onSelect: onComponentSelect,
             onStartConnection: (id: string, _position?: 'top' | 'bottom' | 'left' | 'right') =>
               onStartConnection(id),
@@ -225,6 +228,7 @@ function ReactFlowCanvasInternal({
       layoutPositions,
       selectedComponent,
       connectionStart,
+      visualTheme,
       onComponentSelect,
       onStartConnection,
       onComponentLabelChange,
@@ -429,9 +433,17 @@ function ReactFlowCanvasInternal({
   // Handle React Flow node changes
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      const typedChanges = changes.filter(c => c.type === 'position' || c.type === 'remove');
-      onNodesChange(typedChanges);
-      // Note: position updates are handled on drag stop to avoid duplicates
+      // Let React Flow handle all changes to maintain internal state
+      onNodesChange(changes);
+
+      // Handle any custom logic for specific change types
+      for (const change of changes) {
+        if (change.type === 'remove') {
+          // Node deletion is handled by React Flow and onNodeDragStop
+          // No additional custom logic needed here
+        }
+        // Position updates are handled on drag stop to avoid duplicates
+      }
     },
     [onNodesChange]
   );
@@ -439,14 +451,15 @@ function ReactFlowCanvasInternal({
   // Handle React Flow edge changes
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      const typedChanges = changes.filter(c => c.type === 'remove');
-      onEdgesChange(typedChanges);
+      // Let React Flow handle all changes to maintain internal state
+      onEdgesChange(changes);
 
-      // Handle edge deletions
+      // Handle any custom logic for specific change types
       for (const change of changes) {
         if (change.type === 'remove' && onConnectionDelete) {
           onConnectionDelete(change.id);
         }
+        // Other edge change types are handled by React Flow automatically
       }
     },
     [onEdgesChange, onConnectionDelete]

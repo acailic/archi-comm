@@ -24,6 +24,9 @@ export interface SettingItem {
 
 // Default Settings Configuration
 export const defaultSettings = {
+  appearance: {
+    canvasTheme: 'serious' as 'serious' | 'playful',
+  },
   accessibility: {
     reducedMotion: false,
     highContrast: false,
@@ -66,6 +69,12 @@ export const validateSettings = (settings: any): boolean => {
   try {
     // Basic validation - ensure required properties exist
     if (!settings || typeof settings !== 'object') return false;
+
+    // Validate appearance settings
+    if (settings.appearance) {
+      const { canvasTheme } = settings.appearance;
+      if (!['serious', 'playful'].includes(canvasTheme)) return false;
+    }
 
     // Validate accessibility settings
     if (settings.accessibility) {
@@ -180,6 +189,7 @@ export const loadSettings = (): typeof defaultSettings => {
       ...defaultSettings,
       ...parsed,
       // Ensure nested objects are merged properly
+      appearance: { ...defaultSettings.appearance, ...parsed.appearance },
       accessibility: { ...defaultSettings.accessibility, ...parsed.accessibility },
       workflow: { ...defaultSettings.workflow, ...parsed.workflow },
       audio: { ...defaultSettings.audio, ...parsed.audio },

@@ -22,6 +22,24 @@ import type { CustomNodeData } from '../types';
 import type { UseNodePresenterResult } from '../hooks/useNodePresenter';
 import type { DesignComponent } from '../../../shared/contracts';
 
+function defaultStickerForType(type: string): string {
+  const map: Record<string, string> = {
+    'api-gateway': '🚀',
+    'load-balancer': '🎯',
+    server: '🧩',
+    microservice: '📦',
+    database: '🧪',
+    postgresql: '🧪',
+    mongodb: '🧪',
+    cache: '⚡',
+    redis: '⚡',
+    'message-queue': '🌈',
+    monitoring: '📈',
+    security: '🛡️',
+  };
+  return map[type] || '⭐';
+}
+
 // Component Icon utility - keeping it local as it's simple
 const ComponentIcon = ({
   type,
@@ -57,7 +75,9 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
     onCopy,
     onShowProperties,
     onDelete,
+    visualTheme = 'serious',
   } = nodeData;
+  const playful = visualTheme === 'playful';
 
   // Hide component if not visible
   if (!isVisible) {
@@ -76,7 +96,9 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
     }
     return 'bg-gray-100/60'; // fallback
   };
-  const subtleHeaderBg = getSubtleBackgroundColor(iconInfo.color);
+  const customHex = (component.properties as any)?.bgHex as string | undefined;
+  const bodyBgHex = (component.properties as any)?.bodyBgHex as string | undefined;
+  const subtleHeaderBg = customHex ? '' : getSubtleBackgroundColor(iconInfo.color);
 
   return (
     <ContextMenu>
@@ -87,7 +109,8 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
             computed.visualStateClasses,
             getElevation(selected || state.visualState.isSelected ? 4 : 2),
             animations.hoverRaise,
-            animations.pulseGlow,
+            playful ? animations.pulseGlow : '',
+            playful ? 'transition-[transform,box-shadow] duration-200 hover:-rotate-[0.5deg] hover:shadow-[0_0_0_4px_rgba(168,85,247,0.12)]' : '',
             computed.architecturalStyling.borderColor
           )}
           onMouseEnter={actions.handleMouseEnter}
@@ -98,20 +121,34 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
               'w-full h-full rounded-xl border',
               designSystem.glass.surface,
               'bg-[var(--component-bg)]',
-              subtleHeaderBg
+              subtleHeaderBg,
+              playful ? 'ring-1 ring-primary/20' : ''
             )}
+            style={bodyBgHex ? { background: bodyBgHex } : undefined}
           >
             <div
               className={cx(
                 'w-full h-9 rounded-t-xl flex items-center justify-between px-2 text-white shadow-sm',
                 'border-b border-white/10',
                 'bg-gradient-to-br',
-                computed.gradient
+                computed.gradient,
+                playful ? 'relative overflow-hidden' : ''
               )}
             >
+              {customHex && (
+                <div className='absolute inset-0 opacity-70' style={{ background: customHex }} />
+              )}
+              {playful && (
+                <div className='absolute inset-0 opacity-70' style={{
+                  background:
+                    'linear-gradient(120deg, hsla(280,90%,60%,0.25), hsla(200,90%,60%,0.25), hsla(340,90%,60%,0.25))',
+                  backgroundSize: '200% 200%',
+                  animation: 'archiGradientShift 6s ease-in-out infinite',
+                }} />
+              )}
               <Suspense fallback={<div className='w-5 h-5 rounded-md bg-white/40' />}>
                 <div
-                  className={`w-5 h-5 rounded-md ${computed.iconInfo.color} flex items-center justify-center shadow-sm`}
+                  className={`w-5 h-5 rounded-md ${computed.iconInfo.color} flex items-center justify-center shadow-sm ${playful ? 'ring-2 ring-white/50' : ''}`}
                 >
                   <ComponentIcon type={component.type} className='w-3 h-3 text-white' />
                 </div>
@@ -131,7 +168,10 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
               {component.properties?.showLabel !== false && (
                 <div className='relative'>
                   <div
-                    className='w-full text-[13px] font-semibold truncate text-foreground/90 leading-tight'
+                    className={cx(
+                      'w-full text-[13px] font-semibold truncate text-foreground/90 leading-tight',
+                      playful ? '[text-shadow:0_1px_0_rgba(255,255,255,0.4)]' : ''
+                    )}
                     title={
                       component.label ||
                       `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, ' ')}`
@@ -140,6 +180,37 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
                     {component.label ||
                       `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, ' ')}`}
                   </div>
+                </div>
+              )}
+
+              {/* Playful sparkles on hover */}
+              {playful && state.isHovered && (
+                <div className='pointer-events-none absolute inset-0'>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        position: 'absolute',
+                        left: `${(i * 17) % 90 + 5}%`,
+                        top: `${10 + (i * 7) % 60}%`,
+                        width: 4,
+                        height: 4,
+                        borderRadius: 999,
+                        background: ['#f59e0b', '#22c55e', '#3b82f6', '#a855f7'][i % 4],
+                        opacity: 0.8,
+                        animation: `archiSparkle ${900 + i * 60}ms ease-out ${i * 40}ms both`,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Playful sticker badge */}
+              {(((component.properties as any)?.sticker) || (component.properties as any)?.stickerEmoji || (playful && !((component.properties as any)?.sticker === false))) && (
+                <div className='absolute -top-2 -left-2 w-6 h-6 rounded-full bg-white/80 shadow flex items-center justify-center border border-border/30'>
+                  <span role='img' aria-label='sticker'>
+                    {(component.properties as any)?.stickerEmoji || defaultStickerForType(component.type)}
+                  </span>
                 </div>
               )}
 
@@ -230,6 +301,20 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
           />
         </div>
       </ContextMenuTrigger>
+      {playful && (
+        <style>{`
+          @keyframes archiGradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+          }
+          @keyframes archiSparkle {
+            0% { transform: translateY(0) scale(0.8); opacity: 0.0; }
+            20% { opacity: 0.9; }
+            100% { transform: translateY(-10px) scale(1); opacity: 0; }
+          }
+        `}</style>
+      )}
       <ContextMenuContent className='w-56'>
         <ContextMenuItem onClick={() => onShowProperties?.(component.id)}>
           Edit Properties

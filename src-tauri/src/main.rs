@@ -17,7 +17,6 @@ use std::process;
 use std::os::unix::fs::PermissionsExt;
 use serde_json::Value as JsonValue;
 use tokio::task::JoinHandle;
-use std::time::Instant;
 
 // Operation name constants for consistent error handling
 pub struct OperationNames;
@@ -199,9 +198,9 @@ mod dev_utils;
 
 
 // ========= Native Audio Recording (CPAL + Hound) ==========
-use std::io::BufWriter;
-use std::sync::atomic::{AtomicBool, Ordering};
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+// use std::io::BufWriter;
+// use std::sync::atomic::{AtomicBool, Ordering};
+// use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 // struct NativeRecorder {
 //     stream: Option<cpal::Stream>,
@@ -1205,7 +1204,7 @@ async fn save_audio_file(file_name: String, data: Vec<u8>, base_dir: Option<Stri
 async fn transcribe_audio(
     file_path: String,
     options: Option<TranscriptionOptions>,
-    transcription_jobs: State<'_, TranscriptionJobStore>,
+    _transcription_jobs: State<'_, TranscriptionJobStore>,
 ) -> Result<TranscriptionResponse, ApiError> {
     // Validate file path and security
     let path = Path::new(&file_path);

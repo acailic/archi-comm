@@ -187,6 +187,7 @@
     "demo:mobile-quality": "DEMO_MODE=true playwright test e2e/demo-scenarios/mobile-interactions --project='Demo - Mobile'",
     "demo:clean": "rimraf demo-videos test-results",
     "demo:organize": "node scripts/organize-demo-videos.js",
+    "demo:export": "node scripts/process-demo-videos.js",
     "demo:dev": "DEMO_MODE=true playwright test e2e/demo-scenarios --project='Demo - Desktop HD' --headed",
     "demo:debug": "DEMO_MODE=true playwright test e2e/demo-scenarios --project='Demo - Desktop HD' --debug",
     "type-check": "tsc --noEmit",

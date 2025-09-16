@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Settings, Paintbrush, Zap } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { ArrowLeft, Settings, Paintbrush, Zap, Save, Mic, Shield, Monitor } from 'lucide-react';
 import { loadSettings, saveSettings } from '@/modules/settings';
 
 interface ConfigPageProps {
@@ -79,22 +80,65 @@ export function ConfigPage({
     onVirtualizationToggle?.(enabled);
   };
 
+  const handleSaveAll = () => {
+    try {
+      const currentSettings = loadSettings();
+      saveSettings({
+        ...currentSettings,
+        audio: audioSettings,
+        telemetry: telemetrySettings,
+      });
+      // You could add a toast notification here
+      console.log('Settings saved successfully');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+    }
+  };
+
   return (
     <div className='w-full h-full bg-background flex flex-col'>
       {/* Header */}
-      <div className='flex items-center gap-4 p-6 border-b'>
-        <Button variant='ghost' size='sm' onClick={onBack} className='gap-2'>
-          <ArrowLeft className='w-4 h-4' />
-          Back
-        </Button>
-        <div className='flex items-center gap-2'>
-          <Settings className='w-5 h-5' />
-          <h1 className='text-xl font-semibold'>Configuration</h1>
+      <div className='flex items-center justify-between p-6 border-b'>
+        <div className='flex items-center gap-4'>
+          <Button variant='ghost' size='sm' onClick={onBack} className='gap-2'>
+            <ArrowLeft className='w-4 h-4' />
+            Back
+          </Button>
+          <div className='flex items-center gap-2'>
+            <Settings className='w-5 h-5' />
+            <h1 className='text-xl font-semibold'>Settings</h1>
+          </div>
         </div>
+        <Button onClick={handleSaveAll} className='gap-2'>
+          <Save className='w-4 h-4' />
+          Save All
+        </Button>
       </div>
 
-      {/* Content */}
-      <div className='flex-1 p-6 space-y-6 overflow-auto'>
+      {/* Content with Tabs */}
+      <div className='flex-1 p-6'>
+        <Tabs defaultValue='audio' className='w-full h-full'>
+          <TabsList className='inline-flex h-10 items-center justify-start w-auto p-1'>
+            <TabsTrigger value='audio' className='gap-2'>
+              <Mic className='w-4 h-4' />
+              Audio
+            </TabsTrigger>
+            <TabsTrigger value='appearance' className='gap-2'>
+              <Paintbrush className='w-4 h-4' />
+              Appearance
+            </TabsTrigger>
+            <TabsTrigger value='performance' className='gap-2'>
+              <Zap className='w-4 h-4' />
+              Performance
+            </TabsTrigger>
+            <TabsTrigger value='privacy' className='gap-2'>
+              <Shield className='w-4 h-4' />
+              Privacy
+            </TabsTrigger>
+          </TabsList>
+
+          <div className='mt-6 overflow-auto'>
+            <TabsContent value='audio' className='space-y-6'>
         {/* Audio Settings */}
         <Card>
           <CardHeader>
@@ -188,6 +232,111 @@ export function ConfigPage({
           </CardContent>
         </Card>
 
+            </TabsContent>
+
+            <TabsContent value='appearance' className='space-y-6'>
+        {/* Themes & Appearance */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Themes & Appearance</CardTitle>
+            <CardDescription>Customize canvas visuals</CardDescription>
+          </CardHeader>
+          <CardContent className='grid gap-4'>
+            <div className='grid gap-2 max-w-md'>
+              <label className='text-sm font-medium'>Canvas Theme</label>
+              <Select
+                value={loadSettings().appearance.canvasTheme}
+                onValueChange={(v) => {
+                  const s = loadSettings();
+                  saveSettings({ ...s, appearance: { ...s.appearance, canvasTheme: v as 'serious' | 'playful' } });
+                  window.dispatchEvent(new CustomEvent('settings:appearance-updated', { detail: { canvasTheme: v } }));
+                }}
+              >
+                <SelectTrigger className='w-60'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='serious'>Serious</SelectItem>
+                  <SelectItem value='playful'>Playful</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>Affects node accents and subtle animations.</p>
+            </div>
+          </CardContent>
+        </Card>
+        {/* Canvas Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='flex items-center gap-2'>
+              <Paintbrush className='w-4 h-4' />
+              Canvas Settings
+            </CardTitle>
+            <CardDescription>
+              Configure how connections and components are displayed on the canvas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {/* Connection Style */}
+            <div className='space-y-2'>
+              <label className='text-sm font-medium'>Connection Style</label>
+              <Select value={localConnectionStyle} onValueChange={handleConnectionStyleChange}>
+                <SelectTrigger className='w-48'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='straight'>Straight Lines</SelectItem>
+                  <SelectItem value='curved'>Curved Lines</SelectItem>
+                  <SelectItem value='stepped'>Stepped Lines</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>
+                Choose how connections between components are drawn
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+            </TabsContent>
+
+            <TabsContent value='performance' className='space-y-6'>
+
+        {/* Performance Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className='flex items-center gap-2'>
+              <Zap className='w-4 h-4' />
+              Performance Settings
+            </CardTitle>
+            <CardDescription>
+              Optimize canvas performance for large diagrams
+            </CardDescription>
+          </CardHeader>
+          <CardContent className='space-y-4'>
+            {/* Virtualization */}
+            <div className='space-y-2'>
+              <div className='flex items-center justify-between'>
+                <label className='text-sm font-medium'>Canvas Virtualization</label>
+                <Switch
+                  checked={localVirtualization}
+                  onCheckedChange={handleVirtualizationToggle}
+                />
+              </div>
+              {localVirtualization && virtualizationStats && (
+                <div className='flex items-center gap-2'>
+                  <Badge variant='secondary' className='text-xs'>
+                    {virtualizationStats.visibleComponents}/{virtualizationStats.totalComponents} visible
+                  </Badge>
+                </div>
+              )}
+              <p className='text-xs text-muted-foreground'>
+                Improve performance by only rendering visible components. Recommended for diagrams with 100+ components.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+            </TabsContent>
+
+            <TabsContent value='privacy' className='space-y-6'>
         {/* Telemetry Settings */}
         <Card>
           <CardHeader>
@@ -241,93 +390,9 @@ export function ConfigPage({
             </div>
           </CardContent>
         </Card>
-        {/* Canvas Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2'>
-              <Paintbrush className='w-4 h-4' />
-              Canvas Settings
-            </CardTitle>
-            <CardDescription>
-              Configure how connections and components are displayed on the canvas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            {/* Connection Style */}
-            <div className='space-y-2'>
-              <label className='text-sm font-medium'>Connection Style</label>
-              <Select value={localConnectionStyle} onValueChange={handleConnectionStyleChange}>
-                <SelectTrigger className='w-48'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='straight'>Straight Lines</SelectItem>
-                  <SelectItem value='curved'>Curved Lines</SelectItem>
-                  <SelectItem value='stepped'>Stepped Lines</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className='text-xs text-muted-foreground'>
-                Choose how connections between components are drawn
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Performance Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2'>
-              <Zap className='w-4 h-4' />
-              Performance Settings
-            </CardTitle>
-            <CardDescription>
-              Optimize canvas performance for large diagrams
-            </CardDescription>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            {/* Virtualization */}
-            <div className='space-y-2'>
-              <div className='flex items-center justify-between'>
-                <label className='text-sm font-medium'>Canvas Virtualization</label>
-                <Switch
-                  checked={localVirtualization}
-                  onCheckedChange={handleVirtualizationToggle}
-                />
-              </div>
-              {localVirtualization && virtualizationStats && (
-                <div className='flex items-center gap-2'>
-                  <Badge variant='secondary' className='text-xs'>
-                    {virtualizationStats.visibleComponents}/{virtualizationStats.totalComponents} visible
-                  </Badge>
-                </div>
-              )}
-              <p className='text-xs text-muted-foreground'>
-                Improve performance by only rendering visible components. Recommended for diagrams with 100+ components.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Additional Settings Placeholder */}
-        <Card className='opacity-50'>
-          <CardHeader>
-            <CardTitle>Grid & Layout</CardTitle>
-            <CardDescription>Grid settings and auto-layout options</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className='text-sm text-muted-foreground'>Coming soon...</p>
-          </CardContent>
-        </Card>
-
-        <Card className='opacity-50'>
-          <CardHeader>
-            <CardTitle>Themes & Appearance</CardTitle>
-            <CardDescription>Customize colors and visual themes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className='text-sm text-muted-foreground'>Coming soon...</p>
-          </CardContent>
-        </Card>
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
     </div>
   );

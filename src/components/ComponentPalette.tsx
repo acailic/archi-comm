@@ -753,6 +753,7 @@ interface ComponentPaletteProps {
 export function ComponentPalette({ defaultTags }: ComponentPaletteProps = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [tagFiltersCleared, setTagFiltersCleared] = useState(false);
 
   // When defaultTags are provided (e.g., from a selected challenge),
   // prefill the search with space-separated tags if the user hasn't typed yet.
@@ -830,7 +831,7 @@ export function ComponentPalette({ defaultTags }: ComponentPaletteProps = {}) {
   }, [defaultTags]);
 
   const filteredComponents = componentTypes.filter(component => {
-    const hasTagRecommendations = recommendedTypes.size > 0;
+    const hasTagRecommendations = recommendedTypes.size > 0 && !tagFiltersCleared;
 
     // When we have tag recommendations, prefer them over free-text search
     const matchesTags = hasTagRecommendations ? recommendedTypes.has(component.type) : true;
@@ -873,7 +874,17 @@ export function ComponentPalette({ defaultTags }: ComponentPaletteProps = {}) {
             <Input
               placeholder='Search...'
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => {
+                const newValue = e.target.value;
+                setSearchQuery(newValue);
+                // Reset to "All Components" and clear tag filters when search is cleared
+                if (newValue.trim() === '') {
+                  setActiveCategory('all');
+                  setTagFiltersCleared(true);
+                } else {
+                  setTagFiltersCleared(false);
+                }
+              }}
               className='text-sm bg-background/60 backdrop-blur border-border/30 focus:bg-background/80 transition-all duration-200 pl-10 rounded-lg'
             />
           </div>
