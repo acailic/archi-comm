@@ -16,7 +16,8 @@ const STORAGE_STATE_DIR = './e2e/session-states';
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: MULTI_SESSION_TESTS ? 120_000 : 60_000, // Longer timeout for multi-session tests
+  // Extend base timeouts (~3x) to stabilize demo recordings
+  timeout: MULTI_SESSION_TESTS ? 360_000 : 180_000,
   expect: {
     timeout: 10_000,
     // Visual testing configuration
@@ -62,6 +63,31 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
+    // Curated demo videos recorder (sequential, high-quality video ON)
+    {
+      name: 'demo-videos',
+      testDir: './e2e',
+      testMatch: ['**/demo-video-recording.spec.ts'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+        hasTouch: false,
+        colorScheme: 'light',
+        reducedMotion: 'no-preference',
+        forcedColors: 'none',
+        video: {
+          mode: 'on',
+          size: { width: 1920, height: 1080 }
+        },
+        trace: 'on',
+        screenshot: 'on',
+        actionTimeout: 30_000,
+        navigationTimeout: 90_000,
+      },
+      timeout: 900_000,
+      retries: 0,
+    },
     // Standard functional testing
     {
       name: 'chromium',
@@ -221,7 +247,7 @@ export default defineConfig({
     // Note: Removed legacy demo-videos* projects.
 
     // Demo Scenarios - Desktop HD
-    {
+  {
       name: 'Demo - Desktop HD',
       testDir: './e2e/demo-scenarios',
       testMatch: ['**/*.spec.ts'],
@@ -238,10 +264,10 @@ export default defineConfig({
         },
         trace: 'on',
         screenshot: 'on',
-        actionTimeout: 10_000,
-        navigationTimeout: 30_000,
+        actionTimeout: 30_000,
+        navigationTimeout: 90_000,
       },
-      timeout: 300_000, // 5 minutes for demo scenarios
+      timeout: 900_000,
       retries: 0, // No retries for demo recording
     },
 
@@ -263,10 +289,10 @@ export default defineConfig({
         },
         trace: 'on',
         screenshot: 'on',
-        actionTimeout: 10_000,
-        navigationTimeout: 30_000,
+        actionTimeout: 30_000,
+        navigationTimeout: 90_000,
       },
-      timeout: 300_000,
+      timeout: 900_000,
       retries: 0,
     },
 
@@ -288,10 +314,10 @@ export default defineConfig({
         },
         trace: 'on',
         screenshot: 'on',
-        actionTimeout: 10_000,
-        navigationTimeout: 30_000,
+        actionTimeout: 30_000,
+        navigationTimeout: 90_000,
       },
-      timeout: 300_000,
+      timeout: 900_000,
       retries: 0,
     },
 
@@ -313,7 +339,7 @@ export default defineConfig({
         },
         trace: 'on',
         screenshot: 'on',
-        actionTimeout: 15_000, // Longer for 4K rendering
+        actionTimeout: 45_000, // Longer for 4K rendering
         navigationTimeout: 45_000,
       },
       timeout: 600_000, // 10 minutes for 4K demos

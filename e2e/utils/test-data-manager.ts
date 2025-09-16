@@ -4,10 +4,24 @@
 // RELEVANT FILES: e2e/*.spec.ts, playwright.config.ts
 
 import { Page } from '@playwright/test';
+import type { DesignData as AppDesignData } from '@/shared/contracts';
+import { templateRegistry } from '@/lib/import-export/templates';
+import { componentIconMap } from '@/lib/component-icons';
+
+type FixtureCategory = 'basic' | 'industry' | 'scalability' | 'legacy' | 'benchmark';
+
+interface FixtureMetadata {
+  name: string;
+  category: FixtureCategory;
+  description?: string;
+  componentCount: number;
+  connectionCount?: number;
+  tags?: string[];
+}
 
 export interface ComponentData {
   type: string;
-  name: string;
+  name?: string;
   position: { x: number; y: number };
   properties?: Record<string, any>;
 }
@@ -37,6 +51,8 @@ export interface DesignData {
 export class TestDataManager {
   private static instance: TestDataManager;
   private fixtures: Map<string, DesignData> = new Map();
+  private fixtureCategories: Map<string, FixtureCategory> = new Map();
+  private fixtureMetadata: Map<string, FixtureMetadata> = new Map();
 
   public static getInstance(): TestDataManager {
     if (!TestDataManager.instance) {
@@ -47,9 +63,11 @@ export class TestDataManager {
 
   constructor() {
     this.initializeFixtures();
+    this.loadTemplatesFromRegistry();
   }
 
   private initializeFixtures(): void {
+    // Core/basic examples
     // Simple web application design
     this.fixtures.set('simple-web-app', {
       name: 'Simple Web Application',
@@ -89,6 +107,15 @@ export class TestDataManager {
         { from: 'load-balancer', to: 'server' },
         { from: 'server', to: 'database' },
       ],
+    });
+    this.fixtureCategories.set('simple-web-app', 'basic');
+    this.fixtureMetadata.set('simple-web-app', {
+      name: 'simple-web-app',
+      category: 'basic',
+      description: 'Basic three-tier web application architecture',
+      componentCount: 3,
+      connectionCount: 2,
+      tags: ['web', 'three-tier']
     });
 
     // Microservices architecture
@@ -146,6 +173,14 @@ export class TestDataManager {
         },
       ],
     });
+    this.fixtureCategories.set('microservices', 'basic');
+    this.fixtureMetadata.set('microservices', {
+      name: 'microservices',
+      category: 'basic',
+      description: 'Complex microservices-based system',
+      componentCount: 6,
+      tags: ['microservices']
+    });
 
     // Performance testing scenario
     this.fixtures.set('performance-test', {
@@ -167,6 +202,14 @@ export class TestDataManager {
           y: 50 + Math.floor(i / 4) * 80,
         },
       })),
+    });
+    this.fixtureCategories.set('performance-test', 'basic');
+    this.fixtureMetadata.set('performance-test', {
+      name: 'performance-test',
+      category: 'basic',
+      description: 'Large-scale architecture for performance testing',
+      componentCount: 20,
+      tags: ['performance']
     });
 
     // Mobile app backend
@@ -224,6 +267,517 @@ export class TestDataManager {
         },
       ],
     });
+    this.fixtureCategories.set('mobile-backend', 'basic');
+    this.fixtureMetadata.set('mobile-backend', {
+      name: 'mobile-backend',
+      category: 'basic',
+      description: 'Backend services for mobile application',
+      componentCount: 6,
+      tags: ['mobile']
+    });
+
+    // Extended fixtures
+    this.addIndustryFixtures();
+    this.addScalabilityFixtures();
+    this.addLegacyFixtures();
+    this.addBenchmarkFixtures();
+  }
+
+  // Prefer app-level templates (TemplateRegistry) to avoid fixture drift
+  public loadTemplatesFromRegistry(): void {
+    try {
+      const all = templateRegistry.getAllTemplates();
+      for (const { name, category, data } of all) {
+        const plain = name.includes(':') ? name.split(':')[1] : name;
+        const key = `${category}-${plain}`.toLowerCase();
+        const e2eData = TestUtils.convertAppTemplateToE2E(data as AppDesignData);
+        this.fixtures.set(key, e2eData);
+        this.fixtureCategories.set(key, category as FixtureCategory);
+        this.fixtureMetadata.set(key, {
+          name: key,
+          category: category as FixtureCategory,
+          description: e2eData.description,
+          componentCount: e2eData.components.length,
+          connectionCount: e2eData.connections?.length || 0,
+          tags: Array.isArray((data.metadata as any)?.tags) ? ((data.metadata as any).tags as string[]) : [],
+        });
+      }
+    } catch (err) {
+      console.warn('TemplateRegistry integration failed:', (err as Error).message);
+    }
+  }
+
+  // ---------------------
+  // Industry fixtures
+  // ---------------------
+  private addIndustryFixtures(): void {
+    const ecommerce = this.createECommerceArchitecture();
+    this.fixtures.set('industry-ecommerce', ecommerce);
+    this.fixtureCategories.set('industry-ecommerce', 'industry');
+    this.fixtureMetadata.set('industry-ecommerce', {
+      name: 'industry-ecommerce',
+      category: 'industry',
+      description: 'Comprehensive e-commerce platform architecture',
+      componentCount: ecommerce.components.length,
+      connectionCount: ecommerce.connections?.length || 0,
+      tags: ['industry', 'ecommerce']
+    });
+
+    const fintech = this.createFintechPlatform();
+    this.fixtures.set('industry-fintech', fintech);
+    this.fixtureCategories.set('industry-fintech', 'industry');
+    this.fixtureMetadata.set('industry-fintech', {
+      name: 'industry-fintech',
+      category: 'industry',
+      description: 'Financial services architecture with compliance',
+      componentCount: fintech.components.length,
+      connectionCount: fintech.connections?.length || 0,
+      tags: ['industry', 'fintech']
+    });
+
+    const healthcare = this.createHealthcareSystem();
+    this.fixtures.set('industry-healthcare', healthcare);
+    this.fixtureCategories.set('industry-healthcare', 'industry');
+    this.fixtureMetadata.set('industry-healthcare', {
+      name: 'industry-healthcare',
+      category: 'industry',
+      description: 'HIPAA-compliant healthcare system architecture',
+      componentCount: healthcare.components.length,
+      connectionCount: healthcare.connections?.length || 0,
+      tags: ['industry', 'healthcare']
+    });
+
+    const gaming = this.createGamingPlatform();
+    this.fixtures.set('industry-gaming', gaming);
+    this.fixtureCategories.set('industry-gaming', 'industry');
+    this.fixtureMetadata.set('industry-gaming', {
+      name: 'industry-gaming',
+      category: 'industry',
+      description: 'Real-time gaming platform architecture',
+      componentCount: gaming.components.length,
+      connectionCount: gaming.connections?.length || 0,
+      tags: ['industry', 'gaming']
+    });
+  }
+
+  private createECommerceArchitecture(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'web-app', name: 'Web App', position: { x: 100, y: 80 } },
+      { type: 'mobile-app', name: 'Mobile App', position: { x: 100, y: 160 } },
+      { type: 'cdn', name: 'CDN', position: { x: 260, y: 120 } },
+      { type: 'load-balancer', name: 'Load Balancer', position: { x: 380, y: 120 } },
+      { type: 'api-gateway', name: 'API Gateway', position: { x: 520, y: 120 } },
+      { type: 'microservice', name: 'User Service', position: { x: 680, y: 40 } },
+      { type: 'microservice', name: 'Product Service', position: { x: 680, y: 100 } },
+      { type: 'microservice', name: 'Order Service', position: { x: 680, y: 160 } },
+      { type: 'microservice', name: 'Payment Service', position: { x: 680, y: 220 } },
+      { type: 'microservice', name: 'Inventory Service', position: { x: 680, y: 280 } },
+      { type: 'redis', name: 'Redis Cache', position: { x: 840, y: 100 } },
+      { type: 'postgresql', name: 'Orders DB', position: { x: 840, y: 160 } },
+      { type: 'mongodb', name: 'Catalog DB', position: { x: 840, y: 220 } },
+      { type: 'elasticsearch', name: 'Search', position: { x: 840, y: 280 } },
+      { type: 'monitoring', name: 'Monitoring', position: { x: 1000, y: 80 } },
+      { type: 'security', name: 'Security', position: { x: 1000, y: 160 } },
+    ];
+
+    const connections = [
+      { from: 'web-app', to: 'cdn' },
+      { from: 'mobile-app', to: 'api-gateway' },
+      { from: 'cdn', to: 'load-balancer' },
+      { from: 'load-balancer', to: 'api-gateway' },
+      { from: 'api-gateway', to: 'user-service' },
+      { from: 'api-gateway', to: 'product-service' },
+      { from: 'api-gateway', to: 'order-service' },
+      { from: 'api-gateway', to: 'payment-service' },
+      { from: 'api-gateway', to: 'inventory-service' },
+    ];
+
+    const annotations: AnnotationData[] = [
+      { text: 'Presentation Layer', position: { x: 140, y: 40 } },
+      { text: 'API Layer', position: { x: 520, y: 80 } },
+      { text: 'Service Layer', position: { x: 700, y: 10 } },
+      { text: 'Data Layer', position: { x: 860, y: 70 } },
+    ];
+
+    return {
+      name: 'E-Commerce Platform',
+      description: 'Complete e-commerce platform with services and data stores',
+      components,
+      annotations,
+      connections: connections.map(c => ({ from: c.from, to: c.to }))
+    };
+  }
+
+  private createFintechPlatform(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'web-app', name: 'Customer Portal', position: { x: 100, y: 100 } },
+      { type: 'api-gateway', name: 'API Gateway', position: { x: 300, y: 100 } },
+      { type: 'authentication', name: 'Authentication', position: { x: 480, y: 40 } },
+      { type: 'authorization', name: 'Authorization', position: { x: 480, y: 100 } },
+      { type: 'security', name: 'Encryption', position: { x: 480, y: 160 } },
+      { type: 'microservice', name: 'Payment Gateway', position: { x: 680, y: 40 } },
+      { type: 'microservice', name: 'Fraud Detection', position: { x: 680, y: 100 } },
+      { type: 'microservice', name: 'Compliance Service', position: { x: 680, y: 160 } },
+      { type: 'data-warehouse', name: 'Data Warehouse', position: { x: 880, y: 100 } },
+      { type: 'logging', name: 'Audit Logging', position: { x: 1080, y: 100 } },
+    ];
+    const annotations: AnnotationData[] = [
+      { text: 'PCI & Compliance Zone', position: { x: 650, y: 10 } },
+    ];
+    return {
+      name: 'Fintech Platform',
+      description: 'Financial services architecture with security and compliance',
+      components,
+      annotations,
+      connections: [
+        { from: 'customer-portal', to: 'api-gateway' },
+        { from: 'api-gateway', to: 'authentication' },
+        { from: 'api-gateway', to: 'authorization' },
+        { from: 'api-gateway', to: 'payment-gateway' },
+        { from: 'payment-gateway', to: 'fraud-detection' },
+        { from: 'compliance-service', to: 'audit-logging' },
+      ]
+    } as DesignData;
+  }
+
+  private createHealthcareSystem(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'web-app', name: 'Patient Portal', position: { x: 100, y: 100 } },
+      { type: 'api-gateway', name: 'API Gateway', position: { x: 300, y: 100 } },
+      { type: 'microservice', name: 'EHR System', position: { x: 500, y: 40 } },
+      { type: 'microservice', name: 'Appointment Service', position: { x: 500, y: 100 } },
+      { type: 'microservice', name: 'Billing Service', position: { x: 500, y: 160 } },
+      { type: 'microservice', name: 'Lab Integration', position: { x: 700, y: 40 } },
+      { type: 'microservice', name: 'Imaging Service', position: { x: 700, y: 100 } },
+      { type: 'security', name: 'HIPAA Compliance', position: { x: 700, y: 160 } },
+      { type: 'message-queue', name: 'Secure Messaging', position: { x: 900, y: 100 } },
+    ];
+    const annotations: AnnotationData[] = [
+      { text: 'PHI Boundary', position: { x: 680, y: 10 } },
+    ];
+    return {
+      name: 'Healthcare System',
+      description: 'Healthcare platform with EHR, appointments, and HIPAA compliance',
+      components,
+      annotations,
+      connections: [
+        { from: 'patient-portal', to: 'api-gateway' },
+        { from: 'api-gateway', to: 'ehr-system' },
+        { from: 'api-gateway', to: 'appointment-service' },
+        { from: 'api-gateway', to: 'billing-service' },
+        { from: 'ehr-system', to: 'secure-messaging' },
+      ]
+    } as DesignData;
+  }
+
+  private createGamingPlatform(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'client', name: 'Game Client', position: { x: 100, y: 100 } },
+      { type: 'websocket', name: 'Realtime Messaging', position: { x: 300, y: 100 } },
+      { type: 'microservice', name: 'Matchmaking', position: { x: 500, y: 40 } },
+      { type: 'server', name: 'Game Server', position: { x: 500, y: 100 } },
+      { type: 'microservice', name: 'Leaderboard Service', position: { x: 500, y: 160 } },
+      { type: 'microservice', name: 'Chat Service', position: { x: 700, y: 100 } },
+      { type: 'redis', name: 'Session Management', position: { x: 900, y: 60 } },
+      { type: 'mongodb', name: 'Player Data', position: { x: 900, y: 140 } },
+      { type: 'security', name: 'Anti-cheat', position: { x: 1100, y: 100 } },
+      { type: 'elasticsearch', name: 'Analytics', position: { x: 1300, y: 100 } },
+    ];
+    const annotations: AnnotationData[] = [
+      { text: 'Low latency realtime path', position: { x: 320, y: 60 } },
+    ];
+    return {
+      name: 'Gaming Platform',
+      description: 'Multiplayer gaming platform with realtime services',
+      components,
+      annotations,
+      connections: [
+        { from: 'game-client', to: 'realtime-messaging' },
+        { from: 'realtime-messaging', to: 'game-server' },
+        { from: 'game-server', to: 'session-management' },
+        { from: 'game-server', to: 'player-data' },
+      ]
+    } as DesignData;
+  }
+
+  // ---------------------
+  // Scalability fixtures
+  // ---------------------
+  private addScalabilityFixtures(): void {
+    const ms = this.createMicroservicesEcosystem(50);
+    this.fixtures.set('scalability-microservices-ecosystem', ms);
+    this.fixtureCategories.set('scalability-microservices-ecosystem', 'scalability');
+    this.fixtureMetadata.set('scalability-microservices-ecosystem', {
+      name: 'scalability-microservices-ecosystem',
+      category: 'scalability',
+      description: '50+ microservices with service mesh and observability',
+      componentCount: ms.components.length,
+      connectionCount: ms.connections?.length || 0,
+      tags: ['microservices', 'service-mesh']
+    });
+
+    const serverless = this.createServerlessArchitecture();
+    this.fixtures.set('scalability-serverless', serverless);
+    this.fixtureCategories.set('scalability-serverless', 'scalability');
+    this.fixtureMetadata.set('scalability-serverless', {
+      name: 'scalability-serverless',
+      category: 'scalability',
+      description: 'Event-driven serverless architecture',
+      componentCount: serverless.components.length,
+      connectionCount: serverless.connections?.length || 0,
+      tags: ['serverless', 'event-driven']
+    });
+
+    const dist = this.createDistributedSystem();
+    this.fixtures.set('scalability-distributed-cqrs', dist);
+    this.fixtureCategories.set('scalability-distributed-cqrs', 'scalability');
+    this.fixtureMetadata.set('scalability-distributed-cqrs', {
+      name: 'scalability-distributed-cqrs',
+      category: 'scalability',
+      description: 'CQRS/Event Sourcing distributed system',
+      componentCount: dist.components.length,
+      connectionCount: dist.connections?.length || 0,
+      tags: ['cqrs', 'event-sourcing']
+    });
+  }
+
+  private createMicroservicesEcosystem(count: number = 50): DesignData {
+    const components: ComponentData[] = [];
+    const annotations: AnnotationData[] = [
+      { text: 'Service Mesh + Discovery + Tracing', position: { x: 150, y: 40 } },
+    ];
+
+    // Core infra
+    components.push(
+      { type: 'api-gateway', name: 'API Gateway', position: { x: 80, y: 100 } },
+      { type: 'server', name: 'Service Discovery', position: { x: 80, y: 180 } },
+      { type: 'server', name: 'Config Service', position: { x: 80, y: 260 } },
+      { type: 'monitoring', name: 'Monitoring', position: { x: 80, y: 340 } },
+      { type: 'logging', name: 'Logging', position: { x: 80, y: 420 } },
+      { type: 'metrics', name: 'Metrics', position: { x: 80, y: 500 } },
+    );
+
+    // Services grid
+    const cols = 10;
+    for (let i = 0; i < count; i++) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      components.push({
+        type: 'microservice',
+        name: `Service ${i + 1}`,
+        position: { x: 260 + col * 120, y: 80 + row * 80 },
+      });
+    }
+
+    return {
+      name: 'Microservices Ecosystem',
+      description: `${count} microservices with platform services`,
+      components,
+      annotations,
+    };
+  }
+
+  private createServerlessArchitecture(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'api-gateway', name: 'API Gateway', position: { x: 100, y: 100 } },
+      { type: 'lambda', name: 'Auth Lambda', position: { x: 300, y: 60 } },
+      { type: 'lambda', name: 'Orders Lambda', position: { x: 300, y: 120 } },
+      { type: 'lambda', name: 'Payments Lambda', position: { x: 300, y: 180 } },
+      { type: 's3', name: 'S3 Bucket', position: { x: 500, y: 60 } },
+      { type: 'dynamodb', name: 'DynamoDB', position: { x: 500, y: 120 } },
+      { type: 'message-queue', name: 'SQS Queue', position: { x: 500, y: 180 } },
+      { type: 'monitoring', name: 'CloudWatch', position: { x: 700, y: 120 } },
+    ];
+    return {
+      name: 'Serverless Architecture',
+      description: 'Event-driven serverless with functions and managed services',
+      components,
+      annotations: [
+        { text: 'Event Sources → Lambda → Storage/Queues', position: { x: 120, y: 60 } },
+      ],
+      connections: [
+        { from: 'api-gateway', to: 'auth-lambda' },
+        { from: 'api-gateway', to: 'orders-lambda' },
+        { from: 'orders-lambda', to: 'dynamodb' },
+        { from: 'payments-lambda', to: 'sqs-queue' },
+      ]
+    } as DesignData;
+  }
+
+  private createDistributedSystem(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'cqrs', name: 'CQRS', position: { x: 120, y: 40 } },
+      { type: 'microservice', name: 'Command Service', position: { x: 120, y: 120 } },
+      { type: 'microservice', name: 'Query Service', position: { x: 120, y: 200 } },
+      { type: 'event-sourcing', name: 'Event Store', position: { x: 320, y: 120 } },
+      { type: 'database', name: 'Read Model', position: { x: 520, y: 200 } },
+      { type: 'server', name: 'Saga Orchestrator', position: { x: 320, y: 40 } },
+      { type: 'cache', name: 'Distributed Cache', position: { x: 520, y: 120 } },
+    ];
+    return {
+      name: 'Distributed CQRS System',
+      description: 'CQRS + Event Sourcing with orchestrator and caches',
+      components,
+      annotations: [
+        { text: 'Commands → Events → Projections', position: { x: 320, y: 10 } },
+      ],
+      connections: [
+        { from: 'command-service', to: 'event-store' },
+        { from: 'event-store', to: 'read-model' },
+        { from: 'saga-orchestrator', to: 'command-service' },
+      ]
+    } as DesignData;
+  }
+
+  // ---------------------
+  // Legacy fixtures
+  // ---------------------
+  private addLegacyFixtures(): void {
+    const mainframe = this.createMainframeBridge();
+    this.fixtures.set('legacy-mainframe-bridge', mainframe);
+    this.fixtureCategories.set('legacy-mainframe-bridge', 'legacy');
+    this.fixtureMetadata.set('legacy-mainframe-bridge', {
+      name: 'legacy-mainframe-bridge',
+      category: 'legacy',
+      description: 'COBOL/DB2 integration with modern APIs',
+      componentCount: mainframe.components.length,
+      connectionCount: mainframe.connections?.length || 0,
+      tags: ['legacy', 'mainframe']
+    });
+
+    const ftp = this.createFtpIntegration();
+    this.fixtures.set('legacy-ftp-integration', ftp);
+    this.fixtureCategories.set('legacy-ftp-integration', 'legacy');
+    this.fixtureMetadata.set('legacy-ftp-integration', {
+      name: 'legacy-ftp-integration',
+      category: 'legacy',
+      description: 'File-based integration with FTP and batch processing',
+      componentCount: ftp.components.length,
+      connectionCount: ftp.connections?.length || 0,
+      tags: ['legacy', 'ftp']
+    });
+  }
+
+  private createMainframeBridge(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'server', name: 'Mainframe (COBOL)', position: { x: 100, y: 100 } },
+      { type: 'database', name: 'DB2', position: { x: 100, y: 180 } },
+      { type: 'message-queue', name: 'MQ Series', position: { x: 100, y: 260 } },
+      { type: 'server', name: 'Batch Processing', position: { x: 100, y: 340 } },
+      { type: 'api-gateway', name: 'Modern API Gateway', position: { x: 360, y: 160 } },
+      { type: 'server', name: 'Transformation Service', position: { x: 240, y: 220 } },
+      { type: 'security', name: 'Authentication Bridge', position: { x: 240, y: 100 } },
+      { type: 'logging', name: 'Audit Service', position: { x: 520, y: 160 } },
+      { type: 'monitoring', name: 'Monitoring', position: { x: 680, y: 160 } },
+    ];
+    const annotations: AnnotationData[] = [
+      { text: 'Legacy Zone', position: { x: 80, y: 60 } },
+      { text: 'Bridge/Integration Layer', position: { x: 260, y: 60 } },
+    ];
+    return {
+      name: 'Mainframe Bridge',
+      description: 'Legacy mainframe integration with modern API wrapper',
+      components,
+      annotations,
+      connections: [
+        { from: 'mainframe-(cobol)', to: 'transformation-service' },
+        { from: 'transformation-service', to: 'modern-api-gateway' },
+        { from: 'authentication-bridge', to: 'modern-api-gateway' },
+        { from: 'modern-api-gateway', to: 'audit-service' },
+      ]
+    } as DesignData;
+  }
+
+  private createFtpIntegration(): DesignData {
+    const components: ComponentData[] = [
+      { type: 'server', name: 'FTP Server', position: { x: 100, y: 120 } },
+      { type: 'server', name: 'File Watcher', position: { x: 260, y: 120 } },
+      { type: 'server', name: 'Batch Processor', position: { x: 420, y: 120 } },
+      { type: 'server', name: 'Transformation Service', position: { x: 580, y: 120 } },
+      { type: 'server', name: 'Error Handler', position: { x: 740, y: 120 } },
+      { type: 'message-queue', name: 'Notification Service', position: { x: 900, y: 120 } },
+      { type: 'storage', name: 'Archive Storage', position: { x: 740, y: 200 } },
+      { type: 'monitoring', name: 'Monitoring', position: { x: 900, y: 200 } },
+    ];
+    return {
+      name: 'FTP Integration',
+      description: 'File-based integration with error handling and notifications',
+      components,
+      annotations: [
+        { text: 'Pickup → Process → Transform → Deliver', position: { x: 200, y: 80 } },
+      ],
+      connections: [
+        { from: 'ftp-server', to: 'file-watcher' },
+        { from: 'file-watcher', to: 'batch-processor' },
+        { from: 'batch-processor', to: 'transformation-service' },
+        { from: 'transformation-service', to: 'error-handler' },
+        { from: 'error-handler', to: 'notification-service' },
+      ]
+    } as DesignData;
+  }
+
+  // ---------------------
+  // Benchmark fixtures
+  // ---------------------
+  private addBenchmarkFixtures(): void {
+    const b100 = this.createBenchmark(100, 'Benchmark 100');
+    this.fixtures.set('benchmark-100', b100);
+    this.fixtureCategories.set('benchmark-100', 'benchmark');
+    this.fixtureMetadata.set('benchmark-100', {
+      name: 'benchmark-100',
+      category: 'benchmark',
+      description: '100 components baseline performance test',
+      componentCount: 100,
+      tags: ['benchmark']
+    });
+
+    const b250 = this.createBenchmark(250, 'Benchmark 250');
+    this.fixtures.set('benchmark-250', b250);
+    this.fixtureCategories.set('benchmark-250', 'benchmark');
+    this.fixtureMetadata.set('benchmark-250', {
+      name: 'benchmark-250',
+      category: 'benchmark',
+      description: '250 components stress test',
+      componentCount: 250,
+      tags: ['benchmark']
+    });
+
+    const b500 = this.createBenchmark(500, 'Benchmark 500');
+    this.fixtures.set('benchmark-500', b500);
+    this.fixtureCategories.set('benchmark-500', 'benchmark');
+    this.fixtureMetadata.set('benchmark-500', {
+      name: 'benchmark-500',
+      category: 'benchmark',
+      description: '500 components maximum load test',
+      componentCount: 500,
+      tags: ['benchmark']
+    });
+  }
+
+  private createBenchmark(count: number, title: string): DesignData {
+    const components: ComponentData[] = [];
+    const cols = 20;
+    const spacingX = 80;
+    const spacingY = 70;
+    for (let i = 0; i < count; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const type = i % 5 === 0 ? 'server' : i % 5 === 1 ? 'database' : i % 5 === 2 ? 'cache' : i % 5 === 3 ? 'api-gateway' : 'microservice';
+      const label = `${type}-${i + 1}`;
+      components.push({
+        type,
+        name: label,
+        position: { x: 80 + col * spacingX, y: 80 + row * spacingY },
+      });
+    }
+    return {
+      name: title,
+      description: `${count} components in optimized grid layout`,
+      components,
+      annotations: [
+        { text: `Benchmark template: ${count} components`, position: { x: 60, y: 40 } },
+      ],
+    };
   }
 
   public getFixture(name: string): DesignData | undefined {
@@ -232,6 +786,31 @@ export class TestDataManager {
 
   public getAllFixtures(): Map<string, DesignData> {
     return new Map(this.fixtures);
+  }
+
+  public getFixturesByCategory(category: FixtureCategory | string): Array<{ key: string; data: DesignData }> {
+    const results: Array<{ key: string; data: DesignData }> = [];
+    for (const [key, data] of this.fixtures.entries()) {
+      const cat = this.fixtureCategories.get(key);
+      if (cat === (category as FixtureCategory)) {
+        results.push({ key, data });
+      }
+    }
+    return results;
+  }
+
+  public getFixtureMetadata(name: string): FixtureMetadata | undefined {
+    return this.fixtureMetadata.get(name);
+  }
+
+  public validateFixtureIntegrity(design: DesignData): { valid: boolean; missingTypes: string[] } {
+    // Source from app palette component icon map for DRY list of types
+    const knownTypes = new Set<string>(Object.keys(componentIconMap));
+    // Stopgap: include planned/common types that may appear in tests/templates
+    ['sqs', 'sns', 'kinesis', 'serverless', 'kafka', 'rabbitmq'].forEach(t => knownTypes.add(t));
+
+    const missing = Array.from(new Set(design.components.map(c => c.type))).filter(t => !knownTypes.has(t));
+    return { valid: missing.length === 0, missingTypes: missing };
   }
 
   public createRandomDesign(componentCount: number = 5): DesignData {
@@ -278,17 +857,33 @@ export class TestDataManager {
     // Wait for canvas to be ready
     await canvas.waitFor({ state: 'visible' });
 
+    if ((design.components?.length || 0) >= 200) {
+      await TestUtils.zoomOut(page, 3);
+      await page.waitForTimeout(200);
+    }
+
     // Add components
     for (const component of design.components) {
       const paletteItem = page.locator(`[data-testid="palette-item-${component.type}"]`).first();
+      await TestUtils.retryOperation(async () => {
+        if (!(await paletteItem.isVisible())) throw new Error(`Palette item not visible: ${component.type}`);
+        const before = await page.locator('.react-flow__node').count();
+        await paletteItem.dragTo(canvas, { targetPosition: component.position });
+        await page.waitForTimeout(150);
+        const after = await page.locator('.react-flow__node').count();
+        if (after <= before) throw new Error(`Drop did not add node for ${component.type}`);
+      }, 3, 250);
 
-      if (await paletteItem.isVisible()) {
-        await paletteItem.dragTo(canvas, {
-          targetPosition: component.position,
-        });
-
-        // Brief pause to allow rendering
-        await page.waitForTimeout(200);
+      if (component.name) {
+        try {
+          await canvas.click({ position: component.position });
+          const labelInput = page.getByPlaceholder('Enter component label...');
+          await labelInput.waitFor({ state: 'visible', timeout: 2000 });
+          await labelInput.fill(component.name);
+          await page.waitForTimeout(50);
+        } catch (e) {
+          console.warn(`Unable to set label for ${component.type}: ${(e as Error).message}`);
+        }
       }
     }
 
@@ -311,13 +906,21 @@ export class TestDataManager {
   }
 
   public async verifyDesignOnCanvas(page: Page, design: DesignData): Promise<boolean> {
-    // Verify components
+    // Verify components (case-insensitive; accept provided name or display name)
     for (const component of design.components) {
-      const componentName = component.name || this.getComponentDisplayName(component.type);
-      const node = page.locator('.react-flow__node').filter({ hasText: componentName });
+      const candidates = Array.from(new Set([
+        component.name?.trim(),
+        this.getComponentDisplayName(component.type).trim(),
+      ].filter(Boolean) as string[]));
 
-      if ((await node.count()) === 0) {
-        console.log(`Component ${componentName} not found on canvas`);
+      let found = false;
+      for (const cand of candidates) {
+        const pattern = new RegExp(cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        const node = page.locator('.react-flow__node').filter({ hasText: pattern });
+        if ((await node.count()) > 0) { found = true; break; }
+      }
+      if (!found) {
+        console.log(`Component not found (type=${component.type}, tried=${candidates.join(' | ')})`);
         return false;
       }
     }
@@ -336,15 +939,8 @@ export class TestDataManager {
   }
 
   private getComponentDisplayName(type: string): string {
-    const displayNames: Record<string, string> = {
-      server: 'Server',
-      database: 'Database',
-      cache: 'Cache',
-      'api-gateway': 'Api gateway',
-      'load-balancer': 'Load balancer',
-    };
-
-    return displayNames[type] || type;
+    // Humanize type for comparison; verification uses case-insensitive match
+    return type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 
   public async exportDesignData(page: Page): Promise<any> {
@@ -668,6 +1264,50 @@ export class TestUtils {
 
       return metrics;
     });
+  }
+
+  // Zoom-out helper to improve benchmark drop reliability
+  public static async zoomOut(page: Page, steps: number = 2): Promise<void> {
+    for (let i = 0; i < steps; i++) {
+      try {
+        await page.keyboard.down('Control');
+        await page.keyboard.press('-');
+        await page.keyboard.up('Control');
+      } catch {}
+      try {
+        await page.keyboard.down('Meta');
+        await page.keyboard.press('-');
+        await page.keyboard.up('Meta');
+      } catch {}
+      await page.waitForTimeout(50);
+    }
+  }
+
+  public static async ensurePointClickable(page: Page, selector: string, position: { x: number; y: number }): Promise<void> {
+    const el = page.locator(selector);
+    await el.scrollIntoViewIfNeeded().catch(() => {});
+    await el.hover({ position }).catch(() => {});
+  }
+
+  // Convert app-level templates to simplified E2E structure
+  public static convertAppTemplateToE2E(template: AppDesignData): DesignData {
+    const components: ComponentData[] = template.components.map(c => ({
+      type: c.type,
+      name: c.label,
+      position: { x: Math.round(c.x), y: Math.round(c.y) },
+    }));
+    const annotations: AnnotationData[] = (template.infoCards || []).map(card => ({
+      text: card.content,
+      position: { x: card.x, y: card.y },
+    }));
+    const connections = (template.connections || []).map(conn => ({ from: conn.from, to: conn.to, type: conn.type }));
+    return {
+      name: (template.metadata?.description as string) || 'Template',
+      description: (template.metadata?.description as string) || '',
+      components,
+      annotations,
+      connections,
+    };
   }
 }
 

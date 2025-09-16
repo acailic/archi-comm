@@ -474,3 +474,54 @@ Multi-session tests require special consideration in CI/CD:
 - **Retrospectives**: Regular testing effectiveness analysis
 
 This strategic approach ensures ArchiComm maintains high quality standards while enabling rapid development and deployment cycles.
+
+## Template Testing Strategy
+
+### Template Categories
+
+- Industry Templates: E-commerce, Fintech, Healthcare, Gaming — realistic workflows and domain validation
+- Scalability Templates: Microservices (50+), Serverless, Distributed CQRS, High Availability — performance and scale validation
+- Legacy Integration: Mainframe Bridge, FTP Integration, Database Modernization, Strangler Fig, Hybrid, Legacy Monitoring — integration and migration validation
+- Performance Benchmarks: 100, 250, 500 component templates — stress and performance measurement
+
+### Validation Approach
+
+- Integrity checks: All component types must exist in ComponentPalette
+- Metadata completeness: Name, category, component/connectivity counts, tags
+- Render safety: All templates apply to canvas without errors
+- Performance targets: < 10s for 100 components, < 30s for 500 components; virtualization verified on large graphs
+
+### Fixture Management and E2E Integration
+
+- Centralized fixtures via TestDataManager with categories: industry, scalability, legacy, benchmark
+- Programmatic generation for large templates (100–500 components)
+- E2E utilities: TestUtils.waitForStableCanvas(), TestUtils.measureOperationTime()
+- Palette interaction using data-testid selectors: `palette-item-${type}`
+
+### Execution Guides
+
+- Template validation suite: `npm run test:e2e -- template-validation.spec.ts`
+- Industry workflows: `npm run test:e2e -- industry-specific-tests.spec.ts`
+- Scalability and benchmarks: `npm run test:e2e -- scalability-patterns.spec.ts --grep @stress`
+- Legacy integration: `npm run test:e2e -- legacy-integration.spec.ts`
+
+### Template Development Guidelines
+
+- Use existing component types from ComponentPalette; validate via integrity checks
+- Positioning strategies: grid (benchmarks), layered (industry), workflow-based (legacy)
+- Connections reflect real data/API/event flows; info cards document domain nuances
+- Metadata: complexity, estimatedTime, componentCount, connectionCount, tags, description
+
+### Performance Testing Guidelines
+
+- Targets: < 10s (100 components), < 30s (500 components)
+- Validate virtualization on large templates; observe memory footprint via Performance APIs
+- Capture screenshots for visual baselines of complex layouts
+- Track regressions by comparing operation timings over time
+
+### Maintenance and CI
+
+- Version and tag templates; update metadata on changes
+- Validate integrity in CI; include @stress group as optional matrix
+- Deprecate templates with clear migration guidance
+- Share templates for demos and video scenarios; ensure multi-session compatibility

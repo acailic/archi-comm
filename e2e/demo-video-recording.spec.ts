@@ -82,7 +82,10 @@ test.describe('Demo Video Recording', () => {
       await videoHelpers.smoothPause(800);
     }
 
-    // 5. Annotation Demo (40-55s)
+    // 5. Connections and Annotation Demo (40-55s)
+    await videoHelpers.connectByLabels('Load Balancer', 'Server');
+    await videoHelpers.connectByLabels('Server', 'Database');
+    await videoHelpers.connectByLabels('Cache', 'Server');
     await videoHelpers.addAnnotation('Add explanatory notes anywhere', { x: 960, y: 150 }, 1500);
 
     await videoHelpers.addAnnotation('High-performance web architecture', { x: 300, y: 400 }, 1500);
@@ -374,12 +377,13 @@ test.describe('Demo Video Recording', () => {
   });
 
   test('Instagram Stories Architecture Demo', async ({ page, context }) => {
+    test.setTimeout(240_000);
     const helpers = createHelpers(page);
     const videoHelpers = createVideoHelpers(page, context);
 
     await videoHelpers.startRecording('instagram-stories-architecture', {
-      quality: 'high',
-      frameRate: 30,
+      quality: 'ultra',
+      frameRate: 60,
       showCursor: true,
       highlightClicks: true
     });
@@ -411,7 +415,25 @@ test.describe('Demo Video Recording', () => {
     await videoHelpers.smoothDragComponent('message-queue', 1200, 320, 'Queue');
     await videoHelpers.smoothDragComponent('server', 1000, 320, 'Worker');
 
-    // Annotations
+    // Ensure everything is in view
+    await helpers.canvas.resetZoom();
+    await videoHelpers.smoothPause(400);
+    // Connections
+    await videoHelpers.tryConnectByLabels('CDN', 'API Gateway');
+    await videoHelpers.tryConnectByLabels('API Gateway', 'Load Balancer');
+    await videoHelpers.tryConnectByLabels('Load Balancer', 'Web Server');
+    await videoHelpers.tryConnectByLabels('Load Balancer', 'App Server');
+    await videoHelpers.tryConnectByLabels('App Server', 'Stories Service');
+    await videoHelpers.tryConnectByLabels('Stories Service', 'Filter Service');
+    await videoHelpers.tryConnectByLabels('Stories Service', 'Transcoder');
+    await videoHelpers.tryConnectByLabels('Filter Service', 'Object Storage');
+    await videoHelpers.tryConnectByLabels('Transcoder', 'Object Storage');
+    await videoHelpers.tryConnectByLabels('Stories Service', 'Redis Cache');
+    await videoHelpers.tryConnectByLabels('Stories Service', 'Metadata DB');
+
+    // Region highlight and annotations
+    await videoHelpers.drawRegion(180, 120, 520, 80, 'Edge & Ingress', 1500);
+    await videoHelpers.drawRegion(960, 80, 480, 180, 'Media Processing', 1500);
     await videoHelpers.addAnnotation('Edge → API → LB → App/Stories', { x: 700, y: 80 }, 1800);
     await videoHelpers.addAnnotation('Filters/Transcode → Store in Object Storage', { x: 1320, y: 90 }, 2000);
     await videoHelpers.addAnnotation('Hot paths cached in Redis', { x: 1400, y: 240 }, 1500);
@@ -423,12 +445,13 @@ test.describe('Demo Video Recording', () => {
   });
 
   test('Ad Click Aggregation Architecture Demo', async ({ page, context }) => {
+    test.setTimeout(240_000);
     const helpers = createHelpers(page);
     const videoHelpers = createVideoHelpers(page, context);
 
     await videoHelpers.startRecording('ad-click-aggregation', {
-      quality: 'high',
-      frameRate: 30,
+      quality: 'ultra',
+      frameRate: 60,
       showCursor: true,
       highlightClicks: true
     });
@@ -466,7 +489,26 @@ test.describe('Demo Video Recording', () => {
     await videoHelpers.smoothDragComponent('elasticsearch', 1460, 160, 'OLAP Store');
     await videoHelpers.smoothDragComponent('kibana', 1640, 160, 'BI Dashboard');
 
-    // Annotations for flow
+    // Ensure everything is in view
+    await helpers.canvas.resetZoom();
+    await videoHelpers.smoothPause(400);
+    // Connections
+    await videoHelpers.tryConnectByLabels('Web Client', 'Ingestion API');
+    await videoHelpers.tryConnectByLabels('Mobile Client', 'Ingestion API');
+    await videoHelpers.tryConnectByLabels('Ingestion API', 'Kafka Broker');
+    await videoHelpers.tryConnectByLabels('Kafka Broker', 'Click Events Topic');
+    await videoHelpers.tryConnectByLabels('Click Events Topic', 'Stream Processor');
+    await videoHelpers.tryConnectByLabels('Stream Processor', 'ETL/Enrichment');
+    await videoHelpers.tryConnectByLabels('Stream Processor', 'Data Lake');
+    await videoHelpers.tryConnectByLabels('ETL/Enrichment', 'Data Warehouse');
+    await videoHelpers.tryConnectByLabels('Data Warehouse', 'OLAP Store');
+    await videoHelpers.tryConnectByLabels('OLAP Store', 'BI Dashboard');
+
+    // Regions and annotations
+    await videoHelpers.drawRegion(180, 110, 320, 140, 'Producers', 1500);
+    await videoHelpers.drawRegion(400, 140, 460, 120, 'Ingestion & Broker', 1500);
+    await videoHelpers.drawRegion(980, 110, 320, 160, 'Processing & ETL', 1500);
+    await videoHelpers.drawRegion(1220, 110, 480, 160, 'Storage & Analytics', 1500);
     await videoHelpers.addAnnotation('Producers → API → Kafka Topic', { x: 620, y: 100 }, 1800);
     await videoHelpers.addAnnotation('Stream processing aggregates clicks', { x: 1040, y: 100 }, 1800);
     await videoHelpers.addAnnotation('Batch/ETL to Warehouse, raw to Data Lake', { x: 1240, y: 300 }, 2000);

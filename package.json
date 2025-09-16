@@ -171,7 +171,7 @@
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:ci": "playwright install --with-deps && playwright test",
-    "e2e:demo-videos": "DEMO_MODE=true playwright test --project='Demo - Desktop HD'",
+    "e2e:demo-videos": "DEMO_MODE=true playwright test --project='demo-videos' --workers=1",
     "e2e:demo-videos-mobile": "DEMO_MODE=true playwright test --project='Demo - Mobile'",
     "e2e:demo-videos-collab": "DEMO_MODE=true playwright test --project='Demo - Desktop HD'",
     "demo:generate": "node scripts/generate-demo-videos.js all",
