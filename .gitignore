@@ -354,16 +354,50 @@ local.config.*
 dev.config.*
 *.local.*
 
+# Local development documentation (ignored by git)
+docs/development/
+docs/development/**
+
+# Development-specific files (kept local only)
+TODO.md
+CLAUDE.md
 ideas/
+.local/
+*.local.*
+dev-notes/
+brainstorming/
+scratch/
+temp-*
+draft-*
+notes.md
+development.md
+dev.md
+
+# Personal development files
+.personal/
+personal-*
+my-*
+local-*
+
+# Video processing and demos (existing patterns preserved)
 e2e/demo-videos/
 e2e/processed-videos/
 e2e/session-states/
 
-
-# Scripts
+# Scripts (existing patterns preserved)
 scripts/generate-demo-videos.js
 e2e/utils/video-helpers.ts
 e2e/utils/video-processor.ts
 e2e/utils/demo-scenarios.ts
 e2e/utils/global-setup.ts
 e2e/scripts/generate-demo-videos.ts
+
+# Distribution files (consider moving these to separate repo)
+Casks/
+Formula/
+distribution/homebrew/
+
+# Development tools and temporary files
+tools/temp/
+tools/scratch/
+tools/local/
