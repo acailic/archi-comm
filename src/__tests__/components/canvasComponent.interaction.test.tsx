@@ -3,7 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DesignComponent } from '@/shared/contracts';
-import { CustomNode, type CustomNodeData } from '@/features/canvas/components/CustomNode';
+import { CustomNode, type CustomNodeData } from '@canvas/components/CustomNode';
 
 const baseComponent: DesignComponent = {
   id: 'c1',

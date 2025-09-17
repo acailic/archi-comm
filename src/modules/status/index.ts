@@ -1,2 +1,2 @@
-export { StatusBar } from '@/components/StatusBar';
-export { WindowControls } from '@/components/WindowControls';
+export { StatusBar } from '@ui/components/StatusBar';
+export { WindowControls } from '@ui/components/WindowControls';

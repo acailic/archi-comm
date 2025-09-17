@@ -1,2 +1,2 @@
-export { ChallengeSelection } from '@/components/ChallengeSelection';
-export { ChallengeManager } from '@/components/ChallengeManager';
+export { ChallengeSelection } from '@ui/components/ChallengeSelection';
+export { ChallengeManager } from '@ui/components/ChallengeManager';

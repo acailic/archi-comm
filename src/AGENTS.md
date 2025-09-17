@@ -19,7 +19,7 @@
 ## Coding Style & Naming
 
 - Language: TypeScript, React function components; prefer small, composable components.
-- Naming: Components `PascalCase` (e.g., `ButtonPanel.tsx`), hooks `useX`, files live under the matching folder (`src/components/Foo/`), non-React utilities `camelCase.ts` in `src/lib/`.
+- Naming: Components `PascalCase` (e.g., `ButtonPanel.tsx`), hooks `useX`, files live under the matching folder (`src/packages/ui/components/Foo/`), non-React utilities `camelCase.ts` in `src/lib/`.
 - Formatting: 2-space indent, consistent imports, keep files focused. No enforced ESLint/Prettier yet—match surrounding style.
 - UI: Use Radix UI primitives where possible; keep styles colocated and reusable (utility classes in `index.css`).
 

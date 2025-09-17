@@ -12,9 +12,9 @@ import {
   type IPersistenceService,
   type IAudioService,
 } from './ServiceInterfaces';
-import { CanvasService } from '@/services/canvas/CanvasService';
-import { PersistenceService } from '@/services/canvas/PersistenceService';
-import { AudioService } from '@/services/audio/AudioService';
+import { CanvasService } from '@services/canvas/CanvasService';
+import { PersistenceService } from '@services/canvas/PersistenceService';
+import { AudioService } from '@services/audio/AudioService';
 
 /**
  * Service factory functions for dependency injection

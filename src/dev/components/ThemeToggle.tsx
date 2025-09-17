@@ -9,13 +9,13 @@ import React from 'react';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { ThemeMode } from '../types';
-import { Button } from '@/components/ui/button';
+import { Button } from '@ui/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@ui/components/ui/dropdown-menu';
 
 interface ThemeToggleProps {
   variant?: 'default' | 'ghost' | 'outline';

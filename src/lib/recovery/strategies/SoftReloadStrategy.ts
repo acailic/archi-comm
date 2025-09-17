@@ -5,8 +5,8 @@
 
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
-import { storage } from '../../../services/storage';
-import { CanvasPersistence } from '../../../services/canvas/CanvasPersistence';
+import { storage } from '@services/storage';
+import { CanvasPersistence } from '@services/canvas/CanvasPersistence';
 import { logger } from '../../logger';
 
 export class SoftReloadStrategy implements RecoveryStrategy {

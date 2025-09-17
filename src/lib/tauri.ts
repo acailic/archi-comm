@@ -8,7 +8,7 @@ import {
 } from '@tauri-apps/api/notification';
 import { writeTextFile, writeBinaryFile, createDir, readBinaryFile } from '@tauri-apps/api/fs';
 import { appDataDir, join } from '@tauri-apps/api/path';
-import type { Project, Component, DiagramElement, Connection } from '../services/tauri';
+import type { Project, Component, DiagramElement, Connection } from '@services/tauri';
 import type { TranscriptionResponse, TranscriptionOptions } from '../shared/contracts';
 import { isTauriEnvironment } from './environment';
 // Domain types are centralized in services/tauri
@@ -124,7 +124,7 @@ export const fileUtils = {
 
 // Re-export canonical domain types from services/tauri
 // Prefer importing these types from '../services/tauri'
-export type { Project, Component, DiagramElement, Connection } from '../services/tauri';
+export type { Project, Component, DiagramElement, Connection } from '@services/tauri';
 
 // Project management utilities (matching actual Rust backend commands)
 export const projectUtils = {

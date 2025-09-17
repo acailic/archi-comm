@@ -10,7 +10,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import userEvent from '@testing-library/user-event';
 import { ServiceProvider } from '@/lib/di/ServiceProvider';
 import { createContainer, createToken } from '@/lib/di/Container';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@ui/components/ui/tooltip';
 
 // Types for test data structures
 export interface TestComponent {
@@ -73,9 +73,7 @@ export function renderWithProviders(
     const providers = (
       <DndProvider backend={HTML5Backend}>
         <ServiceProvider container={testContainer as any}>
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
+          {children}
         </ServiceProvider>
       </DndProvider>
     );

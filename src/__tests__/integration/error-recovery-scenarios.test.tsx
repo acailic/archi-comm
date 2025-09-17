@@ -8,13 +8,13 @@ import { screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, AssertionHelpers, MockHelpers } from '../../test/integration-helpers';
 import { errorStore, addError, addReactError, addNetworkError, addPerformanceError } from '../../lib/errorStore';
-import { DesignCanvas } from '../../components/DesignCanvas';
-import { ChallengeSelection } from '../../components/ChallengeSelection';
+import { DesignCanvas } from '@ui/components/DesignCanvas';
+import { ChallengeSelection } from '@ui/components/ChallengeSelection';
 import type { Challenge, DesignData } from '../../shared/contracts';
 
 // Hoisted storage mock so module mocking is applied consistently
 const recoveryStorageMock: any = {};
-vi.mock('@/services/storage', () => ({
+vi.mock('@services/storage', () => ({
   storage: recoveryStorageMock,
 }));
 

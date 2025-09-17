@@ -1,1 +1,1 @@
-export { AudioRecording } from '@/components/AudioRecording';
+export { AudioRecording } from '@ui/components/AudioRecording';

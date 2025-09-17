@@ -17,12 +17,14 @@ build/
 .vite-cache/
 vite.config.ts.timestamp-*
 
-# Generated files
+# macOS artifacts
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
+
+# Windows artifacts
 ehthumbs.db
 Thumbs.db
 
@@ -110,10 +112,6 @@ temp/
 # Rust
 target/
 Cargo.lock
-
-# OS
-.DS_Store
-Thumbs.db
 
 # Claude/AI specific
 .claude-flow/

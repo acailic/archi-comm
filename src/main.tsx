@@ -536,7 +536,7 @@ function loadAndRenderApp() {
   loadLogger.info('Starting application initialization with DI support');
 
   // Load the App component, then try to initialize DI and render with provider
-  import('./components/AppContainer')
+  import('@ui/components/AppContainer')
     .then((appModule) => {
       const AppComponent = appModule.default;
       return initializeDIContainer()
@@ -559,7 +559,7 @@ function loadAndRenderApp() {
         userActions: ['Application loading', 'Dynamic import'],
         additionalData: {
           phase: 'app-import',
-          importPath: './components/AppContainer',
+          importPath: '@ui/components/AppContainer',
         },
       });
 

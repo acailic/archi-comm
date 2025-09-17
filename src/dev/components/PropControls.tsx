@@ -7,22 +7,22 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Copy, RotateCcw, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { ControlsConfig, ControlDefinition, ValidationResult, PropChangeEvent } from '../types';
 import { validatePropChange, mergePropsWithDefaults } from '../utils/propValidation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@ui/components/ui/button';
+import { Input } from '@ui/components/ui/input';
+import { Label } from '@ui/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { Slider } from '@/components/ui/slider';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+} from '@ui/components/ui/select';
+import { Switch } from '@ui/components/ui/switch';
+import { Textarea } from '@ui/components/ui/textarea';
+import { Slider } from '@ui/components/ui/slider';
+import { Card, CardContent, CardHeader, CardTitle } from '@ui/components/ui/card';
+import { Badge } from '@ui/components/ui/badge';
+import { Separator } from '@ui/components/ui/separator';
 
 interface PropControlsProps {
   scenarioId: string;

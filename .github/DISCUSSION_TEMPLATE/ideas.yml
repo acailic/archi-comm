@@ -1,0 +1,83 @@
+title: "Idea: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for sharing your idea! Please fill out this template to help us understand and evaluate your suggestion.
+
+  - type: textarea
+    id: idea-description
+    attributes:
+      label: Idea Description
+      description: Please describe your feature or improvement idea in detail
+      placeholder: "Explain what you'd like to see in ArchiComm..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement or Use Case
+      description: What problem does this solve? What use case does it address?
+      placeholder: "This feature would help when..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target-users
+    attributes:
+      label: Target Users
+      description: Who would benefit most from this feature?
+      multiple: true
+      options:
+        - Developers
+        - End Users
+        - Contributors
+        - Educators
+        - Students
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Suggestions
+      description: Do you have ideas about how this could be implemented?
+      placeholder: "Consider..."
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Potential Impact
+      description: How might this affect existing functionality?
+      placeholder: "This could impact..."
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and Prerequisites
+      description: Are there any dependencies or prerequisites for this feature?
+      placeholder: "Would require..."
+
+  - type: textarea
+    id: feedback-needed
+    attributes:
+      label: Areas Needing Community Input
+      description: What specific aspects would you like community feedback on?
+      placeholder: "Looking for input on..."
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Approaches
+      description: Are there alternative ways to solve this problem?
+      placeholder: "Other potential solutions..."
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related Features or Issues
+      description: Link to related features, issues, or discussions
+      placeholder: "Related to #..."

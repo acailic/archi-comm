@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { aiConfigService } from '../lib/services/AIConfigService';
+import { aiConfigService } from '@/lib/services/AIConfigService';
 import {
   AIConfig,
   ConnectionTestResult,

@@ -5,8 +5,8 @@
 
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
-import { CanvasPersistence } from '../../../services/canvas/CanvasPersistence';
-import { storage } from '../../../services/storage';
+import { CanvasPersistence } from '@services/canvas/CanvasPersistence';
+import { storage } from '@services/storage';
 import { logger } from '../../logger';
 
 export class AutoSaveStrategy implements RecoveryStrategy {

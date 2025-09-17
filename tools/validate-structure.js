@@ -30,6 +30,7 @@ const legacyConfigFiles = [
   'playwright.config.ts',
   'tsconfig.json',
   'vite.config.ts',
+  'src/vite.config.ts',
   'sonar-project.properties'
 ];
 

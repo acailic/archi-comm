@@ -10,7 +10,7 @@ import {
   ShortcutConfig,
 } from '../lib/shortcuts/KeyboardShortcuts';
 import { isTauriEnvironment, DEBUG, FEATURES } from '../lib/environment';
-import { webNotificationManager } from '../services/web-fallback';
+import { webNotificationManager } from '@services/web-fallback';
 
 export interface GlobalShortcutHandlers {
   onCommandPalette?: () => void;

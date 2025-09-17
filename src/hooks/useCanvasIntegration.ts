@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAutoSave } from './useAutoSave';
 import { CanvasPerformanceManager, type CanvasPerformanceConfig } from '@/lib/performance/CanvasPerformanceManager';
-import { useCanvas } from '@/services/canvas/CanvasOrchestrator';
+import { useCanvas } from '@services/canvas/CanvasOrchestrator';
 
 interface UseCanvasIntegrationOptions {
   canvasId: string;
@@ -76,7 +76,7 @@ export function useCanvasIntegration(options: UseCanvasIntegrationOptions): UseC
   const performanceListenerRef = useRef<((event: string, data: any) => void) | null>(null);
   const metricsIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-save integration
+  // Auto-save integration with debouncing to prevent excessive calls
   const createSaveData = useCallback(() => {
     return {
       components: orchestrator.components,
@@ -92,8 +92,16 @@ export function useCanvasIntegration(options: UseCanvasIntegrationOptions): UseC
     };
   }, [orchestrator, canvasId]);
 
+  // Use a ref to prevent createSaveData from causing re-renders
+  const saveDataRef = useRef(createSaveData());
+
+  // Update save data ref only when necessary
+  useEffect(() => {
+    saveDataRef.current = createSaveData();
+  }, [createSaveData]);
+
   const { forceSave, isSaving, status: saveStatus } = useAutoSave(
-    enableAutoSave ? createSaveData() : null,
+    enableAutoSave ? saveDataRef.current : null,
     async (data) => {
       // This would typically save through a persistence service
       console.log('Auto-saving canvas data:', data);
@@ -153,13 +161,20 @@ export function useCanvasIntegration(options: UseCanvasIntegrationOptions): UseC
       console.error('Failed to initialize CanvasPerformanceManager:', error);
       handleError(error instanceof Error ? error : new Error('Performance manager initialization failed'));
     }
-  }, [enablePerformanceMonitoring, performanceConfig]);
+  }, [enablePerformanceMonitoring, JSON.stringify(performanceConfig)]);
 
-  // Set up metrics monitoring
+  // Set up metrics monitoring with throttling to prevent excessive updates
   useEffect(() => {
     if (!performanceManager || !enablePerformanceMonitoring) return;
 
+    let lastUpdateTime = 0;
+    const THROTTLE_MS = 1000; // Update metrics at most once per second
+
     const updateMetrics = () => {
+      const now = Date.now();
+      if (now - lastUpdateTime < THROTTLE_MS) return;
+      lastUpdateTime = now;
+
       try {
         const aggregated = performanceManager.getAggregatedMetrics();
         setState(prev => ({
@@ -173,7 +188,7 @@ export function useCanvasIntegration(options: UseCanvasIntegrationOptions): UseC
       }
     };
 
-    // Update metrics every second
+    // Update metrics every second, but throttled
     metricsIntervalRef.current = setInterval(updateMetrics, 1000);
 
     return () => {

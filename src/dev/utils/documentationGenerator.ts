@@ -1,6 +1,6 @@
 // src/dev/utils/documentationGenerator.ts
 // Documentation generator: extracts component API and usage from scenarios
-// RELEVANT FILES: ../scenarios.ts, ../types.ts, ../../components/ui/*
+// RELEVANT FILES: ../scenarios.ts, ../types.ts, @ui/components/ui/*
 
 import { z } from 'zod';
 import type {
@@ -296,7 +296,7 @@ export function generateComponentDocumentation(
   componentName: string,
   options?: DocumentationConfig & { scenarios?: EnhancedScenario[]; componentSource?: string; componentPath?: string }
 ): ComponentDocumentation {
-  const { scenarios = [], componentSource, componentPath = `src/components/ui/${componentName}.tsx` } = options ?? {};
+  const { scenarios = [], componentSource, componentPath = `src/packages/ui/components/ui/${componentName}.tsx` } = options ?? {};
   const api = extractComponentAPI(componentPath, componentSource);
   const examples = generateUsageExamples(scenarios);
   const best = identifyBestPractices(scenarios);

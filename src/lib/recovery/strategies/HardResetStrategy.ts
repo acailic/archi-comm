@@ -5,7 +5,7 @@
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
 import { logger } from '../../logger';
-import { designsStore } from '../../../services/storage';
+import { designsStore } from '@services/storage';
 
 export class HardResetStrategy implements RecoveryStrategy {
   public readonly name = 'hard-reset';
@@ -68,4 +68,3 @@ export class HardResetStrategy implements RecoveryStrategy {
     }
   }
 }
-

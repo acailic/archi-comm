@@ -1,7 +1,7 @@
 // src/dev/ScenarioViewer.tsx
 // Comprehensive development interface for viewing component scenarios in isolation
 // Provides live preview functionality with error boundaries and scenario navigation
-// RELEVANT FILES: ./types.ts, ./scenarios.ts, ../components/ui/sidebar.tsx, ../components/ui/card.tsx
+// RELEVANT FILES: ./types.ts, ./scenarios.ts, @ui/components/ui/sidebar.tsx, @ui/components/ui/card.tsx
 
 import React, { useState, useMemo, useCallback, useEffect, useRef, useReducer } from 'react';
 import { Search, AlertCircle, Play, Code2, Layers, Eye, EyeOff, Settings } from 'lucide-react';
@@ -17,11 +17,11 @@ import {
   SidebarGroupContent,
   SidebarProvider,
   SidebarInset,
-} from '../components/ui/sidebar';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
+} from '@ui/components/ui/sidebar';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@ui/components/ui/card';
+import { Button } from '@ui/components/ui/button';
+import { Input } from '@ui/components/ui/input';
+import { Badge } from '@ui/components/ui/badge';
 import { scenarios } from './scenarios';
 import type {
   Scenario,

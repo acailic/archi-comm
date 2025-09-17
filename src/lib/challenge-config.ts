@@ -892,6 +892,10 @@ export const defaultChallengeConfig: ChallengeConfig = {
 export class ChallengeManager {
   private config: ChallengeConfig;
   private customChallenges: ExtendedChallenge[] = [];
+  // Add caching for stable object references
+  private _allChallengesCache: ExtendedChallenge[] | null = null;
+  private _allChallengesCacheHash: string = '';
+  private _challengeByIdCache: Map<string, ExtendedChallenge> = new Map();
 
   constructor(config: ChallengeConfig = defaultChallengeConfig) {
     this.config = config;
@@ -1259,11 +1263,34 @@ export class ChallengeManager {
   // Add a custom challenge
   addCustomChallenge(challenge: ExtendedChallenge): void {
     this.customChallenges.push(challenge);
+    // Invalidate cache when data changes
+    this._allChallengesCache = null;
+    this._allChallengesCacheHash = '';
+    this._challengeByIdCache.clear();
   }
 
   // Get all challenges (built-in + custom) - optimized for frequent calls
+  // Returns stable object references when data hasn't changed
   getAllChallenges(): ExtendedChallenge[] {
-    return [...this.config.challenges, ...this.customChallenges];
+    // Create a hash to detect if the underlying data changed
+    const currentHash = `${this.config.challenges.length}:${this.customChallenges.length}:${this.config.version}`;
+
+    // Return cached result if data hasn't changed
+    if (this._allChallengesCache && this._allChallengesCacheHash === currentHash) {
+      return this._allChallengesCache;
+    }
+
+    // Rebuild cache with new data
+    this._allChallengesCache = [...this.config.challenges, ...this.customChallenges];
+    this._allChallengesCacheHash = currentHash;
+
+    // Also update the ID cache
+    this._challengeByIdCache.clear();
+    this._allChallengesCache.forEach(challenge => {
+      this._challengeByIdCache.set(challenge.id, challenge);
+    });
+
+    return this._allChallengesCache;
   }
 
   // Get challenge count for performance monitoring
@@ -1285,9 +1312,13 @@ export class ChallengeManager {
     return this.getAllChallenges().filter(challenge => challenge.difficulty === difficulty);
   }
 
-  // Get challenge by ID
+  // Get challenge by ID with caching for stable references
   getChallengeById(id: string): ExtendedChallenge | undefined {
-    return this.getAllChallenges().find(challenge => challenge.id === id);
+    // Ensure cache is up to date
+    this.getAllChallenges();
+
+    // Return from cache for stable reference
+    return this._challengeByIdCache.get(id);
   }
 
   // Search challenges
@@ -1310,6 +1341,10 @@ export class ChallengeManager {
   // Update configuration
   updateConfig(newConfig: Partial<ChallengeConfig>): void {
     this.config = { ...this.config, ...newConfig };
+    // Invalidate cache when config changes
+    this._allChallengesCache = null;
+    this._allChallengesCacheHash = '';
+    this._challengeByIdCache.clear();
   }
 
   // Export challenges to JSON (for Tauri file saving)
@@ -1327,13 +1362,23 @@ export class ChallengeManager {
     try {
       const data = JSON.parse(jsonData);
       if (data.challenges && Array.isArray(data.challenges)) {
+        let addedCount = 0;
         data.challenges.forEach((challenge: ExtendedChallenge) => {
           // Validate challenge structure
           if (this.validateChallenge(challenge)) {
-            this.addCustomChallenge(challenge);
+            this.customChallenges.push(challenge);
+            addedCount++;
           }
         });
-        return data.challenges.length;
+
+        // Only invalidate cache once after all additions
+        if (addedCount > 0) {
+          this._allChallengesCache = null;
+          this._allChallengesCacheHash = '';
+          this._challengeByIdCache.clear();
+        }
+
+        return addedCount;
       }
       return 0;
     } catch (error) {

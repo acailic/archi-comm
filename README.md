@@ -88,6 +88,10 @@ npm run dev        # for web development
 
 Build binaries: `npm run build` (creates signed Tauri bundles for your OS).
 
+### Package Manager
+
+We standardize on npm for dependency management. Commit updates to `package-lock.json` and avoid adding alternative lockfiles (`yarn.lock`, `pnpm-lock.yaml`). Vite's canonical configuration lives at `config/vite.config.ts`; update that file when changing dev server or build behavior.
+
 ### Auto-Updates
 ArchiComm includes an automatic update system that securely downloads and installs updates. You can:
 - Enable/disable automatic update checks in preferences
@@ -175,7 +179,7 @@ ArchiComm now supports multiple audio recording and transcription engines for ma
 ### Usage
 
 ```typescript
-import { createAudioManager } from './lib/audio';
+import { createAudioManager } from '@audio';
 
 // Initialize with automatic engine selection
 const audioManager = await createAudioManager({
@@ -363,6 +367,19 @@ Press `?` in the app for the full list.
 - Bundler/Dev: Vite
 - Testing: Vitest (unit/integration) + Playwright (E2E)
 - Canvas and interactions: custom canvas engine, Motion/Framer animations
+
+## Repository Layout
+
+- `config/` — centralised configuration for Vite, ESLint, Playwright, TypeScript, semantic-release, and Sonar
+- `docs/` — tracked docs; `docs/development/` is git-ignored for personal notes
+- `src/packages/core/` (`@core`) — domain primitives, shared types, and core business logic
+- `src/packages/ui/` (`@ui`) — component library and design system primitives for the desktop app
+- `src/packages/canvas/` (`@canvas`) — diagram engine, interactions, and canvas-specific utilities
+- `src/packages/services/` (`@services`) — integration services, gateways, and persistence adapters
+- `src/packages/audio/` (`@audio`) — audio capture, processing, and transcription pipeline
+- `src/hooks/`, `src/stores/`, `src/lib/` — shared hooks, Zustand stores, and utilities that complement the packages
+- `distribution/homebrew/` — Homebrew cask & formula definitions tracked with the repo
+- `tools/` — development scripts and structure validators (`npm run validate:structure`)
 
 Useful scripts:
 - `npm run dev` — web dev server (Vite)

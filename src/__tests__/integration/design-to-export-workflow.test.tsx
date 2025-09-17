@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, CanvasTestHelpers, AssertionHelpers, MockHelpers } from '../../test/integration-helpers';
-import { DesignCanvas } from '../../components/DesignCanvas';
+import { DesignCanvas } from '@ui/components/DesignCanvas';
 import type { DesignData, Challenge } from '../../shared/contracts';
 
 // Mock challenge data for testing
@@ -62,7 +62,7 @@ const createMockStorage = () => {
 
 // Hoisted storage mock module to avoid late doMock issues
 const storageMock: any = createMockStorage();
-vi.mock('@/services/storage', () => ({
+vi.mock('@services/storage', () => ({
   storage: storageMock,
 }));
 

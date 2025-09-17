@@ -1,0 +1,79 @@
+title: "Show and Tell: "
+labels: ["showcase"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share your ArchiComm project, customizations, or creative uses! Help inspire the community and showcase what's possible.
+
+  - type: textarea
+    id: project-overview
+    attributes:
+      label: Project Overview
+      description: Tell us about what you built with ArchiComm
+      placeholder: "I created..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: visual-showcase
+    attributes:
+      label: Screenshots or Demo
+      description: Share visuals of your work (images, videos, or links)
+      placeholder: "You can attach images by dragging and dropping them here..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: architecture
+    attributes:
+      label: Architecture and Design
+      description: Share your system design or architectural decisions
+      placeholder: "The architecture consists of..."
+
+  - type: textarea
+    id: technical-details
+    attributes:
+      label: Technical Details
+      description: Share interesting technical aspects or implementation details
+      placeholder: "Some key technical aspects include..."
+
+  - type: textarea
+    id: optimizations
+    attributes:
+      label: Performance Optimizations
+      description: Share any performance improvements or optimizations you made
+      placeholder: "To improve performance, I..."
+
+  - type: textarea
+    id: integrations
+    attributes:
+      label: Tool Integrations
+      description: Describe any integrations with other tools or workflows
+      placeholder: "This integrates with..."
+
+  - type: textarea
+    id: lessons
+    attributes:
+      label: Lessons Learned
+      description: Share key lessons or best practices you discovered
+      placeholder: "Key takeaways include..."
+
+  - type: textarea
+    id: tips
+    attributes:
+      label: Tips for Others
+      description: Share helpful tips for other ArchiComm users
+      placeholder: "Here are some tips..."
+
+  - type: textarea
+    id: feedback
+    attributes:
+      label: ArchiComm Experience
+      description: Share feedback about your experience with ArchiComm
+      placeholder: "My experience with ArchiComm was..."
+
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for sharing your work with the community! Your showcase helps inspire others and demonstrates the possibilities with ArchiComm.

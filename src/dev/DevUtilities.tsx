@@ -1,7 +1,7 @@
 // src/dev/DevUtilities.tsx
 // Development utilities component providing state inspector, component props viewer, and debugging tools
 // Includes floating panel with real-time debugging information and JSON export functionality
-// RELEVANT FILES: ./DevShortcuts.tsx, ./ScenarioViewer.tsx, ../components/ui/card.tsx, ../components/ui/button.tsx
+// RELEVANT FILES: ./DevShortcuts.tsx, ./ScenarioViewer.tsx, @ui/components/ui/card.tsx, @ui/components/ui/button.tsx
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import {
@@ -17,10 +17,10 @@ import {
   Zap,
   Settings,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Input } from '../components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@ui/components/ui/card';
+import { Button } from '@ui/components/ui/button';
+import { Badge } from '@ui/components/ui/badge';
+import { Input } from '@ui/components/ui/input';
 import { PropControls } from './components/PropControls';
 import type { ControlsConfig, PropChangeEvent } from './types';
 

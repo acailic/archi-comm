@@ -10,7 +10,7 @@ import {
   ProjectStatus,
   ComponentType,
   ComponentStatus,
-} from '../services/tauri';
+} from '@services/tauri';
 import { isTauriEnvironment, isWebEnvironment, DEBUG, FEATURES, CONFIG } from '../lib/environment';
 
 // Helper to always log durations safely from finally blocks
@@ -26,7 +26,7 @@ import {
   webNotificationManager,
   initializeWebFallbacks,
   webAutoSave,
-} from '../services/web-fallback';
+} from '@services/web-fallback';
 
 /**
  * Hook for project management with environment-aware functionality

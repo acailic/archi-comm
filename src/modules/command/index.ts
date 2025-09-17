@@ -1,1 +1,1 @@
-export { CommandPalette } from '@/components/CommandPalette';
+export { CommandPalette } from '@ui/components/CommandPalette';

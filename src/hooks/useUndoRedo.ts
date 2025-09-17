@@ -1,76 +1,49 @@
-import { useState, useCallback, useEffect } from 'react';
+// src/hooks/useUndoRedo.ts
+// Canvas undo/redo functionality using zundo with Zustand store
+// Provides canvas-specific undo/redo with keyboard shortcuts
+// RELEVANT FILES: src/stores/canvasStore.ts, src/components/DesignCanvas.tsx, src/features/canvas/types.ts
 
-interface UseUndoRedoOptions {
-  maxHistorySize?: number;
+import { useCallback, useEffect } from 'react';
+import { useCanvasStore, useCanvasUndo, useCanvasRedo, useCanvasCanUndo, useCanvasCanRedo } from '@/stores/canvasStore';
+
+interface UseCanvasUndoRedoOptions {
   enableGlobalShortcuts?: boolean;
 }
 
-interface UseUndoRedoReturn<T> {
-  state: T;
+interface UseCanvasUndoRedoReturn {
   canUndo: boolean;
   canRedo: boolean;
-  pushState: (newState: T) => void;
   undo: () => void;
   redo: () => void;
   clearHistory: () => void;
 }
 
 /**
- * Reusable undo/redo hook for managing edit history
+ * Canvas-specific undo/redo hook using zundo and Zustand
  * Integrates with the existing keyboard shortcut system when enabled
  */
-export function useUndoRedo<T>(
-  initialState: T,
-  options: UseUndoRedoOptions = {}
-): UseUndoRedoReturn<T> {
-  const { maxHistorySize = 50, enableGlobalShortcuts = false } = options;
+export function useCanvasUndoRedo(
+  options: UseCanvasUndoRedoOptions = {}
+): UseCanvasUndoRedoReturn {
+  const { enableGlobalShortcuts = false } = options;
 
-  const [history, setHistory] = useState<T[]>([initialState]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Get undo/redo functions from zundo
+  const undo = useCanvasUndo();
+  const redo = useCanvasRedo();
+  const canUndo = useCanvasCanUndo();
+  const canRedo = useCanvasCanRedo();
 
-  const currentState = history[currentIndex];
-  const canUndo = currentIndex > 0;
-  const canRedo = currentIndex < history.length - 1;
-
-  const pushState = useCallback(
-    (newState: T) => {
-      setHistory(prev => {
-        // Remove any future history if we're not at the end
-        const newHistory = prev.slice(0, currentIndex + 1);
-
-        // Add the new state
-        newHistory.push(newState);
-
-        // Enforce max history size
-        if (newHistory.length > maxHistorySize) {
-          newHistory.splice(0, newHistory.length - maxHistorySize);
-          setCurrentIndex(maxHistorySize - 1);
-          return newHistory;
-        }
-
-        setCurrentIndex(newHistory.length - 1);
-        return newHistory;
-      });
-    },
-    [currentIndex, maxHistorySize]
-  );
-
-  const undo = useCallback(() => {
-    if (canUndo) {
-      setCurrentIndex(prev => prev - 1);
-    }
-  }, [canUndo]);
-
-  const redo = useCallback(() => {
-    if (canRedo) {
-      setCurrentIndex(prev => prev + 1);
-    }
-  }, [canRedo]);
-
+  // Clear history function
   const clearHistory = useCallback(() => {
-    setHistory([currentState]);
-    setCurrentIndex(0);
-  }, [currentState]);
+    const temporalState = useCanvasStore.temporal.getState();
+
+    // Check if clear method exists and is a function before calling it
+    if (temporalState && typeof temporalState.clear === 'function') {
+      temporalState.clear();
+    } else {
+      console.warn('Canvas store clear method is not available or not a function');
+    }
+  }, []);
 
   // Global shortcut integration (similar to DesignCanvas.tsx)
   useEffect(() => {
@@ -105,12 +78,29 @@ export function useUndoRedo<T>(
   }, [enableGlobalShortcuts, canUndo, canRedo, undo, redo]);
 
   return {
-    state: currentState,
     canUndo,
     canRedo,
-    pushState,
     undo,
     redo,
     clearHistory,
+  };
+}
+
+// Legacy hook for backward compatibility
+export function useUndoRedo<T>(
+  initialState: T,
+  _options: { maxHistorySize?: number; enableGlobalShortcuts?: boolean } = {}
+) {
+  console.warn('useUndoRedo is deprecated, use useCanvasUndoRedo for canvas operations');
+
+  // For non-canvas use cases, return a simplified version
+  return {
+    state: initialState,
+    canUndo: false,
+    canRedo: false,
+    pushState: () => {},
+    undo: () => {},
+    redo: () => {},
+    clearHistory: () => {},
   };
 }

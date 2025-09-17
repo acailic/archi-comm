@@ -1,1 +1,1 @@
-export { ReviewScreen } from '@/components/ReviewScreen';
+export { ReviewScreen } from '@ui/components/ReviewScreen';

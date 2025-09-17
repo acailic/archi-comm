@@ -5,7 +5,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { renderWithProviders } from '../test/integration-helpers';
-import { CanvasArea } from '../components/CanvasArea';
+import { CanvasArea } from '@ui/components/CanvasArea';
 import {
   createReactFlowEdge,
   createReactFlowNode,

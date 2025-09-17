@@ -1,14 +1,14 @@
 // src/dev/scenarios.ts
 // Scenario definitions for testing ArchiComm components in isolation using comprehensive mock data
 // Provides realistic component scenarios for development and testing purposes, including comprehensive UI component library coverage
-// RELEVANT FILES: ./testData.ts, ../components/ChallengeSelection.tsx, ../components/CanvasArea.tsx, ../components/AudioRecording.tsx, ../components/ui/*
+// RELEVANT FILES: ./testData.ts, @ui/components/ChallengeSelection.tsx, @ui/components/CanvasArea.tsx, @ui/components/AudioRecording.tsx, @ui/components/ui/*
 
 import React from 'react';
 import { z } from 'zod';
-import { ChallengeSelection } from '../components/ChallengeSelection';
-import { CanvasArea } from '../components/CanvasArea';
-import { AudioRecording } from '../components/AudioRecording';
-import { Button } from '../components/ui/button';
+import { ChallengeSelection } from '@ui/components/ChallengeSelection';
+import { CanvasArea } from '@ui/components/CanvasArea';
+import { AudioRecording } from '@ui/components/AudioRecording';
+import { Button } from '@ui/components/ui/button';
 import {
   Card,
   CardHeader,
@@ -17,9 +17,9 @@ import {
   CardContent,
   CardFooter,
   CardAction,
-} from '../components/ui/card';
-import { Input } from '../components/ui/input';
-import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
+} from '@ui/components/ui/card';
+import { Input } from '@ui/components/ui/input';
+import { Alert, AlertTitle, AlertDescription } from '@ui/components/ui/alert';
 import type { EnhancedScenarioDefinition, ControlsConfig } from './types';
 import { mockChallenges, mockCanvasStates, mockAudioStates, mockUIComponentData } from './testData';
 

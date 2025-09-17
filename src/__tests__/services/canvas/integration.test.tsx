@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from '@testing-library/react';
-import { CanvasOrchestratorProvider, useCanvas } from '@/services/canvas/CanvasOrchestrator';
+import { CanvasOrchestratorProvider, useCanvas } from '@services/canvas/CanvasOrchestrator';
 
 const initialData = {
   components: [],
