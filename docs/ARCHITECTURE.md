@@ -1,140 +1,104 @@
 # ArchiComm Architecture Guide
 
-This guide provides a consolidated technical overview of the ArchiComm application for developers. It covers system structure, core modules, performance strategies, testing, build and deployment, and best practices.
-
-Links:
-- Study workflow and scenarios: `src/docs/SystemDesignPractice.md`
-- UI components and canvas: `src/components`
-- Core libraries and services: `src/lib`, `src/services`
+This guide walks through the technical architecture of ArchiComm after the repository re-organisation. It explains how the codebase is partitioned into packages, how those packages interact, and which supporting layers keep the experience consistent across desktop (Tauri) and the browser fallback.
 
 ## System Overview
 
-ArchiComm is a Tauri desktop app built with React and TypeScript for interactive system design practice. The application centers around a performant canvas system, a task/plugin framework for study modules, and a consistent developer experience that runs both in the Tauri shell and the browser (web fallback).
+ArchiComm is a Tauri desktop application powered by React 18 and TypeScript. The design surface is a highly interactive canvas backed by specialised state stores, service abstractions, and performance tooling. The app is structured around a package-oriented layout that keeps shared logic discoverable and enforces clear boundaries between the UI, canvas runtime, audio stack, and infrastructure services.
 
-Architecture principles:
-- Local-first desktop UX with Tauri, with graceful web fallbacks
-- Clear separation of concerns between orchestration, viewport, and node rendering on the canvas
-- Predictable data flow with typed contracts and utilities
-- Performance budget driven by real-time interactions and frequent re-renders
-- Testable boundaries for services, plugins, and UI
+Key principles:
+- **Package-first organisation.** Every cross-cutting concern lives in a dedicated package under `src/packages` with an explicit public API (`index.ts`).
+- **Typed contracts end-to-end.** Shared types flow through the core package so the UI, canvas, and services consume consistent data structures.
+- **Environment-aware services.** Service implementations expose the same façade whether the app runs inside Tauri or a browser fallback.
+- **Performance visibility.** Canvas, audio, and store layers expose hooks for diagnostics and tracing (`src/hooks/usePerformanceMonitor`, `src/lib/performance`).
 
-## Tech Stack Deep Dive
-
-- Tauri (Rust) for desktop shell, filesystem, and native integrations
-  - Tauri config: `src-tauri/tauri.conf.json`
-  - Rust entrypoint: `src-tauri/src/main.rs`
-- React 18 + TypeScript for UI and stateful interactions
-- Vite for development and bundling (`vite.config.ts`, `src/vite.config.ts`)
-- Tailwind + Radix UI for modern UI components
-- Vitest for unit/integration tests; Playwright for E2E
-
-## Project Structure
+## Repository Topology
 
 ```
+config/                 # Centralised tool configuration (Vite, ESLint, Playwright, tsconfig, semantic-release, Sonar)
+docs/                   # Tracked documentation (see docs/README.md for index)
+  development/          # Ignored local-only scratch space (notes, brainstorming, TODO, etc.)
+distribution/           # Packaging artefacts (Homebrew) kept out of the main git history
 src/
-  components/         # UI components including the canvas system
-  hooks/              # Custom React hooks for app features
-  lib/                # Core utilities, services, contracts, performance
-  services/           # Tauri and web fallback bridges
-  shared/             # Shared utilities and types
-  styles/             # Global styles
-  docs/               # In-app docs and study materials
-src-tauri/            # Tauri Rust code and config
+  packages/             # Primary application packages (see below)
+  hooks/                # Shared React hooks that are still application-scoped
+  lib/                  # Legacy libraries and utilities (incrementally migrating to packages)
+  modules/              # Thin entrypoints that re-export package functionality for feature areas
+  stores/               # Zustand/Valtio stores broken down by domain
+  test/                 # Testing helpers
+  dev/                  # Developer playground utilities and scenarios
+src-tauri/              # Rust shell for the Tauri Desktop build
 ```
 
-Notable modules:
-- `src/components/DesignCanvas.tsx` — canvas orchestrator
-- `src/components/CanvasArea.tsx` — viewport, panning/zooming, hit-testing
-- `src/components/CanvasComponent.tsx` — node rendering and interactions
-- `src/lib/performance/*` — performance tracking and optimization
-- `src/lib/task-system/*` — task templates and plugin interfaces
-- `src/services/tauri.ts`, `src/services/web-fallback.ts` — platform bridges
+### Package Breakdown (`src/packages`)
 
-## Canvas System Architecture
+| Package | Purpose | Example Exports |
+| --- | --- | --- |
+| `core` | Fundamental types and utilities that everything else builds upon. | `types`, `utils`, shared constants |
+| `ui` | All React components, UI primitives, and composition helpers. | `components/AppContainer`, `components/ui/button` |
+| `canvas` | Canvas runtime (React Flow integration, hooks, utilities). | `components/ReactFlowCanvas`, `hooks/useConnectionEditor` |
+| `audio` | Recording, processing, and transcription engines. | `AudioManager`, `detectBestEngines`, engine implementations |
+| `services` | Service façades for persistence, Tauri integration, and fallbacks. | `audio/AudioService`, `storage`, `tauri` |
 
-Three-layer architecture:
-- Orchestration — `DesignCanvas`
-  - Owns overall canvas state, selection, tools/modes
-  - Coordinates persistence and performance measurements
-- Viewport/Interaction — `CanvasArea`
-  - Manages zoom/pan, pointer events, keyboard shortcuts, selection boxes
-  - Translates world <-> screen coordinates
-- Node Rendering — `CanvasComponent`
-  - Renders components, ports, labels, and attachment points
-  - Handles direct manipulation (drag, resize) in a constrained way
+Packages expose a “barrel” file (`index.ts`) that defines the public surface area. Consumers import through the alias defined in `config/tsconfig.json` and `config/vite.config.ts`:
 
-Performance levers:
-- `CanvasPerformanceManager` to track FPS, render timings, memory, and event throughput
-- Batching updates and deferring non-critical work (idle callbacks, rAF)
-- Culling and virtualization to limit DOM updates to visible regions
-- Memoized selectors and stable props to minimize React churn
+```
+import { DesignCanvas } from '@ui/components/DesignCanvas';
+import { ReactFlowCanvas } from '@canvas/components/ReactFlowCanvas';
+import { AudioManager } from '@audio';
+import { StorageService } from '@services/storage';
+import { CanvasState } from '@core/types';
+```
 
-## Data Flow & State Management
+### Dependency Flow
 
-- Typed contracts in `src/lib/contracts` and `src/shared/contracts`
-- Deterministic state transitions for canvas operations (add/move/connect/delete)
-- Error store and logger (`src/lib/errorStore.ts`, `src/lib/logger.ts`) for diagnostics
-- Environment gates in `src/lib/environment.ts` for platform-specific behavior
+```
+┌────────┐     ┌────────┐     ┌──────────┐
+│  core  │ ──▶ │  ui    │ ──▶ │ modules  │
+│        │     │        │     │ (feature │
+│ types  │     │ view   │     │  entry)  │
+└────────┘     │ layer  │     └──────────┘
+     │         │        │
+     │         └────────┴────────┐
+     ▼                            ▼
+┌────────┐     ┌────────┐     ┌──────────┐
+│ canvas │ ◀── │ audio  │ ◀── │ services │
+│ runtime│     │ stack  │     │ infra    │
+└────────┘     └────────┘     └──────────┘
+```
 
-Persistence:
-- Tauri-backed storage for projects and auto-save on desktop (`src/lib/tauri.ts`, `src/services/tauri.ts`)
-- Web fallback layer for previews (`src/services/web-fallback.ts`)
+- `core` owns shared contracts so all packages agree on types.
+- `ui` consumes `core` types and delegates specialised work to `canvas`, `audio`, or `services`.
+- `canvas` and `audio` depend on `core` for types and on `services` for environment-specific integrations (e.g. file access, telemetry).
+- `services` talk to the outside world (filesystem, HTTP, storage) and expose a consistent API back to the UI and runtime packages.
 
-## Plugin System & Extensibility
+## Stores and Hooks
 
-- Task plugins define study modules under `src/lib/task-system/plugins/<task-id>`
-- Plugin interface: `src/lib/task-system/TaskPlugin.ts`
-- Templates registry: `src/lib/task-system/templates/index.ts`
-
-A task typically includes:
-- `task.json` with metadata (id, title, requirements, difficulty, time, category)
-- Optional assets such as diagrams and seed data
-- Optional architecture templates for pre-seeding canvas components and connections
-
-## Performance Management
-
-- `CanvasPerformanceManager` and `PerformanceOptimizer` track core metrics
-- Live diagnostics via `components/PerformanceDashboard.tsx` and `components/DeveloperDiagnosticsPage.tsx`
-- Guidelines:
-  - Prefer derived values and memoization over redundant state
-  - Avoid deep object identity churn in props; keep render surfaces small
-  - Use virtualization/culling strategies for large diagrams
+Domain-specific stores now live under `src/stores`. For example `src/stores/canvas` contains the canvas store, slice helpers, and selectors. Hooks that bridge packages (`useCanvasIntegration`, `useUndoRedo`, `usePerformanceMonitor`) live in `src/hooks` and compose the stores with package APIs.
 
 ## Testing Strategy
 
-- Unit/Integration (Vitest):
-  - Located in `src/__tests__` and inline component tests
-  - Coverage via `vitest` and `@vitest/coverage-v8` (`npm run test:coverage`)
-- End-to-End (Playwright):
-  - Scenarios under `e2e/`
-  - CI workflow `e2e.yml` runs headless; local run via `npm run e2e`
-- Test helpers:
-  - `src/test/setup.ts` for environment setup
-  - Playwright fixtures under `e2e/fixtures`
+- **Unit & integration**: Vitest files co-located with packages (`src/packages/**/__tests__`) and legacy tests under `src/__tests__`.
+- **Canvas regression**: `src/__tests__/components/DesignCanvas.*.test.tsx` exercises the canvas package via the UI exports.
+- **Services**: Add dedicated tests under `src/__tests__/services` to validate the service façade without invoking Tauri.
+- **E2E**: Playwright config moved to `config/playwright.config.ts` with absolute paths derived from the repository root.
 
-## Build & Deployment
+## Build & Tooling
 
-- Web build: `npm run web:build` (Vite bundles)
-- Desktop build: `npm run build` (Tauri bundles native app for OS)
-- CI workflows: `.github/workflows/*.yml` including `ci.yml`, `coverage.yml`, `e2e.yml`, `security.yml`, and `build-tauri.yml`
+All tool configuration lives in `config/`:
 
-Release considerations:
-- Keep `tauri.conf.json` and icons up to date
-- Validate OS-specific signing and permissions
+- `config/vite.config.ts` resolves package aliases and points Vite to the repo root/public directory.
+- `config/eslint.config.js` and `config/.prettierrc` ensure linting and formatting runs against the new structure.
+- `config/playwright.config.ts` resolves paths relative to the project root so E2E tests work after the move.
+- `config/tsconfig.json` exposes the new path aliases and redraws include/exclude paths from the config directory.
+- `config/.releaserc.json` and `config/sonar-project.properties` keep release and analysis tooling in sync with the layout.
 
-## Development Best Practices
+## Working in the New Layout
 
-- TypeScript strictness; avoid `any` and prefer discriminated unions for actions
-- Keep canvas props stable; memoize expensive selectors and computations
-- Isolate side effects in services/hooks; keep components mostly declarative
-- Follow linting and formatting (`eslint`, `prettier`) and keep PRs focused
-- Ensure unit tests for new utilities and hooks; add E2E where user flows are affected
+- Import UI from `@ui` (or `@ui/components/...`) instead of reaching into `src/components`.
+- Canvas utilities live in `@canvas`; avoid crossing package boundaries with relative imports.
+- Audio logic must come from `@audio` so the recorder/transcriber engines remain encapsulated.
+- Prefer `@services` when interacting with persistence or environment bridges; the package chooses the correct implementation for desktop vs web.
+- Shared helpers belong in `@core`. Move additional utilities or types there as they shed coupling to legacy directories.
 
-## References
-
-- Study practice guide: `src/docs/SystemDesignPractice.md`
-- Canvas: `src/components/DesignCanvas.tsx`, `src/components/CanvasArea.tsx`, `src/components/CanvasComponent.tsx`
-- Performance: `src/lib/performance/CanvasPerformanceManager.ts`, `src/lib/performance/PerformanceOptimizer.ts`
-- Plugins: `src/lib/task-system/TaskPlugin.ts`, `src/lib/task-system/templates/index.ts`
-- Services: `src/services/tauri.ts`, `src/services/web-fallback.ts`
-
+For migration specifics and alias mapping, see `docs/MIGRATION.md`.

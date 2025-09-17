@@ -227,8 +227,6 @@ src-tauri/gen/
 # Generic backups and temp files
 *.bak
 *.orig
-.github
-docs/
 # Emacs
 *~
 \#*\#

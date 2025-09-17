@@ -1,0 +1,107 @@
+name: Contributor Recognition
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # Run monthly
+  workflow_dispatch:
+
+jobs:
+  recognize:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      discussions: write
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get monthly contributions
+        id: contributions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: contributors } = await github.rest.repos.listContributors({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
+            const monthAgo = new Date();
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+            // Get merged PRs in the last month
+            const { data: mergedPRs } = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged merged:>${monthAgo.toISOString()}`
+            });
+
+            // Get closed issues in the last month
+            const { data: closedIssues } = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} is:issue is:closed closed:>${monthAgo.toISOString()}`
+            });
+
+            return {
+              contributors,
+              mergedPRs: mergedPRs.items,
+              closedIssues: closedIssues.items
+            };
+
+      - name: Generate recognition post
+        id: post
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const month = new Date().toLocaleString('default', { month: 'long' });
+            const year = new Date().getFullYear();
+
+            const postContent = `# ${month} ${year} Contributor Recognition 🏆
+
+            Thank you to everyone who contributed to ArchiComm this month! 🎉
+
+            ## Pull Request Heroes 💪
+            ${steps.contributions.outputs.mergedPRs.map(pr =>
+              `- @${pr.user.login}: [${pr.title}](${pr.html_url})`
+            ).join('\n')}
+
+            ## Issue Champions 🎯
+            ${steps.contributions.outputs.closedIssues.map(issue =>
+              `- @${issue.user.login}: [${issue.title}](${issue.html_url})`
+            ).join('\n')}
+
+            ## Notable Achievements 🌟
+
+            ${generateAchievements(steps.contributions.outputs)}
+
+            ## Thank You! ❤️
+
+            Your contributions help make ArchiComm better for everyone. Keep up the great work!
+            `;
+
+            // Create a discussion
+            const { data: discussion } = await github.rest.discussions.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `${month} ${year} Contributor Recognition`,
+              body: postContent,
+              category_id: 'DIC_kwDOA1_2vM4CU8qP'  // Recognition category
+            });
+
+            // Pin the discussion
+            await github.rest.discussions.pinDiscussion({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              discussion_number: discussion.number
+            });
+
+      - name: Update CHANGELOG.md
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const month = new Date().toLocaleString('default', { month: 'long' });
+            const year = new Date().getFullYear();
+
+            const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+            const newEntry = `\n## [${month} ${year} Recognition]\n\n${generateContributorSummary(steps.contributions.outputs)}\n`;
+
+            fs.writeFileSync('CHANGELOG.md', changelog.replace('\n## ', `${newEntry}\n## `));
