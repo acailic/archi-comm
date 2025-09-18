@@ -6,7 +6,7 @@
 import { Page } from '@playwright/test';
 import type { DesignData as AppDesignData } from '@/shared/contracts';
 import { templateRegistry } from '@/lib/import-export/templates';
-import { componentIconMap } from '@/lib/component-icons';
+import { componentIconMap } from '@/lib/design/component-icons';
 
 type FixtureCategory = 'basic' | 'industry' | 'scalability' | 'legacy' | 'benchmark';
 

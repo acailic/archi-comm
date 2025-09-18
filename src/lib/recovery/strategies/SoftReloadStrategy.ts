@@ -1,13 +1,13 @@
 // src/lib/recovery/strategies/SoftReloadStrategy.ts
 // Soft reload strategy that restarts the application while preserving user data
 // Lower priority strategy for React errors, chunk load errors, and high severity errors
-// RELEVANT FILES: src/lib/environment.ts, src/services/storage.ts
+// RELEVANT FILES: src/lib/config/environment.ts, src/services/storage.ts
 
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
 import { storage } from '@services/storage';
 import { CanvasPersistence } from '@services/canvas/CanvasPersistence';
-import { logger } from '../../logger';
+import { logger } from '@lib/logging/logger';
 
 export class SoftReloadStrategy implements RecoveryStrategy {
   public readonly name = 'soft-reload';

@@ -9,7 +9,7 @@ import {
   getStyle,
   SizeVariant,
   StyleVariant,
-} from '@/lib/design-system';
+} from '@/lib/design/design-system';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
 
 export interface EnhancedCardProps extends React.HTMLAttributes<HTMLDivElement> {

@@ -5,9 +5,9 @@
 
 import React from 'react';
 import { Bold, Italic, List, ListOrdered, Clock, Highlighter, Search } from 'lucide-react';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { cn } from './ui/utils';
+import { Button } from '@ui/components/ui/button';
+import { Badge } from '@ui/components/ui/badge';
+import { cn } from '@ui/components/ui/utils';
 import {
   loadTiptapReact,
   loadTiptapStarterKit,

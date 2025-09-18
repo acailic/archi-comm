@@ -10,12 +10,12 @@ import {
   Wand2,
   Info,
 } from 'lucide-react';
-import { transcriptionUtils, audioUtils } from '@/lib/tauri';
+import { transcriptionUtils, audioUtils } from '@/lib/platform/tauri';
 import { AudioManager, AudioManagerOptions, getDefaultAudioManagerOptions } from '@audio';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { LoadingSpinner, useLoadingState } from './ui/LoadingSpinner';
+import { Button } from '@ui/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@ui/components/ui/card';
+import { Badge } from '@ui/components/ui/badge';
+import { LoadingSpinner, useLoadingState } from '@ui/components/ui/LoadingSpinner';
 import { TranscriptEditor } from './TranscriptEditor';
 import type {
   Challenge,
@@ -23,7 +23,7 @@ import type {
   AudioData,
   TranscriptionResponse,
 } from '@/shared/contracts/index';
-import { getLogger } from '@/lib/logger';
+import { getLogger } from '@/lib/logging/logger';
 
 const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
@@ -221,7 +221,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         'audio/ogg',
         'audio/mp4;codecs=mp4a.40.2',
         'audio/mp4',
-        'audio/wav',
+        'audio/processing/wav',
       ];
       let supportedMime: string | null = null;
       if (typeof (window as any).MediaRecorder !== 'undefined') {

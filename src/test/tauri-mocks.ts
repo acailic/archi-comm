@@ -56,8 +56,8 @@ vi.mock('@tauri-apps/api', () => ({
   },
 }));
 
-vi.mock('../lib/tauri', () => ({
-  ...vi.importActual('../lib/tauri'),
+vi.mock('../lib/platform/tauri', () => ({
+  ...vi.importActual('../lib/platform/tauri'),
   isTauri: () => true,
 }));
 

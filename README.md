@@ -377,7 +377,7 @@ Press `?` in the app for the full list.
 - `src/packages/canvas/` (`@canvas`) — diagram engine, interactions, and canvas-specific utilities
 - `src/packages/services/` (`@services`) — integration services, gateways, and persistence adapters
 - `src/packages/audio/` (`@audio`) — audio capture, processing, and transcription pipeline
-- `src/hooks/`, `src/stores/`, `src/lib/` — shared hooks, Zustand stores, and utilities that complement the packages
+- `src/shared/hooks/`, `src/stores/`, `src/lib/` — shared hooks, Zustand stores, and utilities that complement the packages
 - `distribution/homebrew/` — Homebrew cask & formula definitions tracked with the repo
 - `tools/` — development scripts and structure validators (`npm run validate:structure`)
 

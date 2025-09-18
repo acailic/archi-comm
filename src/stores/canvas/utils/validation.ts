@@ -1,7 +1,7 @@
 // src/stores/canvas/utils/validation.ts
 // Canvas data validation utilities
 // Validates components, connections, and infoCards for consistency
-// RELEVANT FILES: ../slices/coreSlice.ts, ../../../shared/contracts.ts, ../../../features/canvas/types.ts
+// RELEVANT FILES: ../slices/coreSlice.ts, ../@shared/contracts.ts, ../../../features/canvas/types.ts
 
 import type { Connection, DesignComponent, InfoCard } from '@/shared/contracts';
 

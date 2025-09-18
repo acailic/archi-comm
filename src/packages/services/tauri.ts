@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/tauri';
-import { isTauriEnvironment, DEBUG } from '@/lib/environment';
+import { isTauriEnvironment, DEBUG } from '@/lib/config/environment';
 import {
   webProjectManager,
   webFileManager,

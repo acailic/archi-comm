@@ -1,6 +1,6 @@
 import { appDataDir, join } from '@tauri-apps/api/path';
 import { createDir, readTextFile, writeTextFile, exists } from '@tauri-apps/api/fs';
-import { isTauri } from '../tauri';
+import { isTauri } from '@/lib/platform/tauri';
 import {
   AIConfig,
   ConnectionTestResult,

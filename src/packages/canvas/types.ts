@@ -6,7 +6,7 @@
  */
 
 import type { Node } from '@xyflow/react';
-import type { DesignComponent } from '../../shared/contracts';
+import type { DesignComponent } from '@shared/contracts';
 
 // Define the custom node data type for React Flow
 export interface CustomNodeData extends Record<string, unknown> {

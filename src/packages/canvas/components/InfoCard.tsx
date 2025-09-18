@@ -21,7 +21,7 @@ import {
 } from '@ui/components/ui/context-menu';
 import { Button } from '@ui/components/ui/button';
 import { Textarea } from '@ui/components/ui/textarea';
-import { cx } from '@/lib/design-system';
+import { cx } from '@/lib/design/design-system';
 
 // Define the info card data type for React Flow
 export interface InfoCardData extends Record<string, unknown> {

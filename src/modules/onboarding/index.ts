@@ -1,8 +1,8 @@
-export { WelcomeOverlay } from '@ui/components/WelcomeOverlay';
+export { WelcomeOverlay } from '@ui/components/overlays/WelcomeOverlay';
 
 // Basic Onboarding Components
 export { OnboardingManager, useOnboarding } from '../../lib/onboarding/OnboardingManager';
-export { default as OnboardingOverlay } from '@ui/components/OnboardingOverlay';
+export { default as OnboardingOverlay } from '@ui/components/overlays/OnboardingOverlay';
 
 // Onboarding Flow Types
 export type {

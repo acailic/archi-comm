@@ -1,5 +1,5 @@
 import { useCallback, useRef, useEffect } from 'react';
-import { getLogger } from '@/lib/logger';
+import { getLogger } from '@/lib/logging/logger';
 import { storage } from '@services/storage';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';

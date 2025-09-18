@@ -4,7 +4,7 @@ This document summarizes the public interfaces of major modules, components, hoo
 
 Sources:
 - Components: `src/components`
-- Hooks: `src/hooks`, `src/lib/hooks`
+- Hooks: `src/shared/hooks`, `src/lib/hooks`
 - Services: `src/services`, `src/lib/tauri.ts`
 - Tasks & Plugins: `src/lib/task-system`
 - Shared types and utilities: `src/shared`, `src/lib`
@@ -119,7 +119,7 @@ export interface TaskPlugin {
 
 ## Hooks API
 
-Custom hooks across `src/hooks` and `src/lib/hooks`:
+Custom hooks across `src/shared/hooks` and `src/lib/hooks`:
 - `useUndoRedo` — manage undo/redo stacks
 - `useAutoSave` — debounce and persist diagram changes
 - `usePerformanceMonitoring` — expose live metrics from `CanvasPerformanceManager`
@@ -169,4 +169,3 @@ import { saveProject, loadProject } from '@/services/tauri';
 await saveProject('my-diagram', diagramModel);
 const loaded = await loadProject('my-diagram');
 ```
-

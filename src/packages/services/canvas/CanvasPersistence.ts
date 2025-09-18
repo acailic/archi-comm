@@ -1,6 +1,6 @@
 import { toPng } from 'html-to-image';
 import type { DesignData } from '@/shared/contracts';
-import { isTauriEnvironment } from '@/lib/environment';
+import { isTauriEnvironment } from '@/lib/config/environment';
 import { storage } from '@services/storage';
 import * as TauriClient from '@/lib/api/tauriClient';
 

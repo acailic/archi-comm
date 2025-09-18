@@ -1,7 +1,7 @@
 // src/components/DesignCanvas/DesignCanvasHeader.tsx
 // Header section for DesignCanvas component
 // Contains back button, challenge title, action buttons, and continue button
-// RELEVANT FILES: DesignCanvasCore.tsx, ../ImportExportDropdown.tsx, ../ui/button.tsx, ../../../shared/contracts.ts
+// RELEVANT FILES: DesignCanvasCore.tsx, ../ImportExportDropdown.tsx, ../ui/button.tsx, ../@shared/contracts.ts
 
 import { ImportExportDropdown } from '@ui/components/ImportExportDropdown';
 import { Button } from '@ui/components/ui/button';

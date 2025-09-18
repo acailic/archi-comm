@@ -15,7 +15,7 @@ import {
   type FC,
   type ErrorInfo,
 } from 'react';
-import { DEBUG } from '@/lib/environment';
+import { DEBUG } from '@/lib/config/environment';
 import { webNotificationManager } from '@services/web-fallback';
 
 // Error boundary state

@@ -1,4 +1,4 @@
-import { useUXTracker } from '@/hooks/useUXTracker';
+import { useUXTracker } from '@hooks/useUXTracker';
 
 export interface CanvasTelemetryApi {
   trackCanvasAction: (action: string, data?: unknown, success?: boolean) => void;

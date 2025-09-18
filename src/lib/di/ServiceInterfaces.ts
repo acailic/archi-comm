@@ -1,7 +1,7 @@
 // src/lib/di/ServiceInterfaces.ts
 // Service interfaces that abstract current implementations while maintaining compatibility
 // These interfaces define clean contracts for all core application services
-// RELEVANT FILES: src/lib/di/Container.ts, src/shared/contracts/index.ts, src/services/canvas/CanvasPersistence.ts, src/lib/audio/audio-manager.ts
+// RELEVANT FILES: src/lib/di/Container.ts, src/shared/contracts/index.ts, src/services/canvas/CanvasPersistence.ts, src/packages/audio/audio-manager.ts
 
 import { createToken } from './Container';
 import type {

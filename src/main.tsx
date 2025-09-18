@@ -1,11 +1,11 @@
 import { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
-import { getLogger, logger, LogLevel } from './lib/logger';
-import { errorStore, addGlobalError } from './lib/errorStore';
-import type { AppError } from './lib/errorStore';
+import { getLogger, logger, LogLevel } from './lib/logging/logger';
+import { errorStore, addGlobalError } from './lib/logging/errorStore';
+import type { AppError } from './lib/logging/errorStore';
 import { ErrorRecoverySystem } from './lib/recovery/ErrorRecoverySystem';
-import { isDevelopment, isTauriEnvironment, isProduction } from './lib/environment';
+import { isDevelopment, isTauriEnvironment, isProduction } from './lib/config/environment';
 import type { Container } from '@/lib/di/Container';
 import { createApplicationContainer } from '@/lib/di/ServiceRegistry';
 import { ServiceProvider } from '@/lib/di/ServiceProvider';

@@ -2,11 +2,11 @@
  * src/__tests__/design-comparison.test.ts
  * Unit tests for the design comparison utility that validates user solutions against templates
  * Tests component matching, connection validation, scoring, and edge cases
- * RELEVANT FILES: src/lib/design-comparison.ts, src/shared/contracts/index.ts, src/lib/challenge-config.ts
+ * RELEVANT FILES: src/lib/design/design-comparison.ts, src/shared/contracts/index.ts, src/lib/config/challenge-config.ts
  */
 
-import { compareDesigns } from '../lib/design-comparison';
-import type { ArchitectureTemplate } from '../lib/challenge-config';
+import { compareDesigns } from '../lib/design/design-comparison';
+import type { ArchitectureTemplate } from '../lib/config/challenge-config';
 import type { DesignData } from '@/shared/contracts';
 
 describe('Design Comparison', () => {

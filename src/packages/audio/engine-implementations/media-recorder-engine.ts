@@ -1,9 +1,9 @@
-// src/lib/audio/engine-implementations/media-recorder-engine.ts
+// src/packages/audio/engine-implementations/media-recorder-engine.ts
 // Enhanced MediaRecorder engine with better error handling and format support
 // Builds upon the existing implementation in AudioRecording.tsx
-// RELEVANT FILES: src/components/AudioRecording.tsx, src/lib/audio/recording-engines.ts
+// RELEVANT FILES: src/components/AudioRecording.tsx, src/packages/audio/engines/recording-engines.ts
 
-import { RecordingEngine, RecordingOptions } from '../recording-engines';
+import { RecordingEngine, RecordingOptions } from '../engines/recording-engines';
 
 export class MediaRecorderEngine implements RecordingEngine {
   name = 'MediaRecorder';
@@ -125,7 +125,7 @@ export class MediaRecorderEngine implements RecordingEngine {
       'audio/ogg',
       'audio/mp4;codecs=mp4a.40.2',
       'audio/mp4',
-      'audio/wav'
+      'audio/processing/wav'
     ].filter(Boolean) as string[];
     
     for (const mimeType of candidates) {

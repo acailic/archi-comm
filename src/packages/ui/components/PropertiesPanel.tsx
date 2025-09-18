@@ -11,11 +11,11 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { wrapSetStateWithGuard } from '../../../lib/performance/StateUpdateGuard';
-import type { DesignComponent } from '../shared/contracts';
-import { ComponentPalette } from './ComponentPalette';
-import { Badge } from './ui/badge';
-import { ScrollArea } from './ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import type { DesignComponent } from '@shared/contracts';
+import { ComponentPalette } from '@ui/components/panels/ComponentPalette';
+import { Badge } from '@ui/components/ui/badge';
+import { ScrollArea } from '@ui/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs';
 import { ComponentPropertiesTab } from './PropertiesPanel/ComponentPropertiesTab';
 import { DesignOverviewCard } from './PropertiesPanel/DesignOverviewCard';
 

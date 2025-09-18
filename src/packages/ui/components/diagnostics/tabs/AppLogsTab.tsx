@@ -1,14 +1,14 @@
 // src/components/diagnostics/tabs/AppLogsTab.tsx
 // Application logs tab for developer diagnostics
 // Shows filtered log entries with search, level, and scope filtering capabilities
-// RELEVANT FILES: ../../../lib/logger.ts, DeveloperDiagnosticsPage.tsx, ../../../lib/errorStore.ts
+// RELEVANT FILES: ../../../lib/logging/logger.ts, DeveloperDiagnosticsPage.tsx, ../../../lib/logging/errorStore.ts
 
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   Search,
   FileText,
 } from 'lucide-react';
-import { logger, LogLevel } from '@/lib/logger';
+import { logger, LogLevel } from '@/lib/logging/logger';
 
 // Utility: trigger a file download from string/Blob data
 const triggerDownload = (

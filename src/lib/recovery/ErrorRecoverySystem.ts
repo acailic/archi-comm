@@ -1,11 +1,11 @@
 // src/lib/recovery/ErrorRecoverySystem.ts
 // Core error recovery system that implements progressive fallback strategies
 // Provides centralized error recovery with escalating strategies from auto-save to hard reset
-// RELEVANT FILES: src/lib/errorStore.ts, src/lib/logger.ts, src/services/canvas/CanvasPersistence.ts, src/shared/contracts/index.ts
+// RELEVANT FILES: src/lib/logging/errorStore.ts, src/lib/logging/logger.ts, src/services/canvas/CanvasPersistence.ts, src/shared/contracts/index.ts
 
 import { AppError } from '../errorStore';
-import { logger } from '../logger';
-import { DesignData, AudioData } from '../../shared/contracts';
+import { logger } from '@lib/logging/logger';
+import { DesignData, AudioData } from '@shared/contracts';
 
 // Recovery strategy interface for implementing different recovery approaches
 export interface RecoveryStrategy {

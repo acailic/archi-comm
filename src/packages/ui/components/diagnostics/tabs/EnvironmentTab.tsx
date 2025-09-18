@@ -1,7 +1,7 @@
 // src/components/diagnostics/tabs/EnvironmentTab.tsx
 // Environment information tab for developer diagnostics
 // Shows environment details, feature flags, build info, and canvas performance metrics
-// RELEVANT FILES: ../../../lib/environment.ts, ../../../lib/performance/CanvasPerformanceManager.ts, ../../../hooks/usePerformanceMonitoring.ts, DeveloperDiagnosticsPage.tsx
+// RELEVANT FILES: ../../../lib/config/environment.ts, ../../../lib/performance/CanvasPerformanceManager.ts, ../../../hooks/usePerformanceMonitoring.ts, DeveloperDiagnosticsPage.tsx
 
 import React, { useCallback, useMemo } from 'react';
 import {
@@ -19,7 +19,7 @@ import {
   RUNTIME_ENV,
   FEATURES,
   CONFIG,
-} from '@/lib/environment';
+} from '@/lib/config/environment';
 import { getCanvasPerformanceManager } from '@/lib/performance/CanvasPerformanceManager';
 
 export const EnvironmentTab: React.FC = () => {

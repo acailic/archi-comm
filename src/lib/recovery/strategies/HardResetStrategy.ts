@@ -4,7 +4,7 @@
 
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
-import { logger } from '../../logger';
+import { logger } from '@lib/logging/logger';
 import { designsStore } from '@services/storage';
 
 export class HardResetStrategy implements RecoveryStrategy {

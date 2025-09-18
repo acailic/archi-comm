@@ -4,7 +4,7 @@ import { storage } from '@services/storage';
 import { DesignSerializer } from '@/lib/import-export/DesignSerializer';
 import type { Challenge, DesignData } from '@/shared/contracts';
 import { useCanvasActions } from '@/stores/canvasStore';
-import { useStableCallback } from '@/hooks/useStableCallbacks';
+import { useStableCallback } from '@hooks/useStableCallbacks';
 
 interface UseDesignCanvasImportExportProps {
   serializer: DesignSerializer;

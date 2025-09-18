@@ -15,12 +15,12 @@ import {
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from '@ui/components/ui/context-menu';
-import { animations, cx, designSystem, getElevation } from '@/lib/design-system';
-import { getComponentIcon } from '@/lib/component-icons';
+import { animations, cx, designSystem, getElevation } from '@/lib/design/design-system';
+import { getComponentIcon } from '@/lib/design/component-icons';
 import { getHealthIndicator } from '../utils/component-styles';
 import type { CustomNodeData } from '../types';
 import type { UseNodePresenterResult } from '../hooks/useNodePresenter';
-import type { DesignComponent } from '../../../shared/contracts';
+import type { DesignComponent } from '../@shared/contracts';
 
 function defaultStickerForType(type: string): string {
   const map: Record<string, string> = {

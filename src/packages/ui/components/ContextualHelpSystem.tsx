@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { UXOptimizer } from '@/lib/user-experience/UXOptimizer';
-import { SmartTooltip } from './ui/SmartTooltip';
+import { SmartTooltip } from '@ui/components/ui/SmartTooltip';
 
 interface HelpContent {
   id: string;

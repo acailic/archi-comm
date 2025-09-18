@@ -13,8 +13,8 @@ import type {
   Layer,
   ToolType,
 } from '@/shared/contracts';
-import { useUndoRedo } from '@/hooks/useUndoRedo';
-import { useAutoSave } from '@/hooks/useAutoSave';
+import { useUndoRedo } from '@hooks/useUndoRedo';
+import { useAutoSave } from '@hooks/useAutoSave';
 
 // Import adapter functions for React Flow compatibility
 // These are used by the canvas components but not directly by the orchestrator

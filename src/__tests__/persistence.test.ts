@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { DesignData } from '../shared/contracts';
+import type { DesignData } from '@shared/contracts';
 
 const sampleDesign: DesignData = {
   schemaVersion: 1,
@@ -34,7 +34,7 @@ describe('Persistence round-trip (web)', () => {
   });
 
   it('saves and loads design via localStorage', async () => {
-    vi.doMock('../lib/environment', () => ({ isTauriEnvironment: () => false }));
+    vi.doMock('../lib/config/environment', () => ({ isTauriEnvironment: () => false }));
     const { saveDesign: save, loadDesign: load } = await import('../lib/api/tauriClient');
     await save('test-project', sampleDesign);
     const loaded = await load('test-project');
@@ -50,7 +50,7 @@ describe('Persistence round-trip (tauri mocked)', () => {
   });
 
   it('saves and loads design via tauri fs', async () => {
-    vi.doMock('../lib/environment', () => ({ isTauriEnvironment: () => true }));
+    vi.doMock('../lib/config/environment', () => ({ isTauriEnvironment: () => true }));
     const writes: Record<string, string> = {};
     vi.doMock('@tauri-apps/api/path', () => ({
       appDataDir: async () => '/tmp',

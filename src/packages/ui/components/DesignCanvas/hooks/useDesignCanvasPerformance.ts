@@ -36,6 +36,73 @@ export function useDesignCanvasPerformance({
     []
   );
 
+  const isMountedRef = useRef(true);
+  const circuitBreakerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleAfterRender = useCallback((task: () => void): ReturnType<typeof setTimeout> => {
+    return setTimeout(() => {
+      if (!isMountedRef.current) {
+        return;
+      }
+      task();
+    }, 0);
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (circuitBreakerTimeoutRef.current != null) {
+        clearTimeout(circuitBreakerTimeoutRef.current);
+        circuitBreakerTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleCircuitBreakerOpen = useCallback(
+    (details: CircuitBreakerDetails) => {
+      if (circuitBreakerTimeoutRef.current != null) {
+        clearTimeout(circuitBreakerTimeoutRef.current);
+      }
+
+      circuitBreakerTimeoutRef.current = scheduleAfterRender(() => {
+        circuitBreakerTimeoutRef.current = null;
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        setCircuitBreakerDetails(details);
+        setEmergencyPauseReason(details.reason);
+        flushDesignDataRef.current?.('circuit-breaker', { immediate: true });
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('archicomm:design-canvas:flush-request', {
+              detail: { reason: details.reason ?? 'circuit-breaker' },
+            })
+          );
+        }
+      });
+    },
+    [flushDesignDataRef, scheduleAfterRender]
+  );
+
+  const handleCircuitBreakerClose = useCallback(() => {
+    if (circuitBreakerTimeoutRef.current != null) {
+      clearTimeout(circuitBreakerTimeoutRef.current);
+    }
+
+    circuitBreakerTimeoutRef.current = scheduleAfterRender(() => {
+      circuitBreakerTimeoutRef.current = null;
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setCircuitBreakerDetails(null);
+      setEmergencyPauseReason(null);
+    });
+  }, [scheduleAfterRender]);
+
   const renderGuard = useRenderGuard('DesignCanvasCore', {
     warningThreshold: 25,
     errorThreshold: 45,
@@ -63,21 +130,8 @@ export function useDesignCanvasPerformance({
       selectedComponent,
       isSynced,
     }),
-    onCircuitBreakerOpen: details => {
-      setCircuitBreakerDetails(details);
-      setEmergencyPauseReason(details.reason);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('archicomm:design-canvas:flush-request', {
-            detail: { reason: 'circuit-breaker' },
-          })
-        );
-      }
-    },
-    onCircuitBreakerClose: () => {
-      setCircuitBreakerDetails(null);
-      setEmergencyPauseReason(null);
-    },
+    onCircuitBreakerOpen: handleCircuitBreakerOpen,
+    onCircuitBreakerClose: handleCircuitBreakerClose,
   });
 
   // Stability tracking effect

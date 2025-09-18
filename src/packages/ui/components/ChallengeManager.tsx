@@ -12,18 +12,18 @@ import {
   AlertCircle,
   BookOpen,
 } from 'lucide-react';
-import { ExtendedChallenge, challengeManager, tauriChallengeAPI } from '@/lib/challenge-config';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Badge } from './ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Alert, AlertDescription } from './ui/alert';
+import { ExtendedChallenge, challengeManager, tauriChallengeAPI } from '@/lib/config/challenge-config';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@ui/components/ui/card';
+import { Button } from '@ui/components/ui/button';
+import { Input } from '@ui/components/ui/input';
+import { Textarea } from '@ui/components/ui/textarea';
+import { Label } from '@ui/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/components/ui/select';
+import { Badge } from '@ui/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs';
+import { ScrollArea } from '@ui/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@ui/components/ui/dialog';
+import { Alert, AlertDescription } from '@ui/components/ui/alert';
 import type { Challenge } from '@/shared/contracts';
 
 interface ChallengeManagerProps {

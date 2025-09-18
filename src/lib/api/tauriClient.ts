@@ -3,8 +3,8 @@ import { readTextFile, writeTextFile, createDir, exists, removeFile } from '@tau
 import { appDataDir, join } from '@tauri-apps/api/path';
 import type { Project } from '../contracts/schema';
 import { Project as ProjectSchema } from '../contracts/schema';
-import { isTauriEnvironment } from '../environment';
-import type { DesignData } from '../../shared/contracts';
+import { isTauriEnvironment } from '../config/environment';
+import type { DesignData } from '@shared/contracts';
 
 export async function createProject(name: string, description: string): Promise<Project> {
   const raw = await invoke<unknown>('create_project', { name, description });

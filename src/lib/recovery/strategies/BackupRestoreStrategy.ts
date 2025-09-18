@@ -1,13 +1,13 @@
 // src/lib/recovery/strategies/BackupRestoreStrategy.ts
 // Backup restoration strategy for recovering from corrupted or lost data
 // Mid-priority strategy that attempts to restore from valid backups when data corruption occurs
-// RELEVANT FILES: src/services/canvas/CanvasPersistence.ts, src/lib/errorStore.ts
+// RELEVANT FILES: src/services/canvas/CanvasPersistence.ts, src/lib/logging/errorStore.ts
 
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
 import { CanvasPersistence } from '@services/canvas/CanvasPersistence';
 import { storage, designsStore } from '@services/storage';
-import { logger } from '../../logger';
+import { logger } from '@lib/logging/logger';
 
 export class BackupRestoreStrategy implements RecoveryStrategy {
   public readonly name = 'backup-restore';

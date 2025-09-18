@@ -11,14 +11,14 @@ import {
   Zap
 } from 'lucide-react';
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
-import { ExtendedChallenge, SolutionHint } from '@/lib/challenge-config';
+import { ExtendedChallenge, SolutionHint } from '@/lib/config/challenge-config';
 import type { FramerMotionModule, AnimatePresenceComponent } from '@/lib/types/FramerMotion';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { ScrollArea } from './ui/scroll-area';
-import { Separator } from './ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Badge } from '@ui/components/ui/badge';
+import { Button } from '@ui/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@ui/components/ui/card';
+import { ScrollArea } from '@ui/components/ui/scroll-area';
+import { Separator } from '@ui/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs';
 
 // Lazy load heavy animation components (removed unused)
 // const LazyMotionDiv = React.lazy(() =>

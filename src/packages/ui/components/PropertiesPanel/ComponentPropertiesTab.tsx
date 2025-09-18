@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { EmojiPicker } from '../ui/emoji-picker';
 import { ColorPicker } from '../ui/color-picker';
-import { WhatIfPanel } from '../WhatIfPanel';
+import { WhatIfPanel } from '@ui/components/panels/WhatIfPanel';
 
 interface ComponentPropertiesTabProps {
   selectedComponentData: DesignComponent | null;

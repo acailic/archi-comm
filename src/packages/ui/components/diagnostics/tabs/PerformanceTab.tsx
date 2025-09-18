@@ -11,7 +11,7 @@ import {
   Activity,
   BarChart3,
 } from 'lucide-react';
-import { usePerformanceMonitoring } from '@/hooks/usePerformanceMonitoring';
+import { usePerformanceMonitoring } from '@hooks/usePerformanceMonitoring';
 
 // Utility: trigger a file download from string/Blob data
 const triggerDownload = (

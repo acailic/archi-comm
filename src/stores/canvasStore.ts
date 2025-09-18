@@ -1,14 +1,14 @@
 // src/stores/canvasStore.ts
 // Zustand store for canvas state management with middleware
 // Centralizes components, connections, infoCards, and UI state to reduce re-renders
-// RELEVANT FILES: src/components/DesignCanvas.tsx, src/hooks/useUndoRedo.ts, src/features/canvas/types.ts, src/types/canvas.ts
+// RELEVANT FILES: src/components/DesignCanvas.tsx, src/shared/hooks/canvas/useUndoRedo.ts, src/features/canvas/types.ts, src/types/canvas.ts
 
 import { temporal } from 'zundo';
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { shallow } from 'zustand/shallow';
 import { immer } from 'zustand/middleware/immer';
-import type { Connection, DesignComponent, InfoCard } from '../shared/contracts';
+import type { Connection, DesignComponent, InfoCard } from '@shared/contracts';
 
 type EqualityDifference = { path: string; reason: string };
 

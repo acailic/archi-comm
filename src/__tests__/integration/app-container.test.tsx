@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import AppContainer from '@ui/components/AppContainer';
-import * as env from '@/lib/environment';
+import * as env from '@/lib/config/environment';
 import { renderWithProviders } from '@/test/integration-helpers';
 
 describe('AppContainer integration', () => {

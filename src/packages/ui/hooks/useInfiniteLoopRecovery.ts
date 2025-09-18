@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useAppStore } from '@/hooks/useAppStore';
+import { useAppStore } from '@hooks/useAppStore';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 

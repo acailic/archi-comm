@@ -46,13 +46,13 @@ describe('tauri.ts utility functions', () => {
 
   describe('isTauri', () => {
     it('returns true when in Tauri environment', async () => {
-      const { isTauri } = await import('../lib/tauri');
+      const { isTauri } = await import('../lib/platform/tauri');
       expect(isTauri()).toBe(true);
     });
 
     it('returns false when not in Tauri environment', async () => {
       mockWindow.__TAURI__ = undefined;
-      const { isTauri } = await import('../lib/tauri');
+      const { isTauri } = await import('../lib/platform/tauri');
       expect(isTauri()).toBe(false);
     });
   });
@@ -60,7 +60,7 @@ describe('tauri.ts utility functions', () => {
   describe('windowUtils', () => {
     it('minimize calls appWindow.minimize in Tauri environment', async () => {
       const { appWindow } = await import('@tauri-apps/api/window');
-      const { windowUtils } = await import('../lib/tauri');
+      const { windowUtils } = await import('../lib/platform/tauri');
 
       windowUtils.minimize();
       expect(appWindow.minimize).toHaveBeenCalled();
@@ -68,7 +68,7 @@ describe('tauri.ts utility functions', () => {
 
     it('maximize calls appWindow.toggleMaximize in Tauri environment', async () => {
       const { appWindow } = await import('@tauri-apps/api/window');
-      const { windowUtils } = await import('../lib/tauri');
+      const { windowUtils } = await import('../lib/platform/tauri');
 
       windowUtils.maximize();
       expect(appWindow.toggleMaximize).toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe('tauri.ts utility functions', () => {
 
     it('close calls appWindow.close in Tauri environment', async () => {
       const { appWindow } = await import('@tauri-apps/api/window');
-      const { windowUtils } = await import('../lib/tauri');
+      const { windowUtils } = await import('../lib/platform/tauri');
 
       windowUtils.close();
       expect(appWindow.close).toHaveBeenCalled();
@@ -84,7 +84,7 @@ describe('tauri.ts utility functions', () => {
 
     it('setTitle calls appWindow.setTitle with correct argument', async () => {
       const { appWindow } = await import('@tauri-apps/api/window');
-      const { windowUtils } = await import('../lib/tauri');
+      const { windowUtils } = await import('../lib/platform/tauri');
 
       windowUtils.setTitle('Test Title');
       expect(appWindow.setTitle).toHaveBeenCalledWith('Test Title');
@@ -92,7 +92,7 @@ describe('tauri.ts utility functions', () => {
 
     it('setResizable calls appWindow.setResizable with correct argument', async () => {
       const { appWindow } = await import('@tauri-apps/api/window');
-      const { windowUtils } = await import('../lib/tauri');
+      const { windowUtils } = await import('../lib/platform/tauri');
 
       windowUtils.setResizable(false);
       expect(appWindow.setResizable).toHaveBeenCalledWith(false);
@@ -106,7 +106,7 @@ describe('tauri.ts utility functions', () => {
       );
       vi.mocked(isPermissionGranted).mockResolvedValue(true);
 
-      const { notificationUtils } = await import('../lib/tauri');
+      const { notificationUtils } = await import('../lib/platform/tauri');
       await notificationUtils.send('Test Title', 'Test Body');
 
       expect(sendNotification).toHaveBeenCalledWith({
@@ -122,7 +122,7 @@ describe('tauri.ts utility functions', () => {
       vi.mocked(isPermissionGranted).mockResolvedValue(false);
       vi.mocked(requestPermission).mockResolvedValue('granted');
 
-      const { notificationUtils } = await import('../lib/tauri');
+      const { notificationUtils } = await import('../lib/platform/tauri');
       await notificationUtils.send('Test Title', 'Test Body');
 
       expect(requestPermission).toHaveBeenCalled();
@@ -139,7 +139,7 @@ describe('tauri.ts utility functions', () => {
       vi.mocked(isPermissionGranted).mockResolvedValue(false);
       vi.mocked(requestPermission).mockResolvedValue('denied');
 
-      const { notificationUtils } = await import('../lib/tauri');
+      const { notificationUtils } = await import('../lib/platform/tauri');
       await notificationUtils.send('Test Title', 'Test Body');
 
       expect(requestPermission).toHaveBeenCalled();
@@ -152,7 +152,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue({ data: 'test' });
 
-      const { ipcUtils } = await import('../lib/tauri');
+      const { ipcUtils } = await import('../lib/platform/tauri');
       const result = await ipcUtils.invoke('test_command', { arg: 'value' });
 
       expect(invoke).toHaveBeenCalledWith('test_command', { arg: 'value' });
@@ -165,7 +165,7 @@ describe('tauri.ts utility functions', () => {
       vi.mocked(listen).mockResolvedValue(mockUnlisten);
 
       const callback = vi.fn();
-      const { ipcUtils } = await import('../lib/tauri');
+      const { ipcUtils } = await import('../lib/platform/tauri');
       const unlisten = await ipcUtils.listen('test_event', callback);
 
       expect(listen).toHaveBeenCalled();
@@ -183,7 +183,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue('file content');
 
-      const { fileUtils } = await import('../lib/tauri');
+      const { fileUtils } = await import('../lib/platform/tauri');
       const result = await fileUtils.readFile('/test/path');
 
       expect(invoke).toHaveBeenCalledWith('read_file', { path: '/test/path' });
@@ -194,7 +194,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue(undefined);
 
-      const { fileUtils } = await import('../lib/tauri');
+      const { fileUtils } = await import('../lib/platform/tauri');
       await fileUtils.writeFile('/test/path', 'content');
 
       expect(invoke).toHaveBeenCalledWith('write_file', { path: '/test/path', content: 'content' });
@@ -204,7 +204,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue('/selected/file.txt');
 
-      const { fileUtils } = await import('../lib/tauri');
+      const { fileUtils } = await import('../lib/platform/tauri');
       const result = await fileUtils.selectFile();
 
       expect(invoke).toHaveBeenCalledWith('select_file');
@@ -215,7 +215,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue('/selected/directory');
 
-      const { fileUtils } = await import('../lib/tauri');
+      const { fileUtils } = await import('../lib/platform/tauri');
       const result = await fileUtils.selectDirectory();
 
       expect(invoke).toHaveBeenCalledWith('select_directory');
@@ -229,7 +229,7 @@ describe('tauri.ts utility functions', () => {
       const mockProject = { id: '1', name: 'Test', description: 'Test project' };
       vi.mocked(invoke).mockResolvedValue(mockProject);
 
-      const { projectUtils } = await import('../lib/tauri');
+      const { projectUtils } = await import('../lib/platform/tauri');
       const result = await projectUtils.createProject('Test', 'Test project');
 
       expect(invoke).toHaveBeenCalledWith('create_project', {
@@ -244,7 +244,7 @@ describe('tauri.ts utility functions', () => {
       const mockProjects = [{ id: '1', name: 'Test' }];
       vi.mocked(invoke).mockResolvedValue(mockProjects);
 
-      const { projectUtils } = await import('../lib/tauri');
+      const { projectUtils } = await import('../lib/platform/tauri');
       const result = await projectUtils.getProjects();
 
       expect(invoke).toHaveBeenCalledWith('get_projects');
@@ -256,7 +256,7 @@ describe('tauri.ts utility functions', () => {
       const mockProject = { id: '1', name: 'Test' };
       vi.mocked(invoke).mockResolvedValue(mockProject);
 
-      const { projectUtils } = await import('../lib/tauri');
+      const { projectUtils } = await import('../lib/platform/tauri');
       const result = await projectUtils.getProject('1');
 
       expect(invoke).toHaveBeenCalledWith('get_project', { project_id: '1' });
@@ -268,7 +268,7 @@ describe('tauri.ts utility functions', () => {
       const mockProject = { id: '1', name: 'Updated', description: 'Updated project' };
       vi.mocked(invoke).mockResolvedValue(mockProject);
 
-      const { projectUtils } = await import('../lib/tauri');
+      const { projectUtils } = await import('../lib/platform/tauri');
       const result = await projectUtils.updateProject(
         '1',
         'Updated',
@@ -289,7 +289,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue(true);
 
-      const { projectUtils } = await import('../lib/tauri');
+      const { projectUtils } = await import('../lib/platform/tauri');
       const result = await projectUtils.deleteProject('1');
 
       expect(invoke).toHaveBeenCalledWith('delete_project', { project_id: '1' });
@@ -300,7 +300,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue('exported data');
 
-      const { projectUtils } = await import('../lib/tauri');
+      const { projectUtils } = await import('../lib/platform/tauri');
       const result = await projectUtils.exportProjectData('1');
 
       expect(invoke).toHaveBeenCalledWith('export_project_data', { project_id: '1' });
@@ -314,7 +314,7 @@ describe('tauri.ts utility functions', () => {
       const mockComponent = { id: '1', name: 'Test Component' };
       vi.mocked(invoke).mockResolvedValue(mockComponent);
 
-      const { componentUtils } = await import('../lib/tauri');
+      const { componentUtils } = await import('../lib/platform/tauri');
       const result = await componentUtils.addComponent(
         'proj1',
         'Test Component',
@@ -336,7 +336,7 @@ describe('tauri.ts utility functions', () => {
       const mockComponent = { id: '1', name: 'Updated Component' };
       vi.mocked(invoke).mockResolvedValue(mockComponent);
 
-      const { componentUtils } = await import('../lib/tauri');
+      const { componentUtils } = await import('../lib/platform/tauri');
       const result = await componentUtils.updateComponent(
         'proj1',
         'comp1',
@@ -361,7 +361,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue(true);
 
-      const { componentUtils } = await import('../lib/tauri');
+      const { componentUtils } = await import('../lib/platform/tauri');
       const result = await componentUtils.removeComponent('proj1', 'comp1');
 
       expect(invoke).toHaveBeenCalledWith('remove_component', {
@@ -380,7 +380,7 @@ describe('tauri.ts utility functions', () => {
       ];
       vi.mocked(invoke).mockResolvedValue(undefined);
 
-      const { diagramUtils } = await import('../lib/tauri');
+      const { diagramUtils } = await import('../lib/platform/tauri');
       await diagramUtils.saveDiagram('proj1', mockElements);
 
       expect(invoke).toHaveBeenCalledWith('save_diagram', {
@@ -396,7 +396,7 @@ describe('tauri.ts utility functions', () => {
       ];
       vi.mocked(invoke).mockResolvedValue(mockElements);
 
-      const { diagramUtils } = await import('../lib/tauri');
+      const { diagramUtils } = await import('../lib/platform/tauri');
       const result = await diagramUtils.loadDiagram('proj1');
 
       expect(invoke).toHaveBeenCalledWith('load_diagram', { project_id: 'proj1' });
@@ -410,7 +410,7 @@ describe('tauri.ts utility functions', () => {
       ];
       vi.mocked(invoke).mockResolvedValue(undefined);
 
-      const { diagramUtils } = await import('../lib/tauri');
+      const { diagramUtils } = await import('../lib/platform/tauri');
       await diagramUtils.saveConnections('proj1', mockConnections);
 
       expect(invoke).toHaveBeenCalledWith('save_connections', {
@@ -426,7 +426,7 @@ describe('tauri.ts utility functions', () => {
       ];
       vi.mocked(invoke).mockResolvedValue(mockConnections);
 
-      const { diagramUtils } = await import('../lib/tauri');
+      const { diagramUtils } = await import('../lib/platform/tauri');
       const result = await diagramUtils.loadConnections('proj1');
 
       expect(invoke).toHaveBeenCalledWith('load_connections', { project_id: 'proj1' });
@@ -443,7 +443,7 @@ describe('tauri.ts utility functions', () => {
       };
       vi.mocked(invoke).mockResolvedValue(mockResponse);
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       const result = await transcriptionUtils.transcribeAudio('/test/audio.wav');
 
       expect(invoke).toHaveBeenCalledWith('transcribe_audio', { file_path: '/test/audio.wav' });
@@ -458,7 +458,7 @@ describe('tauri.ts utility functions', () => {
       };
       vi.mocked(invoke).mockResolvedValue(mockResponse);
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       await transcriptionUtils.transcribeAudio('/test/audio.wav', {
         timeout: 30000,
         jobId: 'job123',
@@ -473,7 +473,7 @@ describe('tauri.ts utility functions', () => {
     });
 
     it('transcribeAudio validates parameters', async () => {
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
 
       await expect(
         transcriptionUtils.transcribeAudio('/test/audio.wav', { timeout: -1 })
@@ -502,7 +502,7 @@ describe('tauri.ts utility functions', () => {
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       const result = await transcriptionUtils.transcribeAudio('/test/audio.wav', {
         maxSegments: 2,
       });
@@ -524,7 +524,7 @@ describe('tauri.ts utility functions', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       await expect(transcriptionUtils.transcribeAudio('/test/audio.wav')).rejects.toThrow(
         'Invalid transcription response structure'
       );
@@ -545,7 +545,7 @@ describe('tauri.ts utility functions', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       await expect(transcriptionUtils.transcribeAudio('/test/audio.wav')).rejects.toThrow(
         'Invalid transcription response structure'
       );
@@ -561,7 +561,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue(undefined);
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       const result = await transcriptionUtils.cancelTranscription('job123');
 
       expect(invoke).toHaveBeenCalledWith('cancel_transcription', { job_id: 'job123' });
@@ -574,7 +574,7 @@ describe('tauri.ts utility functions', () => {
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       const result = await transcriptionUtils.cancelTranscription('job123');
 
       expect(result).toBe(false);
@@ -591,7 +591,7 @@ describe('tauri.ts utility functions', () => {
       const mockResponse = { text: 'Test', segments: [{ text: 'Test', start: 0, end: 1 }] };
       vi.mocked(invoke).mockResolvedValue(mockResponse);
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       const result = await transcriptionUtils.testTranscriptionPipeline('/test/audio.wav');
 
       expect(result.success).toBe(true);
@@ -603,7 +603,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockRejectedValue(new Error('Test error'));
 
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       const result = await transcriptionUtils.testTranscriptionPipeline('/test/audio.wav');
 
       expect(result.success).toBe(false);
@@ -617,7 +617,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue('1.0.0');
 
-      const { utilUtils } = await import('../lib/tauri');
+      const { utilUtils } = await import('../lib/platform/tauri');
       const result = await utilUtils.getAppVersion();
 
       expect(invoke).toHaveBeenCalledWith('get_app_version');
@@ -628,7 +628,7 @@ describe('tauri.ts utility functions', () => {
       const { invoke } = await import('@tauri-apps/api/tauri');
       vi.mocked(invoke).mockResolvedValue(undefined);
 
-      const { utilUtils } = await import('../lib/tauri');
+      const { utilUtils } = await import('../lib/platform/tauri');
       await utilUtils.showInFolder('/test/path');
 
       expect(invoke).toHaveBeenCalledWith('show_in_folder', { path: '/test/path' });
@@ -642,7 +642,7 @@ describe('tauri.ts utility functions', () => {
       const mockProjects = [{ id: '1', name: 'Sample' }];
       vi.mocked(invoke).mockResolvedValue(mockProjects);
 
-      const { utilUtils } = await import('../lib/tauri');
+      const { utilUtils } = await import('../lib/platform/tauri');
       const result = await utilUtils.populateSampleData();
 
       expect(invoke).toHaveBeenCalledWith('populate_sample_data');
@@ -657,7 +657,7 @@ describe('tauri.ts utility functions', () => {
 
       const { invoke } = await import('@tauri-apps/api/tauri');
 
-      const { utilUtils } = await import('../lib/tauri');
+      const { utilUtils } = await import('../lib/platform/tauri');
       const result = await utilUtils.populateSampleData();
 
       expect(invoke).not.toHaveBeenCalled();
@@ -675,7 +675,7 @@ describe('tauri.ts utility functions', () => {
     it('ipcUtils.invoke returns empty object and warns', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      const { ipcUtils } = await import('../lib/tauri');
+      const { ipcUtils } = await import('../lib/platform/tauri');
       const result = await ipcUtils.invoke('test_command');
 
       expect(result).toEqual({});
@@ -689,7 +689,7 @@ describe('tauri.ts utility functions', () => {
     it('ipcUtils.listen returns no-op function and warns', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      const { ipcUtils } = await import('../lib/tauri');
+      const { ipcUtils } = await import('../lib/platform/tauri');
       const unlisten = await ipcUtils.listen('test_event', () => {});
 
       expect(typeof unlisten).toBe('function');
@@ -706,7 +706,7 @@ describe('tauri.ts utility functions', () => {
     });
 
     it('transcribeAudio returns mock response in non-Tauri environment', async () => {
-      const { transcriptionUtils } = await import('../lib/tauri');
+      const { transcriptionUtils } = await import('../lib/platform/tauri');
       const result = await transcriptionUtils.transcribeAudio('/test/path');
 
       expect(result).toEqual({
@@ -716,7 +716,7 @@ describe('tauri.ts utility functions', () => {
     });
 
     it('window utils return false in non-Tauri environment', async () => {
-      const { windowUtils } = await import('../lib/tauri');
+      const { windowUtils } = await import('../lib/platform/tauri');
 
       expect(windowUtils.minimize()).toBe(false);
       expect(windowUtils.maximize()).toBe(false);

@@ -1,13 +1,13 @@
 // src/lib/recovery/strategies/AutoSaveStrategy.ts
 // Auto-save recovery strategy that preserves user work during errors
 // Highest priority strategy that saves current design and audio data before other recovery attempts
-// RELEVANT FILES: src/services/canvas/CanvasPersistence.ts, src/services/storage.ts, src/hooks/useAutoSave.ts
+// RELEVANT FILES: src/services/canvas/CanvasPersistence.ts, src/services/storage.ts, src/shared/hooks/common/useAutoSave.ts
 
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
 import { CanvasPersistence } from '@services/canvas/CanvasPersistence';
 import { storage } from '@services/storage';
-import { logger } from '../../logger';
+import { logger } from '@lib/logging/logger';
 
 export class AutoSaveStrategy implements RecoveryStrategy {
   public readonly name = 'auto-save';

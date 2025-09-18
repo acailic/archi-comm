@@ -1,10 +1,10 @@
 // src/dev/testData.ts
 // Comprehensive mock data for testing ArchiComm components in isolation
 // Provides realistic test data for challenges, canvas states, audio recordings, and component configurations
-// RELEVANT FILES: ../lib/challenge-config.ts, ../shared/contracts/index.ts, @ui/components/ChallengeSelection.tsx, @ui/components/CanvasArea.tsx
+// RELEVANT FILES: ../lib/config/challenge-config.ts, @shared/contracts.ts, @ui/components/ChallengeSelection.tsx, @ui/components/canvas/CanvasArea.tsx
 
-import { ExtendedChallenge } from '../lib/challenge-config';
-import { DesignComponent, Connection, AudioData } from '../shared/contracts';
+import { ExtendedChallenge } from '../lib/config/challenge-config';
+import { DesignComponent, Connection, AudioData } from '@shared/contracts';
 
 // Mock challenges using ExtendedChallenge interface
 export const mockChallenges: ExtendedChallenge[] = [

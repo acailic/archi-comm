@@ -6,10 +6,10 @@ import { Search, Command } from 'lucide-react';
 import { formatShortcutKey } from '@/lib/shortcuts/KeyboardShortcuts';
 import { useCommandPalette } from '@ui/hooks/useCommandPalette';
 import { CommandItem } from './CommandPalette/CommandItem';
-import { Input } from './ui/input';
-import { Dialog, DialogContent } from './ui/dialog';
-import { Badge } from './ui/badge';
-import { Separator } from './ui/separator';
+import { Input } from '@ui/components/ui/input';
+import { Dialog, DialogContent } from '@ui/components/ui/dialog';
+import { Badge } from '@ui/components/ui/badge';
+import { Separator } from '@ui/components/ui/separator';
 
 interface CommandPaletteProps {
   isOpen: boolean;

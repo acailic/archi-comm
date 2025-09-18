@@ -1,10 +1,10 @@
-// src/lib/audio/engine-implementations/whisper-rust-engine.ts
+// src/packages/audio/engine-implementations/whisper-rust-engine.ts
 // Wrapper for the existing Whisper-rs transcription via Tauri backend
 // Integrates the current implementation with the new engine system
-// RELEVANT FILES: src/lib/tauri.ts, src/lib/audio/transcription-engines.ts
+// RELEVANT FILES: src/lib/platform/tauri.ts, src/packages/audio/transcription/transcription-engines.ts
 
-import { TranscriptionEngine, TranscriptionEngineOptions } from '../transcription-engines';
-import type { TranscriptionResponse, TranscriptionOptions } from '../../../shared/contracts';
+import { TranscriptionEngine, TranscriptionEngineOptions } from '../transcription/transcription-engines';
+import type { TranscriptionResponse, TranscriptionOptions } from '../@shared/contracts';
 
 export class WhisperRustEngine implements TranscriptionEngine {
   name = 'Whisper-rs';
@@ -19,7 +19,7 @@ export class WhisperRustEngine implements TranscriptionEngine {
       if (!isTauri) return false;
       
       // Dynamically import transcriptionUtils to test availability
-      const { transcriptionUtils } = await import('@/lib/tauri');
+      const { transcriptionUtils } = await import('@/lib/platform/tauri');
       
       // Test the transcription pipeline with a minimal call
       const testResult = await transcriptionUtils.testTranscriptionPipeline('');
@@ -50,7 +50,7 @@ export class WhisperRustEngine implements TranscriptionEngine {
     
     try {
       // Dynamically import audio and transcription utils
-      const { audioUtils, transcriptionUtils } = await import('@/lib/tauri');
+      const { audioUtils, transcriptionUtils } = await import('@/lib/platform/tauri');
       
       // Convert audio to file path using existing audioUtils
       let filePath: string;
@@ -58,7 +58,7 @@ export class WhisperRustEngine implements TranscriptionEngine {
         filePath = await audioUtils.saveAudioBlob(audio);
       } else {
         // Convert ArrayBuffer to Blob first
-        const blob = new Blob([audio], { type: 'audio/wav' });
+        const blob = new Blob([audio], { type: 'audio/processing/wav' });
         filePath = await audioUtils.saveAudioBlob(blob);
       }
       
@@ -102,7 +102,7 @@ export class WhisperRustEngine implements TranscriptionEngine {
   // Additional methods specific to Whisper-rs
   async cancelTranscription(jobId: string): Promise<boolean> {
     try {
-      const { transcriptionUtils } = await import('@/lib/tauri');
+      const { transcriptionUtils } = await import('@/lib/platform/tauri');
       return await transcriptionUtils.cancelTranscription(jobId);
     } catch (error) {
       console.error('Failed to cancel transcription:', error);
@@ -112,7 +112,7 @@ export class WhisperRustEngine implements TranscriptionEngine {
   
   async testPipeline(filePath: string): Promise<{ success: boolean; error?: string; result?: TranscriptionResponse }> {
     try {
-      const { transcriptionUtils } = await import('@/lib/tauri');
+      const { transcriptionUtils } = await import('@/lib/platform/tauri');
       return await transcriptionUtils.testTranscriptionPipeline(filePath);
     } catch (error) {
       return {

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { isDevelopment } from '@/lib/environment';
+import { isDevelopment } from '@/lib/config/environment';
 import type { AppStoreActions } from '@/stores/AppStore';
 
 interface UseDevTogglesProps {

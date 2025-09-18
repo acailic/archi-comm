@@ -2,18 +2,18 @@
  * src/__tests__/useDesignValidation.test.tsx
  * Unit tests for the useDesignValidation React hook
  * Tests hook behavior, memoization, error handling, and edge cases
- * RELEVANT FILES: src/hooks/useDesignValidation.ts, src/lib/design-comparison.ts, src/shared/contracts/index.ts
+ * RELEVANT FILES: src/shared/hooks/validation/useDesignValidation.ts, src/lib/design/design-comparison.ts, src/shared/contracts/index.ts
  */
 
 import React from 'react';
 import { render, renderHook } from '@testing-library/react';
 import { useDesignValidation } from '../hooks/useDesignValidation';
-import * as designComparison from '../lib/design-comparison';
-import type { ExtendedChallenge } from '../lib/challenge-config';
+import * as designComparison from '../lib/design/design-comparison';
+import type { ExtendedChallenge } from '../lib/config/challenge-config';
 import type { DesignData } from '@/shared/contracts';
 
 // Mock the design comparison module
-jest.mock('../lib/design-comparison', () => ({
+jest.mock('../lib/design/design-comparison', () => ({
   compareDesigns: jest.fn()
 }));
 

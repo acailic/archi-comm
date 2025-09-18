@@ -9,7 +9,7 @@ import { useCanvasActions } from '@/stores/canvasStore';
 import { useCallback, useEffect, useRef } from 'react';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 import { storage } from '@services/storage';
-import { useAppStore } from '@/hooks/useAppStore';
+import { useAppStore } from '@hooks/useAppStore';
 
 interface DesignCanvasEffectsProps {
   components: any[];

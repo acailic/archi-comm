@@ -1,14 +1,14 @@
 // src/__tests__/integration/challenge-selection-flow.test.tsx
 // Integration tests for the complete challenge selection workflow from selection to design canvas
 // Tests challenge filtering, selection, data validation, error handling, and navigation flow
-// RELEVANT FILES: src/test/integration-helpers.tsx, src/components/ChallengeSelection.tsx, src/components/AppContainer.tsx, src/lib/challenge-config.ts
+// RELEVANT FILES: src/test/integration-helpers.tsx, src/components/ChallengeSelection.tsx, src/components/AppContainer.tsx, src/lib/config/challenge-config.ts
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, MockHelpers } from '../../test/integration-helpers';
 import { ChallengeSelection } from '@ui/components/ChallengeSelection';
-import * as env from '../../lib/environment';
+import * as env from '../../lib/config/environment';
 
 // Mock challenge data for testing
 const mockChallenges = [
@@ -398,7 +398,7 @@ describe('Challenge Selection Flow Integration Tests', () => {
       vi.doMock('@tauri-apps/api/dialog', () => ({
         open: mockOpen
       }));
-      vi.doMock('../../lib/challenge-config', () => ({
+      vi.doMock('../../lib/config/challenge-config', () => ({
         tauriChallengeAPI: {
           loadChallengesFromFile: mockLoadChallenges
         }

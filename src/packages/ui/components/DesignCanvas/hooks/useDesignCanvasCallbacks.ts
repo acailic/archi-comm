@@ -1,11 +1,11 @@
 // src/components/DesignCanvas/hooks/useDesignCanvasCallbacks.ts
 // Callback handlers for DesignCanvas component
 // Manages all event handlers and actions for canvas interaction
-// RELEVANT FILES: DesignCanvasCore.tsx, ../../../shared/contracts.ts, ../../../lib/utils.ts, useStableCallbacks.ts
+// RELEVANT FILES: DesignCanvasCore.tsx, ../@shared/contracts.ts, ../../../lib/utils.ts, useStableCallbacks.ts
 
 import { useEffect, useRef } from 'react';
 
-import { useStableCallback } from '@/hooks/useStableCallbacks';
+import { useStableCallback } from '@hooks/useStableCallbacks';
 import { generateId } from '@core/utils';
 import type { Connection, DesignComponent, InfoCard } from '@/shared/contracts';
 import { useCanvasActions, useCanvasStore, getCanvasState } from '@/stores/canvasStore';

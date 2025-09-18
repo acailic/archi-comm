@@ -1,7 +1,7 @@
 import { ReviewResp as ReviewRespSchema, type ReviewResp } from '../contracts/schema';
 import { aiConfigService } from '@/lib/services/AIConfigService';
 import { DEFAULT_SETTINGS } from '../types/AIConfig';
-import { isTauri } from '../tauri';
+import { isTauri } from '@/lib/platform/tauri';
 
 // AI API Response interface for different providers
 interface AIResponse {

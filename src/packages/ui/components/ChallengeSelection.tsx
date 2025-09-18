@@ -1,14 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Clock, Database, PlayCircle, Search, Target, TrendingUp } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
-import type { ExtendedChallenge } from '@/lib/challenge-config';
-import { challengeManager } from '@/lib/challenge-config';
-import { isTauriEnvironment } from '@/lib/environment';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import type { ExtendedChallenge } from '@/lib/config/challenge-config';
+import { challengeManager } from '@/lib/config/challenge-config';
+import { isTauriEnvironment } from '@/lib/config/environment';
+import { Badge } from '@ui/components/ui/badge';
+import { Button } from '@ui/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@ui/components/ui/card';
+import { Input } from '@ui/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/components/ui/select';
 // Safe imports with detailed error handling and typed fallbacks
 type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 type Category = 'system-design' | 'architecture' | 'scaling';
@@ -303,7 +303,7 @@ export function ChallengeSelection({
                             filters: [{ name: 'JSON', extensions: ['json'] }],
                           });
                           if (!selected || typeof selected !== 'string') return;
-                          const { tauriChallengeAPI } = await import('@/lib/challenge-config');
+                          const { tauriChallengeAPI } = await import('@/lib/config/challenge-config');
                           const loaded = await tauriChallengeAPI.loadChallengesFromFile(selected);
                           if (Array.isArray(loaded) && loaded.length > 0) {
                             setImportedChallenges(prev => [...prev, ...loaded]);

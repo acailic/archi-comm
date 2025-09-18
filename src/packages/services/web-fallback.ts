@@ -3,7 +3,7 @@
  * Provides browser-based alternatives for desktop-only features
  */
 
-import { CONFIG } from '@/lib/environment';
+import { CONFIG } from '@/lib/config/environment';
 import type { DesignData } from '@/shared/contracts';
 
 // Types for web fallback implementations

@@ -2,13 +2,13 @@
  * src/components/SolutionValidationCard.tsx
  * Component for displaying solution validation results with detailed feedback
  * This component shows validation scores, feedback, and example solutions
- * RELEVANT FILES: src/components/ReviewScreen.tsx, src/hooks/useDesignValidation.ts, src/shared/contracts/index.ts, src/lib/challenge-config.ts
+ * RELEVANT FILES: src/components/ReviewScreen.tsx, src/shared/hooks/validation/useDesignValidation.ts, src/shared/contracts/index.ts, src/lib/config/challenge-config.ts
  */
 
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Target, CheckCircle, AlertCircle, XCircle, Eye } from 'lucide-react';
 import type { DesignValidationResult } from '@/shared/contracts';
-import type { ArchitectureTemplate } from '@/lib/challenge-config';
+import type { ArchitectureTemplate } from '@/lib/config/challenge-config';
 
 interface SolutionValidationCardProps {
   validationResult: DesignValidationResult;

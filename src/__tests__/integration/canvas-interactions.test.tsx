@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders, MockHelpers } from '../../test/integration-helpers';
 import { ReactFlowCanvas } from '../../packages/canvas/components/ReactFlowCanvas';
 import { useNodePresenter } from '../../features/canvas/hooks/useNodePresenter';
-import type { DesignComponent, Connection } from '../../shared/contracts';
+import type { DesignComponent, Connection } from '@shared/contracts';
 
 // Mock canvas data for testing
 const mockComponents: DesignComponent[] = [

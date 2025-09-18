@@ -20,7 +20,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 
 import { CanvasPerformanceManager } from '@/lib/performance/CanvasPerformanceManager';
 import { BoundingBoxImpl } from '@/lib/spatial/RTree';
-import type { Connection, DesignComponent, InfoCard } from '../../../shared/contracts';
+import type { Connection, DesignComponent, InfoCard } from '../@shared/contracts';
 import { useConnectionEditor } from '../hooks/useConnectionEditor';
 import {
   useLevelOfDetail,

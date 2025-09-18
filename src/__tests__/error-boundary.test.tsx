@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 
 // Mocks
-vi.mock('@/lib/logger', () => {
+vi.mock('@/lib/logging/logger', () => {
   const logs: any[] = [];
   return {
     getLogger: () => ({

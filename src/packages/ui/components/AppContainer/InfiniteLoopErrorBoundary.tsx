@@ -1,6 +1,6 @@
 import React from 'react';
 import { RenderLoopDetectedError } from '@/lib/performance/RenderGuard';
-import { getLogger } from '@/lib/logger';
+import { getLogger } from '@/lib/logging/logger';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 import type { DetectorReport } from '@/lib/performance/InfiniteLoopDetector';

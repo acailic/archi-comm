@@ -1,7 +1,7 @@
 // src/components/diagnostics/tabs/SystemInfoTab.tsx
 // System information tab for developer diagnostics
 // Asynchronously collects and displays detailed system information
-// RELEVANT FILES: DeveloperDiagnosticsPage.tsx, ../../../lib/environment.ts
+// RELEVANT FILES: DeveloperDiagnosticsPage.tsx, ../../../lib/config/environment.ts
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {

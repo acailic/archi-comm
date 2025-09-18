@@ -14,7 +14,7 @@ beforeEach(() => {
 
 describe('tauri.ts fallback (non-Tauri env)', () => {
   it('window utils do not throw', async () => {
-    const mod = await import('../lib/tauri');
+    const mod = await import('../lib/platform/tauri');
     expect(mod.isTauri()).toBeFalsy();
     expect(() => mod.windowUtils.minimize()).not.toThrow();
     expect(() => mod.windowUtils.maximize()).not.toThrow();
@@ -24,7 +24,7 @@ describe('tauri.ts fallback (non-Tauri env)', () => {
 
   it('ipc.invoke returns empty object and warns', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { ipcUtils } = await import('../lib/tauri');
+    const { ipcUtils } = await import('../lib/platform/tauri');
     const res = await ipcUtils.invoke<any>('some_command');
     expect(res).toEqual({});
     expect(warn).toHaveBeenCalled();
@@ -33,7 +33,7 @@ describe('tauri.ts fallback (non-Tauri env)', () => {
 
   it('ipc.listen returns no-op unsubscriber', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { ipcUtils } = await import('../lib/tauri');
+    const { ipcUtils } = await import('../lib/platform/tauri');
     const unlisten = await ipcUtils.listen('evt', () => {});
     expect(typeof unlisten).toBe('function');
     // Calling should not throw

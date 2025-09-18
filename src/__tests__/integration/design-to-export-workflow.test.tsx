@@ -8,7 +8,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, CanvasTestHelpers, AssertionHelpers, MockHelpers } from '../../test/integration-helpers';
 import { DesignCanvas } from '@ui/components/DesignCanvas';
-import type { DesignData, Challenge } from '../../shared/contracts';
+import type { DesignData, Challenge } from '@shared/contracts';
 
 // Mock challenge data for testing
 const mockChallenge: Challenge = {

@@ -6,7 +6,7 @@
  */
 
 import { useDrag } from 'react-dnd';
-import { designSystem } from '@/lib/design-system';
+import { designSystem } from '@/lib/design/design-system';
 import { cn } from '@core/utils';
 
 export interface ConnectionPointProps {

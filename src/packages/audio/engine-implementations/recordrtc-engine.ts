@@ -1,9 +1,9 @@
-// src/lib/audio/engine-implementations/recordrtc-engine.ts
+// src/packages/audio/engine-implementations/recordrtc-engine.ts
 // RecordRTC-based recording engine for better cross-browser support
 // Provides additional features like pause/resume and format conversion
-// RELEVANT FILES: src/lib/audio/recording-engines.ts
+// RELEVANT FILES: src/packages/audio/engines/recording-engines.ts
 
-import { RecordingEngine, RecordingOptions } from '../recording-engines';
+import { RecordingEngine, RecordingOptions } from '../engines/recording-engines';
 
 export class RecordRTCEngine implements RecordingEngine {
   name = 'RecordRTC';
@@ -37,7 +37,7 @@ export class RecordRTCEngine implements RecordingEngine {
 
       const recordRTCOptions = {
         type: 'audio',
-        mimeType: options.mimeType || 'audio/wav',
+        mimeType: options.mimeType || 'audio/processing/wav',
         recorderType: RecordRTC.StereoAudioRecorder,
         numberOfAudioChannels: options.channelCount || 1,
         desiredSampRate: options.sampleRate || 16000,

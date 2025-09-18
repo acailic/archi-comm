@@ -155,7 +155,7 @@ export default defineConfig({
           }
 
           // Group challenge and template data into a separate chunk
-          if (id.includes('/src/lib/challenge-config.ts') || id.includes('/src/lib/task-system/')) {
+          if (id.includes('/src/lib/config/challenge-config.ts') || id.includes('/src/lib/task-system/')) {
             return 'challenges';
           }
 
@@ -204,7 +204,7 @@ export default defineConfig({
       '@packages': PACKAGES_DIR,
       '@lib': path.resolve(SRC_DIR, 'lib'),
       '@shared': path.resolve(SRC_DIR, 'shared'),
-      '@hooks': path.resolve(SRC_DIR, 'hooks'),
+      '@hooks': path.resolve(SRC_DIR, 'shared/hooks'),
       '@core': path.resolve(PACKAGES_DIR, 'core'),
       '@ui': path.resolve(PACKAGES_DIR, 'ui'),
       '@canvas': path.resolve(PACKAGES_DIR, 'canvas'),

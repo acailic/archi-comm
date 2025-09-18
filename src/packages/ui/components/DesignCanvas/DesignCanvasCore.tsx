@@ -3,9 +3,9 @@
 // Main component structure, hooks integration, and render guard logic
 // RELEVANT FILES: DesignCanvasHeader.tsx, hooks/useDesignCanvasCallbacks.ts, hooks/useDesignCanvasState.ts, hooks/useDesignCanvasEffects.ts
 
-import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
-import { useInitialCanvasSync } from '@/hooks/useInitialCanvasSync';
-import { useStableCallbacks, useStableCallback } from '@/hooks/useStableCallbacks';
+import { usePerformanceMonitor } from '@hooks/usePerformanceMonitor';
+import { useInitialCanvasSync } from '@hooks/useInitialCanvasSync';
+import { useStableCallbacks, useStableCallback } from '@hooks/useStableCallbacks';
 import { storage } from '@services/storage';
 import {
   useCanvasActions,
@@ -21,11 +21,11 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toast } from 'sonner';
 import { ReactFlowCanvas } from '@canvas/components/ReactFlowCanvas';
-import { ExtendedChallenge, challengeManager } from '@/lib/challenge-config';
+import { ExtendedChallenge, challengeManager } from '@/lib/config/challenge-config';
 import type { Challenge, DesignData } from '@/shared/contracts';
 import { AssignmentPanel } from '@ui/components/AssignmentPanel';
 import { PropertiesPanel } from '@ui/components/PropertiesPanel';
-import { StatusBar } from '@ui/components/StatusBar';
+import { StatusBar } from '@ui/components/layout/StatusBar';
 import { ResizablePanel } from '@ui/components/ui/ResizablePanel';
 import { DesignCanvasHeader } from './DesignCanvasHeader';
 import { useDesignCanvasCallbacks } from './hooks/useDesignCanvasCallbacks';

@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { useAppStore } from '@/hooks/useAppStore';
+import { useAppStore } from '@hooks/useAppStore';
 import type { Challenge, AudioData } from '@/shared/contracts/index';
 
 interface UseAppNavigationOptions {

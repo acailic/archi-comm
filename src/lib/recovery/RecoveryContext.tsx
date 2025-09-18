@@ -1,11 +1,11 @@
 // src/lib/recovery/RecoveryContext.tsx
 // React context and provider for recovery system integration
 // Provides recovery state management and UI integration for the error recovery system
-// RELEVANT FILES: src/lib/recovery/ErrorRecoverySystem.ts, src/lib/errorStore.ts
+// RELEVANT FILES: src/lib/recovery/ErrorRecoverySystem.ts, src/lib/logging/errorStore.ts
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppError } from '../errorStore';
-import { logger } from '../logger';
+import { logger } from '@lib/logging/logger';
 import { ErrorRecoverySystem, RecoveryResult, RecoveryProgress } from './ErrorRecoverySystem';
 
 // Recovery attempt history item

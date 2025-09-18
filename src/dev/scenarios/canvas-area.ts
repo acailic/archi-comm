@@ -1,5 +1,5 @@
 import React from 'react';
-import { CanvasArea } from '@ui/components/CanvasArea';
+import { CanvasArea } from '@ui/components/canvas/CanvasArea';
 import { mockCanvasStates } from '../testData';
 
 export const canvasAreaScenarios = {

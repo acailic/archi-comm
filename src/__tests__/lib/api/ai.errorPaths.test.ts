@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as env from '@/lib/environment';
+import * as env from '@/lib/config/environment';
 import * as aiConfig from '@/lib/services/AIConfigService';
 import { isAIAvailable, parseAIResponse, reviewSolution } from '@/lib/api/ai';
 

@@ -5,7 +5,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { renderWithProviders } from '../test/integration-helpers';
-import { CanvasArea } from '@ui/components/CanvasArea';
+import { CanvasArea } from '@ui/components/canvas/CanvasArea';
 import {
   createReactFlowEdge,
   createReactFlowNode,
@@ -20,7 +20,7 @@ import {
   type ArchiCommEdge,
   type ArchiCommNode,
 } from '../features/canvas/utils/rf-adapters';
-import type { Connection, DesignComponent } from '../shared/contracts';
+import type { Connection, DesignComponent } from '@shared/contracts';
 
 afterEach(() => {
   cleanup();

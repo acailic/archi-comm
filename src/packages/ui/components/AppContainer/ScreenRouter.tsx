@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { isDevelopment } from '@/lib/environment';
+import { isDevelopment } from '@/lib/config/environment';
 import { ChallengeSelection } from '@ui/components/ChallengeSelection';
 import { DesignCanvas } from '@ui/components/DesignCanvas';
 import { AudioRecording } from '@ui/components/AudioRecording';
-import { ReviewScreen } from '@ui/components/ReviewScreen';
-import { WelcomeOverlay } from '@ui/components/WelcomeOverlay';
-import { ConfigPage } from '@ui/components/ConfigPage';
+import { ReviewScreen } from '@ui/components/pages/ReviewScreen';
+import { WelcomeOverlay } from '@ui/components/overlays/WelcomeOverlay';
+import { ConfigPage } from '@ui/components/pages/ConfigPage';
 import { ScenarioViewer } from '@/dev';
 import { InfiniteLoopErrorBoundary } from './InfiniteLoopErrorBoundary';
 import type { Challenge, DesignData, AudioData } from '@/shared/contracts/index';

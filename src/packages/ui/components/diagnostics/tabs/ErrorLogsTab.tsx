@@ -1,7 +1,7 @@
 // src/components/diagnostics/tabs/ErrorLogsTab.tsx
 // Error logs tab for developer diagnostics
 // Shows error list with filtering by search, category, and severity with resolution functionality
-// RELEVANT FILES: ../../../lib/errorStore.ts, DeveloperDiagnosticsPage.tsx, ../../../lib/logger.ts
+// RELEVANT FILES: ../../../lib/logging/errorStore.ts, DeveloperDiagnosticsPage.tsx, ../../../lib/logging/logger.ts
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
@@ -9,7 +9,7 @@ import {
   Bug,
   CheckCircle,
 } from 'lucide-react';
-import { errorStore } from '@/lib/errorStore';
+import { errorStore } from '@/lib/logging/errorStore';
 
 // Utility: trigger a file download from string/Blob data
 const triggerDownload = (

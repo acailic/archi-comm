@@ -10,7 +10,7 @@ Key principles:
 - **Package-first organisation.** Every cross-cutting concern lives in a dedicated package under `src/packages` with an explicit public API (`index.ts`).
 - **Typed contracts end-to-end.** Shared types flow through the core package so the UI, canvas, and services consume consistent data structures.
 - **Environment-aware services.** Service implementations expose the same façade whether the app runs inside Tauri or a browser fallback.
-- **Performance visibility.** Canvas, audio, and store layers expose hooks for diagnostics and tracing (`src/hooks/usePerformanceMonitor`, `src/lib/performance`).
+- **Performance visibility.** Canvas, audio, and store layers expose hooks for diagnostics and tracing (`src/shared/hooks/usePerformanceMonitor`, `src/lib/performance`).
 
 ## Repository Topology
 
@@ -21,7 +21,7 @@ docs/                   # Tracked documentation (see docs/README.md for index)
 distribution/           # Packaging artefacts (Homebrew) kept out of the main git history
 src/
   packages/             # Primary application packages (see below)
-  hooks/                # Shared React hooks that are still application-scoped
+  shared/hooks/         # Shared React hooks grouped by domain
   lib/                  # Legacy libraries and utilities (incrementally migrating to packages)
   modules/              # Thin entrypoints that re-export package functionality for feature areas
   stores/               # Zustand/Valtio stores broken down by domain
@@ -74,7 +74,7 @@ import { CanvasState } from '@core/types';
 
 ## Stores and Hooks
 
-Domain-specific stores now live under `src/stores`. For example `src/stores/canvas` contains the canvas store, slice helpers, and selectors. Hooks that bridge packages (`useCanvasIntegration`, `useUndoRedo`, `usePerformanceMonitor`) live in `src/hooks` and compose the stores with package APIs.
+Domain-specific stores now live under `src/stores`. For example `src/stores/canvas` contains the canvas store, slice helpers, and selectors. Hooks that bridge packages (`useCanvasIntegration`, `useUndoRedo`, `usePerformanceMonitor`) live in `src/shared/hooks` and compose the stores with package APIs.
 
 ## Testing Strategy
 

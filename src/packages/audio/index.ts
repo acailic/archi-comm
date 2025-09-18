@@ -1,4 +1,4 @@
-// src/lib/audio/index.ts
+// src/packages/audio/index.ts
 // Main exports for the enhanced audio recording and transcription system
 // Provides a clean interface for components to import audio functionality
 // RELEVANT FILES: src/shared/contracts/index.ts, src/components/AudioRecording.tsx
@@ -8,20 +8,20 @@ export { AudioManager } from './audio-manager';
 export type { AudioManagerOptions } from './audio-manager';
 
 // Recording engines
-export type { RecordingEngine, RecordingOptions } from './recording-engines';
+export type { RecordingEngine, RecordingOptions } from './engines/recording-engines';
 
 // Transcription engines
-export type { TranscriptionEngine, TranscriptionEngineOptions } from './transcription-engines';
-export { TransformersJSEngine } from './transformers-engine';
-export { WhisperWasmEngine } from './whisper-wasm-engine';
+export type { TranscriptionEngine, TranscriptionEngineOptions } from './transcription/transcription-engines';
+export { TransformersJSEngine } from './engines/transformers-engine';
+export { WhisperWasmEngine } from './engines/whisper-wasm-engine';
 
 // Real-time transcription
-export { RealtimeTranscriptionManager } from './realtime-transcription';
-export type { RealtimeTranscriptionOptions } from './realtime-transcription';
+export { RealtimeTranscriptionManager } from './transcription/realtime-transcription';
+export type { RealtimeTranscriptionOptions } from './transcription/realtime-transcription';
 
 // Audio processing
-export { AudioProcessor } from './audio-processor';
-export type { AudioProcessingOptions } from './audio-processor';
+export { AudioProcessor } from './processing/audio-processor';
+export type { AudioProcessingOptions } from './processing/audio-processor';
 
 // Engine implementations (for advanced usage)
 export { MediaRecorderEngine } from './engine-implementations/media-recorder-engine';
@@ -79,7 +79,7 @@ export const detectBestEngines = async (): Promise<{
   }
   
   try {
-    const { TransformersJSEngine } = await import('./transformers-engine');
+    const { TransformersJSEngine } = await import('./engines/transformers-engine');
     const transformersEngine = new TransformersJSEngine();
     if (await transformersEngine.isAvailable()) {
       transcription.push('Transformers.js');
@@ -89,7 +89,7 @@ export const detectBestEngines = async (): Promise<{
   }
   
   try {
-    const { WhisperWasmEngine } = await import('./whisper-wasm-engine');
+    const { WhisperWasmEngine } = await import('./engines/whisper-wasm-engine');
     const whisperWasmEngine = new WhisperWasmEngine();
     if (await whisperWasmEngine.isAvailable()) {
       transcription.push('Whisper.cpp WASM');
@@ -116,7 +116,7 @@ export type {
   TranscriptionResponse, 
   TranscriptionSegment, 
   TranscriptionOptions 
-} from '../../shared/contracts';
+} from '@shared/contracts';
 
 // Helper function to check if we're in a Tauri environment
 export const isTauriEnvironment = (): boolean => {

@@ -1,9 +1,9 @@
 import type React from 'react';
 
-export { AIConfigPage } from '@ui/components/AIConfigPage';
+export { AIConfigPage } from '@ui/components/pages/AIConfigPage';
 
 // UX Enhancement Components
-export { default as ShortcutCustomizationPanel } from '@ui/components/ShortcutCustomizationPanel';
+export { default as ShortcutCustomizationPanel } from '@ui/components/panels/ShortcutCustomizationPanel';
 
 // Settings Organization Types
 export type SettingsCategory =

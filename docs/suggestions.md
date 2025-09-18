@@ -10,10 +10,10 @@ rbush or flatbush: Fast spatial index for hit‑testing and viewport culling. Wr
 State & Undo
 
 zustand + middleware (persist, subscribeWithSelector) + immer: Simple global store for components/connections with minimal re‑renders; immer simplifies immutable updates. Can centralize canvas state and time‑travel. Start near src/components/DesignCanvas.tsx:26 and replace the scatter of useState with a store.
-zundo (for zustand): Drop‑in undo/redo history with partial snapshots; can replace src/hooks/useUndoRedo.ts:12.
+zundo (for zustand): Drop‑in undo/redo history with partial snapshots; can replace src/shared/hooks/canvas/useUndoRedo.ts:12.
 Persistence & Tauri
 
-Dexie or localforage: IndexedDB wrapper for web fallback persistence beyond localStorage (larger designs, async, throttled writes). Use in src/hooks/useAutoSave.ts or where you call localStorage in src/components/DesignCanvas.tsx:138.
+Dexie or localforage: IndexedDB wrapper for web fallback persistence beyond localStorage (larger designs, async, throttled writes). Use in src/shared/hooks/common/useAutoSave.ts or where you call localStorage in src/components/DesignCanvas.tsx:138.
 tauri-specta: Generate TypeScript bindings for your Rust Tauri commands and data types to keep frontend/backend types in sync. Your Rust types live in src-tauri/src/main.rs:120; specta will emit TS that can replace duplicated shapes in src/shared/contracts.ts.
 tauri-plugin-sql (alternative to custom sqlx commands): If you prefer issuing SQL from the frontend, this plugin saves boilerplate. Your current approach with sqlx in Rust is fine; this is a convenience option.
 Search & UX

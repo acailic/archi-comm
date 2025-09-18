@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { isTauri, ipcUtils, windowUtils, notificationUtils } from '../tauri';
+import { isTauri, ipcUtils, windowUtils, notificationUtils } from '@/lib/platform/tauri';
 
 // Hook to check if app is running in Tauri
 export const useIsTauri = () => {

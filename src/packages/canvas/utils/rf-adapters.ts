@@ -6,7 +6,7 @@
  */
 
 import type { Node, Edge, NodeChange, EdgeChange } from '@xyflow/react';
-import type { DesignComponent, Connection } from '../../../shared/contracts';
+import type { DesignComponent, Connection } from '../@shared/contracts';
 
 // Custom data types for React Flow nodes and edges
 export interface ArchiCommNodeData {

@@ -15,8 +15,8 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-} from './ui/dropdown-menu';
-import { Button } from './ui/button';
+} from '@ui/components/ui/dropdown-menu';
+import { Button } from '@ui/components/ui/button';
 import {
   Download,
   Upload,
@@ -33,7 +33,7 @@ import {
 import type { Challenge, DesignData } from '@/shared/contracts';
 import type { CanvasConfig, ExportFormat } from '@/lib/import-export/types';
 import { DesignSerializer } from '@/lib/import-export/DesignSerializer';
-import { ImportExportModal } from './ImportExportModal';
+import { ImportExportModal } from '@ui/components/modals/ImportExportModal';
 import { toast } from 'sonner';
 
 interface ImportExportDropdownProps {

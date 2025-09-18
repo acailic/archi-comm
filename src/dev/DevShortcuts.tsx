@@ -1,11 +1,11 @@
 // src/dev/DevShortcuts.tsx
 // Development-specific keyboard shortcuts hook for scenario viewer functionality  
 // Extends the global shortcuts system with dev-only shortcuts for demo mode, reset, scenarios, and navigation
-// RELEVANT FILES: ../hooks/useGlobalShortcuts.ts, ./ScenarioViewer.tsx, ./DevUtilities.tsx, ../lib/environment.ts
+// RELEVANT FILES: ../hooks/useGlobalShortcuts.ts, ./ScenarioViewer.tsx, ./DevUtilities.tsx, ../lib/config/environment.ts
 
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { useGlobalShortcuts } from '../hooks/useGlobalShortcuts';
-import { isDevelopment } from '../lib/environment';
+import { useGlobalShortcuts } from '@hooks/useGlobalShortcuts';
+import { isDevelopment } from '../lib/config/environment';
 
 export interface DevShortcutHandlers {
   onToggleScenarios?: () => void;
@@ -406,4 +406,3 @@ export const useDevShortcuts = (
     toggleTheme,
   };
 };
-

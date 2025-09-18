@@ -73,7 +73,7 @@
         "src/shared/*"
       ],
       "@hooks/*": [
-        "src/hooks/*"
+        "src/shared/hooks/*"
       ]
     }
   },

@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { BookOpen, Users, TrendingUp, Award } from 'lucide-react';
 import type { Challenge, DesignComponent } from '@/shared/contracts';
-import { ExtendedChallenge, challengeManager } from '@/lib/challenge-config';
-import { Badge } from './ui/badge';
+import { ExtendedChallenge, challengeManager } from '@/lib/config/challenge-config';
+import { Badge } from '@ui/components/ui/badge';
 import { CollapsibleSection } from './AssignmentPanel/CollapsibleSection';
 import { DescriptionSection } from './AssignmentPanel/sections/DescriptionSection';
 import { RequirementsSection } from './AssignmentPanel/sections/RequirementsSection';

@@ -1,7 +1,7 @@
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map, distinctUntilChanged } from 'rxjs/operators';
 import type { DesignData, Challenge, AudioData } from '@/shared/contracts';
-import type { ExtendedChallenge } from '@/lib/challenge-config';
+import type { ExtendedChallenge } from '@/lib/config/challenge-config';
 
 export type AppPhase = 'design' | 'audio-recording' | 'review';
 export type AppScreen = 'welcome' | 'challenge-selection' | 'design-canvas' | 'audio-recording' | 'review';

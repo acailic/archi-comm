@@ -1,7 +1,7 @@
 // src/__tests__/components/DesignCanvas.infiniteLoop.test.tsx
 // Comprehensive test suite to prevent infinite render loops in DesignCanvas
 // Tests sync operations, error boundaries, and render guard functionality
-// RELEVANT FILES: src/components/DesignCanvas.tsx, src/hooks/useInitialCanvasSync.ts, src/stores/canvasStore.ts
+// RELEVANT FILES: src/components/DesignCanvas.tsx, src/shared/hooks/canvas/useInitialCanvasSync.ts, src/stores/canvasStore.ts
 
 import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
@@ -12,9 +12,9 @@ import type { Challenge, DesignData } from '@/shared/contracts';
 
 // Mock dependencies
 vi.mock('@/stores/canvasStore');
-vi.mock('@/hooks/useInitialCanvasSync');
-vi.mock('@/hooks/usePerformanceMonitor');
-vi.mock('@/lib/challenge-config');
+vi.mock('@hooks/useInitialCanvasSync');
+vi.mock('@hooks/usePerformanceMonitor');
+vi.mock('@/lib/config/challenge-config');
 vi.mock('@services/storage');
 
 // Mock HTML5Backend for DnD
@@ -40,7 +40,7 @@ vi.mock('@ui/components/PropertiesPanel', () => ({
   PropertiesPanel: () => <div data-testid="properties-panel">Properties Panel</div>,
 }));
 
-vi.mock('@ui/components/StatusBar', () => ({
+vi.mock('@ui/components/layout/StatusBar', () => ({
   StatusBar: () => <div data-testid="status-bar">Status Bar</div>,
 }));
 
@@ -135,7 +135,7 @@ describe('DesignCanvas Infinite Loop Prevention', () => {
     });
 
     // Mock useInitialCanvasSync
-    vi.doMock('@/hooks/useInitialCanvasSync', () => ({
+    vi.doMock('@hooks/useInitialCanvasSync', () => ({
       useInitialCanvasSync: vi.fn(() => ({
         isSynced: true,
         lastSyncedChallengeId: 'test-challenge',
@@ -316,7 +316,7 @@ describe('DesignCanvas Infinite Loop Prevention', () => {
 
       // Mock useInitialCanvasSync to track calls
       const mockSync = vi.fn(() => ({ isSynced: false, lastSyncedChallengeId: null }));
-      vi.doMock('@/hooks/useInitialCanvasSync', () => ({
+      vi.doMock('@hooks/useInitialCanvasSync', () => ({
         useInitialCanvasSync: mockSync,
       }));
 
@@ -379,7 +379,7 @@ describe('DesignCanvas Infinite Loop Prevention', () => {
   describe('Error Recovery', () => {
     it('should recover gracefully from sync errors', async () => {
       // Mock sync hook to simulate error
-      vi.doMock('@/hooks/useInitialCanvasSync', () => ({
+      vi.doMock('@hooks/useInitialCanvasSync', () => ({
         useInitialCanvasSync: vi.fn(() => {
           throw new Error('Sync failed');
         }),
@@ -437,7 +437,7 @@ describe('DesignCanvas Infinite Loop Prevention', () => {
   describe('Performance Monitoring', () => {
     it('should track render performance metrics', async () => {
       const mockPerformanceMonitor = vi.fn();
-      vi.doMock('@/hooks/usePerformanceMonitor', () => ({
+      vi.doMock('@hooks/usePerformanceMonitor', () => ({
         usePerformanceMonitor: mockPerformanceMonitor,
       }));
 

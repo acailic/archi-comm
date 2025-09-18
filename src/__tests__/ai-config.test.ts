@@ -12,7 +12,7 @@ vi.mock('@tauri-apps/api/fs', () => ({
   exists: vi.fn(),
 }));
 
-vi.mock('../lib/tauri', () => ({
+vi.mock('../lib/platform/tauri', () => ({
   isTauri: vi.fn(),
 }));
 
@@ -20,7 +20,7 @@ import { appDataDir, join } from '@tauri-apps/api/path';
 import { createDir, readTextFile, writeTextFile, exists } from '@tauri-apps/api/fs';
 import { AIConfigService } from '../lib/services/AIConfigService';
 import { AIProvider, getDefaultConfig } from '../lib/types/AIConfig';
-import { isTauri } from '../lib/tauri';
+import { isTauri } from '../lib/platform/tauri';
 
 const mockedIsTauri = vi.mocked(isTauri);
 const mockedAppDataDir = vi.mocked(appDataDir);

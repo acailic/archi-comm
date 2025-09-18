@@ -1,7 +1,7 @@
 // src/services/audio/AudioService.ts
 // Concrete implementation of the audio service wrapping AudioManager functionality
 // Provides a clean service interface for audio recording, transcription, and engine management
-// RELEVANT FILES: src/lib/di/ServiceInterfaces.ts, src/lib/audio/audio-manager.ts, src/shared/contracts/index.ts
+// RELEVANT FILES: src/lib/di/ServiceInterfaces.ts, src/packages/audio/audio-manager.ts, src/shared/contracts/index.ts
 
 import { AudioManager } from '@audio/audio-manager';
 import type {
@@ -505,7 +505,7 @@ export class AudioService implements IAudioService {
    */
   private getFormatMimeType(format: 'wav' | 'mp3' | 'webm'): string {
     switch (format) {
-      case 'wav': return 'audio/wav';
+      case 'wav': return 'audio/processing/wav';
       case 'mp3': return 'audio/mp3';
       case 'webm': return 'audio/webm';
       default: return 'audio/webm';
@@ -551,6 +551,6 @@ export class AudioService implements IAudioService {
       }
     }
 
-    return new Blob([arrayBuffer], { type: 'audio/wav' });
+    return new Blob([arrayBuffer], { type: 'audio/processing/wav' });
   }
 }

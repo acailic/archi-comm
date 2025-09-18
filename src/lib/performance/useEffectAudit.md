@@ -11,7 +11,7 @@ Audit of all useEffect hooks in the codebase to identify potential circular depe
    - Lines 119, 261: Empty dependency arrays for one-time library loading
    - **Status**: Safe - no circular dependencies
 
-2. **useDebounce Hook** (`src/hooks/useDebounce.ts`)
+2. **useDebounce Hook** (`src/shared/hooks/common/useDebounce.ts`)
    - Line 50: `useEffect(() => cancel, [cancel])`
    - **Status**: Safe - cleanup function with stable dependency
 
@@ -37,7 +37,7 @@ Audit of all useEffect hooks in the codebase to identify potential circular depe
      - Flush operations (lines 166-200): Complex state synchronization
    - **Status**: Moderate risk - needs UpdateDepthMonitor integration
 
-3. **useInitialCanvasSync** (`src/hooks/useInitialCanvasSync.ts`)
+3. **useInitialCanvasSync** (`src/shared/hooks/canvas/useInitialCanvasSync.ts`)
    - Line 144-245: Complex sync logic with deep equality checks
    - **Risk Areas**:
      - State comparison loops

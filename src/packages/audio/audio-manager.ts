@@ -1,13 +1,13 @@
-// src/lib/audio/audio-manager.ts
+// src/packages/audio/audio-manager.ts
 // Central audio manager that coordinates recording and transcription
 // Provides automatic engine selection and fallback mechanisms
-// RELEVANT FILES: src/components/AudioRecording.tsx, src/lib/audio/recording-engines.ts, src/lib/audio/transcription-engines.ts
+// RELEVANT FILES: src/components/AudioRecording.tsx, src/packages/audio/engines/recording-engines.ts, src/packages/audio/transcription/transcription-engines.ts
 
-import type { TranscriptionResponse } from '../../shared/contracts';
-import { RecordingEngine, RecordingOptions } from './recording-engines';
-import { TranscriptionEngine } from './transcription-engines';
-import { RealtimeTranscriptionManager } from './realtime-transcription';
-import { AudioProcessor, AudioProcessingOptions } from './audio-processor';
+import type { TranscriptionResponse } from '@shared/contracts';
+import { RecordingEngine, RecordingOptions } from './engines/recording-engines';
+import { TranscriptionEngine } from './transcription/transcription-engines';
+import { RealtimeTranscriptionManager } from './transcription/realtime-transcription';
+import { AudioProcessor, AudioProcessingOptions } from './processing/audio-processor';
 
 export interface AudioManagerOptions {
   preferredRecordingEngine?: string;
@@ -238,7 +238,7 @@ export class AudioManager {
     
     // Register Transformers.js engine
     try {
-      const { TransformersJSEngine } = await import('./transformers-engine');
+      const { TransformersJSEngine } = await import('./engines/transformers-engine');
       const engine = new TransformersJSEngine();
       this.transcriptionEngines.set('Transformers.js', engine);
     } catch (error) {
@@ -247,7 +247,7 @@ export class AudioManager {
     
     // Register Whisper WASM engine
     try {
-      const { WhisperWasmEngine } = await import('./whisper-wasm-engine');
+      const { WhisperWasmEngine } = await import('./engines/whisper-wasm-engine');
       const engine = new WhisperWasmEngine();
       this.transcriptionEngines.set('Whisper.cpp WASM', engine);
     } catch (error) {

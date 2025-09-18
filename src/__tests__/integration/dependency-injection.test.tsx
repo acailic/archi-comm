@@ -143,7 +143,7 @@ class MockAudioService implements IAudioService {
     const duration = this.recordingStartTime ? Date.now() - this.recordingStartTime : 0;
 
     return {
-      blob: new Blob(['mock audio data'], { type: 'audio/wav' }),
+      blob: new Blob(['mock audio data'], { type: 'audio/processing/wav' }),
       duration,
       format: 'wav'
     };

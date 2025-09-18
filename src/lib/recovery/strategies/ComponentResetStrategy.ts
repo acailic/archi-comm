@@ -4,7 +4,7 @@
 
 import { RecoveryStrategy, RecoveryContext, RecoveryResult } from '../ErrorRecoverySystem';
 import { AppError } from '../../errorStore';
-import { logger } from '../../logger';
+import { logger } from '@lib/logging/logger';
 
 export class ComponentResetStrategy implements RecoveryStrategy {
   public readonly name = 'component-reset';
@@ -45,4 +45,3 @@ export class ComponentResetStrategy implements RecoveryStrategy {
     }
   }
 }
-

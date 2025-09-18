@@ -1,16 +1,16 @@
 // src/__tests__/integration/error-recovery-scenarios.test.tsx
 // Integration tests for error recovery system functionality and user experience
 // Tests error injection, recovery strategies, auto-save recovery, and user interaction patterns
-// RELEVANT FILES: src/test/integration-helpers.tsx, src/lib/errorStore.ts, src/components/AppContainer.tsx
+// RELEVANT FILES: src/test/integration-helpers.tsx, src/lib/logging/errorStore.ts, src/components/AppContainer.tsx
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, AssertionHelpers, MockHelpers } from '../../test/integration-helpers';
-import { errorStore, addError, addReactError, addNetworkError, addPerformanceError } from '../../lib/errorStore';
+import { errorStore, addError, addReactError, addNetworkError, addPerformanceError } from '../../lib/logging/errorStore';
 import { DesignCanvas } from '@ui/components/DesignCanvas';
 import { ChallengeSelection } from '@ui/components/ChallengeSelection';
-import type { Challenge, DesignData } from '../../shared/contracts';
+import type { Challenge, DesignData } from '@shared/contracts';
 
 // Hoisted storage mock so module mocking is applied consistently
 const recoveryStorageMock: any = {};

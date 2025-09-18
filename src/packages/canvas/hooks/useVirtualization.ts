@@ -10,7 +10,7 @@ import { useReactFlow, Viewport } from '@xyflow/react';
 import { useDebouncedCallback } from 'use-debounce';
 import { RTree, SpatialItem, BoundingBoxImpl } from '@/lib/spatial/RTree';
 import { CanvasPerformanceManager } from '@/lib/performance/CanvasPerformanceManager';
-import type { DesignComponent, Connection } from '../../../shared/contracts';
+import type { DesignComponent, Connection } from '../@shared/contracts';
 import type {
   VirtualizationStats,
   LODThreshold,

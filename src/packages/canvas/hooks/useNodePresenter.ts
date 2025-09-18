@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import type { MouseEvent, KeyboardEvent } from 'react';
-import { getComponentIcon } from '@/lib/component-icons';
+import { getComponentIcon } from '@/lib/design/component-icons';
 import {
   getArchitecturalStyling,
   getComponentGradient,

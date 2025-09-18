@@ -1,7 +1,7 @@
 // src/components/DesignCanvas/hooks/useDesignCanvasState.ts
 // State management for DesignCanvas component
 // Handles local UI state, serializer setup, and design snapshot building
-// RELEVANT FILES: DesignCanvasCore.tsx, ../../../lib/import-export/DesignSerializer.ts, ../../../shared/contracts.ts, useCanvasIntegration.ts
+// RELEVANT FILES: DesignCanvasCore.tsx, ../../../lib/import-export/DesignSerializer.ts, ../@shared/contracts.ts, useCanvasIntegration.ts
 
 import { DesignSerializer } from '@/lib/import-export/DesignSerializer';
 import type { CanvasConfig } from '@/lib/import-export/types';

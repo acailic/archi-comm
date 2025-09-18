@@ -2,7 +2,7 @@ import React from 'react';
 import { Lightbulb } from 'lucide-react';
 import { CollapsibleSection } from '../CollapsibleSection';
 import { Badge } from '../../ui/badge';
-import type { ExtendedChallenge } from '@/lib/challenge-config';
+import type { ExtendedChallenge } from '@/lib/config/challenge-config';
 
 interface SolutionHintsSectionProps {
   extendedChallenge: ExtendedChallenge;

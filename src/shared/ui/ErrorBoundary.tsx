@@ -1,7 +1,7 @@
 import React from 'react';
-import { getLogger } from '../../lib/logger';
-import { addReactError, type ErrorSeverity } from '../../lib/errorStore';
-import { isDevelopment } from '../../lib/environment';
+import { getLogger } from '../../lib/logging/logger';
+import { addReactError, type ErrorSeverity } from '../../lib/logging/errorStore';
+import { isDevelopment } from '../../lib/config/environment';
 
 type Props = {
   children: React.ReactNode;

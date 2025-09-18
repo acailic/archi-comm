@@ -1,10 +1,10 @@
-// src/lib/audio/engine-implementations/web-speech-engine.ts
+// src/packages/audio/engine-implementations/web-speech-engine.ts
 // Web Speech API engine for real-time browser-based transcription
 // Provides immediate feedback during recording
-// RELEVANT FILES: src/lib/audio/transcription-engines.ts
+// RELEVANT FILES: src/packages/audio/transcription/transcription-engines.ts
 
-import { TranscriptionEngine, TranscriptionEngineOptions } from '../transcription-engines';
-import type { TranscriptionResponse, TranscriptionSegment } from '../../../shared/contracts';
+import { TranscriptionEngine, TranscriptionEngineOptions } from '../transcription/transcription-engines';
+import type { TranscriptionResponse, TranscriptionSegment } from '../@shared/contracts';
 
 export class WebSpeechEngine implements TranscriptionEngine {
   name = 'Web Speech API';

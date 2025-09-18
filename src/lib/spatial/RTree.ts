@@ -5,7 +5,7 @@
  * RELEVANT FILES: src/shared/contracts/index.ts, src/features/canvas/utils/virtualization.ts
  */
 
-import { DesignComponent, Connection } from '../../shared/contracts/index';
+import { DesignComponent, Connection } from '../@shared/contracts';
 
 export interface BoundingBox {
   x: number;

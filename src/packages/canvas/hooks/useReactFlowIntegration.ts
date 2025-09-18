@@ -19,7 +19,7 @@ import type {
   OnConnectEnd,
   ReactFlowInstance
 } from '@xyflow/react';
-import type { DesignComponent, Connection } from '../../../shared/contracts';
+import type { DesignComponent, Connection } from '../@shared/contracts';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
 import { generateId } from '@core/utils';
 import {
