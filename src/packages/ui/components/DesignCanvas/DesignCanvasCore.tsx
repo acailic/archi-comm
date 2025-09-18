@@ -24,17 +24,21 @@ import { ReactFlowCanvas } from '@canvas/components/ReactFlowCanvas';
 import { ExtendedChallenge, challengeManager } from '@/lib/challenge-config';
 import type { Challenge, DesignData } from '@/shared/contracts';
 import { AssignmentPanel } from '@ui/components/AssignmentPanel';
-import { CommandPalette } from '@ui/components/CommandPalette';
-import Confetti from '@ui/components/Confetti';
 import { PropertiesPanel } from '@ui/components/PropertiesPanel';
-import { SolutionHints } from '@ui/components/SolutionHints';
 import { StatusBar } from '@ui/components/StatusBar';
 import { ResizablePanel } from '@ui/components/ui/ResizablePanel';
 import { DesignCanvasHeader } from './DesignCanvasHeader';
 import { useDesignCanvasCallbacks } from './hooks/useDesignCanvasCallbacks';
 import { useDesignCanvasState } from './hooks/useDesignCanvasState';
 import { useDesignCanvasEffects } from './hooks/useDesignCanvasEffects';
-import { DesignSerializer } from '@/lib/import-export/DesignSerializer';
+import { useDesignCanvasImportExport } from './hooks/useDesignCanvasImportExport';
+import { useDesignCanvasPerformance } from './hooks/useDesignCanvasPerformance';
+import { useRenderSnapshotDebug } from './hooks/useRenderSnapshotDebug';
+import { useStatusBarMetrics } from './hooks/useStatusBarMetrics';
+import { EmergencyPauseOverlay } from './components/EmergencyPauseOverlay';
+import { CanvasOverlays } from './components/CanvasOverlays';
+
+const EMPTY_LAYERS: ReadonlyArray<any> = Object.freeze([]);
 
 export interface DesignCanvasProps {
   challenge: Challenge;
@@ -47,8 +51,21 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   usePerformanceMonitor('DesignCanvas');
 
   const mountedRef = useRef(false);
-  const renderGuardRef = useRef({ count: 0, windowStart: Date.now() });
+  const lastRenderSnapshotRef = useRef<
+    | {
+        componentsLength: number;
+        connectionsLength: number;
+        infoCardsLength: number;
+        selectedComponent: string | null;
+        challengeId: string;
+        isSynced: boolean;
+      }
+    | null
+  >(null);
   const [sessionStartTime] = React.useState<Date>(new Date());
+  const flushDesignDataRef = React.useRef<
+    ((reason: string, options?: { immediate?: boolean }) => void) | undefined
+  >(undefined);
 
   // Mount detection
   useEffect(() => {
@@ -78,45 +95,35 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
   const connectionStart = useCanvasConnectionStart();
   const visualTheme = useCanvasVisualTheme();
 
-  // Render guard logic
-  if (process.env.NODE_ENV !== 'production') {
-    const now = Date.now();
-    const windowMs = 2000;
-    const guard = renderGuardRef.current;
-    if (now - guard.windowStart > windowMs) {
-      guard.windowStart = now;
-      guard.count = 0;
-    }
-    guard.count += 1;
+  // Performance monitoring with extracted hook
+  const {
+    renderGuard,
+    emergencyPauseReason,
+    setEmergencyPauseReason,
+    circuitBreakerDetails,
+    handleResumeAfterPause,
+  } = useDesignCanvasPerformance({
+    challenge,
+    components,
+    connections,
+    infoCards,
+    selectedComponent,
+    isSynced,
+    initialData,
+    flushDesignDataRef,
+  });
 
-    if (guard.count > 25) {
-      console.warn('[DesignCanvas] High render count detected:', {
-        count: guard.count,
-        windowMs,
-        componentsLength: components.length,
-        connectionsLength: connections.length,
-        selectedComponent,
-        challengeId: challenge.id,
-        isSynced,
-        syncStatus: isSynced ? 'synced' : 'pending',
-      });
-    }
+  useRenderSnapshotDebug({
+    components,
+    connections,
+    infoCards,
+    selectedComponent,
+    challengeId: challenge.id,
+    isSynced,
+    renderGuard,
+    lastRenderSnapshotRef,
+  });
 
-    if (guard.count > 50) {
-      console.error(
-        '[DesignCanvas] Infinite render loop detected! Rendered more than 50 times within 2s.',
-        {
-          renderCount: guard.count,
-          challengeId: challenge.id,
-          syncStatus: isSynced ? 'synced' : 'pending',
-          componentsLength: components.length,
-          connectionsLength: connections.length,
-          stackTrace: new Error().stack,
-        }
-      );
-      throw new Error('DesignCanvas: Maximum render limit exceeded - possible infinite loop');
-    }
-  }
 
   // Initialize state and callbacks
   const {
@@ -135,138 +142,76 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
 
   const callbacks = useDesignCanvasCallbacks();
 
+  const stableLayers = useMemo(() => {
+    if (Array.isArray(initialData.layers) && initialData.layers.length > 0) {
+      return initialData.layers;
+    }
+    return EMPTY_LAYERS;
+  }, [initialData.layers]);
+
+  const baseMetadata = useMemo(() => {
+    const created = initialData.metadata?.created ?? new Date().toISOString();
+    const lastModified = initialData.metadata?.lastModified ?? created;
+    const version = initialData.metadata?.version ?? '1.0';
+    return {
+      created,
+      lastModified,
+      version,
+    };
+  }, [initialData.metadata?.created, initialData.metadata?.lastModified, initialData.metadata?.version]);
+
   // Create current design data with stable reference
   const currentDesignData: DesignData = useMemo(
     () => ({
       components,
       connections,
       infoCards,
-      layers: [],
-      metadata: {
-        created: initialData.metadata?.created ?? new Date().toISOString(),
-        lastModified: initialData.metadata?.lastModified ?? new Date().toISOString(),
-        version: '1.0',
-      },
+      layers: stableLayers as DesignData['layers'],
+      metadata: baseMetadata,
     }),
-    [components, connections, infoCards, initialData.metadata]
+    [components, connections, infoCards, stableLayers, baseMetadata]
   );
 
-  // Import/Export handlers
-  const handleImport = useStableCallback((result: any) => {
-    if (result.success && result.data) {
-      canvasActions.updateCanvasData({
-        components: result.data.components ?? [],
-        connections: result.data.connections ?? [],
-        infoCards: result.data.infoCards ?? [],
-      });
-
-      if (result.canvas) {
-        setCanvasConfig(result.canvas);
-      }
-
-      canvasActions.setSelectedComponent(null);
-      canvasActions.setConnectionStart(null);
-
-      toast.success('Design imported successfully!', {
-        description: `Imported ${result.statistics.componentsImported} components and ${result.statistics.connectionsImported} connections`,
-      });
-
-      markDesignModified(result.data?.metadata?.lastModified);
-    }
+  // Import/Export functionality with extracted hook
+  const {
+    handleImport,
+    handleQuickExport,
+    handleQuickSave,
+    handleCopyToClipboard,
+    handleImportFromClipboard,
+    handleSave,
+  } = useDesignCanvasImportExport({
+    serializer,
+    canvasConfig,
+    challenge,
+    buildDesignSnapshot,
+    markDesignModified,
+    setCanvasConfig,
   });
-
-  const handleSave = useCallback(() => {
-    const snapshot = buildDesignSnapshot(currentDesignData, { updateTimestamp: true });
-    void storage.setItem('archicomm-design', JSON.stringify(snapshot));
-    toast.success('Design saved locally');
-  }, [buildDesignSnapshot, currentDesignData]);
-
-  const handleQuickExport = useCallback(async () => {
-    try {
-      const filename = challenge?.title ? `${challenge.title}-design` : 'archicomm-design';
-      const content = await serializer.exportDesign(currentDesignData, challenge, canvasConfig);
-      await DesignSerializer.downloadFile(content, `${filename}.json`, 'application/json');
-
-      toast.success('Design exported successfully!', {
-        description: `Saved as ${filename}.json`,
-      });
-    } catch (error) {
-      toast.error('Export failed', {
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-      });
-    }
-  }, [currentDesignData, challenge, canvasConfig, serializer]);
-
-  const handleQuickSave = useCallback(async () => {
-    void storage.setItem('archicomm-design', JSON.stringify(currentDesignData));
-    await handleQuickExport();
-  }, [currentDesignData, handleQuickExport]);
-
-  const handleCopyToClipboard = useCallback(async () => {
-    try {
-      const content = await serializer.exportDesign(currentDesignData, challenge, canvasConfig);
-      await navigator.clipboard.writeText(content);
-
-      toast.success('Design copied to clipboard!', {
-        description: 'You can now paste it anywhere',
-      });
-    } catch (error) {
-      toast.error('Copy failed', {
-        description: error instanceof Error ? error.message : 'Clipboard not available',
-      });
-    }
-  }, [currentDesignData, challenge, canvasConfig, serializer]);
-
-  const handleImportFromClipboard = useCallback(async () => {
-    try {
-      const clipboardText = await navigator.clipboard.readText();
-
-      if (!clipboardText.trim()) {
-        toast.error('Clipboard is empty', {
-          description: 'Please copy a design JSON first',
-        });
-        return;
-      }
-
-      const result = await serializer.importDesign(clipboardText, {
-        mode: 'replace',
-        handleConflicts: 'auto',
-        preserveIds: false,
-        preservePositions: true,
-        validateComponents: true,
-        importCanvas: true,
-        importAnalytics: true,
-      });
-
-      if (result.success) {
-        handleImport(result);
-      } else {
-        toast.error('Import failed', {
-          description: result.errors.join('; '),
-        });
-      }
-    } catch (error) {
-      toast.error('Import failed', {
-        description: error instanceof Error ? error.message : 'Clipboard read failed',
-      });
-    }
-  }, [serializer, handleImport]);
 
   const handleContinue = useCallback(() => {
     onComplete(currentDesignData);
   }, [currentDesignData, onComplete]);
 
+
   // Initialize effects
-  useDesignCanvasEffects({
+  const designCanvasEffects = useDesignCanvasEffects({
     components,
     connections,
     infoCards,
     currentDesignData,
-    handleQuickExport,
-    handleQuickSave,
-    handleCopyToClipboard,
+    handleQuickExport: (data: any) => handleQuickExport(data),
+    handleQuickSave: (data: any) => handleQuickSave(data),
+    handleCopyToClipboard: (data: any) => handleCopyToClipboard(data),
     handleImportFromClipboard,
   });
+
+  useEffect(() => {
+    flushDesignDataRef.current = designCanvasEffects.flushPendingDesign;
+    return () => {
+      flushDesignDataRef.current = undefined;
+    };
+  }, [designCanvasEffects.flushPendingDesign]);
 
   // Create stable callbacks object for ReactFlowCanvas
   const stableCanvasCallbacks = useStableCallbacks({
@@ -291,19 +236,26 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
     (challengeManager.getChallengeById(challenge.id) as ExtendedChallenge) || challenge;
 
   // Status bar calculations
-  const progress = React.useMemo(
-    () => ({
-      componentsCount: components.length,
-      connectionsCount: connections.length,
-      timeElapsed: Math.floor((Date.now() - sessionStartTime.getTime()) / 1000 / 60),
-    }),
-    [components.length, connections.length, sessionStartTime]
-  );
+  const { progress } = useStatusBarMetrics({
+    components,
+    connections,
+    sessionStartTime,
+  });
 
   const challengeTags = React.useMemo((): string[] | undefined => {
     const tags = (extendedChallenge as any)?.tags;
     return Array.isArray(tags) ? (tags as string[]) : undefined;
   }, [extendedChallenge]);
+
+  if (emergencyPauseReason) {
+    return (
+      <EmergencyPauseOverlay
+        emergencyPauseReason={emergencyPauseReason}
+        circuitBreakerDetails={circuitBreakerDetails}
+        onResumeAfterPause={handleResumeAfterPause}
+      />
+    );
+  }
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -317,7 +269,7 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           onBack={onBack}
           onContinue={handleContinue}
           onToggleHints={() => setShowHints(!showHints)}
-          onSave={handleSave}
+          onSave={() => handleSave(currentDesignData)}
           onShowCommandPalette={() => setShowCommandPalette(true)}
           onImport={handleImport}
         />
@@ -342,15 +294,6 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
               {...stableCanvasCallbacks}
             />
 
-            {showHints && (
-              <div className='absolute top-4 right-4 w-80 z-10'>
-                <SolutionHints
-                  challenge={extendedChallenge}
-                  currentComponents={components}
-                  onClose={() => setShowHints(false)}
-                />
-              </div>
-            )}
           </div>
 
           <ResizablePanel side='right' defaultWidth={320} minWidth={250} maxWidth={600}>
@@ -378,15 +321,18 @@ export function DesignCanvas({ challenge, initialData, onComplete, onBack }: Des
           currentDesignData={currentDesignData}
         />
 
-        <CommandPalette
-          isOpen={showCommandPalette}
-          onClose={() => setShowCommandPalette(false)}
-          currentScreen='design'
+        <CanvasOverlays
+          showHints={showHints}
+          onCloseHints={() => setShowHints(false)}
+          challenge={extendedChallenge}
+          currentComponents={components}
+          showCommandPalette={showCommandPalette}
+          onCloseCommandPalette={() => setShowCommandPalette(false)}
           onNavigate={() => {}}
           selectedChallenge={challenge}
+          showConfetti={showConfetti}
+          onConfettiDone={() => setShowConfetti(false)}
         />
-
-        <Confetti show={showConfetti} onDone={() => setShowConfetti(false)} />
       </div>
     </DndProvider>
   );

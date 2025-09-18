@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders, MockHelpers } from '../../test/integration-helpers';
-import { ReactFlowCanvas } from '../../features/canvas/components/ReactFlowCanvas';
+import { ReactFlowCanvas } from '../../packages/canvas/components/ReactFlowCanvas';
 import { useNodePresenter } from '../../features/canvas/hooks/useNodePresenter';
 import type { DesignComponent, Connection } from '../../shared/contracts';
 

@@ -202,6 +202,9 @@ export default defineConfig({
       // Essential path aliases aligned with the package structure
       '@': SRC_DIR,
       '@packages': PACKAGES_DIR,
+      '@lib': path.resolve(SRC_DIR, 'lib'),
+      '@shared': path.resolve(SRC_DIR, 'shared'),
+      '@hooks': path.resolve(SRC_DIR, 'hooks'),
       '@core': path.resolve(PACKAGES_DIR, 'core'),
       '@ui': path.resolve(PACKAGES_DIR, 'ui'),
       '@canvas': path.resolve(PACKAGES_DIR, 'canvas'),

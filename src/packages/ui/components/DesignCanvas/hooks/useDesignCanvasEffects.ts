@@ -3,12 +3,13 @@
 // Handles auto-save, keyboard shortcuts, theme loading, and navigation events
 // RELEVANT FILES: DesignCanvasCore.tsx, ../../../hooks/useDebounce.ts, ../../../hooks/useAppStore.ts, ImportExportDropdown.tsx
 
-import { useAppStore } from '@/hooks/useAppStore';
-import { useDebouncedCallback } from '@/hooks/useDebounce';
 import { useImportExportShortcuts } from '@ui/components/ImportExportDropdown';
 import type { DesignData } from '@/shared/contracts';
 import { useCanvasActions } from '@/stores/canvasStore';
 import { useCallback, useEffect, useRef } from 'react';
+import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
+import { storage } from '@services/storage';
+import { useAppStore } from '@/hooks/useAppStore';
 
 interface DesignCanvasEffectsProps {
   components: any[];
@@ -32,14 +33,21 @@ export function useDesignCanvasEffects({
   handleImportFromClipboard,
 }: DesignCanvasEffectsProps) {
   const mountedRef = useRef(false);
+  const renderSafeRef = useRef(false);
+  const flushTimerRef = useRef<number | null>(null);
+  const idleHandleRef = useRef<number | null>(null);
+  const flushInFlightRef = useRef(false);
+  const lastFlushReasonRef = useRef<string | null>(null);
   const { setVisualTheme } = useCanvasActions();
   const { actions } = useAppStore();
 
   // Mount detection to prevent infinite loops during initial render
   useEffect(() => {
     mountedRef.current = true;
+    renderSafeRef.current = true;
     return () => {
       mountedRef.current = false;
+      renderSafeRef.current = false;
     };
   }, []);
 
@@ -73,47 +81,123 @@ export function useDesignCanvasEffects({
       window.removeEventListener('settings:appearance-updated', handler as EventListener);
   }, [setVisualTheme]);
 
-  // Save current design data to preserve state
-  const saveCurrentDesign = useCallback(() => {
-    if (components.length > 0 || connections.length > 0 || infoCards.length > 0) {
-      actions.setDesignData(currentDesignData);
-    }
-  }, [currentDesignData, actions, components.length, connections.length, infoCards.length]);
+  const flushPendingDesign = useCallback(
+    (reason: string, options: { immediate?: boolean } = {}) => {
+      if (flushInFlightRef.current) {
+        return;
+      }
 
-  // Debounced save to prevent too frequent updates
-  const debouncedSave = useDebouncedCallback(() => {
-    if (!mountedRef.current) return;
-    saveCurrentDesign();
-  }, 1000);
+      const pending = currentDesignData;
 
-  // Auto-save when data changes
-  useEffect(() => {
-    if (
-      mountedRef.current &&
-      (components.length > 0 || connections.length > 0 || infoCards.length > 0)
-    ) {
-      debouncedSave();
+      const executeFlush = () => {
+        if (flushInFlightRef.current) {
+          return;
+        }
+
+        flushInFlightRef.current = true;
+        lastFlushReasonRef.current = reason;
+
+        try {
+          actions.setDesignData(pending);
+          void storage.setItem('archicomm-design', JSON.stringify(pending));
+          RenderLoopDiagnostics.getInstance().recordDesignFlush({
+            reason,
+            pendingNodes: components.length,
+            pendingConnections: connections.length,
+            pendingInfoCards: infoCards.length,
+          });
+        } catch (error) {
+          console.error('Failed to flush design data', { error, reason });
+        } finally {
+          flushInFlightRef.current = false;
+        }
+      };
+
+      const schedule = () => {
+        if (options.immediate || !renderSafeRef.current) {
+          executeFlush();
+          return;
+        }
+
+        if ('requestIdleCallback' in window) {
+          if (idleHandleRef.current != null) {
+            (window as any).cancelIdleCallback?.(idleHandleRef.current);
+          }
+          idleHandleRef.current = (window as any).requestIdleCallback?.(
+            () => {
+              executeFlush();
+              idleHandleRef.current = null;
+            },
+            { timeout: 1000 }
+          );
+        } else {
+          if (flushTimerRef.current != null) {
+            clearTimeout(flushTimerRef.current);
+          }
+          flushTimerRef.current = window.setTimeout(() => {
+            executeFlush();
+            flushTimerRef.current = null;
+          }, 300);
+        }
+      };
+
+      if (options.immediate) {
+        executeFlush();
+      } else {
+        schedule();
+      }
+    },
+    [currentDesignData, components.length, connections.length, infoCards.length]
+  );
+
+  const cancelScheduledFlush = useCallback(() => {
+    if (flushTimerRef.current != null) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
     }
-  }, [components, connections, infoCards, debouncedSave]);
+    if (idleHandleRef.current != null && 'cancelIdleCallback' in window) {
+      (window as any).cancelIdleCallback?.(idleHandleRef.current);
+      idleHandleRef.current = null;
+    }
+  }, []);
+
 
   // Save state when navigating away or window unloads
   useEffect(() => {
     const handleBeforeUnload = () => {
-      saveCurrentDesign();
+      flushPendingDesign('beforeunload', { immediate: true });
     };
 
     const handleNavigateToConfig = () => {
-      saveCurrentDesign();
+      flushPendingDesign('navigate:config', { immediate: true });
+    };
+
+    const handleExternalFlush = (event: Event) => {
+      const detailReason = (event as CustomEvent)?.detail?.reason as string | undefined;
+      flushPendingDesign(detailReason ?? 'external-request', { immediate: true });
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('navigate:config', handleNavigateToConfig as EventListener);
+    window.addEventListener(
+      'archicomm:design-canvas:flush-request',
+      handleExternalFlush as EventListener
+    );
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('navigate:config', handleNavigateToConfig as EventListener);
+      window.removeEventListener(
+        'archicomm:design-canvas:flush-request',
+        handleExternalFlush as EventListener
+      );
     };
-  }, [saveCurrentDesign]);
+  }, [flushPendingDesign]);
+
+  useEffect(() => () => {
+    cancelScheduledFlush();
+    flushPendingDesign('unmount', { immediate: true });
+  }, [cancelScheduledFlush, flushPendingDesign]);
 
   // Setup keyboard shortcuts for import/export
   useImportExportShortcuts({
@@ -136,5 +220,7 @@ export function useDesignCanvasEffects({
 
   return {
     mountedRef,
+    flushPendingDesign,
+    lastFlushReasonRef,
   };
 }

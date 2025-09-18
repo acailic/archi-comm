@@ -1,27 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 // Comment 1: Move relevantKeys to a module-level Set for performance
 const RELEVANT_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter', 'Escape']);
 import { motion } from 'framer-motion';
-import {
-  Search,
-  Target,
-  Palette,
-  Mic,
-  Eye,
-  RotateCcw,
-  Save,
-  ArrowRight,
-  Command,
-  Settings,
-  HelpCircle,
-  Keyboard,
-  Star,
-} from 'lucide-react';
-import {
-  getAllShortcuts,
-  formatShortcutKey,
-  getShortcutsVersion,
-} from '@/lib/shortcuts/KeyboardShortcuts';
+import { Search, Command } from 'lucide-react';
+import { formatShortcutKey } from '@/lib/shortcuts/KeyboardShortcuts';
+import { useCommandPalette } from '@ui/hooks/useCommandPalette';
+import { CommandItem } from './CommandPalette/CommandItem';
 import { Input } from './ui/input';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Badge } from './ui/badge';
@@ -35,90 +19,6 @@ interface CommandPaletteProps {
   selectedChallenge: any;
 }
 
-interface CommandData {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ComponentType<any>;
-  action: () => void;
-  section: 'navigation' | 'actions' | 'help';
-  shortcut?: string;
-  available?: boolean;
-}
-
-// Comment 4: Extract CommandItem outside main component and memoize
-interface CommandItemProps {
-  command: CommandData;
-  index: number;
-  isSelected: boolean;
-  onClick: () => void;
-  onMouseEnter: () => void;
-  onFocus: () => void;
-}
-
-const CommandItem = React.memo(
-  ({ command, index, isSelected, onClick, onMouseEnter, onFocus }: CommandItemProps) => {
-    const Icon = command.icon;
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, delay: index * 0.02 }}
-        className={`
-        p-3 rounded-lg cursor-pointer transition-all duration-200 group
-        ${isSelected ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-muted/50'}
-      `}
-        onClick={onClick}
-        onMouseEnter={onMouseEnter}
-        onFocus={onFocus}
-        tabIndex={0}
-        role='option'
-        aria-selected={isSelected}
-      >
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center space-x-3'>
-            <div
-              className={`
-            p-2 rounded-md transition-all duration-200
-            ${
-              isSelected
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground'
-            }
-          `}
-            >
-              <Icon className='w-4 h-4' />
-            </div>
-            <div>
-              <div
-                className={`font-medium transition-colors ${isSelected ? 'text-primary' : 'text-foreground'}`}
-              >
-                {command.title}
-              </div>
-              <div className='text-sm text-muted-foreground'>{command.description}</div>
-            </div>
-          </div>
-          <div className='flex items-center space-x-2'>
-            {command.shortcut && (
-              <Badge variant='outline' className='text-xs font-mono'>
-                {command.shortcut}
-              </Badge>
-            )}
-            {isSelected && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300 }}
-              >
-                <ArrowRight className='w-4 h-4 text-primary' />
-              </motion.div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-);
 
 export function CommandPalette({
   isOpen,
@@ -127,203 +27,15 @@ export function CommandPalette({
   onNavigate,
   selectedChallenge,
 }: CommandPaletteProps) {
-  const [query, setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  const commands: CommandData[] = useMemo(() => {
-    const allShortcuts = getAllShortcuts();
-    const getShortcutDisplay = (description: string) => {
-      const shortcut = allShortcuts.find(s =>
-        s.description.toLowerCase().includes(description.toLowerCase())
-      );
-      return shortcut ? formatShortcutKey(shortcut.key, shortcut.modifiers) : undefined;
-    };
-
-    return [
-      // Navigation Commands
-      {
-        id: 'nav-pro-version',
-        title: 'Upgrade to Pro',
-        description: 'Access premium features, advanced AI, and exclusive content',
-        icon: Star,
-        action: () => onNavigate('pro-version'),
-        section: 'navigation',
-        shortcut: undefined,
-        available: true,
-      },
-      {
-        id: 'nav-challenges',
-        title: 'Select Challenge',
-        description: 'Choose a system design challenge to practice',
-        icon: Target,
-        action: () => onNavigate('challenge-selection'),
-        section: 'navigation',
-        shortcut: getShortcutDisplay('challenge selection'),
-        available: true,
-      },
-      {
-        id: 'nav-design',
-        title: 'Design Canvas',
-        description: 'Create your system architecture',
-        icon: Palette,
-        action: () => onNavigate('design-canvas'),
-        section: 'navigation',
-        shortcut: getShortcutDisplay('design canvas'),
-        available: !!selectedChallenge,
-      },
-      {
-        id: 'nav-recording',
-        title: 'Record Explanation',
-        description: 'Practice your technical communication',
-        icon: Mic,
-        action: () => onNavigate('audio-recording'),
-        section: 'navigation',
-        shortcut: getShortcutDisplay('audio recording'),
-        available: !!selectedChallenge,
-      },
-      {
-        id: 'nav-review',
-        title: 'Session Review',
-        description: 'Analyze your performance and get feedback',
-        icon: Eye,
-        action: () => onNavigate('review'),
-        section: 'navigation',
-        shortcut: getShortcutDisplay('review'),
-        available: !!selectedChallenge,
-      },
-      {
-        id: 'nav-config',
-        title: 'Configuration',
-        description: 'Adjust canvas and app settings',
-        icon: Settings,
-        action: () => onNavigate('config'),
-        section: 'navigation',
-        shortcut: undefined,
-        available: true,
-      },
-
-      // Action Commands
-      {
-        id: 'action-new-session',
-        title: 'New Session',
-        description: 'Start a fresh practice session',
-        icon: RotateCcw,
-        action: () => {
-          onNavigate('challenge-selection');
-          // Add logic to reset session
-        },
-        section: 'actions',
-        shortcut: getShortcutDisplay('new project'),
-        available: true,
-      },
-      {
-        id: 'action-save',
-        title: 'Save Session',
-        description: 'Save your current progress',
-        icon: Save,
-        action: () => {
-          window.dispatchEvent(new CustomEvent('shortcut:save-project'));
-        },
-        section: 'actions',
-        shortcut: getShortcutDisplay('save project'),
-        available: !!selectedChallenge,
-      },
-      {
-        id: 'action-ai-settings',
-        title: 'AI Settings',
-        description: 'Configure AI provider settings and API keys',
-        icon: Settings,
-        action: () => {
-          window.dispatchEvent(new CustomEvent('shortcut:ai-settings'));
-        },
-        section: 'actions',
-        shortcut: getShortcutDisplay('AI Settings'),
-        available: true,
-      },
-
-      // Help Commands
-      {
-        id: 'help-shortcuts',
-        title: 'Keyboard Shortcuts',
-        description: 'View all available keyboard shortcuts',
-        icon: Keyboard,
-        action: () => {
-          window.dispatchEvent(new CustomEvent('shortcut:show-help'));
-        },
-        section: 'help',
-        shortcut: getShortcutDisplay('show shortcuts help'),
-        available: true,
-      },
-      {
-        id: 'help-guide',
-        title: 'User Guide',
-        description: 'Learn how to use ArchiComm effectively',
-        icon: HelpCircle,
-        action: () => {
-          // Add user guide logic
-          console.log('Opening user guide...');
-        },
-        section: 'help',
-        available: true,
-      },
-    ];
-  }, [selectedChallenge, onNavigate, getShortcutsVersion()]);
-
-  // Comment 5: Precompute lower-case trimmed query for filtering
-  const filteredCommands = useMemo(() => {
-    const available = commands.filter(cmd => cmd.available !== false);
-    const q = query.trim().toLowerCase();
-    if (!q) return available;
-
-    // Lightweight fuzzy ranking without external deps
-    const score = (text: string, query: string) => {
-      text = text.toLowerCase();
-      if (text.includes(query)) return 0; // best
-      // simple subsequence match score
-      let ti = 0, qi = 0, gaps = 0;
-      while (ti < text.length && qi < query.length) {
-        if (text[ti] === query[qi]) {
-          qi++;
-        } else {
-          gaps++;
-        }
-        ti++;
-      }
-      return qi === query.length ? gaps + (text.length - query.length) : Infinity;
-    };
-
-    const weighted = available
-      .map(cmd => {
-        const sTitle = score(cmd.title, q);
-        const sDesc = score(cmd.description, q);
-        const s = Math.min(sTitle, sDesc + 2); // description slightly less important
-        return { cmd, s };
-      })
-      .filter(r => r.s !== Infinity)
-      .sort((a, b) => a.s - b.s)
-      .map(r => r.cmd);
-
-    // Fallback to basic filtering if fuzzy yields nothing
-    return weighted.length
-      ? weighted
-      : available.filter(
-          c => c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
-        );
-  }, [commands, query]);
-
-  const groupedCommands = useMemo(() => {
-    const groups: Record<string, CommandData[]> = {
-      navigation: [],
-      actions: [],
-      help: [],
-    };
-
-    filteredCommands.forEach(cmd => {
-      groups[cmd.section].push(cmd);
-    });
-
-    return groups;
-  }, [filteredCommands]);
+  // Use extracted hook with fixed dependency issue
+  const {
+    query,
+    setQuery,
+    selectedIndex,
+    setSelectedIndex,
+    filteredCommands,
+    groupedCommands,
+  } = useCommandPalette({ selectedChallenge, onNavigate });
 
   // Keyboard navigation with global shortcuts coordination
   useEffect(() => {

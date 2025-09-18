@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -10,14 +10,20 @@ import {
   Terminal,
   Maximize2,
   Minimize2,
+  RefreshCw,
+  Download,
+  AlertTriangle,
+  Globe,
+  MemoryStick,
+  HardDrive,
 } from 'lucide-react';
 import { errorStore } from '@/lib/errorStore';
-import { isDevelopment } from '@/lib/environment';
+import { isDevelopment, isTauriEnvironment } from '@/lib/environment';
+import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 import { EnvironmentTab } from './diagnostics/tabs/EnvironmentTab';
 import { PerformanceTab } from './diagnostics/tabs/PerformanceTab';
 import { ErrorLogsTab } from './diagnostics/tabs/ErrorLogsTab';
 import { AppLogsTab } from './diagnostics/tabs/AppLogsTab';
-import { SystemInfoTab } from './diagnostics/tabs/SystemInfoTab';
 
 // Types
 interface TabConfig {
@@ -28,8 +34,281 @@ interface TabConfig {
   badge?: number;
 }
 
-// System Information Tab
-const SystemInfoTab: React.FC = () => {
+interface SystemInfo {
+  browser: {
+    name: string;
+    version: string;
+    userAgent: string;
+  };
+  platform: {
+    os: string;
+    architecture: string;
+    cores: number;
+  };
+  memory: {
+    total: number;
+    used: number;
+    available: number;
+    percentage: number;
+  };
+  performance: {
+    hardwareConcurrency: number;
+    deviceMemory?: number;
+    connection?: {
+      effectiveType: string;
+      downlink: number;
+      rtt: number;
+    };
+  };
+  tauri?: {
+    version: string;
+    platform: string;
+    arch: string;
+  };
+}
+
+// Render Loop Diagnostics Tab
+const RenderLoopDiagnosticsTab: React.FC = () => {
+  const [diagnostics, setDiagnostics] = useState<any>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const refreshDiagnostics = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const renderDiagnostics = RenderLoopDiagnostics.getInstance();
+      const events = renderDiagnostics.getEvents();
+      const summary = renderDiagnostics.generateSummary();
+
+      setDiagnostics({
+        events: events.slice(-50), // Show last 50 events
+        summary,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('Failed to refresh render loop diagnostics:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const exportDiagnostics = useCallback(() => {
+    const renderDiagnostics = RenderLoopDiagnostics.getInstance();
+    const data = renderDiagnostics.exportDiagnosticData();
+
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `render-diagnostics-${new Date().toISOString().slice(0, 19)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const resetDiagnostics = useCallback(() => {
+    RenderLoopDiagnostics.getInstance().reset();
+    refreshDiagnostics();
+  }, [refreshDiagnostics]);
+
+  useEffect(() => {
+    refreshDiagnostics();
+    const interval = setInterval(refreshDiagnostics, 2000); // Auto-refresh every 2 seconds
+    return () => clearInterval(interval);
+  }, [refreshDiagnostics]);
+
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString();
+  };
+
+  const getEventIcon = (eventType: string) => {
+    switch (eventType) {
+      case 'circuit-breaker':
+        return '🔴';
+      case 'synthetic-error':
+        return '❌';
+      case 'stability-warning':
+        return '⚠️';
+      case 'memory-spike':
+        return '📈';
+      case 'oscillation':
+        return '🌊';
+      case 'canvas-layer-correlation':
+        return '🔗';
+      case 'canvas-layer-interaction':
+        return '↔️';
+      default:
+        return '📊';
+    }
+  };
+
+  const getEventColor = (eventType: string) => {
+    switch (eventType) {
+      case 'circuit-breaker':
+      case 'synthetic-error':
+        return 'text-red-600';
+      case 'stability-warning':
+      case 'memory-spike':
+        return 'text-yellow-600';
+      case 'oscillation':
+        return 'text-orange-600';
+      case 'canvas-layer-correlation':
+      case 'canvas-layer-interaction':
+        return 'text-blue-600';
+      default:
+        return 'text-gray-600';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Render Loop Diagnostics</h3>
+        <div className="flex space-x-2">
+          <button
+            onClick={refreshDiagnostics}
+            disabled={isRefreshing}
+            className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+          <button
+            onClick={exportDiagnostics}
+            className="flex items-center space-x-1 px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export</span>
+          </button>
+          <button
+            onClick={resetDiagnostics}
+            className="flex items-center space-x-1 px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            <X className="w-4 h-4" />
+            <span>Reset</span>
+          </button>
+        </div>
+      </div>
+
+      {diagnostics ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Summary Panel */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h4 className="font-medium mb-3 flex items-center space-x-2">
+              <Activity className="w-4 h-4 text-blue-500" />
+              <span>Summary</span>
+            </h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Events:</span>
+                <span className="font-mono">{diagnostics.summary.totalEvents}</span>
+              </div>
+              {diagnostics.summary.timeRange && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Duration:</span>
+                    <span className="font-mono">
+                      {Math.round(diagnostics.summary.timeRange.duration / 1000)}s
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Start Time:</span>
+                    <span className="font-mono">
+                      {formatTimestamp(diagnostics.summary.timeRange.start)}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <h5 className="text-sm font-medium mb-2">Event Types</h5>
+              <div className="space-y-1 text-xs">
+                {Object.entries(diagnostics.summary.eventsByType).map(([type, count]) => (
+                  <div key={type} className="flex justify-between">
+                    <span className={`flex items-center space-x-1 ${getEventColor(type)}`}>
+                      <span>{getEventIcon(type)}</span>
+                      <span>{type}</span>
+                    </span>
+                    <span className="font-mono">{count as number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <h5 className="text-sm font-medium mb-2">Affected Components</h5>
+              <div className="space-y-1 text-xs">
+                {Object.entries(diagnostics.summary.componentsByEvent).map(([eventType, components]) => (
+                  <div key={eventType}>
+                    <span className={`font-medium ${getEventColor(eventType)}`}>{eventType}:</span>
+                    <div className="ml-2 text-muted-foreground">
+                      {(components as string[]).join(', ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Events */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h4 className="font-medium mb-3 flex items-center space-x-2">
+              <FileText className="w-4 h-4 text-purple-500" />
+              <span>Recent Events (Last 50)</span>
+            </h4>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {diagnostics.events.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>No render loop events detected</p>
+                </div>
+              ) : (
+                diagnostics.events.map((event: any, index: number) => (
+                  <div
+                    key={index}
+                    className="bg-muted/50 rounded p-3 text-sm border-l-2 border-gray-300"
+                    style={{
+                      borderLeftColor:
+                        event.type.includes('error') || event.type.includes('circuit') ? '#ef4444' :
+                        event.type.includes('warning') || event.type.includes('spike') ? '#f59e0b' :
+                        event.type.includes('canvas') ? '#3b82f6' : '#6b7280'
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`font-medium flex items-center space-x-1 ${getEventColor(event.type)}`}>
+                        <span>{getEventIcon(event.type)}</span>
+                        <span>{event.type}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {formatTimestamp(event.timestamp)}
+                      </span>
+                    </div>
+                    {event.payload.componentName && (
+                      <div className="text-xs text-muted-foreground mb-1">
+                        Component: <span className="font-mono">{event.payload.componentName}</span>
+                      </div>
+                    )}
+                    <div className="text-xs bg-background/50 rounded p-2 font-mono">
+                      {JSON.stringify(event.payload, null, 2)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Local System Information Tab
+const LocalSystemInfoTab: React.FC = () => {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -320,10 +599,11 @@ export const DeveloperDiagnosticsPage: React.FC<{
         case '3':
         case '4':
         case '5':
+        case '6':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
             const tabIndex = parseInt(e.key) - 1;
-            const tabs = ['environment', 'performance', 'errors', 'logs', 'system'];
+            const tabs = ['environment', 'performance', 'render-loops', 'errors', 'logs', 'system'];
             if (tabs[tabIndex]) {
               setActiveTab(tabs[tabIndex]);
             }
@@ -350,6 +630,12 @@ export const DeveloperDiagnosticsPage: React.FC<{
       component: PerformanceTab,
     },
     {
+      id: 'render-loops',
+      label: 'Render Loops',
+      icon: RefreshCw,
+      component: RenderLoopDiagnosticsTab,
+    },
+    {
       id: 'errors',
       label: 'Error Logs',
       icon: Bug,
@@ -366,7 +652,7 @@ export const DeveloperDiagnosticsPage: React.FC<{
       id: 'system',
       label: 'System Info',
       icon: Cpu,
-      component: SystemInfoTab,
+      component: LocalSystemInfoTab,
     },
   ];
 
@@ -457,7 +743,7 @@ export const DeveloperDiagnosticsPage: React.FC<{
                   Keyboard Shortcuts
                 </h4>
                 <div className='space-y-1 text-xs text-muted-foreground'>
-                  <div>Ctrl+1-5 - Switch tabs</div>
+                  <div>Ctrl+1-6 - Switch tabs</div>
                   <div>Ctrl+F - Toggle fullscreen</div>
                   <div>Esc - Close</div>
                 </div>
