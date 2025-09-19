@@ -1,17 +1,20 @@
 import React from 'react';
 import type { CircuitBreakerDetails } from '@/lib/performance/RenderGuard';
+import type { StoreCircuitBreakerSnapshot } from '@/lib/performance/StoreCircuitBreaker';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 
 interface EmergencyPauseOverlayProps {
   emergencyPauseReason: string;
   circuitBreakerDetails: CircuitBreakerDetails | null;
   onResumeAfterPause: () => void;
+  storeCircuitBreakerSnapshot?: StoreCircuitBreakerSnapshot | null;
 }
 
 export function EmergencyPauseOverlay({
   emergencyPauseReason,
   circuitBreakerDetails,
   onResumeAfterPause,
+  storeCircuitBreakerSnapshot,
 }: EmergencyPauseOverlayProps) {
   const latestReport = InfiniteLoopDetector.getInstance().getLatestReport('DesignCanvasCore');
 
@@ -27,6 +30,11 @@ export function EmergencyPauseOverlay({
           <p className='text-xs text-muted-foreground'>
             Render burst detected after {circuitBreakerDetails.renderCount} renders. Cooling down until{' '}
             {new Date(circuitBreakerDetails.until).toLocaleTimeString()}.
+          </p>
+        ) : null}
+        {storeCircuitBreakerSnapshot?.open ? (
+          <p className='text-xs text-muted-foreground'>
+            Canvas store updates paused ({storeCircuitBreakerSnapshot.updatesInWindow} updates in {storeCircuitBreakerSnapshot.windowMs}ms window).
           </p>
         ) : null}
         {latestReport?.reason ? (

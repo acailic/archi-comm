@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, Zap, Clock } from 'lucide-react';
 import type { DesignComponent, Connection, InfoCard, DesignData } from '@shared/contracts';
 import LearningBreadcrumbs from '@ui/components/LearningBreadcrumbs';
+import type { StoreCircuitBreakerSnapshot } from '@/lib/performance/StoreCircuitBreaker';
 
 interface StatusBarProps {
   components: DesignComponent[];
@@ -11,6 +12,7 @@ interface StatusBarProps {
   selectedComponentId: string | null;
   sessionStartTime: Date;
   currentDesignData: DesignData;
+  storeCircuitBreakerSnapshot?: StoreCircuitBreakerSnapshot | null;
 }
 
 const StatusBarClock: React.FC<{ sessionStartTime: Date }> = ({ sessionStartTime }) => {
@@ -45,6 +47,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   selectedComponentId,
   sessionStartTime,
   currentDesignData,
+  storeCircuitBreakerSnapshot,
 }) => {
   const componentTypes = Array.from(new Set(components.map(c => c.type))).length;
   const selectedComponentData = selectedComponentId ? components.find(c => c.id === selectedComponentId) : null;
@@ -71,6 +74,12 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         {selectedComponentData && (
           <div className="flex items-center gap-1 text-primary">
             <span>Selected: {selectedComponentData.label}</span>
+          </div>
+        )}
+        {storeCircuitBreakerSnapshot?.open && (
+          <div className="flex items-center gap-1 text-amber-600">
+            <Zap className="w-3 h-3" />
+            <span>Store cooldown</span>
           </div>
         )}
         <LearningBreadcrumbs design={currentDesignData} />

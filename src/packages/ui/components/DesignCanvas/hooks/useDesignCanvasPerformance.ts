@@ -1,10 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRenderGuard } from '@/lib/performance/RenderGuard';
 import type { CircuitBreakerDetails } from '@/lib/performance/RenderGuard';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 import { RenderStabilityTracker } from '@/lib/performance/RenderStabilityTracker';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import type { Challenge } from '@/shared/contracts';
+import {
+  subscribeToCanvasCircuitBreaker,
+  getCanvasCircuitBreakerSnapshot,
+} from '@/stores/canvasStore';
+import type { StoreCircuitBreakerSnapshot } from '@/lib/performance/StoreCircuitBreaker';
 
 interface UseDesignCanvasPerformanceProps {
   challenge: Challenge;
@@ -30,6 +35,12 @@ export function useDesignCanvasPerformance({
   const [circuitBreakerDetails, setCircuitBreakerDetails] = useState<CircuitBreakerDetails | null>(null);
   const [emergencyPauseReason, setEmergencyPauseReason] = useState<string | null>(null);
   const lastHandledDetectorReportRef = useRef<string | null>(null);
+
+  const storeCircuitBreakerSnapshot: StoreCircuitBreakerSnapshot = useSyncExternalStore(
+    subscribeToCanvasCircuitBreaker,
+    getCanvasCircuitBreakerSnapshot,
+    getCanvasCircuitBreakerSnapshot
+  );
 
   const stabilityTracker = React.useMemo(
     () => RenderStabilityTracker.forComponent('DesignCanvasCore'),
@@ -116,6 +127,8 @@ export function useDesignCanvasPerformance({
       selectedComponent,
       challengeId: challenge.id,
       isSynced,
+      storeBreakerOpen: storeCircuitBreakerSnapshot.open,
+      storeUpdatesInWindow: storeCircuitBreakerSnapshot.updatesInWindow,
     }),
     propsSnapshot: () => ({
       challengeId: challenge.id,
@@ -132,6 +145,11 @@ export function useDesignCanvasPerformance({
     }),
     onCircuitBreakerOpen: handleCircuitBreakerOpen,
     onCircuitBreakerClose: handleCircuitBreakerClose,
+    linkedStoreBreaker: {
+      getSnapshot: () => storeCircuitBreakerSnapshot,
+      label: 'CanvasStore',
+    },
+    pauseWhenStoreBreakerActive: true,
   });
 
   // Stability tracking effect
@@ -221,11 +239,44 @@ export function useDesignCanvasPerformance({
     RenderLoopDiagnostics.getInstance().recordResume('DesignCanvasCore');
   }, [renderGuard]);
 
+  useEffect(() => {
+    const breakerName = storeCircuitBreakerSnapshot.name;
+    const openReason = storeCircuitBreakerSnapshot.reason ?? 'store-circuit-breaker';
+
+    if (!storeCircuitBreakerSnapshot.open) {
+      if (circuitBreakerDetails?.component === breakerName) {
+        if (emergencyPauseReason === circuitBreakerDetails.reason) {
+          setEmergencyPauseReason(null);
+        }
+        setCircuitBreakerDetails(null);
+      }
+      return;
+    }
+
+    setEmergencyPauseReason(prev => prev ?? openReason);
+    setCircuitBreakerDetails({
+      component: breakerName,
+      until: storeCircuitBreakerSnapshot.openUntil ?? Date.now(),
+      reason: openReason,
+      renderCount: storeCircuitBreakerSnapshot.updatesInWindow,
+    });
+  }, [
+    circuitBreakerDetails?.component,
+    circuitBreakerDetails?.reason,
+    emergencyPauseReason,
+    storeCircuitBreakerSnapshot.name,
+    storeCircuitBreakerSnapshot.open,
+    storeCircuitBreakerSnapshot.openUntil,
+    storeCircuitBreakerSnapshot.reason,
+    storeCircuitBreakerSnapshot.updatesInWindow,
+  ]);
+
   return {
     renderGuard,
     emergencyPauseReason,
     setEmergencyPauseReason,
     circuitBreakerDetails,
     handleResumeAfterPause,
+    storeCircuitBreakerSnapshot,
   };
 }

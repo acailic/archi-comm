@@ -1,6 +1,68 @@
-import { useRef } from 'react';
+import { useRef, useCallback } from 'react';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
+import { renderDebugLogger, RenderLogEntry } from '@/lib/debug/RenderDebugLogger';
+import type { StoreCircuitBreakerSnapshot } from './StoreCircuitBreaker';
+
+// Enhanced render cause analysis
+interface RenderCauseAnalysis {
+  primaryCause: string;
+  contributingFactors: string[];
+  propChanges: PropChangeAnalysis[];
+  stateChanges: StateChangeAnalysis[];
+  contextChanges: ContextChangeAnalysis[];
+  hookDependencyChanges: HookDependencyChangeAnalysis[];
+  performanceImpact: PerformanceImpact;
+  renderOptimizationMisses: OptimizationMiss[];
+}
+
+interface PropChangeAnalysis {
+  propName: string;
+  changeType: 'primitive' | 'object' | 'array' | 'function';
+  isSignificant: boolean;
+  previousValue: any;
+  currentValue: any;
+  changeSize: number;
+  stabilityScore: number;
+}
+
+interface StateChangeAnalysis {
+  stateKey: string;
+  actionType: string;
+  changeSource: string;
+  impactLevel: 'low' | 'medium' | 'high';
+  cascadeEffect: boolean;
+}
+
+interface ContextChangeAnalysis {
+  contextName: string;
+  providerComponent: string;
+  changeImpact: 'local' | 'subtree' | 'global';
+  consumers: number;
+}
+
+interface HookDependencyChangeAnalysis {
+  hookType: string;
+  dependencyIndex: number;
+  dependencyName: string;
+  isStale: boolean;
+  changeFrequency: number;
+}
+
+interface PerformanceImpact {
+  expectedRenderTime: number;
+  actualRenderTime: number;
+  memoryUsage: number;
+  affectedComponents: number;
+  renderEfficiency: number;
+}
+
+interface OptimizationMiss {
+  type: 'memo' | 'useMemo' | 'useCallback' | 'shallow-equal';
+  reason: string;
+  potentialSavings: number;
+  recommendation: string;
+}
 
 type ContextProducer = Record<string, unknown> | (() => Record<string, unknown> | undefined);
 
@@ -57,6 +119,20 @@ export interface RenderGuardOptions {
    * Useful for integrating with future detectors.
    */
   onTrip?: (details: { componentName: string; renderCount: number; error: RenderLoopDetectedError }) => void;
+  /**
+   * Optional linked store circuit breaker. When provided, the snapshot is merged into diagnostics
+   * and can be used to pause rendering when store churn is excessive.
+   */
+  linkedStoreBreaker?: {
+    getSnapshot: () => StoreCircuitBreakerSnapshot;
+    label?: string;
+  };
+  /** Pause rendering when the linked store circuit breaker is open. Defaults to true. */
+  pauseWhenStoreBreakerActive?: boolean;
+  /** Pause rendering when this render guard's circuit breaker is active. Defaults to true. */
+  pauseWhenCircuitBreakerActive?: boolean;
+  /** Apply adaptive threshold scaling when store churn is high. Defaults to true. */
+  adaptiveThresholdScale?: boolean;
 }
 
 export interface CircuitBreakerDetails {
@@ -77,6 +153,10 @@ export interface RenderGuardHandle {
   circuitBreakerActive: boolean;
   /** Timestamp (ms) when the circuit breaker will automatically close. */
   circuitBreakerResetAt: number | null;
+  /** Whether consumers should pause heavy work to allow the system to recover. */
+  shouldPause: boolean;
+  /** Snapshot of the linked store circuit breaker, if configured. */
+  storeBreakerSnapshot?: StoreCircuitBreakerSnapshot;
   /** Details about the last synthetic error thrown, if any. */
   lastSyntheticError?: {
     message: string;
@@ -108,6 +188,12 @@ interface RenderGuardState {
   memoryBaseline?: number;
   lastMemorySampleAt: number;
   lastSnapshotHash?: string;
+  renderCauseHistory: RenderCauseAnalysis[];
+  propStabilityTracker: Map<string, { stable: number; unstable: number; lastValue: any }>;
+  contextStabilityTracker: Map<string, { changes: number; lastValue: any }>;
+  hookDependencyTracker: Map<string, { changes: number; lastValues: any[] }>;
+  renderTriggerPatterns: Map<string, number>;
+  optimizationMissCount: number;
 }
 
 const DEFAULT_OPTIONS: Required<
@@ -140,6 +226,8 @@ const PROD_HANDLE: RenderGuardHandle = {
   sincePreviousRenderMs: 0,
   circuitBreakerActive: false,
   circuitBreakerResetAt: null,
+  shouldPause: false,
+  storeBreakerSnapshot: undefined,
   reset: () => {},
   memorySample: null,
 };
@@ -177,6 +265,266 @@ const analyzeStackTrace = (stack?: string) => {
   const frames = stack.split('\n').map(line => line.trim());
   const relevant = frames.filter(frame => !frame.includes('at Object.useRenderGuard'));
   return relevant.slice(0, 5).join(' \u2192 ');
+};
+
+const analyzeRenderCause = (
+  componentName: string,
+  propsSnapshot?: Record<string, unknown>,
+  stateSnapshot?: Record<string, unknown>,
+  previousPropsSnapshot?: Record<string, unknown>,
+  previousStateSnapshot?: Record<string, unknown>,
+  contextSnapshot?: Record<string, unknown>,
+  previousContextSnapshot?: Record<string, unknown>
+): RenderCauseAnalysis => {
+  const propChanges: PropChangeAnalysis[] = [];
+  const stateChanges: StateChangeAnalysis[] = [];
+  const contextChanges: ContextChangeAnalysis[] = [];
+  const contributingFactors: string[] = [];
+  let primaryCause = 'unknown';
+
+  // Analyze prop changes
+  if (propsSnapshot && previousPropsSnapshot) {
+    Object.keys(propsSnapshot).forEach(propName => {
+      const currentValue = propsSnapshot[propName];
+      const previousValue = previousPropsSnapshot[propName];
+
+      if (currentValue !== previousValue) {
+        const changeType = determineChangeType(currentValue);
+        const changeSize = calculateChangeSize(previousValue, currentValue);
+        const isSignificant = isSignificantChange(previousValue, currentValue, changeType);
+
+        propChanges.push({
+          propName,
+          changeType,
+          isSignificant,
+          previousValue,
+          currentValue,
+          changeSize,
+          stabilityScore: calculateStabilityScore(propName, previousValue, currentValue),
+        });
+
+        if (isSignificant) {
+          contributingFactors.push(`prop.${propName}`);
+          if (primaryCause === 'unknown') {
+            primaryCause = `prop-change:${propName}`;
+          }
+        }
+      }
+    });
+  }
+
+  // Analyze state changes
+  if (stateSnapshot && previousStateSnapshot) {
+    Object.keys(stateSnapshot).forEach(stateKey => {
+      const currentValue = stateSnapshot[stateKey];
+      const previousValue = previousStateSnapshot[stateKey];
+
+      if (currentValue !== previousValue) {
+        stateChanges.push({
+          stateKey,
+          actionType: inferActionType(stateKey, previousValue, currentValue),
+          changeSource: 'internal',
+          impactLevel: calculateImpactLevel(previousValue, currentValue),
+          cascadeEffect: mayTriggerCascade(stateKey, currentValue),
+        });
+
+        contributingFactors.push(`state.${stateKey}`);
+        if (primaryCause === 'unknown') {
+          primaryCause = `state-change:${stateKey}`;
+        }
+      }
+    });
+  }
+
+  // Analyze context changes
+  if (contextSnapshot && previousContextSnapshot) {
+    Object.keys(contextSnapshot).forEach(contextKey => {
+      const currentValue = contextSnapshot[contextKey];
+      const previousValue = previousContextSnapshot[contextKey];
+
+      if (currentValue !== previousValue) {
+        contextChanges.push({
+          contextName: contextKey,
+          providerComponent: 'unknown',
+          changeImpact: 'subtree',
+          consumers: 1,
+        });
+
+        contributingFactors.push(`context.${contextKey}`);
+        if (primaryCause === 'unknown') {
+          primaryCause = `context-change:${contextKey}`;
+        }
+      }
+    });
+  }
+
+  // If no specific changes detected, try to infer from patterns
+  if (primaryCause === 'unknown') {
+    if (propChanges.length > 0) {
+      primaryCause = 'props-updated';
+    } else if (stateChanges.length > 0) {
+      primaryCause = 'state-updated';
+    } else if (contextChanges.length > 0) {
+      primaryCause = 'context-updated';
+    } else {
+      primaryCause = 'forced-update';
+    }
+  }
+
+  return {
+    primaryCause,
+    contributingFactors,
+    propChanges,
+    stateChanges,
+    contextChanges,
+    hookDependencyChanges: [], // TODO: Implement hook dependency tracking
+    performanceImpact: {
+      expectedRenderTime: 0,
+      actualRenderTime: 0,
+      memoryUsage: 0,
+      affectedComponents: 1,
+      renderEfficiency: 100,
+    },
+    renderOptimizationMisses: detectOptimizationMisses(propChanges, stateChanges),
+  };
+};
+
+const determineChangeType = (value: any): 'primitive' | 'object' | 'array' | 'function' => {
+  if (typeof value === 'function') return 'function';
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'object' && value !== null) return 'object';
+  return 'primitive';
+};
+
+const calculateChangeSize = (oldValue: any, newValue: any): number => {
+  if (typeof oldValue === 'string' && typeof newValue === 'string') {
+    return Math.abs(newValue.length - oldValue.length);
+  }
+  if (Array.isArray(oldValue) && Array.isArray(newValue)) {
+    return Math.abs(newValue.length - oldValue.length);
+  }
+  if (typeof oldValue === 'object' && typeof newValue === 'object' && oldValue && newValue) {
+    const oldKeys = Object.keys(oldValue).length;
+    const newKeys = Object.keys(newValue).length;
+    return Math.abs(newKeys - oldKeys);
+  }
+  return 1;
+};
+
+const isSignificantChange = (oldValue: any, newValue: any, changeType: string): boolean => {
+  if (changeType === 'primitive') {
+    return oldValue !== newValue;
+  }
+  if (changeType === 'function') {
+    return oldValue !== newValue; // Function reference change is always significant
+  }
+  if (changeType === 'array') {
+    return !Array.isArray(oldValue) || !Array.isArray(newValue) ||
+           oldValue.length !== newValue.length ||
+           !oldValue.every((item, index) => item === newValue[index]);
+  }
+  if (changeType === 'object') {
+    return JSON.stringify(oldValue) !== JSON.stringify(newValue);
+  }
+  return true;
+};
+
+const calculateStabilityScore = (propName: string, oldValue: any, newValue: any): number => {
+  // Higher score means more stable (0-100)
+  if (oldValue === newValue) return 100;
+  if (typeof oldValue !== typeof newValue) return 0;
+
+  if (typeof oldValue === 'function') {
+    return oldValue === newValue ? 100 : 0;
+  }
+
+  if (typeof oldValue === 'object' && oldValue && newValue) {
+    const oldKeys = Object.keys(oldValue);
+    const newKeys = Object.keys(newValue);
+    if (oldKeys.length !== newKeys.length) return 25;
+
+    const sameKeys = oldKeys.every(key => newKeys.includes(key));
+    if (!sameKeys) return 25;
+
+    const sameValues = oldKeys.every(key => oldValue[key] === newValue[key]);
+    return sameValues ? 100 : 50;
+  }
+
+  return 75; // Primitive value change
+};
+
+const inferActionType = (stateKey: string, oldValue: any, newValue: any): string => {
+  if (oldValue === undefined && newValue !== undefined) return 'set';
+  if (oldValue !== undefined && newValue === undefined) return 'unset';
+  if (Array.isArray(oldValue) && Array.isArray(newValue)) {
+    if (newValue.length > oldValue.length) return 'add';
+    if (newValue.length < oldValue.length) return 'remove';
+    return 'update';
+  }
+  return 'update';
+};
+
+const calculateImpactLevel = (oldValue: any, newValue: any): 'low' | 'medium' | 'high' => {
+  const changeSize = calculateChangeSize(oldValue, newValue);
+  if (changeSize === 0) return 'low';
+  if (changeSize < 5) return 'low';
+  if (changeSize < 20) return 'medium';
+  return 'high';
+};
+
+const mayTriggerCascade = (stateKey: string, newValue: any): boolean => {
+  // Heuristics to detect if a state change might trigger cascade updates
+  if (stateKey.includes('selected') || stateKey.includes('active')) return true;
+  if (stateKey.includes('components') || stateKey.includes('connections')) return true;
+  if (Array.isArray(newValue) && newValue.length > 10) return true;
+  return false;
+};
+
+const detectOptimizationMisses = (
+  propChanges: PropChangeAnalysis[],
+  stateChanges: StateChangeAnalysis[]
+): OptimizationMiss[] => {
+  const misses: OptimizationMiss[] = [];
+
+  // Detect unstable function props
+  const unstableFunctions = propChanges.filter(change =>
+    change.changeType === 'function' && change.stabilityScore < 50
+  );
+
+  if (unstableFunctions.length > 0) {
+    misses.push({
+      type: 'useCallback',
+      reason: `Unstable function props: ${unstableFunctions.map(f => f.propName).join(', ')}`,
+      potentialSavings: unstableFunctions.length * 5, // Estimated ms saved
+      recommendation: 'Wrap function props with useCallback to maintain reference stability',
+    });
+  }
+
+  // Detect unstable object props
+  const unstableObjects = propChanges.filter(change =>
+    change.changeType === 'object' && change.stabilityScore < 75
+  );
+
+  if (unstableObjects.length > 0) {
+    misses.push({
+      type: 'useMemo',
+      reason: `Unstable object props: ${unstableObjects.map(o => o.propName).join(', ')}`,
+      potentialSavings: unstableObjects.length * 3,
+      recommendation: 'Memoize object props with useMemo or move them outside the component',
+    });
+  }
+
+  // Detect potential memo optimization
+  if (propChanges.length > 5) {
+    misses.push({
+      type: 'memo',
+      reason: `Component receives many props (${propChanges.length})`,
+      potentialSavings: 10,
+      recommendation: 'Consider wrapping component with React.memo',
+    });
+  }
+
+  return misses;
 };
 
 const sampleMemory = (
@@ -243,7 +591,19 @@ export const useRenderGuard = (
     lastSyntheticErrorAt: 0,
     lastMemorySampleAt: 0,
     lastSnapshotHash: undefined,
+    renderCauseHistory: [],
+    propStabilityTracker: new Map(),
+    contextStabilityTracker: new Map(),
+    hookDependencyTracker: new Map(),
+    renderTriggerPatterns: new Map(),
+    optimizationMissCount: 0,
   });
+
+  const previousSnapshotsRef = useRef<{
+    props?: Record<string, unknown>;
+    state?: Record<string, unknown>;
+    context?: Record<string, unknown>;
+  }>({});
 
   const resolvedOptions = {
     ...DEFAULT_OPTIONS,
@@ -254,8 +614,14 @@ export const useRenderGuard = (
     return PROD_HANDLE;
   }
 
+  const pauseWhenCircuitBreakerActive = options.pauseWhenCircuitBreakerActive ?? true;
+  const pauseWhenStoreBreakerActive = options.pauseWhenStoreBreakerActive ?? true;
+  const adaptiveThresholdScale = options.adaptiveThresholdScale ?? true;
+
   const timestamp = now();
   const state = stateRef.current;
+
+  const storeBreakerSnapshot = options.linkedStoreBreaker?.getSnapshot();
 
   const timeSincePreviousRender = state.previousRenderAt
     ? timestamp - state.previousRenderAt
@@ -265,6 +631,18 @@ export const useRenderGuard = (
   state.previousRenderAt = timestamp;
 
   const sinceFirstRenderMs = timestamp - state.firstRenderAt;
+
+  const thresholdScale =
+    adaptiveThresholdScale && storeBreakerSnapshot
+      ? storeBreakerSnapshot.open
+        ? 0.5
+        : storeBreakerSnapshot.updatesInWindow > 12
+        ? 0.75
+        : 1
+      : 1;
+
+  const warningThreshold = Math.max(3, Math.floor(resolvedOptions.warningThreshold * thresholdScale));
+  const errorThreshold = Math.max(warningThreshold + 2, Math.floor(resolvedOptions.errorThreshold * thresholdScale));
 
   if (resolvedOptions.trackInAnalytics) {
     RenderAnalytics.getInstance().recordRender(componentName);
@@ -276,23 +654,216 @@ export const useRenderGuard = (
   const combinedSnapshot = propsSnapshot || stateSnapshot ? { propsSnapshot, stateSnapshot } : undefined;
   const snapshotHash = hashSnapshot(combinedSnapshot ?? contextPayload);
 
+  // Enhanced render cause analysis
+  const renderCauseAnalysis = analyzeRenderCause(
+    componentName,
+    propsSnapshot,
+    stateSnapshot,
+    previousSnapshotsRef.current.props,
+    previousSnapshotsRef.current.state,
+    contextPayload,
+    previousSnapshotsRef.current.context
+  );
+
+  // Update render trigger patterns
+  state.renderTriggerPatterns.set(
+    renderCauseAnalysis.primaryCause,
+    (state.renderTriggerPatterns.get(renderCauseAnalysis.primaryCause) || 0) + 1
+  );
+
+  // Track prop stability
+  renderCauseAnalysis.propChanges.forEach(propChange => {
+    const tracker = state.propStabilityTracker.get(propChange.propName) || { stable: 0, unstable: 0, lastValue: undefined };
+    if (propChange.isSignificant) {
+      tracker.unstable += 1;
+    } else {
+      tracker.stable += 1;
+    }
+    tracker.lastValue = propChange.currentValue;
+    state.propStabilityTracker.set(propChange.propName, tracker);
+  });
+
+  // Track optimization misses
+  state.optimizationMissCount += renderCauseAnalysis.renderOptimizationMisses.length;
+
+  // Add to render cause history
+  state.renderCauseHistory.push(renderCauseAnalysis);
+  if (state.renderCauseHistory.length > 20) {
+    state.renderCauseHistory.shift();
+  }
+
+  // Update previous snapshots for next comparison
+  previousSnapshotsRef.current = {
+    props: propsSnapshot,
+    state: stateSnapshot,
+    context: contextPayload,
+  };
+
   const memorySample = sampleMemory(state, timestamp, resolvedOptions.memorySampleIntervalMs);
+
+  const enrichedContext = storeBreakerSnapshot
+    ? {
+        ...(contextPayload ?? {}),
+        storeBreaker: {
+          open: storeBreakerSnapshot.open,
+          updatesInWindow: storeBreakerSnapshot.updatesInWindow,
+          totalUpdates: storeBreakerSnapshot.totalUpdates,
+          reason: storeBreakerSnapshot.reason,
+        },
+        renderCauseAnalysis: {
+          primaryCause: renderCauseAnalysis.primaryCause,
+          contributingFactors: renderCauseAnalysis.contributingFactors,
+          propChangesCount: renderCauseAnalysis.propChanges.length,
+          stateChangesCount: renderCauseAnalysis.stateChanges.length,
+          optimizationMissesCount: renderCauseAnalysis.renderOptimizationMisses.length,
+        },
+        propStability: Object.fromEntries(
+          Array.from(state.propStabilityTracker.entries()).map(([prop, tracker]) => [
+            prop,
+            {
+              stabilityRate: (tracker.stable / (tracker.stable + tracker.unstable)) * 100,
+              totalChanges: tracker.stable + tracker.unstable,
+            }
+          ])
+        ),
+        renderTriggerPatterns: Object.fromEntries(state.renderTriggerPatterns),
+      }
+    : {
+        ...(contextPayload ?? {}),
+        renderCauseAnalysis: {
+          primaryCause: renderCauseAnalysis.primaryCause,
+          contributingFactors: renderCauseAnalysis.contributingFactors,
+          propChangesCount: renderCauseAnalysis.propChanges.length,
+          stateChangesCount: renderCauseAnalysis.stateChanges.length,
+          optimizationMissesCount: renderCauseAnalysis.renderOptimizationMisses.length,
+        },
+        propStability: Object.fromEntries(
+          Array.from(state.propStabilityTracker.entries()).map(([prop, tracker]) => [
+            prop,
+            {
+              stabilityRate: (tracker.stable / (tracker.stable + tracker.unstable)) * 100,
+              totalChanges: tracker.stable + tracker.unstable,
+            }
+          ])
+        ),
+        renderTriggerPatterns: Object.fromEntries(state.renderTriggerPatterns),
+      };
 
   const logPayload = () => ({
     component: componentName,
     componentId: resolvedOptions.componentId,
     renderCount: state.renderCount,
-    warningThreshold: resolvedOptions.warningThreshold,
-    errorThreshold: resolvedOptions.errorThreshold,
+    warningThreshold,
+    errorThreshold,
     sinceFirstRenderMs,
     sincePreviousRenderMs: timeSincePreviousRender,
-    context: contextPayload,
+    context: enrichedContext,
     propsSnapshot,
     stateSnapshot,
     snapshotHash,
     memorySample,
+    storeBreaker: storeBreakerSnapshot
+      ? {
+          name: storeBreakerSnapshot.name,
+          open: storeBreakerSnapshot.open,
+          updatesInWindow: storeBreakerSnapshot.updatesInWindow,
+          totalUpdates: storeBreakerSnapshot.totalUpdates,
+          reason: storeBreakerSnapshot.reason,
+          openUntil: storeBreakerSnapshot.openUntil,
+        }
+      : undefined,
     stack: resolvedOptions.includeStackTrace ? new Error().stack : undefined,
+    renderCauseAnalysis,
+    propStability: Object.fromEntries(
+      Array.from(state.propStabilityTracker.entries()).map(([prop, tracker]) => [
+        prop,
+        {
+          stabilityRate: (tracker.stable / (tracker.stable + tracker.unstable)) * 100,
+          totalChanges: tracker.stable + tracker.unstable,
+          isProblematic: tracker.unstable > tracker.stable,
+        }
+      ])
+    ),
+    renderOptimizations: {
+      missCount: state.optimizationMissCount,
+      suggestions: renderCauseAnalysis.renderOptimizationMisses,
+      triggerPatterns: Object.fromEntries(state.renderTriggerPatterns),
+    },
   });
+
+  // Log detailed render cause analysis
+  if (process.env.NODE_ENV === 'development' && (renderCauseAnalysis.propChanges.length > 0 || renderCauseAnalysis.stateChanges.length > 0)) {
+    console.debug(`[RenderGuard:${componentName}] Render cause analysis:`, {
+      renderCount: state.renderCount,
+      primaryCause: renderCauseAnalysis.primaryCause,
+      contributingFactors: renderCauseAnalysis.contributingFactors,
+      propChanges: renderCauseAnalysis.propChanges.map(pc => ({
+        prop: pc.propName,
+        type: pc.changeType,
+        significant: pc.isSignificant,
+        stability: pc.stabilityScore,
+      })),
+      stateChanges: renderCauseAnalysis.stateChanges.map(sc => ({
+        state: sc.stateKey,
+        action: sc.actionType,
+        impact: sc.impactLevel,
+      })),
+      optimizationMisses: renderCauseAnalysis.renderOptimizationMisses.map(om => ({
+        type: om.type,
+        reason: om.reason,
+        savings: `${om.potentialSavings}ms`,
+      })),
+      propStabilityReport: Object.fromEntries(
+        Array.from(state.propStabilityTracker.entries())
+          .filter(([, tracker]) => tracker.unstable > 2)
+          .map(([prop, tracker]) => [
+            prop,
+            `${((tracker.stable / (tracker.stable + tracker.unstable)) * 100).toFixed(1)}% stable`,
+          ])
+      ),
+    });
+  }
+
+  // Integrate with RenderDebugLogger
+  if (state.renderCount % 5 === 0 || renderCauseAnalysis.renderOptimizationMisses.length > 0) {
+    const renderLogEntry: Partial<RenderLogEntry> = {
+      componentName,
+      renderCount: state.renderCount,
+      renderDuration: timeSincePreviousRender,
+      triggerReason: renderCauseAnalysis.primaryCause,
+      propChanges: renderCauseAnalysis.propChanges.map(pc => ({
+        propName: pc.propName,
+        oldValue: pc.previousValue,
+        newValue: pc.currentValue,
+        changeType: pc.changeType as any,
+        isDeepChange: pc.changeType !== 'primitive',
+        changeSize: pc.changeSize,
+      })),
+      stateChanges: renderCauseAnalysis.stateChanges.map(sc => ({
+        stateName: sc.stateKey,
+        oldValue: undefined,
+        newValue: undefined,
+        changeSource: sc.changeSource,
+        actionType: sc.actionType,
+      })),
+      performanceMetrics: {
+        renderDuration: timeSincePreviousRender,
+        componentUpdateTime: timeSincePreviousRender,
+        diffTime: 0,
+        reconciliationTime: 0,
+        memoryUsage: memorySample?.usedJSHeapSize,
+        memoryDelta: memorySample?.deltaSinceBaseline,
+      },
+      renderOptimizations: renderCauseAnalysis.renderOptimizationMisses.map(om => ({
+        type: om.type as any,
+        status: 'miss' as const,
+        reason: om.reason,
+        costSaved: om.potentialSavings,
+      })),
+    };
+
+    renderDebugLogger.logRender(renderLogEntry);
+  }
 
   const detector = InfiniteLoopDetector.getInstance();
 
@@ -306,7 +877,7 @@ export const useRenderGuard = (
     renderCount: state.renderCount,
     sinceFirstRenderMs,
     sincePreviousRenderMs: timeSincePreviousRender,
-    context: contextPayload,
+    context: enrichedContext,
     snapshotHash,
     stackSnippet,
     memorySample,
@@ -324,7 +895,7 @@ export const useRenderGuard = (
 
   const logAndMaybeWarn = () => {
     if (
-      state.renderCount >= resolvedOptions.warningThreshold &&
+      state.renderCount >= warningThreshold &&
       state.renderCount !== state.lastWarningCount &&
       timestamp - state.lastWarningAt >= resolvedOptions.warningIntervalMs
     ) {
@@ -363,10 +934,10 @@ export const useRenderGuard = (
 
   const shouldThrowSyntheticError =
     !resolvedOptions.disableSyntheticError &&
-    (state.renderCount >= resolvedOptions.errorThreshold || detectionResult.shouldThrowSyntheticError) &&
+    (state.renderCount >= errorThreshold || detectionResult.shouldThrowSyntheticError) &&
     state.lastSyntheticErrorAt !== state.renderCount;
 
-  if (state.renderCount >= resolvedOptions.errorThreshold && state.renderCount !== state.lastErrorCount) {
+  if (state.renderCount >= errorThreshold && state.renderCount !== state.lastErrorCount) {
     state.lastErrorCount = state.renderCount;
     console.error(`[RenderGuard:${componentName}] Excessive render frequency`, logPayload());
 
@@ -387,7 +958,7 @@ export const useRenderGuard = (
       renderCount: state.renderCount,
       sinceFirstRenderMs,
       sincePreviousRenderMs: timeSincePreviousRender,
-      context: contextPayload,
+      context: enrichedContext,
       propsSnapshot,
       stateSnapshot,
       memorySample,
@@ -413,7 +984,7 @@ export const useRenderGuard = (
     throw syntheticError;
   }
 
-  const reset = () => {
+  const reset = useCallback(() => {
     state.renderCount = 0;
     state.firstRenderAt = now();
     state.previousRenderAt = 0;
@@ -425,8 +996,20 @@ export const useRenderGuard = (
     state.lastSnapshotHash = undefined;
     state.memoryBaseline = undefined;
     state.lastMemorySampleAt = 0;
+    state.renderCauseHistory = [];
+    state.propStabilityTracker.clear();
+    state.contextStabilityTracker.clear();
+    state.hookDependencyTracker.clear();
+    state.renderTriggerPatterns.clear();
+    state.optimizationMissCount = 0;
     detector.markComponentReset(componentName);
-  };
+    renderDebugLogger.reset(componentName);
+  }, [componentName]);
+
+  const shouldPauseDueToCircuit = pauseWhenCircuitBreakerActive && circuitBreakerActive;
+  const shouldPauseDueToStore =
+    pauseWhenStoreBreakerActive && !!storeBreakerSnapshot && storeBreakerSnapshot.open;
+  const shouldPause = shouldPauseDueToCircuit || shouldPauseDueToStore;
 
   return {
     renderCount: state.renderCount,
@@ -434,6 +1017,8 @@ export const useRenderGuard = (
     sincePreviousRenderMs: timeSincePreviousRender,
     circuitBreakerActive,
     circuitBreakerResetAt: circuitBreakerActive ? state.circuitBreakerOpenUntil : null,
+    shouldPause,
+    storeBreakerSnapshot,
     lastSyntheticError,
     memorySample,
     reset,
@@ -553,6 +1138,16 @@ export const RenderGuardPresets = {
     InteractionLayer: {
       warningThreshold: 8,
       errorThreshold: 15,
+    },
+  },
+  store: {
+    default: {
+      warningThreshold: 12,
+      errorThreshold: 18,
+    },
+    aggressive: {
+      warningThreshold: 8,
+      errorThreshold: 12,
     },
   },
 } as const;

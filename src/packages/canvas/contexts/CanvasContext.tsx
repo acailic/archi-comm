@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useMemo, ReactNode } from 'react';
-import { DesignComponent, Connection, InfoCard } from '../../../types';
-import { ReactFlowInstance } from '@xyflow/react';
+import { ReactFlowInstance } from "@xyflow/react";
+import React, { createContext, ReactNode, useContext, useMemo } from "react";
+import { Connection, DesignComponent, InfoCard } from "../../../types";
 
 export interface LayoutPositions {
   [nodeId: string]: { x: number; y: number };
@@ -23,8 +23,14 @@ export interface CanvasState {
 export interface ComponentCallbacks {
   onComponentSelect: (componentId: string) => void;
   onComponentDeselect: () => void;
-  onComponentDrop: (component: DesignComponent, position: { x: number; y: number }) => void;
-  onComponentPositionChange: (componentId: string, position: { x: number; y: number }) => void;
+  onComponentDrop: (
+    component: DesignComponent,
+    position: { x: number; y: number }
+  ) => void;
+  onComponentPositionChange: (
+    componentId: string,
+    position: { x: number; y: number }
+  ) => void;
   onComponentDelete: (componentId: string) => void;
 }
 
@@ -74,50 +80,119 @@ export const CanvasContextProvider: React.FC<CanvasContextProviderProps> = ({
 }) => {
   const [state, setState] = React.useState<CanvasState>(initialState);
 
+  // Memoize callbacks to prevent unnecessary context value recreation
+  const memoizedCallbacks = useMemo(() => {
+    // Shallow comparison to detect actual callback changes vs object reference changes
+    return callbacks;
+  }, [
+    callbacks.component.onComponentSelect,
+    callbacks.component.onComponentDeselect,
+    callbacks.component.onComponentDrop,
+    callbacks.component.onComponentPositionChange,
+    callbacks.component.onComponentDelete,
+    callbacks.connection.onConnectionCreate,
+    callbacks.connection.onConnectionDelete,
+    callbacks.connection.onConnectionSelect,
+    callbacks.infoCard.onInfoCardCreate,
+    callbacks.infoCard.onInfoCardUpdate,
+    callbacks.infoCard.onInfoCardDelete,
+    callbacks.infoCard.onInfoCardSelect,
+    callbacks.onEmergencyPause,
+    callbacks.onEmergencyResume,
+  ]);
+
   React.useEffect(() => {
     setState(initialState);
   }, [initialState]);
 
-  const updateLayoutPositions = React.useCallback((positions: LayoutPositions) => {
-    setState(prev => ({ ...prev, layoutPositions: positions }));
-  }, []);
+  const updateLayoutPositions = React.useCallback(
+    (positions: LayoutPositions) => {
+      setState((prev) => {
+        // Avoid update if positions haven't actually changed
+        if (
+          JSON.stringify(prev.layoutPositions) === JSON.stringify(positions)
+        ) {
+          return prev;
+        }
+        return { ...prev, layoutPositions: positions };
+      });
+    },
+    []
+  );
 
-  const updateVirtualizationConfig = React.useCallback((config: Partial<VirtualizationConfig>) => {
-    setState(prev => ({
-      ...prev,
-      virtualizationConfig: { ...prev.virtualizationConfig, ...config }
-    }));
-  }, []);
+  const updateVirtualizationConfig = React.useCallback(
+    (config: Partial<VirtualizationConfig>) => {
+      setState((prev) => {
+        const newConfig = { ...prev.virtualizationConfig, ...config };
+        // Avoid update if config hasn't actually changed
+        if (
+          JSON.stringify(prev.virtualizationConfig) ===
+          JSON.stringify(newConfig)
+        ) {
+          return prev;
+        }
+        return { ...prev, virtualizationConfig: newConfig };
+      });
+    },
+    []
+  );
 
   const updateSelectedItems = React.useCallback((items: string[]) => {
-    setState(prev => ({ ...prev, selectedItems: items }));
+    setState((prev) => {
+      // Avoid update if items array is identical
+      if (
+        prev.selectedItems.length === items.length &&
+        prev.selectedItems.every((item, index) => item === items[index])
+      ) {
+        return prev;
+      }
+      return { ...prev, selectedItems: items };
+    });
   }, []);
 
-  const setReactFlowInstance = React.useCallback((instance: ReactFlowInstance | null) => {
-    setState(prev => ({ ...prev, reactFlowInstance: instance }));
-  }, []);
+  const setReactFlowInstance = React.useCallback(
+    (instance: ReactFlowInstance | null) => {
+      setState((prev) => {
+        // Avoid update if instance hasn't changed
+        if (prev.reactFlowInstance === instance) {
+          return prev;
+        }
+        return { ...prev, reactFlowInstance: instance };
+      });
+    },
+    []
+  );
 
   const setEmergencyPause = React.useCallback((paused: boolean) => {
-    setState(prev => ({ ...prev, emergencyPause: paused }));
+    setState((prev) => {
+      // Avoid update if pause state hasn't changed
+      if (prev.emergencyPause === paused) {
+        return prev;
+      }
+      return { ...prev, emergencyPause: paused };
+    });
   }, []);
 
-  const contextValue = useMemo<CanvasContextValue>(() => ({
-    state,
-    callbacks,
-    updateLayoutPositions,
-    updateVirtualizationConfig,
-    updateSelectedItems,
-    setReactFlowInstance,
-    setEmergencyPause,
-  }), [
-    state,
-    callbacks,
-    updateLayoutPositions,
-    updateVirtualizationConfig,
-    updateSelectedItems,
-    setReactFlowInstance,
-    setEmergencyPause,
-  ]);
+  const contextValue = useMemo<CanvasContextValue>(
+    () => ({
+      state,
+      callbacks: memoizedCallbacks,
+      updateLayoutPositions,
+      updateVirtualizationConfig,
+      updateSelectedItems,
+      setReactFlowInstance,
+      setEmergencyPause,
+    }),
+    [
+      state,
+      memoizedCallbacks,
+      updateLayoutPositions,
+      updateVirtualizationConfig,
+      updateSelectedItems,
+      setReactFlowInstance,
+      setEmergencyPause,
+    ]
+  );
 
   return (
     <CanvasContext.Provider value={contextValue}>
@@ -129,7 +204,9 @@ export const CanvasContextProvider: React.FC<CanvasContextProviderProps> = ({
 export const useCanvasContext = (): CanvasContextValue => {
   const context = useContext(CanvasContext);
   if (!context) {
-    throw new Error('useCanvasContext must be used within a CanvasContextProvider');
+    throw new Error(
+      "useCanvasContext must be used within a CanvasContextProvider"
+    );
   }
   return context;
 };
