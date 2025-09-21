@@ -1,3 +1,4 @@
+import { useGuardedState } from "@/lib/performance/useGuardedState";
 import { ReactFlowInstance } from "@xyflow/react";
 import React, { createContext, ReactNode, useContext, useMemo } from "react";
 import { Connection, DesignComponent, InfoCard } from "../../../types";
@@ -78,7 +79,64 @@ export const CanvasContextProvider: React.FC<CanvasContextProviderProps> = ({
   initialState,
   callbacks,
 }) => {
-  const [state, setState] = React.useState<CanvasState>(initialState);
+  const [state, setState] = useGuardedState<CanvasState>(initialState, {
+    componentName: "CanvasContext",
+    maxUpdatesPerTick: 25,
+  });
+
+  // Shallow comparator utility
+  const shallowEqual = React.useCallback((a: any, b: any) => {
+    if (a === b) return true;
+    if (
+      typeof a !== "object" ||
+      typeof b !== "object" ||
+      a == null ||
+      b == null
+    ) {
+      return false;
+    }
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every((key) => a[key] === b[key]);
+  }, []);
+
+  // Targeted useEffects for specific state updates (DO NOT overwrite layoutPositions and reactFlowInstance)
+  React.useEffect(() => {
+    if (!shallowEqual(state.selectedItems, initialState.selectedItems)) {
+      setState((prev) => ({
+        ...prev,
+        selectedItems: initialState.selectedItems,
+      }));
+    }
+  }, [initialState.selectedItems, state.selectedItems, shallowEqual]);
+
+  React.useEffect(() => {
+    if (
+      !shallowEqual(
+        state.virtualizationConfig,
+        initialState.virtualizationConfig
+      )
+    ) {
+      setState((prev) => ({
+        ...prev,
+        virtualizationConfig: initialState.virtualizationConfig,
+      }));
+    }
+  }, [
+    initialState.virtualizationConfig,
+    state.virtualizationConfig,
+    shallowEqual,
+  ]);
+
+  React.useEffect(() => {
+    if (state.emergencyPause !== initialState.emergencyPause) {
+      setState((prev) => ({
+        ...prev,
+        emergencyPause: initialState.emergencyPause,
+      }));
+    }
+  }, [initialState.emergencyPause, state.emergencyPause]);
 
   // Memoize callbacks to prevent unnecessary context value recreation
   const memoizedCallbacks = useMemo(() => {
@@ -101,23 +159,17 @@ export const CanvasContextProvider: React.FC<CanvasContextProviderProps> = ({
     callbacks.onEmergencyResume,
   ]);
 
-  React.useEffect(() => {
-    setState(initialState);
-  }, [initialState]);
-
   const updateLayoutPositions = React.useCallback(
     (positions: LayoutPositions) => {
       setState((prev) => {
         // Avoid update if positions haven't actually changed
-        if (
-          JSON.stringify(prev.layoutPositions) === JSON.stringify(positions)
-        ) {
+        if (shallowEqual(prev.layoutPositions, positions)) {
           return prev;
         }
         return { ...prev, layoutPositions: positions };
       });
     },
-    []
+    [shallowEqual]
   );
 
   const updateVirtualizationConfig = React.useCallback(
@@ -125,16 +177,13 @@ export const CanvasContextProvider: React.FC<CanvasContextProviderProps> = ({
       setState((prev) => {
         const newConfig = { ...prev.virtualizationConfig, ...config };
         // Avoid update if config hasn't actually changed
-        if (
-          JSON.stringify(prev.virtualizationConfig) ===
-          JSON.stringify(newConfig)
-        ) {
+        if (shallowEqual(prev.virtualizationConfig, newConfig)) {
           return prev;
         }
         return { ...prev, virtualizationConfig: newConfig };
       });
     },
-    []
+    [shallowEqual]
   );
 
   const updateSelectedItems = React.useCallback((items: string[]) => {

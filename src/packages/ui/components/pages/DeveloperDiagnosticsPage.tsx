@@ -113,7 +113,8 @@ const RenderLoopDiagnosticsTab: React.FC = () => {
 
   useEffect(() => {
     refreshDiagnostics();
-    const interval = setInterval(refreshDiagnostics, 2000); // Auto-refresh every 2 seconds
+    // Reduced auto-refresh frequency to reduce overhead
+    const interval = setInterval(refreshDiagnostics, 10000); // Auto-refresh every 10 seconds
     return () => clearInterval(interval);
   }, [refreshDiagnostics]);
 

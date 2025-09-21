@@ -132,7 +132,7 @@ export class StoreCircuitBreaker {
 
     if (this.openUntil > timestamp) {
       this.blockedActions += 1;
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.warn(`[StoreCircuitBreaker:${this.options.name}] Blocking action`, {
           action,
           openUntil: this.openUntil,
@@ -191,7 +191,7 @@ export class StoreCircuitBreaker {
     if (shouldWarn) {
       this.warningCount += 1;
       this.lastWarningAt = timestamp;
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.warn(`[StoreCircuitBreaker:${this.options.name}] Elevated update rate`, {
           updatesInWindow,
           windowMs: this.options.windowMs,
@@ -231,7 +231,7 @@ export class StoreCircuitBreaker {
     this.openUntil = timestamp + this.options.cooldownMs;
     this.lastReason = reason;
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error(`[StoreCircuitBreaker:${this.options.name}] Circuit breaker tripped`, {
         reason,
         action: meta.action,
@@ -253,7 +253,7 @@ export class StoreCircuitBreaker {
     this.lastReason = null;
     this.detector.markCircuitBreakerClosed(`Store:${this.options.name}`);
 
-    if (wasOpen && process.env.NODE_ENV === 'development') {
+    if (wasOpen && import.meta.env.DEV) {
       console.info(`[StoreCircuitBreaker:${this.options.name}] Circuit breaker closed`, { reason });
     }
 

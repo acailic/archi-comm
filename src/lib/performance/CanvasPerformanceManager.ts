@@ -3,7 +3,7 @@
  * Specialized performance manager for coordinating canvas operations across different systems
  */
 
-import { CanvasOptimizer, OptimizedEventSystem, PerformanceMonitor } from './PerformanceOptimizer';
+import { CanvasOptimizer, OptimizedEventSystem, PerformanceMonitor, PerformanceOptimizer } from './PerformanceOptimizer';
 
 export interface CanvasPerformanceConfig {
   mode: 'quality' | 'balanced' | 'performance';
@@ -1446,6 +1446,21 @@ export interface PerformanceExport {
 }
 
 export type PerformanceEventListener = (event: string, data: any) => void;
+
+export interface ReactFlowMetrics {
+  nodeCount: number;
+  edgeCount: number;
+  viewportZoom: number;
+  viewportX: number;
+  viewportY: number;
+  lastRenderDuration: number;
+  nodeRenderTime: number;
+  edgeRenderTime: number;
+  layoutCalculationTime: number;
+  connectionCalculationTime: number;
+  visibleNodeCount: number;
+  visibleEdgeCount: number;
+}
 
 // Utility functions for React integration
 

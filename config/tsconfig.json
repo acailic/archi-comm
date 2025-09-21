@@ -28,13 +28,16 @@
     "noImplicitThis": true,
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": false,
-    "baseUrl": "..",
+    "baseUrl": "../",
     "paths": {
       "@/*": [
         "src/*"
       ],
       "@packages/*": [
         "src/packages/*"
+      ],
+      "@stores/*": [
+        "src/stores/*"
       ],
       "@core": [
         "src/packages/core/index.ts"
@@ -74,17 +77,22 @@
       ],
       "@hooks/*": [
         "src/shared/hooks/*"
+      ],
+      "@test/*": [
+        "src/test/*"
       ]
     }
   },
   "include": [
     "../src/**/*",
-    "../src/types/**/*"
+    "../src/types/**/*",
+    "../test/**/*"
   ],
   "exclude": [
     "../node_modules",
     "../dist",
     "../src-tauri",
-    "../test-results"
+    "../test-results",
+    "../coverage"
   ]
 }

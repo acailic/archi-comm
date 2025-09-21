@@ -43,7 +43,7 @@ const trackCallbackStability = (
   isNewReference: boolean,
   dependencyChanges?: string[]
 ): void => {
-  if (process.env.NODE_ENV !== "development") return;
+  if (!import.meta.env.DEV) return;
 
   const now = Date.now();
   let metrics = callbackMonitoringState.metrics.get(callbackName);
@@ -240,7 +240,7 @@ ${Array.from(callbackMonitoringState.optimizationSuggestions)
 type AnyFunction = (...args: any[]) => any;
 
 // Export monitoring state for external access in development
-if (process.env.NODE_ENV === "development") {
+if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as any).__CALLBACK_STABILITY_MONITORING__ = {
     getMetrics: () => callbackMonitoringState.metrics,
     getReport: generateStabilityReport,
@@ -271,7 +271,7 @@ export function useStableCallback<T extends AnyFunction>(callback: T): T {
 
   // Track callback changes for stability monitoring
   const isNewReference = previousCallbackRef.current !== callback;
-  if (process.env.NODE_ENV === "development" && isNewReference) {
+  if (import.meta.env.DEV && isNewReference) {
     trackCallbackStability(
       `useStableCallback:${callbackNameRef.current}`,
       callback,
@@ -290,7 +290,7 @@ export function useStableCallback<T extends AnyFunction>(callback: T): T {
   const stableCallback = useCallback(
     ((...args: Parameters<T>) => {
       // Track callback usage
-      if (process.env.NODE_ENV === "development") {
+      if (import.meta.env.DEV) {
         const metrics = callbackMonitoringState.metrics.get(
           `useStableCallback:${callbackNameRef.current}`
         );
@@ -351,7 +351,7 @@ export function useStableCallbacks<T extends Record<string, AnyFunction>>(
   );
 
   // Track callback changes for stability monitoring
-  if (process.env.NODE_ENV === "development") {
+  if (import.meta.env.DEV) {
     const changedCallbacks = hasCallbackChanges(
       previousCallbacksRef.current,
       callbacks
@@ -434,7 +434,7 @@ export function useStableCallbacks<T extends Record<string, AnyFunction>>(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         stableCallbacks[key] = ((...args: any[]) => {
           // Track callback usage for performance monitoring
-          if (process.env.NODE_ENV === "development") {
+          if (import.meta.env.DEV) {
             const metrics = callbackMonitoringState.metrics.get(
               `useStableCallbacks:${key}`
             );
@@ -463,7 +463,7 @@ export function useStableCallbacks<T extends Record<string, AnyFunction>>(
 
     stableCallbacksRef.current = stableCallbacks;
 
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.DEV) {
       console.debug(
         "[useStableCallbacks] Created new stable callbacks object",
         {
@@ -502,7 +502,7 @@ export function useStableUpdater<T>(updater: (prev: T) => T): (prev: T) => T {
 export function useCallbackStabilityTracker(
   name: string,
   callback: AnyFunction,
-  enabled = process.env.NODE_ENV === "development"
+  enabled = import.meta.env.DEV
 ) {
   const previousCallbackRef = useRef<AnyFunction>();
   const renderCountRef = useRef(0);
@@ -547,7 +547,7 @@ export function useCallbackStabilityTracker(
  * Development helper to get callback stability metrics
  */
 export function getCallbackStabilityMetrics(): CallbackStabilityMetrics[] {
-  if (process.env.NODE_ENV !== "development") {
+  if (!import.meta.env.DEV) {
     return [];
   }
   return Array.from(callbackMonitoringState.metrics.values());
@@ -557,7 +557,7 @@ export function getCallbackStabilityMetrics(): CallbackStabilityMetrics[] {
  * Development helper to get callback stability report
  */
 export function getCallbackStabilityReport(): string {
-  if (process.env.NODE_ENV !== "development") {
+  if (!import.meta.env.DEV) {
     return "Callback stability tracking is only available in development mode.";
   }
   return generateStabilityReport();
@@ -567,7 +567,7 @@ export function getCallbackStabilityReport(): string {
  * Development helper to reset callback stability metrics
  */
 export function resetCallbackStabilityMetrics(): void {
-  if (process.env.NODE_ENV !== "development") {
+  if (!import.meta.env.DEV) {
     return;
   }
   callbackMonitoringState.metrics.clear();
@@ -585,7 +585,7 @@ export function analyzeComponentCallbackStability(componentName: string): {
   averageStabilityScore: number;
   suggestions: string[];
 } {
-  if (process.env.NODE_ENV !== "development") {
+  if (!import.meta.env.DEV) {
     return {
       totalCallbacks: 0,
       unstableCallbacks: 0,
@@ -622,7 +622,7 @@ export function analyzeComponentCallbackStability(componentName: string): {
 }
 
 // Periodic stability report in development
-if (process.env.NODE_ENV === "development") {
+if (import.meta.env.DEV) {
   setInterval(() => {
     const unstableCount = callbackMonitoringState.unstableCallbacks.size;
     if (unstableCount > 5) {

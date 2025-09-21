@@ -15,6 +15,8 @@ import {
   EdgeLabelRenderer,
 } from '@xyflow/react';
 import type { Connection } from '@/shared/contracts';
+import { useStableStyleEx } from '@/shared/hooks/useStableLiterals';
+import { createHotLeafComponent } from '@/shared/utils/hotLeafMemoization';
 
 interface CustomEdgeData {
   connection: Connection;
@@ -28,7 +30,7 @@ export interface CustomEdgeProps extends EdgeProps {
   data: CustomEdgeData;
 }
 
-export function CustomEdge({
+function CustomEdgeInner({
   id,
   sourceX,
   sourceY,
@@ -112,6 +114,44 @@ export function CustomEdge({
   const strokeWidth = isSelected ? 3 : 2;
   const opacity = isStartConnection ? 0.5 : 1;
 
+  // Stable styles for better performance
+  const svgContainerStyle = useStableStyleEx(
+    () => ({ position: 'absolute' as const }),
+    []
+  );
+
+  const edgeStyle = useStableStyleEx(
+    () => ({
+      ...style,
+      stroke: color,
+      strokeWidth,
+      strokeDasharray,
+      opacity,
+      strokeOpacity: 1,
+      fill: 'none',
+      vectorEffect: 'non-scaling-stroke' as const,
+      filter: isSelected ? `url(#${glowId})` : undefined,
+      cursor: 'pointer' as const,
+    }),
+    [style, color, strokeWidth, strokeDasharray, opacity, isSelected, glowId]
+  );
+
+  const labelContainerStyle = useStableStyleEx(
+    () => ({
+      position: 'absolute' as const,
+      transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+      pointerEvents: 'all' as const,
+    }),
+    [labelX, labelY]
+  );
+
+  const labelStyle = useStableStyleEx(
+    () => ({
+      filter: isSelected ? `url(#${glowId})` : undefined,
+    }),
+    [isSelected, glowId]
+  );
+
   // Handle edge click
   const handleEdgeClick = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -121,7 +161,7 @@ export function CustomEdge({
   return (
     <>
       {/* SVG Definitions for markers and filters */}
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
+      <svg width="0" height="0" style={svgContainerStyle}>
         <defs>
           <marker
             id={arrowId}
@@ -150,18 +190,7 @@ export function CustomEdge({
       <BaseEdge
         id={id}
         path={edgePath}
-        style={{
-          ...style,
-          stroke: color,
-          strokeWidth,
-          strokeDasharray,
-          opacity,
-          strokeOpacity: 1,
-          fill: 'none',
-          vectorEffect: 'non-scaling-stroke',
-          filter: isSelected ? `url(#${glowId})` : undefined,
-          cursor: 'pointer',
-        }}
+        style={edgeStyle}
         markerEnd={`url(#${arrowId})`}
         onClick={handleEdgeClick}
         className={isSelected ? 'transition-all duration-200' : 'transition-all duration-200'}
@@ -171,11 +200,7 @@ export function CustomEdge({
       {connection.label && (
         <EdgeLabelRenderer>
           <div
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              pointerEvents: 'all',
-            }}
+            style={labelContainerStyle}
             className='cursor-pointer select-none'
             onClick={handleEdgeClick}
           >
@@ -185,9 +210,7 @@ export function CustomEdge({
                 ${isSelected ? 'border-2 shadow-lg' : 'border-1'}
                 transition-all duration-200
               `}
-              style={{
-                filter: isSelected ? `url(#${glowId})` : undefined,
-              }}
+              style={labelStyle}
             >
               {connection.label}
             </div>
@@ -197,6 +220,38 @@ export function CustomEdge({
     </>
   );
 }
+
+// Custom equality function for edge props
+const edgePropsEquality = (prev: CustomEdgeProps, next: CustomEdgeProps): boolean => {
+  // Check critical edge properties
+  if (prev.id !== next.id) return false;
+  if (prev.sourceX !== next.sourceX || prev.sourceY !== next.sourceY) return false;
+  if (prev.targetX !== next.targetX || prev.targetY !== next.targetY) return false;
+  if (prev.sourcePosition !== next.sourcePosition || prev.targetPosition !== next.targetPosition) return false;
+
+  // Check data properties that affect rendering
+  if (prev.data.connection.id !== next.data.connection.id) return false;
+  if (prev.data.connectionStyle !== next.data.connectionStyle) return false;
+  if (prev.data.isSelected !== next.data.isSelected) return false;
+  if (prev.data.isStartConnection !== next.data.isStartConnection) return false;
+  if (prev.data.connection.type !== next.data.connection.type) return false;
+  if (prev.data.connection.label !== next.data.connection.label) return false;
+  if (prev.data.connection.visualStyle !== next.data.connection.visualStyle) return false;
+
+  // Check other props
+  if (prev.markerEnd !== next.markerEnd) return false;
+
+  return true;
+};
+
+// Create optimized edge component with hot-leaf memoization
+export const CustomEdge = createHotLeafComponent(CustomEdgeInner, {
+  equalityFn: edgePropsEquality,
+  trackPerformance: true,
+  displayName: 'CustomEdge',
+  debugMode: import.meta.env.DEV,
+  frequencyThreshold: 10, // Edges can re-render frequently during interactions
+});
 
 // Export default for React Flow edge types registration
 export default CustomEdge;

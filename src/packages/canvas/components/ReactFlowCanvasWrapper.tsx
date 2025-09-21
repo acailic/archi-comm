@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { DesignComponent, Connection, InfoCard } from '../../../types';
@@ -8,6 +8,9 @@ import { EdgeLayer } from './EdgeLayer';
 import { LayoutEngine } from './LayoutEngine';
 import { VirtualizationLayer } from './VirtualizationLayer';
 import { CanvasInteractionLayer } from './CanvasInteractionLayer';
+import { EnhancedErrorBoundary } from '@ui/components/ErrorBoundary/EnhancedErrorBoundary';
+import { useAnnouncer } from '@/shared/hooks/useAccessibility';
+import { equalityFunctions } from '@/shared/utils/memoization';
 
 export interface ReactFlowCanvasWrapperProps {
   components: DesignComponent[];
@@ -38,7 +41,7 @@ export interface ReactFlowCanvasWrapperProps {
   onInfoCardSelect?: (infoCardId: string) => void;
 }
 
-export const ReactFlowCanvasWrapper: React.FC<ReactFlowCanvasWrapperProps> = ({
+const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = ({
   components,
   connections,
   infoCards = [],
@@ -66,6 +69,70 @@ export const ReactFlowCanvasWrapper: React.FC<ReactFlowCanvasWrapperProps> = ({
   onInfoCardDelete = () => {},
   onInfoCardSelect = () => {},
 }) => {
+  const announce = useAnnouncer();
+  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const hasAnnouncedInitialRef = useRef(false);
+
+  const canvasLabel = useMemo(() => {
+    const componentCount = components.length;
+    const connectionCount = connections.length;
+    return `Design canvas with ${componentCount} component${componentCount === 1 ? '' : 's'} and ${connectionCount} connection${connectionCount === 1 ? '' : 's'}`;
+  }, [components.length, connections.length]);
+
+  useEffect(() => {
+    if (!hasAnnouncedInitialRef.current && components.length > 0) {
+      announce(`Canvas loaded with ${components.length} components`);
+      hasAnnouncedInitialRef.current = true;
+    }
+  }, [announce, components.length]);
+
+  useEffect(() => {
+    if (!selectedComponentId) {
+      return;
+    }
+    const selectedComponent = components.find((component) => component.id === selectedComponentId);
+    if (selectedComponent) {
+      announce(`Component ${selectedComponent.label ?? selectedComponent.id} selected`);
+    }
+  }, [announce, components, selectedComponentId]);
+
+  useEffect(() => {
+    if (!selectedConnectionId) {
+      return;
+    }
+    const connection = connections.find((item) => item.id === selectedConnectionId);
+    if (connection) {
+      announce(`Connection from ${connection.source} to ${connection.target} selected`);
+    }
+  }, [announce, connections, selectedConnectionId]);
+
+  const handleKeyboardNavigation = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (components.length === 0) {
+        return;
+      }
+
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+        const currentIndex = selectedComponentId
+          ? components.findIndex((component) => component.id === selectedComponentId)
+          : -1;
+        const nextIndex = (currentIndex + direction + components.length) % components.length;
+        const nextComponent = components[nextIndex];
+        if (nextComponent) {
+          onComponentSelect(nextComponent.id);
+        }
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onComponentDeselect();
+      }
+    },
+    [components, onComponentDeselect, onComponentSelect, selectedComponentId]
+  );
+
   return (
     <ReactFlowProvider>
       <CanvasController
@@ -90,27 +157,40 @@ export const ReactFlowCanvasWrapper: React.FC<ReactFlowCanvasWrapperProps> = ({
         onInfoCardDelete={onInfoCardDelete}
         onInfoCardSelect={onInfoCardSelect}
       >
-        <NodeLayer components={components} infoCards={infoCards}>
-          <EdgeLayer connections={connections}>
-            <VirtualizationLayer nodes={[]} edges={[]}>
-              <CanvasInteractionLayer
-                enableDragDrop={enableDragDrop}
-                enableContextMenu={enableContextMenu}
-                enableKeyboardShortcuts={enableKeyboardShortcuts}
-              >
-                <ReactFlow
-                  fitView
-                  attributionPosition="bottom-left"
-                  className="react-flow-canvas"
-                >
-                  {showBackground && <Background />}
-                  {showControls && <Controls />}
-                  {showMiniMap && <MiniMap />}
-                </ReactFlow>
-              </CanvasInteractionLayer>
-            </VirtualizationLayer>
-          </EdgeLayer>
-        </NodeLayer>
+        <EnhancedErrorBoundary boundaryId="canvas-node-layer">
+          <NodeLayer components={components} infoCards={infoCards}>
+            <EnhancedErrorBoundary boundaryId="canvas-edge-layer">
+              <EdgeLayer connections={connections}>
+                <EnhancedErrorBoundary boundaryId="canvas-virtualization-layer">
+                  <VirtualizationLayer nodes={[]} edges={[]}>
+                    <EnhancedErrorBoundary boundaryId="canvas-interaction-layer">
+                      <CanvasInteractionLayer
+                        enableDragDrop={enableDragDrop}
+                        enableContextMenu={enableContextMenu}
+                        enableKeyboardShortcuts={enableKeyboardShortcuts}
+                      >
+                        <div
+                          ref={canvasContainerRef}
+                          role="application"
+                          aria-label={canvasLabel}
+                          tabIndex={0}
+                          className="react-flow-accessible-container focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-background"
+                          onKeyDown={handleKeyboardNavigation}
+                        >
+                          <ReactFlow fitView attributionPosition="bottom-left" className="react-flow-canvas">
+                            {showBackground && <Background />}
+                            {showControls && <Controls />}
+                            {showMiniMap && <MiniMap />}
+                          </ReactFlow>
+                        </div>
+                      </CanvasInteractionLayer>
+                    </EnhancedErrorBoundary>
+                  </VirtualizationLayer>
+                </EnhancedErrorBoundary>
+              </EdgeLayer>
+            </EnhancedErrorBoundary>
+          </NodeLayer>
+        </EnhancedErrorBoundary>
 
         <LayoutEngine
           components={components}
@@ -121,3 +201,61 @@ export const ReactFlowCanvasWrapper: React.FC<ReactFlowCanvasWrapperProps> = ({
     </ReactFlowProvider>
   );
 };
+
+// Optimized equality function for ReactFlowCanvasWrapper props
+const reactFlowCanvasPropsEqual = (prev: ReactFlowCanvasWrapperProps, next: ReactFlowCanvasWrapperProps): boolean => {
+  // Fast path: check array lengths first
+  if (prev.components.length !== next.components.length ||
+      prev.connections.length !== next.connections.length ||
+      (prev.infoCards?.length ?? 0) !== (next.infoCards?.length ?? 0)) {
+    return false;
+  }
+
+  // Check selected IDs
+  if (prev.selectedComponentId !== next.selectedComponentId ||
+      prev.selectedConnectionId !== next.selectedConnectionId ||
+      prev.selectedInfoCardId !== next.selectedInfoCardId) {
+    return false;
+  }
+
+  // Check boolean flags
+  if (prev.enableAutoLayout !== next.enableAutoLayout ||
+      prev.virtualizationEnabled !== next.virtualizationEnabled ||
+      prev.enableDragDrop !== next.enableDragDrop ||
+      prev.enableContextMenu !== next.enableContextMenu ||
+      prev.enableKeyboardShortcuts !== next.enableKeyboardShortcuts ||
+      prev.showBackground !== next.showBackground ||
+      prev.showControls !== next.showControls ||
+      prev.showMiniMap !== next.showMiniMap) {
+    return false;
+  }
+
+  // Check callback references (assume they're stable)
+  if (prev.onComponentSelect !== next.onComponentSelect ||
+      prev.onComponentDeselect !== next.onComponentDeselect ||
+      prev.onComponentDrop !== next.onComponentDrop ||
+      prev.onComponentPositionChange !== next.onComponentPositionChange ||
+      prev.onComponentDelete !== next.onComponentDelete ||
+      prev.onConnectionCreate !== next.onConnectionCreate ||
+      prev.onConnectionDelete !== next.onConnectionDelete ||
+      prev.onConnectionSelect !== next.onConnectionSelect ||
+      prev.onInfoCardCreate !== next.onInfoCardCreate ||
+      prev.onInfoCardUpdate !== next.onInfoCardUpdate ||
+      prev.onInfoCardDelete !== next.onInfoCardDelete ||
+      prev.onInfoCardSelect !== next.onInfoCardSelect) {
+    return false;
+  }
+
+  // Use arrays equality function for deep comparison
+  return equalityFunctions.arrays({
+    components: prev.components,
+    connections: prev.connections,
+    infoCards: prev.infoCards
+  }, {
+    components: next.components,
+    connections: next.connections,
+    infoCards: next.infoCards
+  });
+};
+
+export const ReactFlowCanvasWrapper = React.memo(ReactFlowCanvasWrapperComponent, reactFlowCanvasPropsEqual);

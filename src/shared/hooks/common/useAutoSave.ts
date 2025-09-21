@@ -47,7 +47,7 @@ export function useAutoSave<T>(
     setLastError(null);
     try {
       await onSaveRef.current(dataToSave);
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.log('Auto-save completed successfully');
       }
       setStatus('saved');

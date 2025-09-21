@@ -353,6 +353,7 @@ dev.config.*
 # Local development documentation (ignored by git)
 docs/development/
 docs/development/**
+docs/react-learning/
 
 # Development-specific files (kept local only)
 TODO.md

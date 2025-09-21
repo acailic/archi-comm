@@ -3,14 +3,16 @@ import typescript from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import reactPerf from 'eslint-plugin-react-perf';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
 import unusedImports from 'eslint-plugin-unused-imports';
+import renderOptimization from '../eslint-rules/react-render-optimization.js';
 
 export default [
   js.configs.recommended,
   {
-    ignores: ['tools/scripts/*.js', 'tools/scripts/*.mjs', 'config/vite.config.ts', 'config/eslint.config.js'],
+    ignores: ['tools/scripts/*.js', 'tools/scripts/*.mjs', 'config/vite.config.ts', 'config/eslint.config.js', 'eslint-rules/*.js'],
   },
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -79,11 +81,16 @@ export default [
       '@typescript-eslint': typescript,
       'import': importPlugin,
       'unused-imports': unusedImports,
+      'render-optimization': renderOptimization,
+      'react-perf': reactPerf,
     },
     settings: {
       'import/resolver': {
         node: {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
+        },
+        typescript: {
+          project: ['./config/tsconfig.json'],
         },
       },
     },
@@ -114,10 +121,23 @@ export default [
       '@typescript-eslint/await-thenable': 'warn',
 
       // Import/Export rules
-      'import/no-unresolved': 'off', // Disabled temporarily due to module resolution issues
+      'import/no-unresolved': 'error',
       'import/no-duplicates': 'warn',
-      'import/order': ['warn', { 'groups': ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'] }],
-      
+      'import/order': ['warn', {
+        'groups': ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+        'pathGroups': [
+          { 'pattern': '@/**', 'group': 'internal', 'position': 'before' },
+          { 'pattern': '@shared/**', 'group': 'internal', 'position': 'before' },
+          { 'pattern': '@lib/**', 'group': 'internal', 'position': 'before' },
+          { 'pattern': '@packages/**', 'group': 'internal', 'position': 'before' },
+          { 'pattern': '@stores/**', 'group': 'internal', 'position': 'before' }
+        ],
+        'pathGroupsExcludedImportTypes': ['builtin'],
+        'newlines-between': 'always',
+        'alphabetize': { 'order': 'asc', 'caseInsensitive': true }
+      }],
+      'import/newline-after-import': ['warn', { 'count': 1 }],
+
       // Unused imports rules
       'unused-imports/no-unused-imports': 'warn',
       'unused-imports/no-unused-vars': [
@@ -127,6 +147,16 @@ export default [
           'argsIgnorePattern': '^_',
         },
       ],
+
+      // React Render Optimization rules
+      'render-optimization/no-inline-objects': 'warn', // Temporarily downgraded until inline literal refactors are complete
+      'render-optimization/require-memo': ['warn', { propThreshold: 3 }],
+      'render-optimization/no-expensive-render': 'error',
+
+      // React Performance rules
+      'react-perf/jsx-no-new-object-as-prop': 'warn',
+      'react-perf/jsx-no-new-array-as-prop': 'warn',
+      'react-perf/jsx-no-new-function-as-prop': 'warn',
     },
   },
   // React-specific configuration
@@ -147,6 +177,7 @@ export default [
     plugins: {
       'react': react,
       'react-hooks': reactHooks,
+      'react-perf': reactPerf,
       'jsx-a11y': jsxA11y,
       '@typescript-eslint': typescript,
     },
@@ -164,11 +195,22 @@ export default [
       'react/no-deprecated': 'warn',
       'react/no-unknown-property': 'error',
       'react/self-closing-comp': 'warn',
-      
+      'react/jsx-no-leaked-render': ['error', { 'validStrategies': ['ternary', 'coerce'] }],
+      'react/jsx-no-useless-fragment': ['warn', { 'allowExpressions': true }],
+      'react/hook-use-state': 'warn',
+      'react/jsx-no-constructed-context-values': 'warn',
+      'react/no-array-index-key': 'warn',
+
       // React Hooks rules
       'react-hooks/rules-of-hooks': 'warn', // Temporarily downgraded for pre-commit
       'react-hooks/exhaustive-deps': 'warn',
-      
+
+      // React Performance rules (JSX-specific)
+      'react-perf/jsx-no-new-object-as-prop': 'warn',
+      'react-perf/jsx-no-new-array-as-prop': 'warn',
+      'react-perf/jsx-no-new-function-as-prop': 'warn',
+      'react-perf/jsx-no-jsx-as-prop': 'warn',
+
       // JSX Accessibility rules
       'jsx-a11y/alt-text': 'warn',
       'jsx-a11y/anchor-has-content': 'warn',
@@ -183,6 +225,25 @@ export default [
       '@typescript-eslint/no-explicit-any': 'off',
       'no-console': 'off',
       'import/no-unresolved': 'off', // Disable for test files to avoid module resolution issues
+      // Relax performance rules for test files
+      'react-perf/jsx-no-new-object-as-prop': 'off',
+      'react-perf/jsx-no-new-array-as-prop': 'off',
+      'react-perf/jsx-no-new-function-as-prop': 'off',
+      'render-optimization/no-inline-objects': 'off',
+    },
+  },
+  {
+    // Legacy canvas/UI files that need gradual migration to stable literals
+    files: [
+      'src/packages/canvas/**/*.{tsx,ts}',
+      'src/packages/ui/**/*.{tsx,ts}',
+      'src/features/canvas/**/*.{tsx,ts}',
+    ],
+    rules: {
+      'render-optimization/no-inline-objects': 'warn',
+      'react-perf/jsx-no-new-object-as-prop': 'warn',
+      'react-perf/jsx-no-new-array-as-prop': 'warn',
+      'react-perf/jsx-no-new-function-as-prop': 'warn',
     },
   },
   {

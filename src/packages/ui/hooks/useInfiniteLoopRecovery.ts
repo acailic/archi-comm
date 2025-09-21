@@ -1,16 +1,16 @@
 import { useCallback } from 'react';
-import { useAppStore } from '@hooks/useAppStore';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
+import type { AppStoreActions } from '@/stores/AppStore';
 
 type RecoveryStage = 'flush' | 'soft-reset' | 'hard-reset';
 
 interface UseInfiniteLoopRecoveryOptions {
   persistChanged: (options?: { force?: boolean; reason?: string }) => Promise<void>;
+  actions: AppStoreActions;
 }
 
-export function useInfiniteLoopRecovery({ persistChanged }: UseInfiniteLoopRecoveryOptions) {
-  const { actions } = useAppStore();
+export function useInfiniteLoopRecovery({ persistChanged, actions }: UseInfiniteLoopRecoveryOptions) {
   const loopDetector = InfiniteLoopDetector.getInstance();
 
   // Handle infinite loop recovery by resetting sync state

@@ -254,16 +254,17 @@ export function PerformanceDashboard({
     });
   }, [isRecording, maxDataPoints, performanceMonitor]);
 
-  // Start/stop data collection
+  // Start/stop data collection - disabled for performance
   useEffect(() => {
-    if (isRecording && isOpen) {
-      intervalRef.current = setInterval(collectPerformanceData, updateInterval);
-    } else {
+    // Disabled automatic performance monitoring to reduce overhead
+    // if (isRecording && isOpen) {
+    //   intervalRef.current = setInterval(collectPerformanceData, updateInterval);
+    // } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-    }
+    // }
 
     return () => {
       if (intervalRef.current) {

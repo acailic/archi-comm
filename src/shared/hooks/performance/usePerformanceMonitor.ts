@@ -14,7 +14,7 @@ interface PerformanceMetrics {
 
 const performanceMap = new Map<string, PerformanceMetrics>();
 
-export function usePerformanceMonitor(componentName: string, enabled = process.env.NODE_ENV === 'development') {
+export function usePerformanceMonitor(componentName: string, enabled = import.meta.env.DEV) {
   const renderCount = useRef(0);
   const renderTimes = useRef<number[]>([]);
   const startTime = useRef<number>();

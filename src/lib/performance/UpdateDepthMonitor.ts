@@ -24,8 +24,8 @@ class UpdateDepthMonitor {
   private static instance: UpdateDepthMonitor | null = null;
   private updateCounts = new Map<string, UpdateDepthEntry>();
   private config: UpdateDepthConfig = {
-    maxUpdatesPerComponent: 50,
-    maxUpdatesPerSecond: 100,
+    maxUpdatesPerComponent: 25,
+    maxUpdatesPerSecond: 60,
     timeWindowMs: 1000,
     enableStackTraces: true,
     enableAutoRecovery: true,
@@ -58,7 +58,7 @@ class UpdateDepthMonitor {
     if (existing) {
       existing.updateCount++;
       existing.lastUpdate = now;
-      if (this.config.enableStackTraces && existing.updateCount > this.config.maxUpdatesPerComponent * 0.7) {
+      if (this.config.enableStackTraces && existing.updateCount > this.config.maxUpdatesPerComponent * 0.5) {
         existing.stackTrace = this.captureStackTrace();
       }
     } else {
@@ -103,7 +103,7 @@ class UpdateDepthMonitor {
       return false;
     }
 
-    if (entry.updateCount > this.config.maxUpdatesPerComponent * 0.8) {
+    if (entry.updateCount > this.config.maxUpdatesPerComponent * 0.6) {
       this.recordWarning(entry);
     }
 

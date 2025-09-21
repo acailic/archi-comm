@@ -3,6 +3,8 @@ import { memo } from 'react';
 import { useNodePresenter } from '../hooks/useNodePresenter';
 import type { CustomNodeData } from '../types';
 import { CustomNodeView } from './CustomNodeView';
+import { createCanvasNodeComponent } from '@/shared/utils/hotLeafMemoization';
+import { equalityFunctions } from '@/shared/utils/memoization';
 
 /**
  * Custom node component for rendering nodes in the canvas.
@@ -23,7 +25,12 @@ function CustomNodeInner({ data, selected }: NodeProps<CustomNodeData | undefine
   return <CustomNodeView presenter={presenter} nodeData={data} selected={selected} />;
 }
 
-export const CustomNode = memo(CustomNodeInner);
-
-// Set displayName for better debugging
-CustomNode.displayName = 'CustomNode';
+// Create optimized canvas node with hot leaf memoization
+export const CustomNode = createCanvasNodeComponent(CustomNodeInner, {
+  positionSensitive: true,
+  styleSensitive: true,
+  interactionSensitive: true,
+  trackPerformance: true,
+  displayName: 'CustomNode',
+  debugMode: import.meta.env.DEV,
+});

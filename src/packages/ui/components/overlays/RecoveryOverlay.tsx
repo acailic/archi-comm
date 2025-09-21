@@ -238,7 +238,7 @@ export function RecoveryOverlay({
           </div>
 
           {/* Technical Details (development only) */}
-          {process.env.NODE_ENV === 'development' && hasResult && (
+          {import.meta.env.DEV && hasResult && (
             <details className="text-xs">
               <summary className="cursor-pointer text-gray-600 hover:text-gray-800 font-medium">
                 🔧 Technical Details

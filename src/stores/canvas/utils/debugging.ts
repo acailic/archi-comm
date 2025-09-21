@@ -13,7 +13,7 @@ export const debugMetrics = {
 };
 
 export function debugLog(action: string, oldValue: any, newValue: any, source?: string) {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     const startTime = performance.now();
     const changed = !deepEqual(oldValue, newValue);
     const endTime = performance.now();

@@ -150,16 +150,22 @@ export function useInitialCanvasSync(options: UseInitialCanvasSyncOptions) {
       return;
     }
 
-    if (!validateCanvasDataShape(initialData, challengeId)) {
+    const normalizedInitialData: CanvasData = {
+      components: initialData.components ?? [],
+      connections: initialData.connections ?? [],
+      infoCards: initialData.infoCards ?? [],
+    };
+
+    if (!validateCanvasDataShape(normalizedInitialData, challengeId)) {
       return;
     }
 
-    const serializedHash = stableHashData(initialData);
+    const serializedHash = stableHashData(normalizedInitialData);
 
     if (
       syncCompletedRef.current === challengeId &&
       lastSerializedHashRef.current === serializedHash &&
-      isDataEqual(lastSyncDataRef.current, initialData)
+      isDataEqual(lastSyncDataRef.current, normalizedInitialData)
     ) {
       return;
     }
@@ -171,9 +177,9 @@ export function useInitialCanvasSync(options: UseInitialCanvasSyncOptions) {
       infoCards: currentState.infoCards,
     };
 
-    if (isDataEqual(currentCanvasData, initialData)) {
+    if (isDataEqual(currentCanvasData, normalizedInitialData)) {
       syncCompletedRef.current = challengeId;
-      lastSyncDataRef.current = initialData;
+      lastSyncDataRef.current = normalizedInitialData;
       lastSerializedHashRef.current = serializedHash;
       return;
     }
@@ -204,9 +210,9 @@ export function useInitialCanvasSync(options: UseInitialCanvasSyncOptions) {
     const performSync = async () => {
       try {
         syncInProgressRef.current = true;
-        await updateCanvasData(initialData, { silent: true });
+        await updateCanvasData(normalizedInitialData, { silent: true });
         syncCompletedRef.current = challengeId;
-        lastSyncDataRef.current = initialData;
+        lastSyncDataRef.current = normalizedInitialData;
         lastSerializedHashRef.current = serializedHash;
         RenderLoopDiagnostics.getInstance().recordInitialSync({
           challengeId,

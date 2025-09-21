@@ -115,7 +115,7 @@ export class WhisperWasmEngine implements TranscriptionEngine {
       // This is a placeholder that simulates the loading process
       
       // Check if running in development vs production
-      const wasmUrl = process.env.NODE_ENV === 'development'
+      const wasmUrl = import.meta.env.DEV
         ? '/whisper.wasm'  // Serve from public folder in dev
         : 'https://cdn.jsdelivr.net/npm/whisper-wasm@latest/whisper.wasm'; // CDN in prod
       

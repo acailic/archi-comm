@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore, useMemo } from 'react';
 import { useRenderGuard } from '@/lib/performance/RenderGuard';
 import type { CircuitBreakerDetails } from '@/lib/performance/RenderGuard';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
@@ -35,6 +35,8 @@ export function useDesignCanvasPerformance({
   const [circuitBreakerDetails, setCircuitBreakerDetails] = useState<CircuitBreakerDetails | null>(null);
   const [emergencyPauseReason, setEmergencyPauseReason] = useState<string | null>(null);
   const lastHandledDetectorReportRef = useRef<string | null>(null);
+  const lastStabilityCheckRef = useRef<number>(0);
+  const lastMemoryCheckRef = useRef<number>(0);
 
   const storeCircuitBreakerSnapshot: StoreCircuitBreakerSnapshot = useSyncExternalStore(
     subscribeToCanvasCircuitBreaker,
@@ -46,6 +48,25 @@ export function useDesignCanvasPerformance({
     () => RenderStabilityTracker.forComponent('DesignCanvasCore'),
     []
   );
+
+  // Memoize stable values to prevent unnecessary re-renders
+  const stableProps = useMemo(() => ({
+    challengeId: challenge.id,
+    schemaVersion: initialData.schemaVersion,
+    selectedComponent: selectedComponent ?? 'none',
+  }), [challenge.id, initialData.schemaVersion, selectedComponent]);
+
+  const stableState = useMemo(() => ({
+    componentsLength: components.length,
+    connectionsLength: connections.length,
+    infoCardsLength: infoCards.length,
+    isSynced,
+  }), [components.length, connections.length, infoCards.length, isSynced]);
+
+  // Stable flush function to prevent dependency chain issues
+  const stableFlushFunction = useCallback((reason: string, options?: { immediate?: boolean }) => {
+    flushDesignDataRef.current?.(reason, options);
+  }, []);
 
   const isMountedRef = useRef(true);
   const circuitBreakerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,7 +105,7 @@ export function useDesignCanvasPerformance({
 
         setCircuitBreakerDetails(details);
         setEmergencyPauseReason(details.reason);
-        flushDesignDataRef.current?.('circuit-breaker', { immediate: true });
+        stableFlushFunction('circuit-breaker', { immediate: true });
 
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
@@ -95,7 +116,7 @@ export function useDesignCanvasPerformance({
         }
       });
     },
-    [flushDesignDataRef, scheduleAfterRender]
+    [stableFlushFunction, scheduleAfterRender]
   );
 
   const handleCircuitBreakerClose = useCallback(() => {
@@ -152,22 +173,20 @@ export function useDesignCanvasPerformance({
     pauseWhenStoreBreakerActive: true,
   });
 
-  // Stability tracking effect
+  // Stability tracking effect - now throttled to prevent excessive re-renders
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (import.meta.env.PROD) return;
+
+    // Throttle stability checks to prevent render loops
+    const now = Date.now();
+    if (now - lastStabilityCheckRef.current < 100) {
+      return;
+    }
+    lastStabilityCheckRef.current = now;
 
     const report = stabilityTracker.track({
-      props: {
-        challengeId: challenge.id,
-        schemaVersion: initialData.schemaVersion,
-        selectedComponent: selectedComponent ?? 'none',
-      },
-      state: {
-        componentsLength: components.length,
-        connectionsLength: connections.length,
-        infoCardsLength: infoCards.length,
-        isSynced,
-      },
+      props: stableProps,
+      state: stableState,
       metrics: {
         renderCount: renderGuard.renderCount,
         sincePreviousRenderMs: renderGuard.sincePreviousRenderMs,
@@ -181,26 +200,30 @@ export function useDesignCanvasPerformance({
 
     if (report.shouldFreeze && !emergencyPauseReason) {
       setEmergencyPauseReason(report.freezeReason ?? 'stability-tracker');
-      flushDesignDataRef.current?.('stability-freeze', { immediate: true });
+      stableFlushFunction('stability-freeze', { immediate: true });
     }
   }, [
     stabilityTracker,
-    challenge.id,
-    initialData.schemaVersion,
-    selectedComponent,
-    components.length,
-    connections.length,
-    infoCards.length,
-    isSynced,
+    stableProps,
+    stableState,
     renderGuard.renderCount,
     renderGuard.sincePreviousRenderMs,
     emergencyPauseReason,
+    stableFlushFunction,
   ]);
 
-  // Memory spike monitoring
+  // Memory spike monitoring - throttled to prevent excessive checks
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (import.meta.env.PROD) return;
     if (!renderGuard.memorySample) return;
+
+    // Throttle memory checks to prevent render loops
+    const now = Date.now();
+    if (now - lastMemoryCheckRef.current < 500) {
+      return;
+    }
+    lastMemoryCheckRef.current = now;
+
     const delta = renderGuard.memorySample.deltaSinceBaseline ?? 0;
     if (Math.abs(delta) > 5_000_000) {
       RenderLoopDiagnostics.getInstance().recordMemorySpike('DesignCanvasCore', {
@@ -210,9 +233,11 @@ export function useDesignCanvasPerformance({
     }
   }, [renderGuard.memorySample]);
 
-  // Infinite loop detection
+  // Infinite loop detection with safe state updates
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return;
+    if (import.meta.env.PROD) return;
+    if (!isMountedRef.current) return;
+
     const detector = InfiniteLoopDetector.getInstance();
     const latest = detector.getLatestReport('DesignCanvasCore');
     if (!latest) return;
@@ -223,28 +248,45 @@ export function useDesignCanvasPerformance({
 
     if (latest.severity === 'critical') {
       lastHandledDetectorReportRef.current = latest.id;
-      if (!emergencyPauseReason) {
+      if (!emergencyPauseReason && isMountedRef.current) {
         setEmergencyPauseReason(latest.reason ?? 'loop-detector');
+        stableFlushFunction('detector-critical', { immediate: true });
       }
-      flushDesignDataRef.current?.('detector-critical', { immediate: true });
     }
-  }, [renderGuard.renderCount, emergencyPauseReason]);
+  }, [renderGuard.renderCount, emergencyPauseReason, stableFlushFunction]);
 
   const handleResumeAfterPause = useCallback(() => {
+    if (!isMountedRef.current) return;
+
     renderGuard.reset();
     setEmergencyPauseReason(null);
     setCircuitBreakerDetails(null);
-    flushDesignDataRef.current?.('manual-resume', { immediate: true });
+    stableFlushFunction('manual-resume', { immediate: true });
     InfiniteLoopDetector.getInstance().acknowledgeRecovery('DesignCanvasCore');
     RenderLoopDiagnostics.getInstance().recordResume('DesignCanvasCore');
-  }, [renderGuard]);
+  }, [renderGuard, stableFlushFunction]);
 
+  // Memoize store snapshot values to prevent excessive re-renders
+  const storeSnapshot = useMemo(() => ({
+    name: storeCircuitBreakerSnapshot.name,
+    open: storeCircuitBreakerSnapshot.open,
+    reason: storeCircuitBreakerSnapshot.reason ?? 'store-circuit-breaker',
+    openUntil: storeCircuitBreakerSnapshot.openUntil ?? Date.now(),
+    updatesInWindow: storeCircuitBreakerSnapshot.updatesInWindow,
+  }), [
+    storeCircuitBreakerSnapshot.name,
+    storeCircuitBreakerSnapshot.open,
+    storeCircuitBreakerSnapshot.reason,
+    storeCircuitBreakerSnapshot.openUntil,
+    storeCircuitBreakerSnapshot.updatesInWindow,
+  ]);
+
+  // Store circuit breaker integration with safety checks
   useEffect(() => {
-    const breakerName = storeCircuitBreakerSnapshot.name;
-    const openReason = storeCircuitBreakerSnapshot.reason ?? 'store-circuit-breaker';
+    if (!isMountedRef.current) return;
 
-    if (!storeCircuitBreakerSnapshot.open) {
-      if (circuitBreakerDetails?.component === breakerName) {
+    if (!storeSnapshot.open) {
+      if (circuitBreakerDetails?.component === storeSnapshot.name) {
         if (emergencyPauseReason === circuitBreakerDetails.reason) {
           setEmergencyPauseReason(null);
         }
@@ -253,22 +295,18 @@ export function useDesignCanvasPerformance({
       return;
     }
 
-    setEmergencyPauseReason(prev => prev ?? openReason);
+    setEmergencyPauseReason(prev => prev ?? storeSnapshot.reason);
     setCircuitBreakerDetails({
-      component: breakerName,
-      until: storeCircuitBreakerSnapshot.openUntil ?? Date.now(),
-      reason: openReason,
-      renderCount: storeCircuitBreakerSnapshot.updatesInWindow,
+      component: storeSnapshot.name,
+      until: storeSnapshot.openUntil,
+      reason: storeSnapshot.reason,
+      renderCount: storeSnapshot.updatesInWindow,
     });
   }, [
+    storeSnapshot,
     circuitBreakerDetails?.component,
     circuitBreakerDetails?.reason,
     emergencyPauseReason,
-    storeCircuitBreakerSnapshot.name,
-    storeCircuitBreakerSnapshot.open,
-    storeCircuitBreakerSnapshot.openUntil,
-    storeCircuitBreakerSnapshot.reason,
-    storeCircuitBreakerSnapshot.updatesInWindow,
   ]);
 
   return {

@@ -51,7 +51,7 @@ export class PerformanceMonitor {
   private static readonly WARNING_COOLDOWN_MS = 5000;
   private static readonly LOW_FPS_THRESHOLD = 30;
   private static readonly LOW_FPS_STREAK_THRESHOLD = 10;
-  private static readonly isDevelopment = process.env.NODE_ENV !== 'production';
+  private static readonly isDevelopment = import.meta.env.DEV;
 
   // Changes:
   // 1. Add lazy initialization flag to PerformanceMonitor:
@@ -1042,6 +1042,70 @@ export async function createPerformanceUtils(level: InitializationLevel = 'basic
     OptimizedEventSystem: OptimizedEventSystem.getInstance(),
     CanvasOptimizer,
   };
+}
+
+// Main PerformanceOptimizer class that acts as a facade
+export class PerformanceOptimizer extends PerformanceMonitor {
+  private static instance: PerformanceOptimizer;
+  private performanceIssueCallbacks = new Set<(issue: PerformanceIssue) => void>();
+
+  static getInstance(): PerformanceOptimizer {
+    if (!PerformanceOptimizer.instance) {
+      PerformanceOptimizer.instance = new PerformanceOptimizer();
+    }
+    return PerformanceOptimizer.instance;
+  }
+
+  onPerformanceIssue(callback: (issue: PerformanceIssue) => void): () => void {
+    this.performanceIssueCallbacks.add(callback);
+    return () => {
+      this.performanceIssueCallbacks.delete(callback);
+    };
+  }
+
+  protected notifyPerformanceIssue(issue: PerformanceIssue) {
+    this.performanceIssueCallbacks.forEach(callback => {
+      try {
+        callback(issue);
+      } catch (error) {
+        console.warn('Performance issue callback error:', error);
+      }
+    });
+  }
+
+  // Override recordMetric to detect performance issues
+  recordMetric(name: string, metric: PerformanceMetric) {
+    super.recordMetric(name, metric);
+
+    // Detect performance issues
+    if (metric.type === 'fps' && metric.value < 30) {
+      this.notifyPerformanceIssue({
+        type: 'low-fps',
+        message: `Low FPS detected: ${metric.value}`,
+        severity: 'warning',
+        timestamp: metric.timestamp,
+        data: metric
+      });
+    }
+
+    if (metric.duration > 100) {
+      this.notifyPerformanceIssue({
+        type: 'slow-operation',
+        message: `Slow operation detected: ${name} took ${metric.duration}ms`,
+        severity: 'warning',
+        timestamp: metric.timestamp,
+        data: metric
+      });
+    }
+  }
+}
+
+interface PerformanceIssue {
+  type: 'low-fps' | 'slow-operation' | 'memory-pressure';
+  message: string;
+  severity: 'info' | 'warning' | 'error';
+  timestamp: number;
+  data?: any;
 }
 
 // Lightweight export for basic usage (no immediate initialization)

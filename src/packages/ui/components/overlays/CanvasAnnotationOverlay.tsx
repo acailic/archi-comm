@@ -82,11 +82,11 @@ export const CanvasAnnotationOverlay = forwardRef<
             optimizerRef.current = new CanvasOptimizer(canvas);
             setOptimizationEnabled(true);
 
-            if (process.env.NODE_ENV === 'development') {
+            if (import.meta.env.DEV) {
               console.log('Canvas optimization enabled with OffscreenCanvas and Worker support');
             }
           } else {
-            if (process.env.NODE_ENV === 'development') {
+            if (import.meta.env.DEV) {
               console.warn(
                 'Canvas optimization disabled: missing OffscreenCanvas or Worker support'
               );
@@ -94,7 +94,7 @@ export const CanvasAnnotationOverlay = forwardRef<
           }
         } catch (error) {
           console.error('Failed to initialize CanvasOptimizer:', error);
-          if (process.env.NODE_ENV === 'development') {
+          if (import.meta.env.DEV) {
             console.warn('Falling back to direct canvas rendering');
           }
           optimizerRef.current = null;
@@ -202,38 +202,47 @@ export const CanvasAnnotationOverlay = forwardRef<
       }
     }, [onAnnotationCreate, onAnnotationUpdate, onAnnotationDelete, onAnnotationSelect]);
 
-    // Animation loop for render queue flushing
+    // Animation loop for render queue flushing - only when needed
     useEffect(() => {
-      if (!optimizerRef.current || !optimizationEnabled) return;
+      if (!optimizerRef.current || !optimizationEnabled || !isActive) return;
 
-      const renderLoop = () => {
-        try {
-          // Flush render queue on each animation frame
-          optimizerRef.current?.flushRenderQueue();
+      let isRenderScheduled = false;
 
-          // Continue the loop
-          animationFrameRef.current = requestAnimationFrame(renderLoop);
-        } catch (error) {
-          console.error('Error in render loop:', error);
-          // Stop the animation loop on error to prevent infinite error loops
-          if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-            animationFrameRef.current = null;
+      const scheduleRender = () => {
+        if (isRenderScheduled) return;
+        isRenderScheduled = true;
+
+        animationFrameRef.current = requestAnimationFrame(() => {
+          try {
+            // Flush render queue only when needed
+            optimizerRef.current?.flushRenderQueue();
+            isRenderScheduled = false;
+          } catch (error) {
+            console.error('Error in render loop:', error);
+            isRenderScheduled = false;
           }
+        });
+      };
+
+      // Only schedule render when there are pending operations
+      const checkForPendingWork = () => {
+        if (optimizerRef.current?.hasPendingWork?.()) {
+          scheduleRender();
         }
       };
 
-      // Start the render loop
-      animationFrameRef.current = requestAnimationFrame(renderLoop);
+      // Check for work periodically but less frequently
+      const workChecker = setInterval(checkForPendingWork, 100);
 
       // Cleanup function
       return () => {
+        clearInterval(workChecker);
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
           animationFrameRef.current = null;
         }
       };
-    }, [optimizationEnabled]);
+    }, [optimizationEnabled, isActive]);
 
     // Update canvas size when dimensions change
     useEffect(() => {
@@ -467,7 +476,7 @@ export const CanvasAnnotationOverlay = forwardRef<
         )}
 
         {/* Development mode performance indicator */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.DEV && (
           <div className='absolute top-2 right-2 text-xs bg-black/70 text-white px-2 py-1 rounded'>
             {optimizationEnabled ? '🚀 Optimized' : '⚠️ Fallback'}
           </div>

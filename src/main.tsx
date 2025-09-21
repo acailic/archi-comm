@@ -1,6 +1,8 @@
 import { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ErrorBoundary } from './shared/ui/ErrorBoundary';
+import { EnhancedErrorBoundary } from '@ui/components/ErrorBoundary/EnhancedErrorBoundary';
+import { AccessibilityProvider } from '@ui/components/accessibility/AccessibilityProvider';
+import { RecoveryProvider } from './lib/recovery/RecoveryContext';
 import { getLogger, logger, LogLevel } from './lib/logging/logger';
 import { errorStore, addGlobalError } from './lib/logging/errorStore';
 import type { AppError } from './lib/logging/errorStore';
@@ -10,6 +12,120 @@ import type { Container } from '@/lib/di/Container';
 import { createApplicationContainer } from '@/lib/di/ServiceRegistry';
 import { ServiceProvider } from '@/lib/di/ServiceProvider';
 import './index.css';
+
+// Initialize performance monitoring and profiling infrastructure in development
+if (import.meta.env.DEV) {
+  // ProfilerOrchestrator temporarily disabled due to import issues
+  // Can be re-enabled after fixing module exports
+  /*
+  import('./lib/performance/ProfilerOrchestrator').then(({ ProfilerOrchestrator }) => {
+    const profilerOrchestrator = ProfilerOrchestrator.getInstance();
+
+    // Start lightweight profiling session for app initialization
+    profilerOrchestrator.startSession({
+      name: 'app-initialization',
+      duration: 10000, // Reduced to 10 seconds to minimize overhead
+      componentsToTrack: [
+        'DesignCanvas',
+        'CanvasController',
+        'ReactFlowCanvasWrapper'
+      ], // Track only the most critical components
+      triggerConditions: {
+        renderThreshold: 100, // Increased threshold to 100ms
+        updateDepthThreshold: 8, // Increased threshold to 8 levels
+        memoryThreshold: 200 * 1024 * 1024, // Increased to 200MB
+      },
+      autoOptimize: false, // Disable auto-optimization to reduce overhead
+    });
+
+    // Make profiler orchestrator available globally
+    (window as any).__PROFILER_ORCHESTRATOR__ = profilerOrchestrator;
+    console.info('🎯 ProfilerOrchestrator initialized. Access via window.__PROFILER_ORCHESTRATOR__');
+  }).catch(err => {
+    console.warn('Failed to initialize ProfilerOrchestrator:', err);
+  });
+  */
+
+  // Performance monitor temporarily disabled to reduce overhead
+  /*
+  import('./shared/utils/performanceMonitor').then(({ performanceMonitor }) => {
+    // Make performance monitor available globally in development
+    (window as any).__PERFORMANCE_MONITOR__ = performanceMonitor;
+    console.info('🎯 Performance monitoring enabled. Access via window.__PERFORMANCE_MONITOR__');
+  }).catch(err => {
+    console.warn('Failed to initialize performance monitor:', err);
+  });
+  */
+
+  // Why-did-you-render disabled for now to reduce performance overhead
+  // Can be re-enabled when debugging specific render issues
+  /*
+  Promise.all([
+    import('@welldone-software/why-did-you-render'),
+    import('react')
+  ])
+    .then(([whyDidYouRender, reactMod]) => {
+      const React = reactMod.default;
+      whyDidYouRender.default(React, {
+        trackAllPureComponents: false,
+        trackHooks: true,
+        logOwnerReasons: true,
+        collapseGroups: true,
+        include: [
+          /^AppContent/,
+          /^AppContainer/,
+          /^ScreenRouter/,
+          /^Canvas/,
+          /^Design/,
+          /^Custom/,
+          /^Info/,
+          /^Assignment/,
+          /^Properties/,
+        ],
+        exclude: [/^ErrorBoundary/, /^Suspense/, /^StrictMode/, /^Fragment/, /^Provider/],
+        notifier: (payload: any) => {
+          try {
+            const notifications = Array.isArray(payload) ? payload : [payload];
+            const perf = (window as any).__PERFORMANCE_MONITOR__;
+            const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+
+            notifications.forEach((n: any) => {
+              // Safe integration with performance monitor if available
+              if (perf && typeof perf.trackRenderIssue === 'function') {
+                perf.trackRenderIssue(n);
+              }
+
+              // Integration with ProfilerOrchestrator
+              if (profiler && typeof profiler.recordRenderIssue === 'function') {
+                const componentName = n?.displayName || n?.Component?.displayName || n?.Component?.name || 'UnknownComponent';
+                profiler.recordRenderIssue({
+                  componentName,
+                  issue: n?.reason || n?.why || n,
+                  timestamp: performance.now(),
+                  source: 'why-did-you-render'
+                });
+              }
+
+              // Console debug summary to aid profiling
+              const name = n?.displayName || n?.Component?.displayName || n?.Component?.name || 'UnknownComponent';
+              const reason = n?.reason || n?.why || n;
+              // Keep log concise but informative
+              // eslint-disable-next-line no-console
+              console.debug('[WDYR]', name, reason);
+            });
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn('WDYR notifier error:', e, payload);
+          }
+        }
+      });
+      console.info('🔍 Why-did-you-render initialized with performance integration');
+    })
+    .catch(err => {
+      console.warn('Failed to initialize why-did-you-render:', err);
+    });
+  */
+}
 
 // Initialize logger early in the application lifecycle
 const mainLogger = getLogger('main');
@@ -393,11 +509,15 @@ const renderWith = (AppComponent: any, container?: Container) => {
 
     const AppContent = () => (
       <StrictMode>
-        <ErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <AppComponent />
-          </Suspense>
-        </ErrorBoundary>
+        <RecoveryProvider>
+          <AccessibilityProvider>
+            <EnhancedErrorBoundary boundaryId='app-root'>
+              <Suspense fallback={<LoadingFallback />}>
+                <AppComponent />
+              </Suspense>
+            </EnhancedErrorBoundary>
+          </AccessibilityProvider>
+        </RecoveryProvider>
       </StrictMode>
     );
 
@@ -673,6 +793,38 @@ if (isDevelopment()) {
           servicesAvailable: containerExists ?
             (window as any).__ARCHICOMM_DI_CONTAINER__.getRegisteredServices() : [],
         };
+      },
+    },
+
+    // Profiling utilities
+    profiling: {
+      getActiveSession: () => {
+        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+        return profiler ? profiler.getActiveSession() : null;
+      },
+      getAllSessions: () => {
+        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+        return profiler ? profiler.getAllSessions() : [];
+      },
+      startSession: (options: any) => {
+        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+        return profiler ? profiler.startSession(options) : null;
+      },
+      stopSession: () => {
+        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+        return profiler ? profiler.stopCurrentSession() : null;
+      },
+      getInsights: () => {
+        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+        return profiler ? profiler.getOptimizationInsights() : [];
+      },
+      exportSessionData: (sessionId?: string) => {
+        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+        return profiler ? profiler.exportSessionData(sessionId) : null;
+      },
+      generateReport: () => {
+        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
+        return profiler ? profiler.generatePerformanceReport() : null;
       },
     },
 

@@ -105,7 +105,7 @@ export class RenderStabilityTracker {
     const shouldFreeze = unstableProps.length > 0 && oscillationCount >= OSCILLATION_LIMIT;
     const freezeReason = shouldFreeze ? 'Detected repeated prop oscillation' : undefined;
 
-    if ((warnings.length > 0 || unstableProps.length > 0) && process.env.NODE_ENV !== 'production') {
+    if ((warnings.length > 0 || unstableProps.length > 0) && import.meta.env.DEV) {
       RenderLoopDiagnostics.getInstance().recordStabilityWarning(this.componentName, {
         warnings,
         unstableProps,

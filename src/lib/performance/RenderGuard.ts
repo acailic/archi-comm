@@ -610,7 +610,7 @@ export const useRenderGuard = (
     ...options,
   } satisfies typeof DEFAULT_OPTIONS & RenderGuardOptions;
 
-  if (process.env.NODE_ENV === 'production') {
+  if (import.meta.env.PROD) {
     return PROD_HANDLE;
   }
 
@@ -792,7 +792,7 @@ export const useRenderGuard = (
   });
 
   // Log detailed render cause analysis
-  if (process.env.NODE_ENV === 'development' && (renderCauseAnalysis.propChanges.length > 0 || renderCauseAnalysis.stateChanges.length > 0)) {
+  if (import.meta.env.DEV && (renderCauseAnalysis.propChanges.length > 0 || renderCauseAnalysis.stateChanges.length > 0)) {
     console.debug(`[RenderGuard:${componentName}] Render cause analysis:`, {
       renderCount: state.renderCount,
       primaryCause: renderCauseAnalysis.primaryCause,
@@ -1050,20 +1050,20 @@ export class RenderAnalytics {
   }
 
   recordRender(componentName: string): void {
-    if (process.env.NODE_ENV === 'production') return;
+    if (import.meta.env.PROD) return;
     const entry = this.ensureEntry(componentName);
     entry.totalRenders += 1;
   }
 
   recordWarning(componentName: string): void {
-    if (process.env.NODE_ENV === 'production') return;
+    if (import.meta.env.PROD) return;
     const entry = this.ensureEntry(componentName);
     entry.warnings += 1;
     entry.lastWarningAt = now();
   }
 
   recordInfiniteLoop(componentName: string): void {
-    if (process.env.NODE_ENV === 'production') return;
+    if (import.meta.env.PROD) return;
     const entry = this.ensureEntry(componentName);
     entry.errors += 1;
     entry.lastErrorAt = now();

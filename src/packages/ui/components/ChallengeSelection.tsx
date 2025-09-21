@@ -15,7 +15,7 @@ type Category = 'system-design' | 'architecture' | 'scaling';
 
 // Error handling utility that only logs in development
 const handleError = (context: string, error: unknown) => {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     console.error(`[ChallengeSelection] ${context}:`, error);
   }
 };
@@ -163,7 +163,7 @@ export function ChallengeSelection({
 
       if (validBaseChallenges.length === 0) {
         // Only log warning in development mode to reduce noise
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           // Silent fallback to default challenges from manager
         }
         return [...challengeManager.getDefaultChallenges(), ...proChallenges];
@@ -172,7 +172,7 @@ export function ChallengeSelection({
       return [...validBaseChallenges, ...importedChallenges, ...proChallenges];
     } catch (error) {
       // Only log error in development mode
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         handleError('Error processing challenges', error);
       }
       return [...challengeManager.getDefaultChallenges(), ...importedChallenges, ...proChallenges];
@@ -211,7 +211,7 @@ export function ChallengeSelection({
       });
     } catch (error) {
       // Only log error in development mode to reduce console noise
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         handleError('Error filtering challenges', error);
       }
       return allChallenges; // Return all challenges if filtering fails
@@ -244,7 +244,7 @@ export function ChallengeSelection({
       };
     } catch (error) {
       // Only log error in development mode to reduce console noise
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         handleError('Error calculating stats', error);
       }
       return { total: 0, beginner: 0, intermediate: 0, advanced: 0, avgTime: 0 };
@@ -522,7 +522,7 @@ export function ChallengeSelection({
                               try {
                                 // Validate challenge has required ID before selection
                                 if (!challenge.id) {
-                                  if (process.env.NODE_ENV === 'development') {
+                                  if (import.meta.env.DEV) {
                                     handleError(
                                       'Challenge missing required ID field',
                                       new Error('Missing ID')
@@ -533,7 +533,7 @@ export function ChallengeSelection({
                                 onChallengeSelect(challenge);
                               } catch (error) {
                                 // Only log error in development mode to reduce console noise
-                                if (process.env.NODE_ENV === 'development') {
+                                if (import.meta.env.DEV) {
                                   handleError('Error selecting challenge', error);
                                 }
                               }

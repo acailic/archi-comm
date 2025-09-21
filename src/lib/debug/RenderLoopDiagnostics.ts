@@ -133,7 +133,7 @@ export class RenderLoopDiagnostics {
   }
 
   private record(type: string, payload: unknown) {
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
       return;
     }
 
@@ -142,7 +142,7 @@ export class RenderLoopDiagnostics {
       this.events.shift();
     }
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
       console.debug(`[RenderDiagnostics:${type}]`, payload);
     }

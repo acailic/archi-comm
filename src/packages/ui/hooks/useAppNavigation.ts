@@ -1,25 +1,35 @@
-import { useCallback, useEffect } from 'react';
-import { useAppStore } from '@hooks/useAppStore';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Challenge, AudioData } from '@/shared/contracts/index';
+import type { AppStoreActions } from '@/stores/AppStore';
 
 interface UseAppNavigationOptions {
   selectedChallenge: Challenge | null;
   audioData: AudioData | null;
+  actions: AppStoreActions;
 }
 
-export function useAppNavigation({ selectedChallenge, audioData }: UseAppNavigationOptions) {
-  const { actions } = useAppStore();
+export function useAppNavigation({ selectedChallenge, audioData, actions }: UseAppNavigationOptions) {
+  // Store actions in ref to avoid recreation of callbacks when actions object changes
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
 
-  // Memoized navigation and palette handlers
+  // Store current state in refs to avoid stale closures
+  const stateRef = useRef({ selectedChallenge, audioData });
+  stateRef.current = { selectedChallenge, audioData };
+
+  // Memoized navigation and palette handlers with stable dependencies
   const handleOpenCommandPalette = useCallback(() => {
-    actions.setShowCommandPalette(true);
-  }, [actions]);
+    actionsRef.current.setShowCommandPalette(true);
+  }, []);
 
   const handlePaletteClose = useCallback(() => {
-    actions.setShowCommandPalette(false);
-  }, [actions]);
+    actionsRef.current.setShowCommandPalette(false);
+  }, []);
 
   const handleNavigateFromPalette = useCallback((screen: string) => {
+    const { selectedChallenge, audioData } = stateRef.current;
+    const actions = actionsRef.current;
+
     if (screen === 'challenge-selection') {
       actions.setSelectedChallenge(null);
       actions.setPhase('design');
@@ -44,66 +54,75 @@ export function useAppNavigation({ selectedChallenge, audioData }: UseAppNavigat
       actions.setCurrentScreen('config');
     }
     actions.setShowCommandPalette(false);
-  }, [actions, selectedChallenge, audioData]);
+  }, []);
 
   const handleNavigateToScreenShortcut = useCallback((screen: string) => {
+    const actions = actionsRef.current;
     if (screen === 'challenge-selection') {
       actions.setSelectedChallenge(null);
       actions.setPhase('design');
       actions.setCurrentScreen('challenge-selection');
       actions.setShowDevScenarios(false);
     }
-  }, [actions]);
+  }, []);
 
   const handleChallengeSelect = useCallback((c: Challenge) => {
+    const actions = actionsRef.current;
     actions.setSelectedChallenge(c);
     actions.setPhase('design');
     actions.setCurrentScreen('design-canvas');
-  }, [actions]);
+  }, []);
 
   const handleBackFromAudio = useCallback(() => {
+    const actions = actionsRef.current;
     actions.setPhase('design');
     actions.setCurrentScreen('design-canvas');
-  }, [actions]);
+  }, []);
 
   const handleStartOver = useCallback(() => {
+    const actions = actionsRef.current;
     actions.setSelectedChallenge(null);
     actions.setPhase('design');
     actions.setAudioData(null);
     actions.setCurrentScreen('challenge-selection');
-  }, [actions]);
+  }, []);
 
   const handleBackToDesign = useCallback(() => {
+    const actions = actionsRef.current;
     actions.setPhase('design');
     actions.setCurrentScreen('design-canvas');
-  }, [actions]);
+  }, []);
 
   const handleBackToAudio = useCallback(() => {
+    const actions = actionsRef.current;
     actions.setPhase('audio-recording');
     actions.setCurrentScreen('audio-recording');
-  }, [actions]);
+  }, []);
 
   const handleConfigBack = useCallback(() => {
+    const actions = actionsRef.current;
     actions.setCurrentScreen('design-canvas');
-  }, [actions]);
+  }, []);
 
   const handleBackToSelection = useCallback(() => {
+    const actions = actionsRef.current;
     actions.setSelectedChallenge(null);
     actions.setPhase('design');
     actions.setCurrentScreen('challenge-selection');
-  }, [actions]);
+  }, []);
 
   const handleWelcomeComplete = useCallback(() => {
+    const actions = actionsRef.current;
     actions.setShowWelcome(false);
     actions.setCurrentScreen('challenge-selection');
-  }, [actions]);
+  }, []);
 
   // Listen for toolbar navigation events (e.g., settings/config)
   useEffect(() => {
-    const toConfig = () => actions.setCurrentScreen('config');
+    const toConfig = () => actionsRef.current.setCurrentScreen('config');
     window.addEventListener('navigate:config', toConfig as EventListener);
     return () => window.removeEventListener('navigate:config', toConfig as EventListener);
-  }, [actions]);
+  }, []); // Empty dependency array - the effect should only run once
 
   return {
     handleOpenCommandPalette,

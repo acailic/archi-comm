@@ -7,7 +7,7 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { MiniMap, useReactFlow } from '@xyflow/react';
 import { Plus, Minus, Eye, EyeOff } from 'lucide-react';
 import type { DesignComponent } from '../@shared/contracts';
-import { useEnhancedMinimap } from '../hooks/useEnhancedMinimap';
+import { useEnhancedMinimap } from '../hooks/useEnhancedMinimap.tsx';
 import {
   getMinimapBackgroundColor,
   getMinimapBorderColor,

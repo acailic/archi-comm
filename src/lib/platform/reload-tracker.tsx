@@ -25,7 +25,7 @@ class ReloadTracker {
     if (typeof window === 'undefined') return;
 
     // Only track in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       this.isTracking = true;
       this.setupListeners();
     }
@@ -171,7 +171,7 @@ export const useReloadTracker = () => {
 
 // Development-only reload prevention utility
 export const preventUnnecessaryReload = (componentName: string) => {
-  if (process.env.NODE_ENV !== 'development') return () => {};
+  if (!import.meta.env.DEV) return () => {};
 
   let lastRenderTime = Date.now();
   let renderCount = 0;

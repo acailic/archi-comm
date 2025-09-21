@@ -386,7 +386,7 @@ export function optimizeRenderList<T>(
 
 // Debugging and monitoring utilities
 export function logVirtualizationStats(stats: VirtualizationStats): void {
-  if (process.env.NODE_ENV !== 'development') return;
+  if (!import.meta.env.DEV) return;
 
   console.group('🎯 Virtualization Stats');
   console.log(`📦 Components: ${stats.visibleComponents}/${stats.totalComponents}`);

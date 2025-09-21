@@ -274,7 +274,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
         } else {
           clearInterval(timer);
         }
-      }, 1000);
+      }, 2000); // Update every 2 seconds instead of 1 second to reduce overhead
 
       mediaRecorder.onstop = () => {
         clearInterval(timer);

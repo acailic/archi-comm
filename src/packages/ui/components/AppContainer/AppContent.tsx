@@ -1,154 +1,188 @@
-import React, { Suspense, useEffect, useMemo, useCallback } from 'react';
-import { isDevelopment, isTauriEnvironment } from '@/lib/config/environment';
+import React, { Suspense, useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { isDevelopment } from '@/lib/config/environment';
 import { CommandPalette } from '@ui/components/CommandPalette';
-import { getLogger } from '@/lib/logging/logger';
 import { challengeManager } from '@/lib/config/challenge-config';
 import type { DesignData, AudioData } from '@/shared/contracts/index';
-import { useGlobalShortcuts } from '@hooks/useGlobalShortcuts';
-import { useDevShortcuts } from '@/dev/DevShortcuts';
 import { useRecovery } from '@/lib/recovery/RecoveryContext';
 import { RecoveryOverlay } from '@ui/components/overlays/RecoveryOverlay';
-import { useAppStore, useAppStoreSelector } from '@hooks/useAppStore';
 import { TooltipProvider } from '@ui/components/ui/tooltip';
-import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
-import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { useAppPersistence } from '../../hooks/useAppPersistence';
-import { useInfiniteLoopRecovery } from '../../hooks/useInfiniteLoopRecovery';
-import { useDevToggles } from '../../hooks/useDevToggles';
 import { ScreenRouter } from './ScreenRouter';
-import { RecoveryStatusWidget } from './components/RecoveryStatusWidget';
+import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
+// Temporarily disabled complex state management to fix infinite loops
+// import { useUnifiedState } from '@/shared/hooks/useUnifiedState';
+// import { shallow } from 'zustand/shallow';
+// import { useAppVariant } from '@/shared/hooks/useAppVariant';
+// import { useLogger } from '@/shared/hooks/useLogger';
+// import type { AppState } from '@/stores/AppStore';
 
-export type AppVariant = 'basic' | 'complex' | 'safe';
-
-export interface FeatureConfig {
-  router: boolean;
-  ux: boolean;
-  commandPalette: boolean;
-  diagnostics: boolean;
-}
-
-function detectVariant(): AppVariant {
-  const env = (import.meta as any).env || {};
-  const variant =
-    (env.VITE_APP_VARIANT as AppVariant) || (isTauriEnvironment() ? 'complex' : 'basic');
-  return variant;
-}
-
-function featuresForVariant(variant: AppVariant): FeatureConfig {
-  switch (variant) {
-    case 'complex':
-      return { router: true, ux: true, commandPalette: true, diagnostics: true };
-    case 'safe':
-      return { router: false, ux: false, commandPalette: false, diagnostics: true };
-    default:
-      return { router: false, ux: true, commandPalette: true, diagnostics: true };
-  }
-}
-
-const logger = getLogger('app-container');
-
-// Main app content component that uses recovery system
+// Simplified state management to fix infinite loops
 export function AppContent() {
-  const variant = useMemo(detectVariant, []);
-  const features = useMemo(() => featuresForVariant(variant), [variant]);
+  // Infinite loop detection
+  const renderCountRef = useRef(0);
+  const lastRenderTime = useRef(Date.now());
+  const loopDetector = InfiniteLoopDetector.getInstance();
+
+  // Track renders for debugging
+  renderCountRef.current++;
+  const now = Date.now();
+  if (now - lastRenderTime.current < 100 && renderCountRef.current % 10 === 0) {
+    console.warn(`AppContent rendered ${renderCountRef.current} times in quick succession`);
+    loopDetector.notifyRenderLoop('AppContent', renderCountRef.current);
+  }
+  lastRenderTime.current = now;
+
+  // Use simple local state instead of complex unified state
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
+  const [designData, setDesignData] = useState(null);
+  const [audioData, setAudioData] = useState(null);
+  const [phase, setPhase] = useState('challenge-selection');
+  const [availableChallenges, setAvailableChallenges] = useState([]);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [currentScreen, setCurrentScreen] = useState('challenge-selection');
+  const [showDevScenarios, setShowDevScenarios] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+
+  // Simple actions object
+  const appActions = useMemo(() => ({
+    setSelectedChallenge,
+    setDesignData,
+    setAudioData,
+    setPhase,
+    setAvailableChallenges,
+    setShowCommandPalette,
+    setCurrentScreen,
+    setShowDevScenarios,
+    setIsDemoMode,
+    setShowWelcome,
+  }), []);
+
+  // Simple features object
+  const features = useMemo(() => ({
+    commandPalette: true,
+  }), []);
 
   // Recovery system integration
   const recovery = useRecovery();
-  const { actions } = useAppStore();
-  const selectedChallenge = useAppStoreSelector(s => s.selectedChallenge);
-  const designData = useAppStoreSelector(s => s.designData);
-  const audioData = useAppStoreSelector(s => s.audioData);
-  const phase = useAppStoreSelector(s => s.phase);
-  const availableChallenges = useAppStoreSelector(s => s.availableChallenges);
-  const showCommandPalette = useAppStoreSelector(s => s.showCommandPalette);
-  const currentScreen = useAppStoreSelector(s => s.currentScreen);
-  const showDevScenarios = useAppStoreSelector(s => s.showDevScenarios);
-  const isDemoMode = useAppStoreSelector(s => s.isDemoMode);
-  const showWelcome = useAppStoreSelector(s => s.showWelcome);
 
-  // Use extracted hooks
-  const { persistChanged } = useAppPersistence({
-    designData,
-    audioData,
-    selectedChallenge,
-    variant,
-    features,
-    currentScreen,
-    phase,
-    isDemoMode,
-  });
+  // Stable navigation handlers with proper memoization
+  const handleChallengeSelect = useCallback((challenge) => {
+    setSelectedChallenge(challenge);
+    setCurrentScreen('design-canvas');
+    setPhase('design');
+  }, []);
 
-  const navigation = useAppNavigation({ selectedChallenge, audioData });
-  const infiniteLoopRecovery = useInfiniteLoopRecovery({ persistChanged });
+  const handleOpenCommandPalette = useCallback(() => setShowCommandPalette(true), []);
+  const handlePaletteClose = useCallback(() => setShowCommandPalette(false), []);
+  const handleNavigateToScreenShortcut = useCallback(() => {}, []);
+  const handleNavigateFromPalette = useCallback(() => {}, []);
 
-  const { handleToggleScenarios, handleToggleDemoMode, handleDevReset } = useDevToggles({
-    actions,
-    showDevScenarios,
-    isDemoMode,
-  });
+  const handleBackFromAudio = useCallback(() => {
+    setCurrentScreen('design-canvas');
+    setPhase('design');
+  }, []);
+
+  const handleStartOver = useCallback(() => {
+    setCurrentScreen('challenge-selection');
+    setPhase('challenge-selection');
+    setSelectedChallenge(null);
+    setDesignData(null);
+    setAudioData(null);
+  }, []);
+
+  const handleBackToDesign = useCallback(() => {
+    setCurrentScreen('design-canvas');
+    setPhase('design');
+  }, []);
+
+  const handleBackToAudio = useCallback(() => {
+    setCurrentScreen('audio-recording');
+    setPhase('audio-recording');
+  }, []);
+
+  const handleConfigBack = useCallback(() => {
+    setCurrentScreen('challenge-selection');
+    setPhase('challenge-selection');
+  }, []);
+
+  const handleBackToSelection = useCallback(() => {
+    setCurrentScreen('challenge-selection');
+    setPhase('challenge-selection');
+  }, []);
+
+  const handleWelcomeComplete = useCallback(() => setShowWelcome(false), []);
+
+  // Group navigation handlers into a stable object
+  const navigation = useMemo(() => ({
+    handleChallengeSelect,
+    handleOpenCommandPalette,
+    handlePaletteClose,
+    handleNavigateToScreenShortcut,
+    handleNavigateFromPalette,
+    handleBackFromAudio,
+    handleStartOver,
+    handleBackToDesign,
+    handleBackToAudio,
+    handleConfigBack,
+    handleBackToSelection,
+    handleWelcomeComplete,
+  }), [
+    handleChallengeSelect,
+    handleOpenCommandPalette,
+    handlePaletteClose,
+    handleNavigateToScreenShortcut,
+    handleNavigateFromPalette,
+    handleBackFromAudio,
+    handleStartOver,
+    handleBackToDesign,
+    handleBackToAudio,
+    handleConfigBack,
+    handleBackToSelection,
+    handleWelcomeComplete,
+  ]);
 
   useEffect(() => {
     try {
-      actions.setAvailableChallenges(challengeManager.getAllChallenges());
+      setAvailableChallenges(challengeManager.getAllChallenges());
     } catch (error) {
-      logger.error('Failed to load challenges', error as any);
+      console.error('Failed to load challenges', error);
     }
-  }, []);
+  }, []); // Empty dependency array - this should only run once
 
   // Check for development scenario viewer route
   useEffect(() => {
-    if (isDevelopment()) {
-      const checkDevRoute = () => {
-        const pathname = window.location.pathname || '';
-        actions.setShowDevScenarios(pathname.includes('/dev/scenarios'));
-      };
+    if (!isDevelopment()) return;
 
-      checkDevRoute();
+    const checkDevRoute = () => {
+      const pathname = window.location.pathname || '';
+      setShowDevScenarios(pathname.includes('/dev/scenarios'));
+    };
 
-      // Listen for navigation changes
-      window.addEventListener('popstate', checkDevRoute);
-      return () => window.removeEventListener('popstate', checkDevRoute);
-    }
-  }, []);
+    checkDevRoute();
+
+    // Listen for navigation changes
+    window.addEventListener('popstate', checkDevRoute);
+    return () => window.removeEventListener('popstate', checkDevRoute);
+  }, []); // Empty dependency array - this should only run once
 
   const handleComplete = useCallback((data: DesignData) => {
-    actions.setDesignData(data);
-    actions.setPhase('audio-recording');
-    actions.setCurrentScreen('audio-recording');
-  }, [actions]);
+    setDesignData(data);
+    setPhase('audio-recording');
+    setCurrentScreen('audio-recording');
+  }, []);
 
   const handleAudioComplete = useCallback((data: AudioData) => {
-    actions.setAudioData(data);
-    actions.setPhase('review');
-    actions.setCurrentScreen('review');
-  }, [actions]);
+    setAudioData(data);
+    setPhase('review');
+    setCurrentScreen('review');
+  }, []);
 
-  // Global shortcuts integration
-  const globalShortcuts = useGlobalShortcuts({
-    handlers: {
-      onCommandPalette: navigation.handleOpenCommandPalette,
-      onNavigateToScreen: navigation.handleNavigateToScreenShortcut,
-    },
-    currentScreen,
-    selectedChallenge,
-  });
-
-  const devShortcuts = useDevShortcuts({
-    handlers: {
-      onToggleScenarios: handleToggleScenarios,
-      onToggleDemoMode: handleToggleDemoMode,
-      onReset: handleDevReset,
-    },
-    enabled: isDevelopment(),
-    scenarioViewerActive: showDevScenarios,
-  });
-
-  // Legacy keyboard shortcuts for command palette
+  // Simplified keyboard shortcuts for command palette
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && showCommandPalette) {
-      actions.setShowCommandPalette(false);
+      setShowCommandPalette(false);
     }
-  }, [actions, showCommandPalette]);
+  }, [showCommandPalette]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -198,8 +232,8 @@ export function AppContent() {
             onConfigBack={navigation.handleConfigBack}
             onBackToSelection={navigation.handleBackToSelection}
             onWelcomeComplete={navigation.handleWelcomeComplete}
-            onInfiniteLoopReset={infiniteLoopRecovery.handleInfiniteLoopReset}
-            onRequestRecovery={infiniteLoopRecovery.requestRecovery}
+            onInfiniteLoopReset={() => {}}
+            onRequestRecovery={() => {}}
           />
         </Suspense>
 
@@ -224,9 +258,7 @@ export function AppContent() {
           onRetry={recoveryRetryHandler}
         />
 
-        {features.diagnostics && isDevelopment() ? (
-          <RecoveryStatusWidget variant={variant} isRecovering={recovery.isRecovering} />
-        ) : null}
+        {/* diagnostics UI removed */}
       </div>
     </TooltipProvider>
   );

@@ -193,7 +193,7 @@ export const VirtualizationLayer: React.FC<VirtualizationLayerProps> = ({
 
   return (
     <div className="virtualization-layer">
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <div className="virtualization-debug" style={{
           position: 'absolute',
           top: 10,

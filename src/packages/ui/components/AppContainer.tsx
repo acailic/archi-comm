@@ -1,11 +1,10 @@
 import React from 'react';
-import { RecoveryProvider } from '@/lib/recovery/RecoveryContext';
 import { AppContent } from './AppContainer/AppContent';
 
 // Re-export types for external use
-export type { AppVariant, FeatureConfig } from './AppContainer/AppContent';
+export type { AppVariant, VariantFeatures as FeatureConfig } from '@/shared/hooks/useAppVariant';
 
-// Main app container with recovery provider
+// Main app container
 export default function AppContainer() {
   const [resetCounter, setResetCounter] = React.useState(0);
 
@@ -17,9 +16,12 @@ export default function AppContainer() {
   }, []);
 
   return (
-    <RecoveryProvider>
-      {/* key change forces controlled remount */}
+    <>
+      {/* Main app content - key change forces controlled remount */}
       <AppContent key={resetCounter} />
-    </RecoveryProvider>
+
+      {/* Performance monitor disabled to reduce overhead */}
+      {/* Development tools can be accessed via browser console debug utilities */}
+    </>
   );
 }

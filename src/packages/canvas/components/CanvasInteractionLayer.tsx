@@ -19,20 +19,18 @@ import {
 } from "../../../stores/canvasStore";
 import { DesignComponent } from "../../../types";
 import { useCanvasContext } from "../contexts/CanvasContext";
+import {
+  ContextMenu,
+  ContextMenuAPI,
+  ContextMenuCallbacks,
+  ContextMenuState,
+} from "./ContextMenu";
 
 export interface CanvasInteractionLayerProps {
   enableDragDrop?: boolean;
   enableContextMenu?: boolean;
   enableKeyboardShortcuts?: boolean;
   children: React.ReactNode;
-}
-
-interface ContextMenuState {
-  visible: boolean;
-  x: number;
-  y: number;
-  nodeId?: string;
-  edgeId?: string;
 }
 
 interface KeyboardShortcuts {
@@ -59,6 +57,17 @@ const CanvasInteractionLayerComponent: React.FC<
   const { selectedItems, reactFlowInstance } = state;
   const { component: componentCallbacks, connection: connectionCallbacks } =
     callbacks;
+
+  const contextMenuCallbacks = useMemo<ContextMenuCallbacks>(
+    () => ({
+      onComponentSelect: componentCallbacks.onComponentSelect,
+      onComponentDelete: componentCallbacks.onComponentDelete,
+      onComponentDeselect: componentCallbacks.onComponentDeselect,
+      onConnectionSelect: connectionCallbacks.onConnectionSelect,
+      onConnectionDelete: connectionCallbacks.onConnectionDelete,
+    }),
+    [componentCallbacks, connectionCallbacks]
+  );
 
   // Render debugging state
   const renderCountRef = useRef(0);
@@ -109,7 +118,7 @@ const CanvasInteractionLayerComponent: React.FC<
   );
 
   const detectPropChanges = () => {
-    if (process.env.NODE_ENV !== "development") return;
+    if (!import.meta.env.DEV) return;
 
     const lastProps = lastPropsRef.current;
     const changes: Array<{ property: string; oldValue: any; newValue: any }> =
@@ -171,7 +180,7 @@ const CanvasInteractionLayerComponent: React.FC<
 
   // Track callback stability
   const trackCallbackStability = (name: string, callback: any) => {
-    if (process.env.NODE_ENV !== "development") return;
+    if (!import.meta.env.DEV) return;
 
     const stability = callbackStabilityRef.current.get(name) || {
       refCount: 0,
@@ -232,11 +241,16 @@ const CanvasInteractionLayerComponent: React.FC<
     connectionCallbacks.onConnectionDelete
   );
 
-  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+  const contextMenuRef = useRef<ContextMenuAPI | null>(null);
+  const contextMenuStateRef = useRef<ContextMenuState>({
     visible: false,
     x: 0,
     y: 0,
   });
+
+  const handleContextMenuStateChange = useCallback((nextState: ContextMenuState) => {
+    contextMenuStateRef.current = nextState;
+  }, []);
 
   const [draggedComponent, setDraggedComponent] =
     useState<DesignComponent | null>(null);
@@ -252,7 +266,7 @@ const CanvasInteractionLayerComponent: React.FC<
       enableContextMenu,
       enableKeyboardShortcuts,
       selectedItems: selectedItems.length,
-      contextMenuVisible: contextMenu.visible,
+      contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
       renderCount: renderCountRef.current,
       propChangeHistory: propChangeHistoryRef.current.slice(-3),
       callbackStability: Object.fromEntries(
@@ -274,67 +288,39 @@ const CanvasInteractionLayerComponent: React.FC<
       enableKeyboardShortcuts,
       selectedItemsLength: selectedItems.length,
       reactFlowInstanceId: reactFlowInstance?.id || null,
-      contextMenuVisible: contextMenu.visible,
+      contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
     }),
     stateSnapshot: () => ({
       draggedComponent: draggedComponent?.id || null,
       contextMenuState: {
-        visible: contextMenu.visible,
-        nodeId: contextMenu.nodeId,
-        edgeId: contextMenu.edgeId,
+        visible: contextMenuStateRef.current.visible,
+        nodeId: contextMenuStateRef.current.nodeId,
+        edgeId: contextMenuStateRef.current.edgeId,
       },
     }),
   });
 
   const hideContextMenu = useCallback(() => {
-    setContextMenu((prev) => {
-      if (!prev.visible) return prev; // Guard against redundant updates
-      return { ...prev, visible: false };
-    });
+    contextMenuRef.current?.hide();
   }, []);
 
   const handleContextMenu = useCallback(
     (event: React.MouseEvent, nodeId?: string, edgeId?: string) => {
       if (!enableContextMenu) return;
-
-      event.preventDefault();
-      const newX = event.clientX;
-      const newY = event.clientY;
-
-      setContextMenu((prev) => {
-        // Avoid setting same position multiple times
-        if (
-          prev.visible &&
-          prev.x === newX &&
-          prev.y === newY &&
-          prev.nodeId === nodeId &&
-          prev.edgeId === edgeId
-        ) {
-          return prev;
-        }
-        return {
-          visible: true,
-          x: newX,
-          y: newY,
-          nodeId,
-          edgeId,
-        };
-      });
+      contextMenuRef.current?.show(event, nodeId, edgeId);
     },
     [enableContextMenu]
   );
 
   const handlePaneClick = useCallback(
     (event: React.MouseEvent) => {
-      if (contextMenu.visible) {
-        hideContextMenu();
-      }
+      hideContextMenu();
 
       if (!event.defaultPrevented) {
         componentCallbacks.onComponentDeselect();
       }
     },
-    [componentCallbacks, contextMenu.visible, hideContextMenu]
+    [componentCallbacks, hideContextMenu]
   );
 
   const handleComponentDrop = useCallback(
@@ -405,9 +391,6 @@ const CanvasInteractionLayerComponent: React.FC<
   const keyDownHandlerRef = useRef(handleKeyDown);
   keyDownHandlerRef.current = handleKeyDown;
 
-  const hideContextMenuRef = useRef(hideContextMenu);
-  hideContextMenuRef.current = hideContextMenu;
-
   useEffect(() => {
     if (!enableKeyboardShortcuts) {
       return;
@@ -418,15 +401,9 @@ const CanvasInteractionLayerComponent: React.FC<
     return () => document.removeEventListener("keydown", keyHandler);
   }, [enableKeyboardShortcuts]);
 
-  useEffect(() => {
-    const clickHandler = () => hideContextMenuRef.current();
-    document.addEventListener("click", clickHandler);
-    return () => document.removeEventListener("click", clickHandler);
-  }, []);
-
   // Enhanced render tracking with detailed analysis
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development") {
+    if (!import.meta.env.DEV) {
       return;
     }
 
@@ -442,7 +419,7 @@ const CanvasInteractionLayerComponent: React.FC<
         enableContextMenu,
         enableKeyboardShortcuts,
         selectedItemsCount: selectedItems.length,
-        contextMenuVisible: contextMenu.visible,
+        contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
         draggedComponentPresent: !!draggedComponent,
         reactFlowInstanceReady: !!reactFlowInstance,
         propChangeHistory: propChangeHistoryRef.current.slice(-3),
@@ -463,7 +440,7 @@ const CanvasInteractionLayerComponent: React.FC<
         enableContextMenu,
         enableKeyboardShortcuts,
         selectedItemsCount: selectedItems.length,
-        contextMenuVisible: contextMenu.visible,
+        contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
         draggedComponent: draggedComponent?.id,
         reactFlowInstanceId: reactFlowInstance?.id,
       }),
@@ -539,7 +516,6 @@ const CanvasInteractionLayerComponent: React.FC<
       },
     });
   }, [
-    contextMenu.visible,
     enableContextMenu,
     enableDragDrop,
     enableKeyboardShortcuts,
@@ -614,64 +590,12 @@ const CanvasInteractionLayerComponent: React.FC<
     <div className="canvas-interaction-layer">
       {enhancedChildren}
 
-      {contextMenu.visible && (
-        <div
-          className="context-menu"
-          style={{
-            position: "fixed",
-            top: contextMenu.y,
-            left: contextMenu.x,
-            background: "white",
-            border: "1px solid #ccc",
-            borderRadius: 4,
-            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-            zIndex: 1000,
-            padding: 8,
-          }}
-        >
-          {contextMenu.nodeId && (
-            <>
-              <button
-                onClick={() =>
-                  componentCallbacks.onComponentSelect(contextMenu.nodeId!)
-                }
-              >
-                Select
-              </button>
-              <button
-                onClick={() =>
-                  componentCallbacks.onComponentDelete(contextMenu.nodeId!)
-                }
-              >
-                Delete
-              </button>
-            </>
-          )}
-          {contextMenu.edgeId && (
-            <>
-              <button
-                onClick={() =>
-                  connectionCallbacks.onConnectionSelect(contextMenu.edgeId!)
-                }
-              >
-                Select
-              </button>
-              <button
-                onClick={() =>
-                  connectionCallbacks.onConnectionDelete(contextMenu.edgeId!)
-                }
-              >
-                Delete
-              </button>
-            </>
-          )}
-          {!contextMenu.nodeId && !contextMenu.edgeId && (
-            <button onClick={() => componentCallbacks.onComponentDeselect()}>
-              Clear Selection
-            </button>
-          )}
-        </div>
-      )}
+      <ContextMenu
+        ref={contextMenuRef}
+        enabled={enableContextMenu}
+        callbacks={contextMenuCallbacks}
+        onStateChange={handleContextMenuStateChange}
+      />
     </div>
   );
 };
@@ -693,7 +617,7 @@ export const CanvasInteractionLayer = memo(
       prev.enableKeyboardShortcuts === next.enableKeyboardShortcuts &&
       childrenEqual;
 
-    if (process.env.NODE_ENV === "development" && !propsEqual) {
+    if (import.meta.env.DEV && !propsEqual) {
       const changedProps = [];
       if (prev.enableDragDrop !== next.enableDragDrop)
         changedProps.push("enableDragDrop");

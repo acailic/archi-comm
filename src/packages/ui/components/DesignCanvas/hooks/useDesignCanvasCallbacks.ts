@@ -45,7 +45,7 @@ const trackCallbackExecution = (
   executionFn: () => any,
   stateChangesTriggered: string[] = []
 ): any => {
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return executionFn();
   }
 
@@ -669,7 +669,7 @@ export function useDesignCanvasCallbacks() {
 
   // Callback metrics tracking for development
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       const interval = setInterval(() => {
         const metricsReport = {
           totalCallbacks: callbackMetrics.size,
@@ -731,7 +731,7 @@ export function useDesignCanvasCallbacks() {
   };
 
   // Add debug methods in development
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     (callbacks as any).getCallbackMetrics = () => callbackMetrics;
     (callbacks as any).getExecutionHistory = () => callbackExecutionHistory;
     (callbacks as any).getCallbackAnalysis = () => ({

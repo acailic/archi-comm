@@ -4,6 +4,7 @@ import { Activity, Zap, Clock } from 'lucide-react';
 import type { DesignComponent, Connection, InfoCard, DesignData } from '@shared/contracts';
 import LearningBreadcrumbs from '@ui/components/LearningBreadcrumbs';
 import type { StoreCircuitBreakerSnapshot } from '@/lib/performance/StoreCircuitBreaker';
+import { equalityFunctions } from '@/shared/utils/memoization';
 
 interface StatusBarProps {
   components: DesignComponent[];
@@ -15,13 +16,14 @@ interface StatusBarProps {
   storeCircuitBreakerSnapshot?: StoreCircuitBreakerSnapshot | null;
 }
 
-const StatusBarClock: React.FC<{ sessionStartTime: Date }> = ({ sessionStartTime }) => {
+const StatusBarClock = React.memo<{ sessionStartTime: Date }>(({ sessionStartTime }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
+    // Update less frequently to reduce CPU usage
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000);
+    }, 30000); // Update every 30 seconds instead of every second
     return () => clearInterval(timer);
   }, []);
 
@@ -38,9 +40,11 @@ const StatusBarClock: React.FC<{ sessionStartTime: Date }> = ({ sessionStartTime
       </div>
     </div>
   );
-};
+});
 
-export const StatusBar: React.FC<StatusBarProps> = ({
+StatusBarClock.displayName = 'StatusBarClock';
+
+const StatusBarComponent: React.FC<StatusBarProps> = ({
   components,
   connections,
   infoCards,
@@ -88,3 +92,29 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     </div>
   );
 };
+
+// Optimized equality function for StatusBar props
+const statusBarPropsEqual = (prev: StatusBarProps, next: StatusBarProps): boolean => {
+  // Fast path: check array lengths and selected ID
+  if (prev.components.length !== next.components.length ||
+      prev.connections.length !== next.connections.length ||
+      prev.infoCards.length !== next.infoCards.length ||
+      prev.selectedComponentId !== next.selectedComponentId) {
+    return false;
+  }
+
+  // Check session start time (should be stable)
+  if (prev.sessionStartTime.getTime() !== next.sessionStartTime.getTime()) {
+    return false;
+  }
+
+  // Check circuit breaker snapshot
+  if (prev.storeCircuitBreakerSnapshot !== next.storeCircuitBreakerSnapshot) {
+    return false;
+  }
+
+  // Shallow comparison for currentDesignData
+  return equalityFunctions.mixed(prev.currentDesignData, next.currentDesignData);
+};
+
+export const StatusBar = React.memo(StatusBarComponent, statusBarPropsEqual);

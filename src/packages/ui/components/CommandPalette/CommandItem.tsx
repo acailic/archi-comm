@@ -21,10 +21,11 @@ interface CommandItemProps {
   onClick: () => void;
   onMouseEnter: () => void;
   onFocus: () => void;
+  optionId?: string;
 }
 
 export const CommandItem = React.memo(
-  ({ command, index, isSelected, onClick, onMouseEnter, onFocus }: CommandItemProps) => {
+  ({ command, index, isSelected, onClick, onMouseEnter, onFocus, optionId }: CommandItemProps) => {
     const Icon = command.icon;
     return (
       <motion.div
@@ -41,6 +42,7 @@ export const CommandItem = React.memo(
         tabIndex={0}
         role='option'
         aria-selected={isSelected}
+        id={optionId}
       >
         <div className='flex items-center justify-between'>
           <div className='flex items-center space-x-3'>

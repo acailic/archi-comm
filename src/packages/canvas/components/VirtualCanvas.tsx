@@ -28,7 +28,7 @@ import {
   useViewportTracking,
   useVirtualizationPerformance,
   useVisibleItems,
-} from '../hooks/useVirtualization';
+} from '../hooks/useVirtualization.tsx';
 import { toReactFlowEdges } from '../utils/rf-adapters';
 import {
   DEFAULT_VIRTUALIZATION_CONFIG,

@@ -172,7 +172,7 @@ export class KeyboardShortcutManager {
   /**
    * Debug mode for development
    */
-  private debugMode = process.env.NODE_ENV === 'development';
+  private debugMode = import.meta.env.DEV;
 
   setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;

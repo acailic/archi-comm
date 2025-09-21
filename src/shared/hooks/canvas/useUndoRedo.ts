@@ -52,7 +52,7 @@ export function useCanvasUndoRedo(
     const handleUndoShortcut = () => {
       if (canUndo) {
         undo();
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.log('Undo triggered via keyboard shortcut');
         }
       }
@@ -61,7 +61,7 @@ export function useCanvasUndoRedo(
     const handleRedoShortcut = () => {
       if (canRedo) {
         redo();
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.log('Redo triggered via keyboard shortcut');
         }
       }

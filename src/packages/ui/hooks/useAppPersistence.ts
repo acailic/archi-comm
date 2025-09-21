@@ -4,7 +4,7 @@ import { storage } from '@services/storage';
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 import type { DesignData, AudioData, Challenge } from '@/shared/contracts/index';
-import type { AppVariant, FeatureConfig } from '../components/AppContainer';
+import type { AppVariant, VariantFeatures } from '@/shared/hooks/useAppVariant';
 
 const logger = getLogger('app-persistence');
 
@@ -13,7 +13,7 @@ interface UseAppPersistenceOptions {
   audioData: AudioData | null;
   selectedChallenge: Challenge | null;
   variant: AppVariant;
-  features: FeatureConfig;
+  features: VariantFeatures;
   currentScreen: string;
   phase: string;
   isDemoMode: boolean;
@@ -63,16 +63,47 @@ export function useAppPersistence({
     }
   }, []);
 
+  // Store current state in ref to avoid recreation of persistChanged
+  const currentStateRef = useRef({
+    designData,
+    audioData,
+    selectedChallenge,
+    variant,
+    features,
+    currentScreen,
+    phase,
+    isDemoMode,
+  });
+
+  // Update ref without triggering re-renders
+  currentStateRef.current = {
+    designData,
+    audioData,
+    selectedChallenge,
+    variant,
+    features,
+    currentScreen,
+    phase,
+    isDemoMode,
+  };
+
   const persistChanged = useCallback(
     async ({ force = false, reason = 'state-change' }: { force?: boolean; reason?: string } = {}) => {
       if (!mountedRef.current) return;
 
-      const allowDesignPersist = force || currentScreen !== 'design-canvas';
+      const state = currentStateRef.current;
+      const allowDesignPersist = force || state.currentScreen !== 'design-canvas';
 
-      const nextDesign = designData && Object.keys(designData).length > 0 ? JSON.stringify(designData) : '';
-      const nextAudio = audioData ? JSON.stringify(audioData) : '';
-      const userPreferences = JSON.stringify({ variant, features, currentScreen, phase, isDemoMode });
-      const nextProjectId = selectedChallenge?.id ?? '';
+      const nextDesign = state.designData && Object.keys(state.designData).length > 0 ? JSON.stringify(state.designData) : '';
+      const nextAudio = state.audioData ? JSON.stringify(state.audioData) : '';
+      const userPreferences = JSON.stringify({
+        variant: state.variant,
+        features: state.features,
+        currentScreen: state.currentScreen,
+        phase: state.phase,
+        isDemoMode: state.isDemoMode
+      });
+      const nextProjectId = state.selectedChallenge?.id ?? '';
 
       const last = lastSerializedRef.current;
 
@@ -85,7 +116,7 @@ export function useAppPersistence({
             RenderLoopDiagnostics.getInstance().recordAutoSaveSuppressed({
               channel: 'designData',
               reason,
-              screen: currentScreen,
+              screen: state.currentScreen,
             });
             loopDetector.markPersistenceSuppressed('designData', reason);
           }
@@ -126,18 +157,7 @@ export function useAppPersistence({
         RenderLoopDiagnostics.getInstance().recordPersistenceFailure({ reason, error: error as Error });
       }
     },
-    [
-      designData,
-      audioData,
-      selectedChallenge,
-      variant,
-      features,
-      currentScreen,
-      phase,
-      isDemoMode,
-      safeLocalSet,
-      loopDetector,
-    ]
+    [safeLocalSet, loopDetector] // Only include stable dependencies
   );
 
   const schedulePersist = useCallback(
@@ -171,15 +191,38 @@ export function useAppPersistence({
     [persistChanged]
   );
 
-  // Set up recovery context provider to give current app state to recovery system
-  const updateRecoveryContext = useCallback(() => {
-    schedulePersist({ reason: 'state-change' });
-  }, [schedulePersist]);
+  // Track significant state changes and trigger persistence
+  const prevStateRef = useRef<typeof currentStateRef.current | null>(null);
 
   useEffect(() => {
-    // Update context whenever state changes
-    updateRecoveryContext();
-  }, [updateRecoveryContext]);
+    if (!mountedRef.current) return;
+
+    const current = currentStateRef.current;
+    const prev = prevStateRef.current;
+
+    if (prev === null) {
+      // Initial mount - don't persist yet
+      prevStateRef.current = current;
+      return;
+    }
+
+    // Only persist if significant state actually changed
+    const hasSignificantChange = (
+      current.designData !== prev.designData ||
+      current.audioData !== prev.audioData ||
+      current.selectedChallenge?.id !== prev.selectedChallenge?.id ||
+      current.variant !== prev.variant ||
+      current.currentScreen !== prev.currentScreen ||
+      current.phase !== prev.phase ||
+      current.isDemoMode !== prev.isDemoMode
+    );
+
+    if (hasSignificantChange) {
+      schedulePersist({ reason: 'state-change' });
+    }
+
+    prevStateRef.current = current;
+  });
 
   useEffect(() => {
     const handleBeforeUnload = () => {

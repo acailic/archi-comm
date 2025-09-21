@@ -5,6 +5,8 @@
 
 import { Node, NodeProps } from '@xyflow/react';
 import { memo, useCallback, useRef, useState } from 'react';
+import { createCanvasNodeComponent } from '@/shared/utils/hotLeafMemoization';
+import { useStableConfig, useStableActions } from '@/shared/hooks/useStableLiterals';
 import { 
   MessageSquare, 
   Edit3, 
@@ -257,4 +259,12 @@ function InfoCardInner({ data, selected }: NodeProps) {
   );
 }
 
-export const InfoCard = memo(InfoCardInner);
+// Use hot-leaf memoization for InfoCard
+export const InfoCard = createCanvasNodeComponent(InfoCardInner, {
+  positionSensitive: false, // InfoCard position doesn't affect visual rendering
+  styleSensitive: true,     // Color changes affect rendering
+  interactionSensitive: true, // Selected state and editing state affect rendering
+  trackPerformance: true,
+  displayName: 'InfoCard',
+  debugMode: import.meta.env.DEV,
+});

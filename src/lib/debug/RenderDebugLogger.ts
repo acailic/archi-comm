@@ -134,7 +134,7 @@ export class RenderDebugLogger {
   private static instance: RenderDebugLogger;
   private componentStates = new Map<string, ComponentRenderState>();
   private globalRenderLog: RenderLogEntry[] = [];
-  private isEnabled = process.env.NODE_ENV === 'development';
+  private isEnabled = import.meta.env.DEV;
   private maxLogEntries = 500;
   private maxComponentHistory = 50;
 

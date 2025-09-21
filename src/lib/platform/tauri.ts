@@ -247,7 +247,7 @@ export const utilUtils = {
 
   // Debug function only available in development
   async populateSampleData(): Promise<Project[]> {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       return ipcUtils.invoke('populate_sample_data');
     }
     return [];

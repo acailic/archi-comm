@@ -264,7 +264,7 @@ export function useRenderSnapshotDebug({
   const triggerAnalysisHistoryRef = useRef<RenderTriggerAnalysis[]>([]);
   const renderOptimizationSuggestionsRef = useRef<Set<string>>(new Set());
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (import.meta.env.DEV) {
     const snapshot = {
       componentsLength: components.length,
       connectionsLength: connections.length,

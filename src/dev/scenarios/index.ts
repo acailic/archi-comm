@@ -1,9 +1,9 @@
 import type { EnhancedScenarioDefinition } from '../types';
-import { challengeSelectionScenarios } from './challenge-selection';
-import { canvasAreaScenarios } from './canvas-area';
-import { audioRecordingScenarios } from './audio-recording';
-import { uiComponentScenarios } from './ui-components';
-import { architectureDiagramScenarios } from './architecture-diagrams';
+import { challengeSelectionScenarios } from './challenge-selection.tsx';
+import { canvasAreaScenarios } from './canvas-area.tsx';
+import { audioRecordingScenarios } from './audio-recording.tsx';
+import { uiComponentScenarios } from './ui-components.tsx';
+import { architectureDiagramScenarios } from './architecture-diagrams.tsx';
 
 // Runtime validation utilities
 function validateScenarioStructure(definition: Record<string, any>): void {

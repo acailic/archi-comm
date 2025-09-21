@@ -8,6 +8,7 @@ import {
   CanvasOptimizer,
   PerformanceMonitor,
   MemoryOptimizer,
+  PerformanceOptimizer,
 } from '../performance/PerformanceOptimizer';
 
 export interface CanvasAnnotation {

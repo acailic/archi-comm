@@ -66,7 +66,7 @@ class ServiceErrorBoundary extends React.Component<
           <p className="text-red-700 text-sm mt-1">
             Failed to resolve service: {this.state.error.message}
           </p>
-          {process.env.NODE_ENV === 'development' && (
+          {import.meta.env.DEV && (
             <details className="mt-2">
               <summary className="text-red-600 cursor-pointer">Debug Info</summary>
               <pre className="text-xs text-red-600 mt-1 overflow-auto">
@@ -91,7 +91,7 @@ const DefaultErrorFallback: ComponentType<{ error: Error }> = ({ error }) => (
     <p className="text-red-700 text-sm mt-1">
       The application service is temporarily unavailable. Please try refreshing the page.
     </p>
-    {process.env.NODE_ENV === 'development' && (
+    {import.meta.env.DEV && (
       <p className="text-red-600 text-xs mt-2">{error.message}</p>
     )}
   </div>
@@ -116,7 +116,7 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({
         // Validate that the container is properly configured
         const registeredServices = container.getRegisteredServices();
 
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
           console.log('ServiceProvider: Registered services:', registeredServices);
         }
 
@@ -334,7 +334,7 @@ export function useServiceDebug(): {
   }, [container]);
 
   // Only expose debug utilities in development
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     return { listServices, getDependencyGraph, testService };
   }
 

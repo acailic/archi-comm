@@ -13,6 +13,16 @@ import type { Connection, DesignComponent, InfoCard } from '@shared/contracts';
 import { StoreCircuitBreaker } from '@/lib/performance/StoreCircuitBreaker';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 
+// Import normalized store infrastructure
+import {
+  normalizeCanvasData,
+  denormalizeCanvasData,
+  NormalizedDataUpdater,
+  NormalizedDataSelectors,
+  type NormalizedCanvasData,
+  type CanvasDataSnapshot,
+} from '@/stores/normalized/CanvasDataNormalizer';
+
 type EqualityDifference = { path: string; reason: string };
 
 interface DeepEqualContext {
@@ -251,7 +261,7 @@ function deepEqual(a: any, b: any): boolean {
 const getLastEqualityDiagnostics = () => equalityDiagnostics.slice(0, MAX_DIAGNOSTIC_ENTRIES);
 
 const ensureSerializable = (value: unknown, label: string) => {
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return;
   }
 
@@ -410,7 +420,7 @@ const createActionTrace = (action: string, newValue: any, source?: string): Acti
       const chainPattern = [lastTrace.causedByAction, lastTrace.action, action];
       debugMetrics.renderCauseAnalysis.suspiciousActionChains.push(chainPattern);
 
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.warn('[CanvasStore] Suspicious action chain detected:', chainPattern.join(' → '));
       }
     }
@@ -468,7 +478,7 @@ const analyzeRenderCause = (action: string, trace: ActionTrace): string[] => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function debugLog(action: string, oldValue: any, newValue: any, source?: string, options?: DebugLogOptions) {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     const startTime = performance.now();
     const equal = options?.skipEqualityCheck ? false : deepEqual(oldValue, newValue);
     const endTime = performance.now();
@@ -605,6 +615,10 @@ interface CanvasStoreState {
   _lastUpdateTime: number;
   _updateCount: number;
   _bootstrapped: boolean;
+
+  // Normalized data layer (optional, controlled by feature flag)
+  _normalizedData?: NormalizedCanvasData;
+  _useNormalizedData?: boolean;
 }
 
 export type CanvasState = CanvasStoreState;
@@ -676,6 +690,9 @@ interface CanvasActions {
   getDebugInfo: () => typeof debugMetrics;
 }
 
+// Feature flag for normalized data
+const USE_NORMALIZED_DATA = import.meta.env.VITE_USE_NORMALIZED_STORE === 'true' || import.meta.env.DEV;
+
 const initialState: CanvasStoreState = {
   components: [],
   connections: [],
@@ -686,6 +703,14 @@ const initialState: CanvasStoreState = {
   _lastUpdateTime: 0,
   _updateCount: 0,
   _bootstrapped: false,
+  _useNormalizedData: USE_NORMALIZED_DATA,
+  _normalizedData: USE_NORMALIZED_DATA ? {
+    components: { byId: {}, allIds: [], byType: {}, byLayer: {} },
+    connections: { byId: {}, allIds: [], bySourceId: {}, byTargetId: {}, byType: {} },
+    infoCards: { byId: {}, allIds: [], byPosition: {} },
+    lastUpdated: Date.now(),
+    version: 1,
+  } : undefined,
 };
 
 export const useCanvasStore = create<CanvasStoreState>()(
@@ -740,7 +765,56 @@ const buildCommitContext = (options?: CommitOptions): Record<string, unknown> | 
   return Object.keys(context).length ? context : undefined;
 };
 
+// Normalized data synchronization utilities
+const syncNormalizedData = (state: CanvasStoreState): void => {
+  if (!state._useNormalizedData) return;
+
+  const snapshot: CanvasDataSnapshot = {
+    components: state.components,
+    connections: state.connections,
+    infoCards: state.infoCards,
+  };
+
+  state._normalizedData = normalizeCanvasData(snapshot, {
+    generateIds: true,
+    preserveOrder: true,
+    gridSize: 100,
+  });
+
+  if (import.meta.env.DEV) {
+    console.debug('[CanvasStore] Normalized data synchronized', {
+      componentCount: state._normalizedData.components.allIds.length,
+      connectionCount: state._normalizedData.connections.allIds.length,
+      infoCardCount: state._normalizedData.infoCards.allIds.length,
+    });
+  }
+};
+
+const syncArrayDataFromNormalized = (state: CanvasStoreState): void => {
+  if (!state._useNormalizedData || !state._normalizedData) return;
+
+  const denormalized = denormalizeCanvasData(state._normalizedData);
+  state.components = denormalized.components;
+  state.connections = denormalized.connections;
+  state.infoCards = denormalized.infoCards;
+
+  if (import.meta.env.DEV) {
+    console.debug('[CanvasStore] Array data synchronized from normalized data', {
+      componentCount: state.components.length,
+      connectionCount: state.connections.length,
+      infoCardCount: state.infoCards.length,
+    });
+  }
+};
+
 const recordNoChange = (action: string, options?: CommitOptions) => {
+  if (import.meta.env.DEV) {
+    console.debug(`[CanvasStore] ${action}: No change detected - equality check prevented update`, {
+      action,
+      source: options?.source,
+      context: buildCommitContext(options),
+    });
+  }
   canvasStoreCircuitBreaker.record({
     action,
     changed: false,
@@ -760,6 +834,12 @@ const commitStateMutation = (
 
   useCanvasStore.setState(state => {
     mutator(state);
+
+    // Sync normalized data after mutation if enabled
+    if (state._useNormalizedData) {
+      syncNormalizedData(state);
+    }
+
     if (options?.markMetrics !== false) {
       state._lastUpdateTime = timestamp;
       state._updateCount += 1;
@@ -791,7 +871,7 @@ const replaceArrayState = <T>(
     return;
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     const actionTrace = createActionTrace(action, next, options?.source);
     debugLog(action, current, next, options?.source, { skipEqualityCheck: true, actionTrace });
     ensureSerializable(next, `${action}.payload`);
@@ -848,7 +928,7 @@ const conditionalSet = <K extends keyof CanvasStoreState>(
     return;
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     const actionTrace = createActionTrace(action, value, options?.source);
     debugLog(action, current, value, options?.source, { skipEqualityCheck: true, actionTrace });
     ensureSerializable(value, `${action}.value`);
@@ -963,7 +1043,7 @@ const applyCanvasData = (
         ...(options.context ?? {}),
       },
     });
-    if (process.env.NODE_ENV === 'development' && !options.silent) {
+    if (import.meta.env.DEV && !options.silent) {
       console.debug('[CanvasStore] updateCanvasData called but no changes detected');
     }
     return;
@@ -981,7 +1061,7 @@ const applyCanvasData = (
     }
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     for (const change of changes) {
       const actionTrace = createActionTrace(change.action, change.newValue, options.source);
       debugLog(change.action, change.oldValue, change.newValue, options.source, { skipEqualityCheck: true, actionTrace });
@@ -1165,7 +1245,7 @@ const mutableCanvasActions: CanvasActions = {
       immediate: options.immediate ?? true,
       validate: options.validate ?? true,
       silent: options.silent ?? false,
-      context: options.context,
+      context: options.context ?? {},
     } satisfies Required<UpdateCanvasDataOptions> & { source: string };
 
     if (!merged.immediate) {
@@ -1261,9 +1341,95 @@ export const useCanvasCanRedo = () => useCanvasStore.temporal.getState().futureS
 
 export const getCanvasState = () => useCanvasStore.getState();
 
+// Normalized data selectors
+export const useNormalizedCanvasData = () => {
+  return useCanvasStore(state => state._normalizedData);
+};
+
+export const useComponentsByType = (type: string) => {
+  return useCanvasStore(state => {
+    if (!state._useNormalizedData || !state._normalizedData) {
+      return state.components.filter(c => c.type === type);
+    }
+    return NormalizedDataSelectors.getComponentsByType(state._normalizedData.components, type);
+  });
+};
+
+export const useComponentsByLayer = (layerId: string) => {
+  return useCanvasStore(state => {
+    if (!state._useNormalizedData || !state._normalizedData) {
+      return state.components.filter(c => (c.layerId || 'default') === layerId);
+    }
+    return NormalizedDataSelectors.getComponentsByLayer(state._normalizedData.components, layerId);
+  });
+};
+
+export const useConnectionsForComponent = (componentId: string) => {
+  return useCanvasStore(state => {
+    if (!state._useNormalizedData || !state._normalizedData) {
+      const incoming = state.connections.filter(c => c.to === componentId);
+      const outgoing = state.connections.filter(c => c.from === componentId);
+      return { incoming, outgoing };
+    }
+    return NormalizedDataSelectors.getConnectionsForComponent(state._normalizedData.connections, componentId);
+  });
+};
+
+export const useInfoCardsInRegion = (x: number, y: number, width: number, height: number) => {
+  return useCanvasStore(state => {
+    if (!state._useNormalizedData || !state._normalizedData) {
+      return state.infoCards.filter(card =>
+        card.x >= x && card.x <= x + width &&
+        card.y >= y && card.y <= y + height
+      );
+    }
+    return NormalizedDataSelectors.getInfoCardsInRegion(
+      state._normalizedData.infoCards,
+      x, y, width, height
+    );
+  });
+};
+
+// Toggle normalized data mode (for development/testing)
+export const toggleNormalizedDataMode = () => {
+  useCanvasStore.setState(state => {
+    state._useNormalizedData = !state._useNormalizedData;
+
+    if (state._useNormalizedData) {
+      // Sync normalized data when enabling
+      syncNormalizedData(state);
+    } else {
+      // Clear normalized data when disabling
+      state._normalizedData = undefined;
+    }
+
+    if (import.meta.env.DEV) {
+      console.log(`[CanvasStore] Normalized data mode: ${state._useNormalizedData ? 'enabled' : 'disabled'}`);
+    }
+  });
+};
+
+// Development utilities
+if (import.meta.env.DEV) {
+  (window as any).__CANVAS_STORE_DEBUG__ = {
+    ...((window as any).__CANVAS_STORE_DEBUG__ || {}),
+    toggleNormalizedMode: toggleNormalizedDataMode,
+    getNormalizedData: () => useCanvasStore.getState()._normalizedData,
+    isNormalizedMode: () => useCanvasStore.getState()._useNormalizedData,
+    validateNormalizedIntegrity: () => {
+      const state = useCanvasStore.getState();
+      if (state._normalizedData) {
+        return NormalizedDataSelectors.validateIntegrity(state._normalizedData);
+      }
+      return { isValid: false, errors: ['Normalized data not available'] };
+    },
+  };
+}
+
 export const subscribeToCanvasCircuitBreaker = canvasStoreCircuitBreaker.subscribe.bind(
   canvasStoreCircuitBreaker
 );
+
 const generateOptimizationRecommendations = (action: string, traces: ActionTrace[]): string[] => {
   const recommendations: string[] = [];
 
@@ -1291,3 +1457,6 @@ const generateOptimizationRecommendations = (action: string, traces: ActionTrace
 };
 
 export const getCanvasCircuitBreakerSnapshot = () => canvasStoreCircuitBreaker.getSnapshot();
+
+// Export deepEqual function for use in other stores
+export { deepEqual };

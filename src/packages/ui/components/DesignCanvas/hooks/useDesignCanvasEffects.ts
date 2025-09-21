@@ -98,6 +98,17 @@ export function useDesignCanvasEffects({
         lastFlushReasonRef.current = reason;
 
         try {
+          if (import.meta.env.DEV) {
+            console.debug('[useDesignCanvasEffects] flushPendingDesign: Attempting to flush design data', {
+              reason,
+              pendingDataKeys: Object.keys(pending),
+              componentsCount: components.length,
+              connectionsCount: connections.length,
+              infoCardsCount: infoCards.length,
+              timestamp: Date.now(),
+            });
+          }
+
           actions.setDesignData(pending);
           void storage.setItem('archicomm-design', JSON.stringify(pending));
           RenderLoopDiagnostics.getInstance().recordDesignFlush({
@@ -106,6 +117,13 @@ export function useDesignCanvasEffects({
             pendingConnections: connections.length,
             pendingInfoCards: infoCards.length,
           });
+
+          if (import.meta.env.DEV) {
+            console.debug('[useDesignCanvasEffects] flushPendingDesign: Successfully flushed design data', {
+              reason,
+              result: 'success',
+            });
+          }
         } catch (error) {
           console.error('Failed to flush design data', { error, reason });
         } finally {
