@@ -5,8 +5,12 @@
 # ArchiComm Community Edition
 ### A desktop companion for learning and practicing system design
 
-<!-- Badges (simplified) -->
+<!-- Badges -->
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/0000/badge)](https://www.bestpractices.dev/projects/0000)
 [![Build Status](https://github.com/acailic/archi-comm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/acailic/archi-comm/actions/workflows/ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=acailic_archicomm)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=coverage)](https://sonarcloud.io/summary/new_code?id=acailic_archicomm)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=acailic_archicomm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 <img alt="Version" src="https://img.shields.io/badge/version-0.2.1-blue.svg">
 <img alt="Node >=18" src="https://img.shields.io/badge/node-%3E%3D18.0.0-339933?logo=nodedotjs&logoColor=white">

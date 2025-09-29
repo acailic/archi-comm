@@ -398,3 +398,4 @@ distribution/homebrew/
 tools/temp/
 tools/scratch/
 tools/local/
+.playwright-mcp/
