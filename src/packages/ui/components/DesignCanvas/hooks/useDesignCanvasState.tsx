@@ -7,6 +7,7 @@ import { DesignSerializer } from '@/lib/import-export/DesignSerializer';
 import type { CanvasConfig } from '@/lib/import-export/types';
 import type { DesignData } from '@/shared/contracts';
 import React, { useCallback, useMemo, useRef } from 'react';
+import { useGuardedState } from '@/lib/performance/useGuardedState';
 
 interface DesignCanvasStateProps {
   initialData: DesignData;
@@ -14,11 +15,20 @@ interface DesignCanvasStateProps {
 }
 
 export function useDesignCanvasState({ initialData, sessionStartTime }: DesignCanvasStateProps) {
-  // Local UI state (not shared in store)
-  const [showHints, setShowHints] = React.useState(false);
-  const [showCommandPalette, setShowCommandPalette] = React.useState(false);
-  const [showConfetti, setShowConfetti] = React.useState(false);
-  const [canvasConfig, setCanvasConfig] = React.useState<CanvasConfig>({
+  // Local UI state using guarded state for canvas operations (more conservative limits)
+  const [showHints, setShowHints] = useGuardedState(false, {
+    componentName: 'DesignCanvasState',
+    maxUpdatesPerTick: 10
+  });
+  const [showCommandPalette, setShowCommandPalette] = useGuardedState(false, {
+    componentName: 'DesignCanvasState',
+    maxUpdatesPerTick: 10
+  });
+  const [showConfetti, setShowConfetti] = useGuardedState(false, {
+    componentName: 'DesignCanvasState',
+    maxUpdatesPerTick: 10
+  });
+  const [canvasConfig, setCanvasConfig] = useGuardedState<CanvasConfig>({
     viewport: { x: 0, y: 0, zoom: 1 },
     gridConfig: {
       visible: true,
@@ -28,6 +38,12 @@ export function useDesignCanvasState({ initialData, sessionStartTime }: DesignCa
     },
     theme: 'light',
     virtualizationEnabled: false,
+  }, {
+    componentName: 'DesignCanvasState',
+    maxUpdatesPerTick: 10,
+    onTrip: (count) => {
+      console.warn(`DesignCanvasState canvasConfig throttled after ${count} updates`);
+    }
   });
 
   // Initialize design serializer with session timing

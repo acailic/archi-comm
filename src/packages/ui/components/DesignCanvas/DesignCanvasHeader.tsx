@@ -8,7 +8,7 @@ import { Button } from '@ui/components/ui/button';
 import type { CanvasConfig } from '@/lib/import-export/types';
 import type { Challenge, DesignData } from '@/shared/contracts';
 import { ArrowLeft, Lightbulb, Save, Search, Settings as SettingsIcon } from 'lucide-react';
-import React from 'react';
+
 
 interface DesignCanvasHeaderProps {
   challenge: Challenge;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Folder, File, Save, Download, Bell } from 'lucide-react';
 import { useIsTauri, useWindow, useNotification, useFile, useProject } from '@/lib/hooks/useTauri';
 import { Button } from '@ui/components/ui/button';

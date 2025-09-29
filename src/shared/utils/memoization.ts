@@ -7,11 +7,81 @@ import { shallow } from 'zustand/shallow';
 
 // Type-safe shallow comparison for React.memo
 export function shallowEqual<T extends Record<string, any>>(prev: T, next: T): boolean {
+  // Guard null/undefined
+  if (prev === next) return true;
+  if (prev == null || next == null) return prev === next;
   return shallow(prev, next);
 }
 
 // Specialized equality functions for different prop patterns
 export const equalityFunctions = {
+  // Generic shallow comparison across common value types
+  shallow: <T>(prev: T, next: T): boolean => {
+    if (prev === next) return true;
+    if (prev == null || next == null) return prev === next;
+    // Arrays: compare length + shallow items
+    if (Array.isArray(prev) && Array.isArray(next)) {
+      if (prev.length !== next.length) return false;
+      for (let i = 0; i < prev.length; i++) {
+        if (!shallow(prev[i] as any, next[i] as any)) return false;
+      }
+      return true;
+    }
+    if ((Array.isArray(prev) && !Array.isArray(next)) || (!Array.isArray(prev) && Array.isArray(next))) {
+      if (import.meta.env.DEV) {
+        console.warn('[memoization.shallow] Type mismatch: one value is array and the other is not');
+      }
+      return false;
+    }
+    // Objects
+    if (
+      typeof prev === 'object' && prev !== null &&
+      typeof next === 'object' && next !== null
+    ) {
+      return shallow(prev as any, next as any);
+    }
+    // Fallback to strict equality for primitives/functions
+    return prev === next;
+  },
+
+  // Deep comparison (dev-oriented, not optimized for cycles)
+  deep: <T>(prev: T, next: T): boolean => {
+    if (prev === next) return true;
+    if (prev == null || next == null) return prev === next;
+    try {
+      return JSON.stringify(prev) === JSON.stringify(next);
+    } catch {
+      // Fallback to shallow if serialization fails
+      return equalityFunctions.shallow(prev as any, next as any);
+    }
+  },
+
+  // Structural comparison suitable for large collections
+  structural: <T>(prev: T, next: T): boolean => {
+    if (prev === next) return true;
+    if (prev == null || next == null) return prev === next;
+    // Prefer array-length and key-count fast checks, then shallow
+    if (Array.isArray(prev) && Array.isArray(next)) {
+      return prev.length === next.length && equalityFunctions.shallow(prev as any, next as any);
+    }
+    if ((Array.isArray(prev) && !Array.isArray(next)) || (!Array.isArray(prev) && Array.isArray(next))) {
+      if (import.meta.env.DEV) {
+        console.warn('[memoization.structural] Type mismatch: one value is array and the other is not');
+      }
+      return false;
+    }
+    if (
+      typeof prev === 'object' && prev !== null &&
+      typeof next === 'object' && next !== null
+    ) {
+      const pk = Object.keys(prev as any);
+      const nk = Object.keys(next as any);
+      if (pk.length !== nk.length) return false;
+      return shallow(prev as any, next as any);
+    }
+    return prev === next;
+  },
+
   // For components with simple primitive props
   primitives: <T extends Record<string, string | number | boolean | null | undefined>>(
     prev: T,
@@ -67,7 +137,16 @@ export const equalityFunctions = {
 
   // For components with mixed prop types (most common)
   mixed: <T extends Record<string, any>>(prev: T, next: T): boolean => {
-    return shallow(prev, next);
+    if (prev === next) return true;
+    if (prev == null || next == null) return prev === next;
+    if (
+      typeof prev === 'object' && prev !== null &&
+      typeof next === 'object' && next !== null
+    ) {
+      return shallow(prev, next);
+    }
+    // For non-objects/primitives/functions
+    return prev === next;
   },
 
   // For components with specific ID-based props

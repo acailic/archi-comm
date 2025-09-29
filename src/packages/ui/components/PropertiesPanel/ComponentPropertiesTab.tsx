@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { motion } from 'framer-motion';
 import { Edit3, Eye, EyeOff, Info, Palette, Trash2 } from 'lucide-react';
 import type { DesignComponent } from '@/shared/contracts';

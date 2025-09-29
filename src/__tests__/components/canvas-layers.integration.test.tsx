@@ -546,7 +546,7 @@ describe('Canvas Layers Integration Tests', () => {
 
     it('circuit breaker cooldown period is respected', async () => {
       const detector = InfiniteLoopDetector.getInstance();
-      const componentName = 'ReactFlowCanvas.VirtualizationLayer';
+      const componentName = 'ReactFlowCanvas.CanvasLayer';
 
       // Trip the circuit breaker
       const now = Date.now();

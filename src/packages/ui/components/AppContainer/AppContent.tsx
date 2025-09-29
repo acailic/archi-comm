@@ -1,218 +1,237 @@
-import React, { Suspense, useEffect, useMemo, useCallback, useState, useRef } from 'react';
-import { isDevelopment } from '@/lib/config/environment';
-import { CommandPalette } from '@ui/components/CommandPalette';
-import { challengeManager } from '@/lib/config/challenge-config';
-import type { DesignData, AudioData } from '@/shared/contracts/index';
-import { useRecovery } from '@/lib/recovery/RecoveryContext';
-import { RecoveryOverlay } from '@ui/components/overlays/RecoveryOverlay';
-import { TooltipProvider } from '@ui/components/ui/tooltip';
-import { ScreenRouter } from './ScreenRouter';
-import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
-// Temporarily disabled complex state management to fix infinite loops
-// import { useUnifiedState } from '@/shared/hooks/useUnifiedState';
-// import { shallow } from 'zustand/shallow';
-// import { useAppVariant } from '@/shared/hooks/useAppVariant';
-// import { useLogger } from '@/shared/hooks/useLogger';
-// import type { AppState } from '@/stores/AppStore';
+// src/packages/ui/components/AppContainer/AppContent.tsx
+// Main application content component that handles routing and state management
+// Provides simplified state management without complex DI or recovery systems
+// RELEVANT FILES: src/packages/ui/components/AppContainer/ScreenRouter.tsx, src/lib/config/challenge-config.ts, src/packages/ui/components/CommandPalette.tsx, src/shared/contracts/index.ts
 
-// Simplified state management to fix infinite loops
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { challengeManager } from "../../../../lib/config/challenge-config";
+import { isDevelopment } from "../../../../lib/config/environment";
+import type {
+  AudioData,
+  Challenge,
+  DesignData,
+} from "../../../../shared/contracts/index";
+import { useAppStore, type AppState } from "../../../../stores/SimpleAppStore";
+import { CommandPalette } from "../CommandPalette";
+import { TooltipProvider } from "../ui/tooltip";
+import { ScreenRouter } from "./ScreenRouter";
+
 export function AppContent() {
-  // Infinite loop detection
-  const renderCountRef = useRef(0);
-  const lastRenderTime = useRef(Date.now());
-  const loopDetector = InfiniteLoopDetector.getInstance();
+  // Use a simple state object to avoid Zustand selector issues
+  const [appState, setAppState] = useState<AppState>({
+    selectedChallenge: null,
+    designData: null,
+    audioData: null,
+    phase: "challenge-selection",
+    availableChallenges: [],
+    showCommandPalette: false,
+    currentScreen: "challenge-selection",
+    showDevScenarios: false,
+    isDemoMode: false,
+    showWelcome: true,
+    isLoading: false,
+    error: null,
+  });
 
-  // Track renders for debugging
-  renderCountRef.current++;
-  const now = Date.now();
-  if (now - lastRenderTime.current < 100 && renderCountRef.current % 10 === 0) {
-    console.warn(`AppContent rendered ${renderCountRef.current} times in quick succession`);
-    loopDetector.notifyRenderLoop('AppContent', renderCountRef.current);
-  }
-  lastRenderTime.current = now;
+  // Subscribe to store changes with useEffect
+  useEffect(() => {
+    // Get initial state
+    const store = useAppStore.getState();
+    setAppState(store);
 
-  // Use simple local state instead of complex unified state
-  const [selectedChallenge, setSelectedChallenge] = useState(null);
-  const [designData, setDesignData] = useState(null);
-  const [audioData, setAudioData] = useState(null);
-  const [phase, setPhase] = useState('challenge-selection');
-  const [availableChallenges, setAvailableChallenges] = useState([]);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState('challenge-selection');
-  const [showDevScenarios, setShowDevScenarios] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+    // Subscribe to changes
+    const unsubscribe = useAppStore.subscribe((state: AppState) => {
+      setAppState(state);
+    });
 
-  // Simple actions object
-  const appActions = useMemo(() => ({
-    setSelectedChallenge,
-    setDesignData,
-    setAudioData,
-    setPhase,
-    setAvailableChallenges,
-    setShowCommandPalette,
-    setCurrentScreen,
-    setShowDevScenarios,
-    setIsDemoMode,
-    setShowWelcome,
-  }), []);
-
-  // Simple features object
-  const features = useMemo(() => ({
-    commandPalette: true,
-  }), []);
-
-  // Recovery system integration
-  const recovery = useRecovery();
-
-  // Stable navigation handlers with proper memoization
-  const handleChallengeSelect = useCallback((challenge) => {
-    setSelectedChallenge(challenge);
-    setCurrentScreen('design-canvas');
-    setPhase('design');
+    return unsubscribe;
   }, []);
 
-  const handleOpenCommandPalette = useCallback(() => setShowCommandPalette(true), []);
-  const handlePaletteClose = useCallback(() => setShowCommandPalette(false), []);
+  // Extract state for cleaner code
+  const {
+    selectedChallenge,
+    phase,
+    currentScreen,
+    showCommandPalette,
+    availableChallenges,
+    designData,
+    audioData,
+    showDevScenarios,
+
+    showWelcome,
+  } = appState;
+
+  // Get actions directly from store without hooks
+  const store = useAppStore.getState();
+  const {
+    setSelectedChallenge,
+    setPhase,
+    setCurrentScreen,
+    setShowCommandPalette,
+    setDesignData,
+    setAudioData,
+    setAvailableChallenges,
+    setShowDevScenarios,
+
+    setShowWelcome,
+    resetAll,
+  } = store;
+
+  // Simple features object
+  const features = useMemo(
+    () => ({
+      commandPalette: true,
+    }),
+    []
+  );
+
+  // Stable navigation handlers with proper memoization
+  const handleChallengeSelect = useCallback(
+    (challenge: Challenge) => {
+      setSelectedChallenge(challenge);
+      setCurrentScreen("design-canvas");
+      setPhase("design");
+    },
+    [setSelectedChallenge, setCurrentScreen, setPhase]
+  );
+
+  const handleOpenCommandPalette = useCallback(
+    () => setShowCommandPalette(true),
+    [setShowCommandPalette]
+  );
+  const handlePaletteClose = useCallback(
+    () => setShowCommandPalette(false),
+    [setShowCommandPalette]
+  );
   const handleNavigateToScreenShortcut = useCallback(() => {}, []);
   const handleNavigateFromPalette = useCallback(() => {}, []);
 
   const handleBackFromAudio = useCallback(() => {
-    setCurrentScreen('design-canvas');
-    setPhase('design');
-  }, []);
+    setCurrentScreen("design-canvas");
+    setPhase("design");
+  }, [setCurrentScreen, setPhase]);
 
   const handleStartOver = useCallback(() => {
-    setCurrentScreen('challenge-selection');
-    setPhase('challenge-selection');
-    setSelectedChallenge(null);
-    setDesignData(null);
-    setAudioData(null);
-  }, []);
+    resetAll();
+    setCurrentScreen("challenge-selection");
+    setPhase("challenge-selection");
+  }, [resetAll, setCurrentScreen, setPhase]);
 
   const handleBackToDesign = useCallback(() => {
-    setCurrentScreen('design-canvas');
-    setPhase('design');
-  }, []);
+    setCurrentScreen("design-canvas");
+    setPhase("design");
+  }, [setCurrentScreen, setPhase]);
 
   const handleBackToAudio = useCallback(() => {
-    setCurrentScreen('audio-recording');
-    setPhase('audio-recording');
-  }, []);
+    setCurrentScreen("audio-recording");
+    setPhase("recording");
+  }, [setCurrentScreen, setPhase]);
 
   const handleConfigBack = useCallback(() => {
-    setCurrentScreen('challenge-selection');
-    setPhase('challenge-selection');
-  }, []);
+    setCurrentScreen("challenge-selection");
+    setPhase("challenge-selection");
+  }, [setCurrentScreen, setPhase]);
 
   const handleBackToSelection = useCallback(() => {
-    setCurrentScreen('challenge-selection');
-    setPhase('challenge-selection');
-  }, []);
+    setCurrentScreen("challenge-selection");
+    setPhase("challenge-selection");
+  }, [setCurrentScreen, setPhase]);
 
-  const handleWelcomeComplete = useCallback(() => setShowWelcome(false), []);
+  const handleWelcomeComplete = useCallback(
+    () => setShowWelcome(false),
+    [setShowWelcome]
+  );
 
   // Group navigation handlers into a stable object
-  const navigation = useMemo(() => ({
-    handleChallengeSelect,
-    handleOpenCommandPalette,
-    handlePaletteClose,
-    handleNavigateToScreenShortcut,
-    handleNavigateFromPalette,
-    handleBackFromAudio,
-    handleStartOver,
-    handleBackToDesign,
-    handleBackToAudio,
-    handleConfigBack,
-    handleBackToSelection,
-    handleWelcomeComplete,
-  }), [
-    handleChallengeSelect,
-    handleOpenCommandPalette,
-    handlePaletteClose,
-    handleNavigateToScreenShortcut,
-    handleNavigateFromPalette,
-    handleBackFromAudio,
-    handleStartOver,
-    handleBackToDesign,
-    handleBackToAudio,
-    handleConfigBack,
-    handleBackToSelection,
-    handleWelcomeComplete,
-  ]);
+  const navigation = useMemo(
+    () => ({
+      handleChallengeSelect,
+      handleOpenCommandPalette,
+      handlePaletteClose,
+      handleNavigateToScreenShortcut,
+      handleNavigateFromPalette,
+      handleBackFromAudio,
+      handleStartOver,
+      handleBackToDesign,
+      handleBackToAudio,
+      handleConfigBack,
+      handleBackToSelection,
+      handleWelcomeComplete,
+    }),
+    [
+      handleChallengeSelect,
+      handleOpenCommandPalette,
+      handlePaletteClose,
+      handleNavigateToScreenShortcut,
+      handleNavigateFromPalette,
+      handleBackFromAudio,
+      handleStartOver,
+      handleBackToDesign,
+      handleBackToAudio,
+      handleConfigBack,
+      handleBackToSelection,
+      handleWelcomeComplete,
+    ]
+  );
 
   useEffect(() => {
     try {
       setAvailableChallenges(challengeManager.getAllChallenges());
     } catch (error) {
-      console.error('Failed to load challenges', error);
+      console.error("Failed to load challenges", error);
     }
-  }, []); // Empty dependency array - this should only run once
+  }, []); // No dependencies - load challenges only once on mount
 
   // Check for development scenario viewer route
   useEffect(() => {
     if (!isDevelopment()) return;
 
     const checkDevRoute = () => {
-      const pathname = window.location.pathname || '';
-      setShowDevScenarios(pathname.includes('/dev/scenarios'));
+      const pathname = window.location.pathname || "";
+      setShowDevScenarios(pathname.includes("/dev/scenarios"));
     };
 
     checkDevRoute();
 
     // Listen for navigation changes
-    window.addEventListener('popstate', checkDevRoute);
-    return () => window.removeEventListener('popstate', checkDevRoute);
-  }, []); // Empty dependency array - this should only run once
+    window.addEventListener("popstate", checkDevRoute);
+    return () => window.removeEventListener("popstate", checkDevRoute);
+  }, [setShowDevScenarios]); // Depend on the action
 
-  const handleComplete = useCallback((data: DesignData) => {
-    setDesignData(data);
-    setPhase('audio-recording');
-    setCurrentScreen('audio-recording');
-  }, []);
+  const handleComplete = useCallback(
+    (data: DesignData) => {
+      setDesignData(data);
+      setPhase("recording");
+      setCurrentScreen("audio-recording");
+    },
+    [setDesignData, setPhase, setCurrentScreen]
+  );
 
-  const handleAudioComplete = useCallback((data: AudioData) => {
-    setAudioData(data);
-    setPhase('review');
-    setCurrentScreen('review');
-  }, []);
+  const handleAudioComplete = useCallback(
+    (data: AudioData) => {
+      setAudioData(data);
+      setPhase("review");
+      setCurrentScreen("review");
+    },
+    [setAudioData, setPhase, setCurrentScreen]
+  );
 
   // Simplified keyboard shortcuts for command palette
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && showCommandPalette) {
-      setShowCommandPalette(false);
-    }
-  }, [showCommandPalette]);
-
   useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showCommandPalette) {
+        setShowCommandPalette(false);
+      }
+    };
 
-  const recoveryRetryHandler = React.useMemo<(() => void) | undefined>(() => {
-    if (recovery.lastRecoveryResult && !recovery.lastRecoveryResult.success) {
-      return () => {
-        const retryError = {
-          id: `retry_${Date.now()}`,
-          message: 'Manual retry requested',
-          category: 'unknown' as const,
-          severity: 'high' as const,
-          timestamp: Date.now(),
-          count: 1,
-          resolved: false,
-          context: { userActions: ['Manual retry'], additionalData: { retry: true } },
-          hash: `retry_${Date.now()}`,
-        };
-        recovery.triggerRecovery(retryError);
-      };
-    }
-    return undefined;
-  }, [recovery.lastRecoveryResult]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showCommandPalette, setShowCommandPalette]);
 
   return (
     <TooltipProvider>
-      <div className='w-full h-full'>
-        <Suspense fallback={<div className='p-4'>Loading…</div>}>
+      <div className="w-full h-full">
+        <Suspense fallback={<div className="p-4">Loading…</div>}>
           <ScreenRouter
             showDevScenarios={showDevScenarios}
             showWelcome={showWelcome}
@@ -242,23 +261,13 @@ export function AppContent() {
           <CommandPalette
             isOpen={showCommandPalette}
             onClose={navigation.handlePaletteClose}
-            currentScreen={selectedChallenge ? currentScreen : 'challenge-selection'}
+            currentScreen={
+              selectedChallenge ? currentScreen : "challenge-selection"
+            }
             onNavigate={navigation.handleNavigateFromPalette}
             selectedChallenge={selectedChallenge}
           />
         )}
-
-        {/* Recovery Overlay */}
-        <RecoveryOverlay
-          isVisible={recovery.showRecoveryUI}
-          recoveryProgress={recovery.recoveryProgress}
-          recoveryResult={recovery.lastRecoveryResult}
-          onCancel={recovery.cancelRecovery}
-          onDismiss={recovery.dismissRecovery}
-          onRetry={recoveryRetryHandler}
-        />
-
-        {/* diagnostics UI removed */}
       </div>
     </TooltipProvider>
   );

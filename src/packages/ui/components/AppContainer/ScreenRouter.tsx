@@ -1,14 +1,18 @@
-import React, { useMemo } from 'react';
-import { isDevelopment } from '@/lib/config/environment';
-import { ChallengeSelection } from '@ui/components/ChallengeSelection';
-import { DesignCanvas } from '@ui/components/DesignCanvas';
-import { AudioRecording } from '@ui/components/AudioRecording';
-import { ReviewScreen } from '@ui/components/pages/ReviewScreen';
-import { WelcomeOverlay } from '@ui/components/overlays/WelcomeOverlay';
-import { ConfigPage } from '@ui/components/pages/ConfigPage';
-import { ScenarioViewer } from '@/dev';
-import { InfiniteLoopErrorBoundary } from './InfiniteLoopErrorBoundary';
-import type { Challenge, DesignData, AudioData } from '@/shared/contracts/index';
+import { useMemo } from "react";
+import { ScenarioViewer } from "../../../../dev";
+import { isDevelopment } from "../../../../lib/config/environment";
+import type {
+  AudioData,
+  Challenge,
+  DesignData,
+} from "../../../../shared/contracts/index";
+import { AudioRecording } from "../AudioRecording";
+import { ChallengeSelection } from "../ChallengeSelection";
+import { DesignCanvas } from "../DesignCanvas";
+import { WelcomeOverlay } from "../overlays/WelcomeOverlay";
+import { ConfigPage } from "../pages/ConfigPage";
+import { ReviewScreen } from "../pages/ReviewScreen";
+import { InfiniteLoopErrorBoundary } from "./InfiniteLoopErrorBoundary";
 
 interface ScreenRouterProps {
   showDevScenarios: boolean;
@@ -74,7 +78,7 @@ export function ScreenRouter({
     );
   }
 
-  if (phase === 'audio-recording') {
+  if (phase === "audio-recording") {
     return (
       <AudioRecording
         challenge={selectedChallenge}
@@ -85,7 +89,7 @@ export function ScreenRouter({
     );
   }
 
-  if (phase === 'review' && audioData) {
+  if (phase === "review" && audioData) {
     return (
       <ReviewScreen
         challenge={selectedChallenge}
@@ -99,22 +103,22 @@ export function ScreenRouter({
   }
 
   // Show config page if requested
-  if (currentScreen === 'config') {
-    return (
-      <ConfigPage onBack={onConfigBack} />
-    );
+  if (currentScreen === "config") {
+    return <ConfigPage onBack={onConfigBack} />;
   }
 
   // Default to design canvas with memoized initialData
   const memoizedDesignData = useMemo(() => {
-    return designData || {
-      schemaVersion: 1,
-      components: [],
-      connections: [],
-      infoCards: [],
-      layers: [],
-      metadata: { version: '1.0' }
-    };
+    return (
+      designData || {
+        schemaVersion: 1,
+        components: [],
+        connections: [],
+        infoCards: [],
+        layers: [],
+        metadata: { version: "1.0" },
+      }
+    );
   }, [designData]);
 
   return (

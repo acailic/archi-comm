@@ -149,7 +149,7 @@ export const ContextualHelpSystem: React.FC<ContextualHelpSystemProps> = ({ clas
 
   // Keyboard navigation
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if (!helpState.isVisible) return;
 
       switch (event.key) {

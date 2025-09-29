@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Activity, Zap, Clock } from 'lucide-react';
 import type { DesignComponent, Connection, InfoCard, DesignData } from '@shared/contracts';
 import LearningBreadcrumbs from '@ui/components/LearningBreadcrumbs';
-import type { StoreCircuitBreakerSnapshot } from '@/lib/performance/StoreCircuitBreaker';
-import { equalityFunctions } from '@/shared/utils/memoization';
+import type { CanvasRateLimiterSnapshot } from '@/stores/canvasStore';
+import { shallow } from 'zustand/shallow';
 
 interface StatusBarProps {
   components: DesignComponent[];
@@ -13,7 +13,7 @@ interface StatusBarProps {
   selectedComponentId: string | null;
   sessionStartTime: Date;
   currentDesignData: DesignData;
-  storeCircuitBreakerSnapshot?: StoreCircuitBreakerSnapshot | null;
+  storeCircuitBreakerSnapshot?: CanvasRateLimiterSnapshot | null;
 }
 
 const StatusBarClock = React.memo<{ sessionStartTime: Date }>(({ sessionStartTime }) => {
@@ -114,7 +114,7 @@ const statusBarPropsEqual = (prev: StatusBarProps, next: StatusBarProps): boolea
   }
 
   // Shallow comparison for currentDesignData
-  return equalityFunctions.mixed(prev.currentDesignData, next.currentDesignData);
+  return shallow(prev.currentDesignData, next.currentDesignData);
 };
 
 export const StatusBar = React.memo(StatusBarComponent, statusBarPropsEqual);

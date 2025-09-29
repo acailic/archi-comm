@@ -276,8 +276,15 @@ export function useStableLiterals<T extends {
   actions?: Record<string, Record<string, Function>>;
 }>(
   literals: T,
-  deps: React.DependencyList
+  deps?: React.DependencyList
 ): T {
+  // Guard: ensure dependency list is always iterable
+  const depsArr = Array.isArray(deps) ? deps : [];
+  if (import.meta.env?.DEV && deps !== undefined && !Array.isArray(deps)) {
+    // eslint-disable-next-line no-console
+    console.warn('[useStableLiterals] Expected deps to be an array. Received:', deps);
+  }
+
   const stableStyles = useMemo(() => {
     if (!literals.styles) return undefined;
     return Object.fromEntries(
@@ -286,7 +293,7 @@ export function useStableLiterals<T extends {
         typeof style === 'function' ? style() : style
       ])
     );
-  }, [literals.styles, ...deps]);
+  }, [literals.styles, depsArr]);
 
   const stableClasses = useMemo(() => {
     if (!literals.classes) return undefined;
@@ -296,7 +303,7 @@ export function useStableLiterals<T extends {
         typeof className === 'function' ? className() : className
       ])
     );
-  }, [literals.classes, ...deps]);
+  }, [literals.classes, depsArr]);
 
   const stableConfigs = useMemo(() => {
     if (!literals.configs) return undefined;
@@ -306,7 +313,7 @@ export function useStableLiterals<T extends {
         typeof config === 'function' ? config() : config
       ])
     );
-  }, [literals.configs, ...deps]);
+  }, [literals.configs, depsArr]);
 
   const stableArrays = useMemo(() => {
     if (!literals.arrays) return undefined;
@@ -316,7 +323,7 @@ export function useStableLiterals<T extends {
         typeof array === 'function' ? array() : array
       ])
     );
-  }, [literals.arrays, ...deps]);
+  }, [literals.arrays, depsArr]);
 
   const stableActions = useMemo(() => {
     if (!literals.actions) return undefined;
@@ -326,7 +333,7 @@ export function useStableLiterals<T extends {
         typeof actions === 'function' ? actions() : actions
       ])
     );
-  }, [literals.actions, ...deps]);
+  }, [literals.actions, depsArr]);
 
   return useMemo(() => ({
     ...literals,

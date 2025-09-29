@@ -6,8 +6,6 @@
 
 import React, { useMemo, useCallback, useRef, useState } from 'react';
 import { useListVirtualization } from '@/shared/hooks/useVirtualization';
-import { useSmartMemo } from '@/shared/hooks/performance/useSmartMemo';
-import { useStableContracts } from '@/shared/hooks/performance/useStableContracts';
 import { componentOptimizer } from '@/lib/performance/ComponentOptimizer';
 import { reactProfilerIntegration } from '@/lib/performance/ReactProfilerIntegration';
 
@@ -62,15 +60,13 @@ const ComponentPaletteItemRenderer: React.FC<{
     onDragStart(component, event);
   }, [component, onDragStart]);
 
-  const stableProps = useStableContracts({
+  const stableProps = useMemo(() => ({
     component,
     style,
     isSelected,
     onSelect,
     onDragStart,
-  }, {
-    componentName: 'ComponentPaletteItemRenderer',
-  });
+  }), [component, style, isSelected, onSelect, onDragStart]);
 
   return (
     <div
@@ -143,7 +139,7 @@ export const VirtualizedComponentPalette: React.FC<VirtualizedComponentPalettePr
   const [scrollTop, setScrollTop] = useState(0);
 
   // Filter and search components
-  const filteredComponents = useSmartMemo(() => {
+  const filteredComponents = useMemo(() => {
     let filtered = components;
 
     // Apply search filter
@@ -163,13 +159,10 @@ export const VirtualizedComponentPalette: React.FC<VirtualizedComponentPalettePr
     }
 
     return filtered;
-  }, [components, searchQuery, categoryFilter], {
-    componentName: 'VirtualizedComponentPalette',
-    strategy: 'mixed',
-  });
+  }, [components, searchQuery, categoryFilter]);
 
   // Group components by category if needed
-  const groupedComponents = useSmartMemo(() => {
+  const groupedComponents = useMemo(() => {
     if (!groupByCategory) {
       return null;
     }
@@ -198,13 +191,10 @@ export const VirtualizedComponentPalette: React.FC<VirtualizedComponentPalettePr
     });
 
     return result;
-  }, [filteredComponents, groupByCategory], {
-    componentName: 'VirtualizedComponentPalette',
-    strategy: 'deep',
-  });
+  }, [filteredComponents, groupByCategory]);
 
   // Create flat list for virtualization (including headers if grouped)
-  const flattenedItems = useSmartMemo(() => {
+  const flattenedItems = useMemo(() => {
     if (!groupByCategory || !groupedComponents) {
       return filteredComponents.map((component, index) => ({
         type: 'component' as const,
@@ -242,10 +232,7 @@ export const VirtualizedComponentPalette: React.FC<VirtualizedComponentPalettePr
     });
 
     return items;
-  }, [filteredComponents, groupedComponents, groupByCategory], {
-    componentName: 'VirtualizedComponentPalette',
-    strategy: 'deep',
-  });
+  }, [filteredComponents, groupedComponents, groupByCategory]);
 
   // Determine if virtualization should be enabled
   const shouldVirtualize = enableVirtualization && flattenedItems.length > virtualizationThreshold;
@@ -273,12 +260,10 @@ export const VirtualizedComponentPalette: React.FC<VirtualizedComponentPalettePr
   );
 
   // Stable callback handlers
-  const stableCallbacks = useStableContracts({
+  const stableCallbacks = useMemo(() => ({
     onComponentSelect: onComponentSelect || (() => {}),
     onComponentDragStart: onComponentDragStart || (() => {}),
-  }, {
-    componentName: 'VirtualizedComponentPalette',
-  });
+  }), [onComponentSelect, onComponentDragStart]);
 
   // Scroll event handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {

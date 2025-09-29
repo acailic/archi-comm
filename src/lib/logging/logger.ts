@@ -38,7 +38,7 @@ export function safeStringify(value: unknown, space?: number): string {
     }
   }
 }
-import { PerformanceMonitor } from '@lib/performance/PerformanceOptimizer';
+import { PerformanceMonitor } from '@lib/performance/PerformanceMonitor';
 
 // Log levels with numeric values for filtering
 export enum LogLevel {

@@ -1,16 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ReactFlow, ReactFlowProvider, Background, Controls, MiniMap } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { DesignComponent, Connection, InfoCard } from '../../../types';
-import { CanvasController } from './CanvasController';
-import { NodeLayer } from './NodeLayer';
-import { EdgeLayer } from './EdgeLayer';
-import { LayoutEngine } from './LayoutEngine';
-import { VirtualizationLayer } from './VirtualizationLayer';
-import { CanvasInteractionLayer } from './CanvasInteractionLayer';
-import { EnhancedErrorBoundary } from '@ui/components/ErrorBoundary/EnhancedErrorBoundary';
-import { useAnnouncer } from '@/shared/hooks/useAccessibility';
-import { equalityFunctions } from '@/shared/utils/memoization';
+import { useAnnouncer } from "@/shared/hooks/useAccessibility";
+import { equalityFunctions } from "@/shared/utils/memoization";
+import { EnhancedErrorBoundary } from "@ui/components/ErrorBoundary/EnhancedErrorBoundary";
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  ReactFlowProvider,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { Connection, DesignComponent, InfoCard } from "../../../types";
+import { CanvasController } from "./CanvasController";
+import { CanvasInteractionLayer } from "./CanvasInteractionLayer";
+import { EdgeLayer } from "./EdgeLayer";
+import { LayoutEngine } from "./LayoutEngine";
+import { NodeLayer } from "./NodeLayer";
 
 export interface ReactFlowCanvasWrapperProps {
   components: DesignComponent[];
@@ -29,8 +35,14 @@ export interface ReactFlowCanvasWrapperProps {
   showMiniMap?: boolean;
   onComponentSelect: (componentId: string) => void;
   onComponentDeselect: () => void;
-  onComponentDrop: (component: DesignComponent, position: { x: number; y: number }) => void;
-  onComponentPositionChange: (componentId: string, position: { x: number; y: number }) => void;
+  onComponentDrop: (
+    component: DesignComponent,
+    position: { x: number; y: number }
+  ) => void;
+  onComponentPositionChange: (
+    componentId: string,
+    position: { x: number; y: number }
+  ) => void;
   onComponentDelete: (componentId: string) => void;
   onConnectionCreate: (connection: Connection) => void;
   onConnectionDelete: (connectionId: string) => void;
@@ -41,7 +53,9 @@ export interface ReactFlowCanvasWrapperProps {
   onInfoCardSelect?: (infoCardId: string) => void;
 }
 
-const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = ({
+const ReactFlowCanvasWrapperComponent: React.FC<
+  ReactFlowCanvasWrapperProps
+> = ({
   components,
   connections,
   infoCards = [],
@@ -76,7 +90,7 @@ const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = (
   const canvasLabel = useMemo(() => {
     const componentCount = components.length;
     const connectionCount = connections.length;
-    return `Design canvas with ${componentCount} component${componentCount === 1 ? '' : 's'} and ${connectionCount} connection${connectionCount === 1 ? '' : 's'}`;
+    return `Design canvas with ${componentCount} component${componentCount === 1 ? "" : "s"} and ${connectionCount} connection${connectionCount === 1 ? "" : "s"}`;
   }, [components.length, connections.length]);
 
   useEffect(() => {
@@ -90,9 +104,13 @@ const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = (
     if (!selectedComponentId) {
       return;
     }
-    const selectedComponent = components.find((component) => component.id === selectedComponentId);
+    const selectedComponent = components.find(
+      (component) => component.id === selectedComponentId
+    );
     if (selectedComponent) {
-      announce(`Component ${selectedComponent.label ?? selectedComponent.id} selected`);
+      announce(
+        `Component ${selectedComponent.label ?? selectedComponent.id} selected`
+      );
     }
   }, [announce, components, selectedComponentId]);
 
@@ -100,9 +118,13 @@ const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = (
     if (!selectedConnectionId) {
       return;
     }
-    const connection = connections.find((item) => item.id === selectedConnectionId);
+    const connection = connections.find(
+      (item) => item.id === selectedConnectionId
+    );
     if (connection) {
-      announce(`Connection from ${connection.source} to ${connection.target} selected`);
+      announce(
+        `Connection from ${connection.source} to ${connection.target} selected`
+      );
     }
   }, [announce, connections, selectedConnectionId]);
 
@@ -112,20 +134,29 @@ const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = (
         return;
       }
 
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      if (
+        event.key === "ArrowRight" ||
+        event.key === "ArrowDown" ||
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowUp"
+      ) {
         event.preventDefault();
-        const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+        const direction =
+          event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
         const currentIndex = selectedComponentId
-          ? components.findIndex((component) => component.id === selectedComponentId)
+          ? components.findIndex(
+              (component) => component.id === selectedComponentId
+            )
           : -1;
-        const nextIndex = (currentIndex + direction + components.length) % components.length;
+        const nextIndex =
+          (currentIndex + direction + components.length) % components.length;
         const nextComponent = components[nextIndex];
         if (nextComponent) {
           onComponentSelect(nextComponent.id);
         }
       }
 
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         onComponentDeselect();
       }
@@ -161,31 +192,38 @@ const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = (
           <NodeLayer components={components} infoCards={infoCards}>
             <EnhancedErrorBoundary boundaryId="canvas-edge-layer">
               <EdgeLayer connections={connections}>
-                <EnhancedErrorBoundary boundaryId="canvas-virtualization-layer">
-                  <VirtualizationLayer nodes={[]} edges={[]}>
-                    <EnhancedErrorBoundary boundaryId="canvas-interaction-layer">
-                      <CanvasInteractionLayer
-                        enableDragDrop={enableDragDrop}
-                        enableContextMenu={enableContextMenu}
-                        enableKeyboardShortcuts={enableKeyboardShortcuts}
+                <EnhancedErrorBoundary boundaryId="canvas-interaction-layer">
+                  <CanvasInteractionLayer
+                    enableDragDrop={enableDragDrop}
+                    enableContextMenu={enableContextMenu}
+                    enableKeyboardShortcuts={enableKeyboardShortcuts}
+                  >
+                    <div
+                      ref={canvasContainerRef}
+                      role="application"
+                      aria-label={canvasLabel}
+                      tabIndex={0}
+                      className="react-flow-accessible-container focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-background"
+                      onKeyDown={handleKeyboardNavigation}
+                    >
+                      <ReactFlow
+                        fitView
+                        attributionPosition="bottom-left"
+                        className="react-flow-canvas"
                       >
-                        <div
-                          ref={canvasContainerRef}
-                          role="application"
-                          aria-label={canvasLabel}
-                          tabIndex={0}
-                          className="react-flow-accessible-container focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-background"
-                          onKeyDown={handleKeyboardNavigation}
-                        >
-                          <ReactFlow fitView attributionPosition="bottom-left" className="react-flow-canvas">
-                            {showBackground && <Background />}
-                            {showControls && <Controls />}
-                            {showMiniMap && <MiniMap />}
-                          </ReactFlow>
-                        </div>
-                      </CanvasInteractionLayer>
-                    </EnhancedErrorBoundary>
-                  </VirtualizationLayer>
+                        {showBackground && (
+                          <Background
+                            color="#d1d5db"
+                            gap={20}
+                            size={2}
+                            variant={BackgroundVariant.Dots}
+                          />
+                        )}
+                        {showControls && <Controls />}
+                        {showMiniMap && <MiniMap />}
+                      </ReactFlow>
+                    </div>
+                  </CanvasInteractionLayer>
                 </EnhancedErrorBoundary>
               </EdgeLayer>
             </EnhancedErrorBoundary>
@@ -203,59 +241,76 @@ const ReactFlowCanvasWrapperComponent: React.FC<ReactFlowCanvasWrapperProps> = (
 };
 
 // Optimized equality function for ReactFlowCanvasWrapper props
-const reactFlowCanvasPropsEqual = (prev: ReactFlowCanvasWrapperProps, next: ReactFlowCanvasWrapperProps): boolean => {
+const reactFlowCanvasPropsEqual = (
+  prev: ReactFlowCanvasWrapperProps,
+  next: ReactFlowCanvasWrapperProps
+): boolean => {
   // Fast path: check array lengths first
-  if (prev.components.length !== next.components.length ||
-      prev.connections.length !== next.connections.length ||
-      (prev.infoCards?.length ?? 0) !== (next.infoCards?.length ?? 0)) {
+  if (
+    prev.components.length !== next.components.length ||
+    prev.connections.length !== next.connections.length ||
+    (prev.infoCards?.length ?? 0) !== (next.infoCards?.length ?? 0)
+  ) {
     return false;
   }
 
   // Check selected IDs
-  if (prev.selectedComponentId !== next.selectedComponentId ||
-      prev.selectedConnectionId !== next.selectedConnectionId ||
-      prev.selectedInfoCardId !== next.selectedInfoCardId) {
+  if (
+    prev.selectedComponentId !== next.selectedComponentId ||
+    prev.selectedConnectionId !== next.selectedConnectionId ||
+    prev.selectedInfoCardId !== next.selectedInfoCardId
+  ) {
     return false;
   }
 
   // Check boolean flags
-  if (prev.enableAutoLayout !== next.enableAutoLayout ||
-      prev.virtualizationEnabled !== next.virtualizationEnabled ||
-      prev.enableDragDrop !== next.enableDragDrop ||
-      prev.enableContextMenu !== next.enableContextMenu ||
-      prev.enableKeyboardShortcuts !== next.enableKeyboardShortcuts ||
-      prev.showBackground !== next.showBackground ||
-      prev.showControls !== next.showControls ||
-      prev.showMiniMap !== next.showMiniMap) {
+  if (
+    prev.enableAutoLayout !== next.enableAutoLayout ||
+    prev.virtualizationEnabled !== next.virtualizationEnabled ||
+    prev.enableDragDrop !== next.enableDragDrop ||
+    prev.enableContextMenu !== next.enableContextMenu ||
+    prev.enableKeyboardShortcuts !== next.enableKeyboardShortcuts ||
+    prev.showBackground !== next.showBackground ||
+    prev.showControls !== next.showControls ||
+    prev.showMiniMap !== next.showMiniMap
+  ) {
     return false;
   }
 
   // Check callback references (assume they're stable)
-  if (prev.onComponentSelect !== next.onComponentSelect ||
-      prev.onComponentDeselect !== next.onComponentDeselect ||
-      prev.onComponentDrop !== next.onComponentDrop ||
-      prev.onComponentPositionChange !== next.onComponentPositionChange ||
-      prev.onComponentDelete !== next.onComponentDelete ||
-      prev.onConnectionCreate !== next.onConnectionCreate ||
-      prev.onConnectionDelete !== next.onConnectionDelete ||
-      prev.onConnectionSelect !== next.onConnectionSelect ||
-      prev.onInfoCardCreate !== next.onInfoCardCreate ||
-      prev.onInfoCardUpdate !== next.onInfoCardUpdate ||
-      prev.onInfoCardDelete !== next.onInfoCardDelete ||
-      prev.onInfoCardSelect !== next.onInfoCardSelect) {
+  if (
+    prev.onComponentSelect !== next.onComponentSelect ||
+    prev.onComponentDeselect !== next.onComponentDeselect ||
+    prev.onComponentDrop !== next.onComponentDrop ||
+    prev.onComponentPositionChange !== next.onComponentPositionChange ||
+    prev.onComponentDelete !== next.onComponentDelete ||
+    prev.onConnectionCreate !== next.onConnectionCreate ||
+    prev.onConnectionDelete !== next.onConnectionDelete ||
+    prev.onConnectionSelect !== next.onConnectionSelect ||
+    prev.onInfoCardCreate !== next.onInfoCardCreate ||
+    prev.onInfoCardUpdate !== next.onInfoCardUpdate ||
+    prev.onInfoCardDelete !== next.onInfoCardDelete ||
+    prev.onInfoCardSelect !== next.onInfoCardSelect
+  ) {
     return false;
   }
 
   // Use arrays equality function for deep comparison
-  return equalityFunctions.arrays({
-    components: prev.components,
-    connections: prev.connections,
-    infoCards: prev.infoCards
-  }, {
-    components: next.components,
-    connections: next.connections,
-    infoCards: next.infoCards
-  });
+  return equalityFunctions.arrays(
+    {
+      components: prev.components,
+      connections: prev.connections,
+      infoCards: prev.infoCards,
+    },
+    {
+      components: next.components,
+      connections: next.connections,
+      infoCards: next.infoCards,
+    }
+  );
 };
 
-export const ReactFlowCanvasWrapper = React.memo(ReactFlowCanvasWrapperComponent, reactFlowCanvasPropsEqual);
+export const ReactFlowCanvasWrapper = React.memo(
+  ReactFlowCanvasWrapperComponent,
+  reactFlowCanvasPropsEqual
+);

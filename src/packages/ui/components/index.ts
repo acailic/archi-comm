@@ -39,7 +39,6 @@ export * from './panels/LeetCodeStylePanel';
 export * from './canvas/Minimap';
 export * from './overlays/OnboardingOverlay';
 export { default as OnboardingOverlay } from './overlays/OnboardingOverlay';
-export * from './PerformanceDashboard';
 export * from './pages/ProVersionPage';
 export { default as ProVersionPage } from './pages/ProVersionPage';
 export * from './PropertiesPanel';

@@ -3,8 +3,6 @@ export { default as useCanvasIntegration } from './canvas/useCanvasIntegration';
 export * from './canvas/useInitialCanvasSync';
 export * from './canvas/useUndoRedo';
 
-export * from './performance/usePerformanceMonitor';
-export * from './performance/usePerformanceMonitoring';
 
 export * from './ai/useAIConfig';
 export * from './ai/useAIReview';

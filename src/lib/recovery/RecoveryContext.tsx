@@ -6,16 +6,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppError } from '../errorStore';
 import { logger } from '@lib/logging/logger';
-import { ErrorRecoverySystem, RecoveryResult, RecoveryProgress } from './ErrorRecoverySystem';
-
-// Recovery attempt history item
-export interface RecoveryAttempt {
-  timestamp: number;
-  error: AppError;
-  strategy: string;
-  result: RecoveryResult;
-  duration: number;
-}
+import {
+  ErrorRecoverySystem,
+  RecoveryResult,
+  RecoveryProgress,
+  RecoveryAttempt,
+} from './ErrorRecoverySystem';
 
 // Recovery context type definition
 export interface RecoveryContextType {
@@ -47,70 +43,57 @@ export function RecoveryProvider({ children }: RecoveryProviderProps) {
 
   // Initialize recovery system and event listeners
   useEffect(() => {
-    const handleRecoveryStarted = (event: CustomEvent) => {
-      const { strategy, error } = event.detail;
-      setIsRecovering(true);
-      setShowRecoveryUI(true);
-      setRecoveryProgress({
-        strategy,
-        step: 'Initializing',
-        progress: 0,
-        message: 'Starting recovery process...',
-        canCancel: false
-      });
-      logger.info('Recovery started', { strategy, errorId: error.id });
-    };
+    const unsubscribe = recoverySystem.subscribe(event => {
+      switch (event.type) {
+        case 'started':
+          setIsRecovering(true);
+          setShowRecoveryUI(true);
+          setRecoveryProgress({
+            strategy: event.strategy,
+            step: 'Initializing',
+            progress: 0,
+            message: 'Starting recovery process...',
+            canCancel: false,
+          });
+          logger.info('Recovery started', { strategy: event.strategy, errorId: event.error.id });
+          break;
+        case 'progress':
+          setRecoveryProgress(event.progress);
+          logger.info('Recovery progress', {
+            strategy: event.progress.strategy,
+            message: event.progress.message,
+          });
+          break;
+        case 'completed':
+          setIsRecovering(false);
+          setRecoveryProgress(null);
+          setLastRecoveryResult(event.result);
+          logger.info('Recovery completed', {
+            success: event.result.success,
+            strategy: event.result.strategy,
+            duration: event.duration,
+          });
+          setTimeout(() => setShowRecoveryUI(false), 3000);
+          break;
+        case 'failed':
+          setIsRecovering(false);
+          setRecoveryProgress(null);
+          setLastRecoveryResult({
+            success: false,
+            strategy: 'system',
+            message: 'Recovery system encountered an error',
+            nextAction: 'reset',
+            requiresUserAction: true,
+          });
+          setShowRecoveryUI(true);
+          logger.error('Recovery system failed', { error: event.error, duration: event.duration });
+          break;
+        default:
+          break;
+      }
+    });
 
-    const handleStrategyStarted = (event: CustomEvent) => {
-      const { strategy, progress } = event.detail;
-      setRecoveryProgress(progress);
-      logger.info('Recovery strategy started', { strategy });
-    };
-
-    const handleRecoveryCompleted = (event: CustomEvent) => {
-      const { result, duration } = event.detail;
-      setIsRecovering(false);
-      setRecoveryProgress(null);
-      setLastRecoveryResult(result);
-
-      // Show UI for a few seconds to display result
-      setTimeout(() => {
-        setShowRecoveryUI(false);
-      }, 3000);
-
-      logger.info('Recovery completed', {
-        success: result.success,
-        strategy: result.strategy,
-        duration
-      });
-    };
-
-    const handleRecoveryFailed = (event: CustomEvent) => {
-      const { error, duration } = event.detail;
-      setIsRecovering(false);
-      setRecoveryProgress(null);
-      setLastRecoveryResult({
-        success: false,
-        strategy: 'system',
-        message: 'Recovery system encountered an error'
-      });
-      setShowRecoveryUI(true);
-
-      logger.error('Recovery system failed', { error, duration });
-    };
-
-    // Register event listeners
-    recoverySystem.addEventListener('recovery-started', handleRecoveryStarted);
-    recoverySystem.addEventListener('strategy-started', handleStrategyStarted);
-    recoverySystem.addEventListener('recovery-completed', handleRecoveryCompleted);
-    recoverySystem.addEventListener('recovery-failed', handleRecoveryFailed);
-
-    return () => {
-      recoverySystem.removeEventListener('recovery-started', handleRecoveryStarted);
-      recoverySystem.removeEventListener('strategy-started', handleStrategyStarted);
-      recoverySystem.removeEventListener('recovery-completed', handleRecoveryCompleted);
-      recoverySystem.removeEventListener('recovery-failed', handleRecoveryFailed);
-    };
+    return unsubscribe;
   }, [recoverySystem]);
 
   // Trigger recovery manually

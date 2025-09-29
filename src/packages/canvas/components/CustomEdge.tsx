@@ -5,22 +5,22 @@
  * RELEVANT FILES: ConnectionSvgLayer.tsx, connection-paths.ts, rf-adapters.ts
  */
 
-import React, { useMemo, useId } from 'react';
+import type { Connection } from "@/shared/contracts";
+import { useStableStyleEx } from "@/shared/hooks/useStableLiterals";
+import { createHotLeafComponent } from "@/shared/utils/hotLeafMemoization";
 import {
   BaseEdge,
+  EdgeLabelRenderer,
   EdgeProps,
   getBezierPath,
   getSmoothStepPath,
   getStraightPath,
-  EdgeLabelRenderer,
-} from '@xyflow/react';
-import type { Connection } from '@/shared/contracts';
-import { useStableStyleEx } from '@/shared/hooks/useStableLiterals';
-import { createHotLeafComponent } from '@/shared/utils/hotLeafMemoization';
+} from "@xyflow/react";
+import React, { useId, useMemo } from "react";
 
 interface CustomEdgeData {
   connection: Connection;
-  connectionStyle: 'straight' | 'curved' | 'stepped';
+  connectionStyle: "straight" | "curved" | "stepped";
   isSelected: boolean;
   isStartConnection: boolean;
   onConnectionSelect: (id: string | null, x?: number, y?: number) => void;
@@ -46,27 +46,32 @@ function CustomEdgeInner({
   const arrowId = `arrow-${uniqueId}`;
   const glowId = `glow-${uniqueId}`;
 
-  const { connection, connectionStyle, isSelected, isStartConnection, onConnectionSelect } = data;
+  const {
+    connection,
+    connectionStyle,
+    isSelected,
+    isStartConnection,
+    onConnectionSelect,
+  } = data;
 
-  // Connection colors mapping
-  // Use robust color mapping (avoid undefined CSS vars inside SVG)
+  // Connection colors mapping - High contrast black/white theme
   const connectionColors = useMemo(
     () => ({
-      data: '#3b82f6',    // blue-500
-      control: '#a855f7', // purple-500
-      sync: '#22c55e',    // green-500
-      async: '#f97316',   // orange-500
+      data: "#374151", // gray-700 - High contrast
+      control: "#1f2937", // gray-800 - Darker for control flows
+      sync: "#111827", // gray-900 - Darkest for sync
+      async: "#4b5563", // gray-600 - Medium for async
     }),
     []
   );
 
-  // Visual style colors for queue message flows
+  // Visual style colors for queue message flows - High contrast
   const visualStyleColors = useMemo(
     () => ({
       default: null, // Use connection type color
-      ack: '#22c55e',    // green-500
-      retry: '#f97316',  // orange-500
-      error: '#ef4444',  // red-500
+      ack: "#059669", // emerald-600 - Dark green for success
+      retry: "#ea580c", // orange-600 - Dark orange for retry
+      error: "#dc2626", // red-600 - Dark red for error
     }),
     []
   );
@@ -83,40 +88,51 @@ function CustomEdgeInner({
     };
 
     switch (connectionStyle) {
-      case 'straight':
+      case "straight":
         return getStraightPath(pathParams);
-      case 'stepped':
+      case "stepped":
         return getSmoothStepPath({ ...pathParams, borderRadius: 0 });
-      case 'curved':
+      case "curved":
       default:
         return getBezierPath(pathParams);
     }
-  }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, connectionStyle]);
+  }, [
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    connectionStyle,
+  ]);
 
   // Edge styling
   const visualStyleColor = connection.visualStyle
-    ? visualStyleColors[connection.visualStyle as keyof typeof visualStyleColors]
+    ? visualStyleColors[
+        connection.visualStyle as keyof typeof visualStyleColors
+      ]
     : null;
 
-  const color = visualStyleColor ||
+  const color =
+    visualStyleColor ||
     connectionColors[connection.type as keyof typeof connectionColors] ||
-    '#3b82f6';
+    "#3b82f6";
 
   // Determine stroke dash array based on visual style and connection type
   const getStrokeDashArray = () => {
-    if (connection.visualStyle && connection.visualStyle !== 'default') {
-      return '8,4'; // Dashed lines for queue message flows (ACK, retry, error)
+    if (connection.visualStyle && connection.visualStyle !== "default") {
+      return "8,4"; // Dashed lines for queue message flows (ACK, retry, error)
     }
-    return connection.type === 'async' ? '5,5' : undefined;
+    return connection.type === "async" ? "5,5" : undefined;
   };
 
   const strokeDasharray = getStrokeDashArray();
-  const strokeWidth = isSelected ? 3 : 2;
-  const opacity = isStartConnection ? 0.5 : 1;
+  const strokeWidth = isSelected ? 4 : 3; // Thicker lines for better visibility
+  const opacity = isStartConnection ? 0.6 : 1; // Better contrast for connection preview
 
   // Stable styles for better performance
   const svgContainerStyle = useStableStyleEx(
-    () => ({ position: 'absolute' as const }),
+    () => ({ position: "absolute" as const }),
     []
   );
 
@@ -128,19 +144,19 @@ function CustomEdgeInner({
       strokeDasharray,
       opacity,
       strokeOpacity: 1,
-      fill: 'none',
-      vectorEffect: 'non-scaling-stroke' as const,
+      fill: "none",
+      vectorEffect: "non-scaling-stroke" as const,
       filter: isSelected ? `url(#${glowId})` : undefined,
-      cursor: 'pointer' as const,
+      cursor: "pointer" as const,
     }),
     [style, color, strokeWidth, strokeDasharray, opacity, isSelected, glowId]
   );
 
   const labelContainerStyle = useStableStyleEx(
     () => ({
-      position: 'absolute' as const,
+      position: "absolute" as const,
       transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-      pointerEvents: 'all' as const,
+      pointerEvents: "all" as const,
     }),
     [labelX, labelY]
   );
@@ -165,22 +181,22 @@ function CustomEdgeInner({
         <defs>
           <marker
             id={arrowId}
-            viewBox='0 0 10 10'
-            refX='9'
-            refY='5'
-            markerUnits='strokeWidth'
-            markerWidth='10'
-            markerHeight='10'
-            orient='auto-start-reverse'
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerUnits="strokeWidth"
+            markerWidth="10"
+            markerHeight="10"
+            orient="auto-start-reverse"
           >
-            <path d='M 0 0 L 10 5 L 0 10 z' fill={color} />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
           </marker>
 
-          <filter id={glowId} x='-20%' y='-20%' width='140%' height='140%'>
-            <feGaussianBlur stdDeviation='2' result='coloredBlur' />
+          <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur" />
             <feMerge>
-              <feMergeNode in='coloredBlur' />
-              <feMergeNode in='SourceGraphic' />
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
@@ -193,7 +209,11 @@ function CustomEdgeInner({
         style={edgeStyle}
         markerEnd={`url(#${arrowId})`}
         onClick={handleEdgeClick}
-        className={isSelected ? 'transition-all duration-200' : 'transition-all duration-200'}
+        className={
+          isSelected
+            ? "transition-all duration-200"
+            : "transition-all duration-200"
+        }
       />
 
       {/* Edge label using EdgeLabelRenderer for proper positioning */}
@@ -201,13 +221,13 @@ function CustomEdgeInner({
         <EdgeLabelRenderer>
           <div
             style={labelContainerStyle}
-            className='cursor-pointer select-none'
+            className="cursor-pointer select-none"
             onClick={handleEdgeClick}
           >
             <div
               className={`
                 px-3 py-1 rounded bg-background/90 border border-border text-xs
-                ${isSelected ? 'border-2 shadow-lg' : 'border-1'}
+                ${isSelected ? "border-2 shadow-lg" : "border-1"}
                 transition-all duration-200
               `}
               style={labelStyle}
@@ -222,12 +242,21 @@ function CustomEdgeInner({
 }
 
 // Custom equality function for edge props
-const edgePropsEquality = (prev: CustomEdgeProps, next: CustomEdgeProps): boolean => {
+const edgePropsEquality = (
+  prev: CustomEdgeProps,
+  next: CustomEdgeProps
+): boolean => {
   // Check critical edge properties
   if (prev.id !== next.id) return false;
-  if (prev.sourceX !== next.sourceX || prev.sourceY !== next.sourceY) return false;
-  if (prev.targetX !== next.targetX || prev.targetY !== next.targetY) return false;
-  if (prev.sourcePosition !== next.sourcePosition || prev.targetPosition !== next.targetPosition) return false;
+  if (prev.sourceX !== next.sourceX || prev.sourceY !== next.sourceY)
+    return false;
+  if (prev.targetX !== next.targetX || prev.targetY !== next.targetY)
+    return false;
+  if (
+    prev.sourcePosition !== next.sourcePosition ||
+    prev.targetPosition !== next.targetPosition
+  )
+    return false;
 
   // Check data properties that affect rendering
   if (prev.data.connection.id !== next.data.connection.id) return false;
@@ -236,7 +265,8 @@ const edgePropsEquality = (prev: CustomEdgeProps, next: CustomEdgeProps): boolea
   if (prev.data.isStartConnection !== next.data.isStartConnection) return false;
   if (prev.data.connection.type !== next.data.connection.type) return false;
   if (prev.data.connection.label !== next.data.connection.label) return false;
-  if (prev.data.connection.visualStyle !== next.data.connection.visualStyle) return false;
+  if (prev.data.connection.visualStyle !== next.data.connection.visualStyle)
+    return false;
 
   // Check other props
   if (prev.markerEnd !== next.markerEnd) return false;
@@ -248,7 +278,7 @@ const edgePropsEquality = (prev: CustomEdgeProps, next: CustomEdgeProps): boolea
 export const CustomEdge = createHotLeafComponent(CustomEdgeInner, {
   equalityFn: edgePropsEquality,
   trackPerformance: true,
-  displayName: 'CustomEdge',
+  displayName: "CustomEdge",
   debugMode: import.meta.env.DEV,
   frequencyThreshold: 10, // Edges can re-render frequently during interactions
 });

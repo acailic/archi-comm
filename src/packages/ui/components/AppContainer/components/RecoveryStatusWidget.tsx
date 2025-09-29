@@ -1,9 +1,7 @@
-import React from 'react';
 import { isDevelopment } from '@/lib/config/environment';
-import type { AppVariant } from '../AppContent';
 
 interface RecoveryStatusWidgetProps {
-  variant: AppVariant;
+  variant: string;
   isRecovering: boolean;
 }
 

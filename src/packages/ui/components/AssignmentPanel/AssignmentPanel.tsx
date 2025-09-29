@@ -4,9 +4,7 @@
  */
 
 import React, { Suspense, useMemo, useCallback, useState } from 'react';
-import { useSmartMemo } from '@/shared/hooks/performance/useSmartMemo';
-import { useStableContracts } from '@/shared/hooks/performance/useStableContracts';
-import { useLazyComponent, usePreloadComponents } from '@/lib/lazy-loading/ComponentLazyLoader';
+import { usePreloadComponents } from '@/lib/lazy-loading/ComponentLazyLoader';
 import { useListVirtualization } from '@/shared/hooks/useVirtualization';
 import { reactProfilerIntegration } from '@/lib/performance/ReactProfilerIntegration';
 import { componentOptimizer } from '@/lib/performance/ComponentOptimizer';
@@ -34,14 +32,7 @@ interface RequirementItem {
   priority: 'high' | 'medium' | 'low';
 }
 
-// Lazy-loaded components for better performance
-const LazyMarkdownRenderer = React.lazy(() =>
-  import('@/packages/ui/components/common/MarkdownRenderer')
-);
-
-const LazyProgressVisualization = React.lazy(() =>
-  import('@/packages/ui/components/common/ProgressVisualization')
-);
+// Lazy-loaded components removed - these components don't exist yet
 
 // Virtualized requirement item component
 const RequirementItemRenderer: React.FC<{
@@ -227,8 +218,8 @@ export const AssignmentPanel: React.FC<AssignmentPanelProps> = ({
   // Preload components that might be used
   usePreloadComponents(['react-hook-form', 'zod']);
 
-  // Smart memoization for requirements processing
-  const processedRequirements = useSmartMemo(() => {
+  // Memoization for requirements processing
+  const processedRequirements = useMemo(() => {
     const requirements: RequirementItem[] = challenge.requirements.map((req, index) => {
       // Basic completion detection logic (can be enhanced)
       const isComponentRequirement = req.toLowerCase().includes('component') ||
@@ -272,19 +263,13 @@ export const AssignmentPanel: React.FC<AssignmentPanelProps> = ({
     });
 
     return requirements;
-  }, [challenge.requirements, currentComponents.length, progress], {
-    componentName: 'AssignmentPanel',
-    strategy: 'mixed',
-    expensiveThreshold: 10,
-  });
+  }, [challenge.requirements, currentComponents.length, progress]);
 
-  // Stable contracts for callbacks
-  const stableCallbacks = useStableContracts({
+  // Stable callbacks
+  const stableCallbacks = useMemo(() => ({
     onRequirementClick: onRequirementClick || (() => {}),
     onConceptClick: onConceptClick || (() => {}),
-  }, {
-    componentName: 'AssignmentPanel',
-  });
+  }), [onRequirementClick, onConceptClick]);
 
   // Virtualization for requirements list
   const { virtualItems, totalHeight } = useListVirtualization(
@@ -404,12 +389,8 @@ export const AssignmentPanel: React.FC<AssignmentPanelProps> = ({
             <span>{expandedSections.progress ? '▼' : '▶'}</span>
           </button>
 
-          <Suspense fallback={<div>Loading progress...</div>}>
-            <LazyProgressVisualization
-              progress={progress}
-              showDetails={true}
-            />
-          </Suspense>
+          {/* Progress visualization removed - component doesn't exist yet */}
+          <div>Progress tracking to be implemented</div>
         </div>
       )}
 
@@ -441,9 +422,8 @@ export const AssignmentPanel: React.FC<AssignmentPanelProps> = ({
             <span>{expandedSections.description ? '▼' : '▶'}</span>
           </button>
 
-          <Suspense fallback={<div>Loading description...</div>}>
-            <LazyMarkdownRenderer content={challenge.description} />
-          </Suspense>
+          {/* Markdown renderer removed - component doesn't exist yet */}
+          <div style={{ lineHeight: '1.6' }}>{challenge.description}</div>
         </div>
       )}
 

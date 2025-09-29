@@ -3,7 +3,7 @@
 // Houses controls that were moved from the canvas for cleaner interface
 // RELEVANT FILES: AppContainer.tsx, ReactFlowCanvas.tsx, CommandPalette.tsx, DesignCanvas.tsx
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@ui/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/components/ui/select';
 import { Switch } from '@ui/components/ui/switch';

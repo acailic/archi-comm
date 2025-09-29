@@ -117,8 +117,8 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
   };
 
   // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+  useEffect((): (() => void) | undefined => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && onClose) {
         event.preventDefault();
         handleClose();

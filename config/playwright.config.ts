@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module workaround for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Centralized configuration values
 const IS_CI = !!process.env.CI;

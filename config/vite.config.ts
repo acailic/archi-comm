@@ -107,14 +107,6 @@ export default defineConfig(({ command, mode }) => {
 
     envPrefix: ['VITE_', 'TAURI_'],
 
-    worker: {
-      format: 'es',
-      plugins: () => [
-        react({
-          devTarget: 'esnext',
-        }),
-      ],
-    },
 
     build: {
       target: tauriPlatform === 'windows' ? 'chrome105' : 'safari13',
@@ -147,22 +139,6 @@ export default defineConfig(({ command, mode }) => {
 
             if (id.includes('/node_modules/recharts')) return 'charts-vendor';
 
-            if (
-              id.includes('/node_modules/recordrtc') ||
-              id.includes('/node_modules/web-audio-api') ||
-              id.includes('/node_modules/microphone-stream') ||
-              id.includes('/node_modules/audiobuffer-to-wav') ||
-              id.includes('/node_modules/lamejs')
-            ) {
-              return 'audio-vendor';
-            }
-
-            if (
-              id.includes('/node_modules/@xenova/transformers') ||
-              id.includes('/node_modules/@huggingface/transformers')
-            ) {
-              return 'ml-vendor';
-            }
 
             if (id.includes('/src/lib/config/challenge-config.ts') || id.includes('/src/lib/task-system/')) {
               return 'challenges';

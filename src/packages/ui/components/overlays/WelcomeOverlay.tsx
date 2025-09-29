@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { ArrowRight, Users } from 'lucide-react';
 import { useOnboarding } from '@/lib/onboarding/OnboardingManager';
 import { Button } from '@ui/components/ui/button';

@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isDevelopment } from '@/lib/config/environment';
 import { errorStore, type AppError, type ErrorSeverity } from '@/lib/logging/errorStore';
+import { useGuardedState } from '@/lib/performance/useGuardedState';
 
 // Animation variants for smooth transitions
 const overlayVariants = {
@@ -107,11 +108,33 @@ interface DevOverlayProps {
 }
 
 export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => {
-  const [currentError, setCurrentError] = useState<AppError | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [errorQueue, setErrorQueue] = useState<AppError[]>([]);
-  const [currentErrorIndex, setCurrentErrorIndex] = useState(0);
+  // Using guarded state for rapid error state changes with higher limits for dev overlay
+  const [currentError, setCurrentError] = useGuardedState<AppError | null>(null, {
+    componentName: 'DevOverlay',
+    maxUpdatesPerTick: 25
+  });
+  const [isVisible, setIsVisible] = useGuardedState(false, {
+    componentName: 'DevOverlay',
+    maxUpdatesPerTick: 25
+  });
+  const [isMinimized, setIsMinimized] = useGuardedState(false, {
+    componentName: 'DevOverlay',
+    maxUpdatesPerTick: 25
+  });
+  const [errorQueue, setErrorQueue] = useGuardedState<AppError[]>([], {
+    componentName: 'DevOverlay',
+    maxUpdatesPerTick: 25,
+    onTrip: (count) => {
+      console.warn(`DevOverlay errorQueue state throttled after ${count} updates`);
+    }
+  });
+  const [currentErrorIndex, setCurrentErrorIndex] = useGuardedState(0, {
+    componentName: 'DevOverlay',
+    maxUpdatesPerTick: 25,
+    onTrip: (count) => {
+      console.warn(`DevOverlay currentErrorIndex state throttled after ${count} updates`);
+    }
+  });
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Only render in development mode
@@ -154,8 +177,8 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
   }, [currentError, isVisible]);
 
   // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+  useEffect((): (() => void) | undefined => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if (!isVisible || !currentError) return;
 
       switch (event.key) {

@@ -10,7 +10,7 @@ Key principles:
 - **Package-first organisation.** Every cross-cutting concern lives in a dedicated package under `src/packages` with an explicit public API (`index.ts`).
 - **Typed contracts end-to-end.** Shared types flow through the core package so the UI, canvas, and services consume consistent data structures.
 - **Environment-aware services.** Service implementations expose the same façade whether the app runs inside Tauri or a browser fallback.
-- **Performance visibility.** Canvas, audio, and store layers expose hooks for diagnostics and tracing (`src/shared/hooks/usePerformanceMonitor`, `src/lib/performance`).
+- **Simplified architecture.** Focus on core functionality with minimal complexity and dependencies.
 
 ## Repository Topology
 
@@ -24,7 +24,7 @@ src/
   shared/hooks/         # Shared React hooks grouped by domain
   lib/                  # Legacy libraries and utilities (incrementally migrating to packages)
   modules/              # Thin entrypoints that re-export package functionality for feature areas
-  stores/               # Zustand/Valtio stores broken down by domain
+  stores/               # Simplified Zustand stores (SimpleAppStore, canvasStore)
   test/                 # Testing helpers
   dev/                  # Developer playground utilities and scenarios
 src-tauri/              # Rust shell for the Tauri Desktop build
@@ -37,7 +37,7 @@ src-tauri/              # Rust shell for the Tauri Desktop build
 | `core` | Fundamental types and utilities that everything else builds upon. | `types`, `utils`, shared constants |
 | `ui` | All React components, UI primitives, and composition helpers. | `components/AppContainer`, `components/ui/button` |
 | `canvas` | Canvas runtime (React Flow integration, hooks, utilities). | `components/ReactFlowCanvas`, `hooks/useConnectionEditor` |
-| `audio` | Recording, processing, and transcription engines. | `AudioManager`, `detectBestEngines`, engine implementations |
+| `audio` | Simple audio recording with MediaRecorder API. | `SimpleAudioManager`, recording state management |
 | `services` | Service façades for persistence, Tauri integration, and fallbacks. | `audio/AudioService`, `storage`, `tauri` |
 
 Packages expose a “barrel” file (`index.ts`) that defines the public surface area. Consumers import through the alias defined in `config/tsconfig.json` and `config/vite.config.ts`:
@@ -45,7 +45,7 @@ Packages expose a “barrel” file (`index.ts`) that defines the public surface
 ```
 import { DesignCanvas } from '@ui/components/DesignCanvas';
 import { ReactFlowCanvas } from '@canvas/components/ReactFlowCanvas';
-import { AudioManager } from '@audio';
+import { SimpleAudioManager } from '@audio';
 import { StorageService } from '@services/storage';
 import { CanvasState } from '@core/types';
 ```
@@ -97,7 +97,7 @@ All tool configuration lives in `config/`:
 
 - Import UI from `@ui` (or `@ui/components/...`) instead of reaching into `src/components`.
 - Canvas utilities live in `@canvas`; avoid crossing package boundaries with relative imports.
-- Audio logic must come from `@audio` so the recorder/transcriber engines remain encapsulated.
+- Audio logic must come from `@audio` for simple MediaRecorder-based recording.
 - Prefer `@services` when interacting with persistence or environment bridges; the package chooses the correct implementation for desktop vs web.
 - Shared helpers belong in `@core`. Move additional utilities or types there as they shed coupling to legacy directories.
 

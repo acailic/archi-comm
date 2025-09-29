@@ -5,26 +5,19 @@ import React, {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
-} from "react";
-import { RenderLoopDiagnostics } from "../../../lib/debug/RenderLoopDiagnostics";
-import { InfiniteLoopDetector } from "../../../lib/performance/InfiniteLoopDetector";
+} from 'react';
 import {
   RenderGuardPresets,
   useRenderGuard,
-} from "../../../lib/performance/RenderGuard";
-import {
-  getCanvasCircuitBreakerSnapshot,
-  subscribeToCanvasCircuitBreaker,
-} from "../../../stores/canvasStore";
-import { DesignComponent } from "../../../types";
-import { useCanvasContext } from "../contexts/CanvasContext";
+} from '@/lib/performance/RenderGuard';
+import type { DesignComponent } from '../../../types';
+import { useCanvasContext } from '../contexts/CanvasContext';
 import {
   ContextMenu,
   ContextMenuAPI,
   ContextMenuCallbacks,
   ContextMenuState,
-} from "./ContextMenu";
+} from './ContextMenu';
 
 export interface CanvasInteractionLayerProps {
   enableDragDrop?: boolean;
@@ -37,26 +30,55 @@ interface KeyboardShortcuts {
   [key: string]: (event: KeyboardEvent) => void;
 }
 
-const useCanvasCircuitBreakerSnapshot = () =>
-  useSyncExternalStore(
-    subscribeToCanvasCircuitBreaker,
-    getCanvasCircuitBreakerSnapshot,
-    getCanvasCircuitBreakerSnapshot
-  );
-
-const CanvasInteractionLayerComponent: React.FC<
-  CanvasInteractionLayerProps
-> = ({
+const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = ({
   enableDragDrop = true,
   enableContextMenu = true,
   enableKeyboardShortcuts = true,
   children,
 }) => {
-  const circuitBreakerSnapshot = useCanvasCircuitBreakerSnapshot();
   const { state, callbacks } = useCanvasContext();
   const { selectedItems, reactFlowInstance } = state;
-  const { component: componentCallbacks, connection: connectionCallbacks } =
-    callbacks;
+  const { component: componentCallbacks, connection: connectionCallbacks } = callbacks;
+
+  const contextMenuRef = useRef<ContextMenuAPI | null>(null);
+  const contextMenuStateRef = useRef<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
+
+  const [draggedComponent, setDraggedComponent] = useState<DesignComponent | null>(null);
+
+  const renderGuardHandle = useRenderGuard('ReactFlowCanvas.Interactions', {
+    ...RenderGuardPresets.canvasLayers.InteractionLayer,
+    context: () => ({
+      enableDragDrop,
+      enableContextMenu,
+      enableKeyboardShortcuts,
+      selectedItems: selectedItems.length,
+      contextMenuVisible: contextMenuStateRef.current.visible,
+    }),
+  });
+
+  const {
+    shouldPause,
+    circuitBreakerActive,
+    lastSyntheticError,
+    renderCount,
+    reset,
+  } = renderGuardHandle;
+
+  useEffect(() => {
+    if (!shouldPause || !import.meta.env.DEV) {
+      return;
+    }
+
+    console.warn('[CanvasInteractionLayer] Render guard pause engaged', {
+      renderCount,
+      circuitBreakerActive,
+      error: lastSyntheticError?.message,
+    });
+  }, [shouldPause, circuitBreakerActive, lastSyntheticError, renderCount]);
 
   const contextMenuCallbacks = useMemo<ContextMenuCallbacks>(
     () => ({
@@ -69,236 +91,9 @@ const CanvasInteractionLayerComponent: React.FC<
     [componentCallbacks, connectionCallbacks]
   );
 
-  // Render debugging state
-  const renderCountRef = useRef(0);
-  const lastPropsRef = useRef<{
-    enableDragDrop: boolean;
-    enableContextMenu: boolean;
-    enableKeyboardShortcuts: boolean;
-    selectedItemsLength: number;
-    reactFlowInstanceId: string | null;
-  }>({
-    enableDragDrop,
-    enableContextMenu,
-    enableKeyboardShortcuts,
-    selectedItemsLength: 0,
-    reactFlowInstanceId: null,
-  });
-  const propChangeHistoryRef = useRef<
-    Array<{
-      timestamp: number;
-      property: string;
-      oldValue: any;
-      newValue: any;
-      renderCount: number;
-    }>
-  >([]);
-  const callbackStabilityRef = useRef<
-    Map<string, { refCount: number; lastRef: any; changes: number }>
-  >(new Map());
-
-  renderCountRef.current += 1;
-
-  // Track prop changes with detailed analysis
-  const currentProps = useMemo(
-    () => ({
-      enableDragDrop,
-      enableContextMenu,
-      enableKeyboardShortcuts,
-      selectedItemsLength: selectedItems.length,
-      reactFlowInstanceId: reactFlowInstance?.id || null,
-    }),
-    [
-      enableDragDrop,
-      enableContextMenu,
-      enableKeyboardShortcuts,
-      selectedItems.length,
-      reactFlowInstance?.id,
-    ]
-  );
-
-  const detectPropChanges = () => {
-    if (!import.meta.env.DEV) return;
-
-    const lastProps = lastPropsRef.current;
-    const changes: Array<{ property: string; oldValue: any; newValue: any }> =
-      [];
-
-    Object.keys(currentProps).forEach((key) => {
-      const typedKey = key as keyof typeof currentProps;
-      if (lastProps[typedKey] !== currentProps[typedKey]) {
-        changes.push({
-          property: key,
-          oldValue: lastProps[typedKey],
-          newValue: currentProps[typedKey],
-        });
-      }
-    });
-
-    if (changes.length > 0) {
-      changes.forEach((change) => {
-        propChangeHistoryRef.current.push({
-          timestamp: Date.now(),
-          property: change.property,
-          oldValue: change.oldValue,
-          newValue: change.newValue,
-          renderCount: renderCountRef.current,
-        });
-      });
-
-      // Keep only last 20 prop changes
-      if (propChangeHistoryRef.current.length > 20) {
-        propChangeHistoryRef.current = propChangeHistoryRef.current.slice(-20);
-      }
-
-      console.debug("[CanvasInteractionLayer] Prop changes detected:", {
-        renderCount: renderCountRef.current,
-        changes,
-        propChangeHistory: propChangeHistoryRef.current.slice(-5),
-        timeSinceLastRender:
-          propChangeHistoryRef.current.length > 1
-            ? Date.now() -
-              propChangeHistoryRef.current[
-                propChangeHistoryRef.current.length - 2
-              ].timestamp
-            : 0,
-      });
-
-      RenderLoopDiagnostics.getInstance().record(
-        "interaction-layer-prop-change",
-        {
-          componentName: "CanvasInteractionLayer",
-          renderCount: renderCountRef.current,
-          changes,
-          propChangeHistory: propChangeHistoryRef.current.slice(-5),
-        }
-      );
-    }
-
-    lastPropsRef.current = { ...currentProps };
-  };
-
-  // Track callback stability
-  const trackCallbackStability = (name: string, callback: any) => {
-    if (!import.meta.env.DEV) return;
-
-    const stability = callbackStabilityRef.current.get(name) || {
-      refCount: 0,
-      lastRef: null,
-      changes: 0,
-    };
-    stability.refCount += 1;
-
-    if (stability.lastRef !== callback) {
-      stability.changes += 1;
-      stability.lastRef = callback;
-
-      if (stability.refCount > 1) {
-        console.warn(
-          `[CanvasInteractionLayer] Callback '${name}' reference changed on render #${renderCountRef.current}`,
-          {
-            totalChanges: stability.changes,
-            refCount: stability.refCount,
-            changeRate: (stability.changes / stability.refCount) * 100,
-            suggestion:
-              "Consider using useCallback or stable references to prevent unnecessary re-renders",
-          }
-        );
-
-        RenderLoopDiagnostics.getInstance().recordStabilityWarning(
-          "CanvasInteractionLayer",
-          {
-            callbackName: name,
-            totalChanges: stability.changes,
-            refCount: stability.refCount,
-            changeRate: (stability.changes / stability.refCount) * 100,
-          }
-        );
-      }
-    }
-
-    callbackStabilityRef.current.set(name, stability);
-  };
-
-  // Run prop change detection
-  detectPropChanges();
-
-  // Track callback stability for key callbacks
-  trackCallbackStability(
-    "componentCallbacks.onComponentDrop",
-    componentCallbacks.onComponentDrop
-  );
-  trackCallbackStability(
-    "componentCallbacks.onComponentSelect",
-    componentCallbacks.onComponentSelect
-  );
-  trackCallbackStability(
-    "componentCallbacks.onComponentDeselect",
-    componentCallbacks.onComponentDeselect
-  );
-  trackCallbackStability(
-    "connectionCallbacks.onConnectionDelete",
-    connectionCallbacks.onConnectionDelete
-  );
-
-  const contextMenuRef = useRef<ContextMenuAPI | null>(null);
-  const contextMenuStateRef = useRef<ContextMenuState>({
-    visible: false,
-    x: 0,
-    y: 0,
-  });
-
   const handleContextMenuStateChange = useCallback((nextState: ContextMenuState) => {
     contextMenuStateRef.current = nextState;
   }, []);
-
-  const [draggedComponent, setDraggedComponent] =
-    useState<DesignComponent | null>(null);
-
-  const renderGuard = useRenderGuard("ReactFlowCanvas.Interactions", {
-    ...RenderGuardPresets.canvasLayers.InteractionLayer,
-    linkedStoreBreaker: {
-      getSnapshot: () => circuitBreakerSnapshot,
-      label: "CanvasStore",
-    },
-    context: () => ({
-      enableDragDrop,
-      enableContextMenu,
-      enableKeyboardShortcuts,
-      selectedItems: selectedItems.length,
-      contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
-      renderCount: renderCountRef.current,
-      propChangeHistory: propChangeHistoryRef.current.slice(-3),
-      callbackStability: Object.fromEntries(
-        Array.from(callbackStabilityRef.current.entries()).map(
-          ([name, stats]) => [
-            name,
-            {
-              changes: stats.changes,
-              refCount: stats.refCount,
-              changeRate: (stats.changes / stats.refCount) * 100,
-            },
-          ]
-        )
-      ),
-    }),
-    propsSnapshot: () => ({
-      enableDragDrop,
-      enableContextMenu,
-      enableKeyboardShortcuts,
-      selectedItemsLength: selectedItems.length,
-      reactFlowInstanceId: reactFlowInstance?.id || null,
-      contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
-    }),
-    stateSnapshot: () => ({
-      draggedComponent: draggedComponent?.id || null,
-      contextMenuState: {
-        visible: contextMenuStateRef.current.visible,
-        nodeId: contextMenuStateRef.current.nodeId,
-        edgeId: contextMenuStateRef.current.edgeId,
-      },
-    }),
-  });
 
   const hideContextMenu = useCallback(() => {
     contextMenuRef.current?.hide();
@@ -312,6 +107,61 @@ const CanvasInteractionLayerComponent: React.FC<
     [enableContextMenu]
   );
 
+  const resolveDraggedComponent = useCallback(
+    (event: React.DragEvent): DesignComponent | null => {
+      if (draggedComponent) {
+        return draggedComponent;
+      }
+
+      const payload = event.dataTransfer.getData('application/json');
+      if (!payload) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(payload) as DesignComponent;
+      } catch {
+        return null;
+      }
+    },
+    [draggedComponent]
+  );
+
+  const handleComponentDrop = useCallback(
+    (event: React.DragEvent) => {
+      if (!enableDragDrop || !reactFlowInstance) return;
+
+      event.preventDefault();
+
+      const component = resolveDraggedComponent(event);
+      if (!component) return;
+
+      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      const position = reactFlowInstance.project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      });
+
+      componentCallbacks.onComponentDrop(component, position);
+      setDraggedComponent(null);
+    },
+    [
+      componentCallbacks,
+      enableDragDrop,
+      reactFlowInstance,
+      resolveDraggedComponent,
+    ]
+  );
+
+  const handleDragOver = useCallback(
+    (event: React.DragEvent) => {
+      if (!enableDragDrop) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    },
+    [enableDragDrop]
+  );
+
   const handlePaneClick = useCallback(
     (event: React.MouseEvent) => {
       hideContextMenu();
@@ -323,38 +173,11 @@ const CanvasInteractionLayerComponent: React.FC<
     [componentCallbacks, hideContextMenu]
   );
 
-  const handleComponentDrop = useCallback(
-    (event: React.DragEvent) => {
-      if (!enableDragDrop || !draggedComponent || !reactFlowInstance) return;
-
-      event.preventDefault();
-
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      const position = reactFlowInstance.project({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
-      });
-
-      componentCallbacks.onComponentDrop(draggedComponent, position);
-      setDraggedComponent(null);
-    },
-    [componentCallbacks, draggedComponent, enableDragDrop, reactFlowInstance]
-  );
-
-  const handleDragOver = useCallback(
-    (event: React.DragEvent) => {
-      if (!enableDragDrop) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-    },
-    [enableDragDrop]
-  );
-
   const keyboardShortcuts = useMemo<KeyboardShortcuts>(
     () => ({
       Delete: () => {
         selectedItems.forEach((itemId) => {
-          if (itemId.includes("-")) {
+          if (itemId.includes('-')) {
             connectionCallbacks.onConnectionDelete(itemId);
           } else {
             componentCallbacks.onComponentDelete(itemId);
@@ -378,7 +201,7 @@ const CanvasInteractionLayerComponent: React.FC<
     (event: KeyboardEvent) => {
       if (!enableKeyboardShortcuts) return;
 
-      const key = event.code === "Delete" ? "Delete" : event.code;
+      const key = event.code === 'Delete' ? 'Delete' : event.code;
       const shortcut = keyboardShortcuts[key];
 
       if (shortcut) {
@@ -389,144 +212,19 @@ const CanvasInteractionLayerComponent: React.FC<
   );
 
   const keyDownHandlerRef = useRef(handleKeyDown);
-  keyDownHandlerRef.current = handleKeyDown;
+  useEffect(() => {
+    keyDownHandlerRef.current = handleKeyDown;
+  }, [handleKeyDown]);
 
   useEffect(() => {
     if (!enableKeyboardShortcuts) {
       return;
     }
-    const keyHandler = (event: KeyboardEvent) =>
-      keyDownHandlerRef.current(event);
-    document.addEventListener("keydown", keyHandler);
-    return () => document.removeEventListener("keydown", keyHandler);
+
+    const keyHandler = (event: KeyboardEvent) => keyDownHandlerRef.current(event);
+    document.addEventListener('keydown', keyHandler);
+    return () => document.removeEventListener('keydown', keyHandler);
   }, [enableKeyboardShortcuts]);
-
-  // Enhanced render tracking with detailed analysis
-  useEffect(() => {
-    if (!import.meta.env.DEV) {
-      return;
-    }
-
-    // Enhanced render loop detection with more detailed context
-    const renderData = {
-      componentName: "CanvasInteractionLayer",
-      renderCount: renderGuard.renderCount,
-      timestamp: Date.now(),
-      sinceFirstRenderMs: renderGuard.sinceFirstRenderMs,
-      sincePreviousRenderMs: renderGuard.sincePreviousRenderMs,
-      context: {
-        enableDragDrop,
-        enableContextMenu,
-        enableKeyboardShortcuts,
-        selectedItemsCount: selectedItems.length,
-        contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
-        draggedComponentPresent: !!draggedComponent,
-        reactFlowInstanceReady: !!reactFlowInstance,
-        propChangeHistory: propChangeHistoryRef.current.slice(-3),
-        callbackStability: Object.fromEntries(
-          Array.from(callbackStabilityRef.current.entries()).map(
-            ([name, stats]) => [
-              name,
-              {
-                changes: stats.changes,
-                changeRate: (stats.changes / stats.refCount) * 100,
-              },
-            ]
-          )
-        ),
-      },
-      snapshotHash: JSON.stringify({
-        enableDragDrop,
-        enableContextMenu,
-        enableKeyboardShortcuts,
-        selectedItemsCount: selectedItems.length,
-        contextMenuVisible: contextMenuRef.current?.isVisible ?? false,
-        draggedComponent: draggedComponent?.id,
-        reactFlowInstanceId: reactFlowInstance?.id,
-      }),
-    };
-
-    const detectionResult = InfiniteLoopDetector.recordRender(
-      "ReactFlowCanvas.Interactions",
-      renderData
-    );
-
-    // Log detailed render analysis every few renders or when issues are detected
-    if (
-      renderGuard.renderCount % 5 === 0 ||
-      detectionResult.isOscillating ||
-      renderGuard.sincePreviousRenderMs < 16
-    ) {
-      console.debug("[CanvasInteractionLayer] Render analysis:", {
-        renderCount: renderGuard.renderCount,
-        renderTiming: {
-          sinceFirstRenderMs: renderGuard.sinceFirstRenderMs,
-          sincePreviousRenderMs: renderGuard.sincePreviousRenderMs,
-          averageRenderInterval:
-            renderGuard.sinceFirstRenderMs / renderGuard.renderCount,
-        },
-        detectionResult,
-        renderFrequency:
-          renderGuard.renderCount / (renderGuard.sinceFirstRenderMs / 1000),
-        potentialIssues: {
-          tooFrequent: renderGuard.sincePreviousRenderMs < 16,
-          oscillating: detectionResult.isOscillating,
-          circuitBreakerActive: renderGuard.circuitBreakerActive,
-          storeBreakerActive: renderGuard.storeBreakerSnapshot?.open,
-        },
-        propAnalysis: {
-          recentChanges: propChangeHistoryRef.current.slice(-5),
-          frequentChanges: propChangeHistoryRef.current.reduce(
-            (acc, change) => {
-              acc[change.property] = (acc[change.property] || 0) + 1;
-              return acc;
-            },
-            {} as Record<string, number>
-          ),
-        },
-        callbackAnalysis: Object.fromEntries(
-          Array.from(callbackStabilityRef.current.entries()).map(
-            ([name, stats]) => [
-              name,
-              {
-                changes: stats.changes,
-                stability:
-                  ((stats.refCount - stats.changes) / stats.refCount) * 100,
-                recommendation:
-                  stats.changes > stats.refCount * 0.3
-                    ? "Consider memoization"
-                    : "Stable",
-              },
-            ]
-          )
-        ),
-      });
-    }
-
-    // Record to diagnostics system
-    RenderLoopDiagnostics.getInstance().record("interaction-layer-render", {
-      ...renderData,
-      detectionResult,
-      renderAnalysis: {
-        frequency:
-          renderGuard.renderCount / (renderGuard.sinceFirstRenderMs / 1000),
-        averageInterval:
-          renderGuard.sinceFirstRenderMs / renderGuard.renderCount,
-        circuitBreakerActive: renderGuard.circuitBreakerActive,
-      },
-    });
-  }, [
-    enableContextMenu,
-    enableDragDrop,
-    enableKeyboardShortcuts,
-    renderGuard.renderCount,
-    renderGuard.sinceFirstRenderMs,
-    renderGuard.sincePreviousRenderMs,
-    renderGuard.circuitBreakerActive,
-    selectedItems.length,
-    draggedComponent,
-    reactFlowInstance,
-  ]);
 
   const enhancedChildren = useMemo(() => {
     if (!children) {
@@ -542,12 +240,23 @@ const CanvasInteractionLayerComponent: React.FC<
         onPaneClick: handlePaneClick,
         onDrop: handleComponentDrop,
         onDragOver: handleDragOver,
-        onPaneContextMenu: (event: React.MouseEvent) =>
-          handleContextMenu(event),
+        onPaneContextMenu: (event: React.MouseEvent) => handleContextMenu(event),
         onNodeContextMenu: (event: React.MouseEvent, node: any) =>
           handleContextMenu(event, node.id),
         onEdgeContextMenu: (event: React.MouseEvent, edge: any) =>
           handleContextMenu(event, undefined, edge.id),
+        onDragStart: (event: React.DragEvent) => {
+          const payload = event.dataTransfer.getData('application/json');
+          if (payload) {
+            try {
+              setDraggedComponent(JSON.parse(payload) as DesignComponent);
+              return;
+            } catch {
+              // Ignore malformed payloads and fall back to resolver
+            }
+          }
+          setDraggedComponent(null);
+        },
       });
     });
   }, [
@@ -558,28 +267,27 @@ const CanvasInteractionLayerComponent: React.FC<
     handlePaneClick,
   ]);
 
-  const pauseReason = useMemo(() => {
-    if (renderGuard.storeBreakerSnapshot?.open) {
-      return "Canvas data updates are cooling down after a burst of changes.";
+  const pauseMessage = useMemo(() => {
+    if (!shouldPause) {
+      return null;
     }
-    if (renderGuard.circuitBreakerActive) {
-      return "Interaction layer paused due to rapid re-renders.";
-    }
-    if (renderGuard.lastSyntheticError) {
-      return "Interaction layer paused after a render guard trip.";
-    }
-    return "Interaction layer paused to prevent a potential render loop.";
-  }, [
-    renderGuard.circuitBreakerActive,
-    renderGuard.lastSyntheticError,
-    renderGuard.storeBreakerSnapshot,
-  ]);
 
-  if (renderGuard.shouldPause) {
+    if (lastSyntheticError) {
+      return lastSyntheticError.message;
+    }
+
+    if (circuitBreakerActive) {
+      return 'Interaction layer cooling down after rapid updates.';
+    }
+
+    return 'Interaction layer paused to prevent a render loop.';
+  }, [shouldPause, lastSyntheticError, circuitBreakerActive]);
+
+  if (shouldPause) {
     return (
       <div className="interaction-layer-paused">
-        <p>{pauseReason}</p>
-        <button type="button" onClick={renderGuard.reset}>
+        <p>{pauseMessage}</p>
+        <button type="button" onClick={reset}>
           Resume interactions
         </button>
       </div>
@@ -600,62 +308,4 @@ const CanvasInteractionLayerComponent: React.FC<
   );
 };
 
-export const CanvasInteractionLayer = memo(
-  CanvasInteractionLayerComponent,
-  (prev, next) => {
-    // More intelligent children comparison
-    const childrenEqual =
-      prev.children === next.children ||
-      (React.isValidElement(prev.children) &&
-        React.isValidElement(next.children) &&
-        prev.children.type === next.children.type &&
-        prev.children.key === next.children.key);
-
-    const propsEqual =
-      prev.enableDragDrop === next.enableDragDrop &&
-      prev.enableContextMenu === next.enableContextMenu &&
-      prev.enableKeyboardShortcuts === next.enableKeyboardShortcuts &&
-      childrenEqual;
-
-    if (import.meta.env.DEV && !propsEqual) {
-      const changedProps = [];
-      if (prev.enableDragDrop !== next.enableDragDrop)
-        changedProps.push("enableDragDrop");
-      if (prev.enableContextMenu !== next.enableContextMenu)
-        changedProps.push("enableContextMenu");
-      if (prev.enableKeyboardShortcuts !== next.enableKeyboardShortcuts)
-        changedProps.push("enableKeyboardShortcuts");
-      if (prev.children !== next.children) changedProps.push("children");
-
-      console.debug(
-        "[CanvasInteractionLayer] Memo comparison failed - props changed:",
-        {
-          changedProps,
-          prevProps: {
-            enableDragDrop: prev.enableDragDrop,
-            enableContextMenu: prev.enableContextMenu,
-            enableKeyboardShortcuts: prev.enableKeyboardShortcuts,
-            childrenType: typeof prev.children,
-          },
-          nextProps: {
-            enableDragDrop: next.enableDragDrop,
-            enableContextMenu: next.enableContextMenu,
-            enableKeyboardShortcuts: next.enableKeyboardShortcuts,
-            childrenType: typeof next.children,
-          },
-        }
-      );
-
-      RenderLoopDiagnostics.getInstance().record(
-        "interaction-layer-memo-skip",
-        {
-          componentName: "CanvasInteractionLayer",
-          changedProps,
-          reason: "Props changed, memo comparison failed",
-        }
-      );
-    }
-
-    return propsEqual;
-  }
-);
+export const CanvasInteractionLayer = memo(CanvasInteractionLayerComponent);

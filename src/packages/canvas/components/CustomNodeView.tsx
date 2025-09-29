@@ -5,8 +5,11 @@
  * RELEVANT FILES: CustomNode.tsx, useNodePresenter.ts, component-styles.ts, ComponentIcon.tsx
  */
 
-import { Handle, Position } from '@xyflow/react';
-import { Suspense, memo } from 'react';
+import { Handle, Position } from "@xyflow/react";
+import { Suspense, memo } from "react";
+import { getComponentIcon } from "../../../lib/design/component-icons";
+import { cx } from "../../../lib/design/design-system";
+import type { DesignComponent } from "../../../shared/contracts";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -14,30 +17,27 @@ import {
   ContextMenuSeparator,
   ContextMenuShortcut,
   ContextMenuTrigger,
-} from '@ui/components/ui/context-menu';
-import { animations, cx, designSystem, getElevation } from '@/lib/design/design-system';
-import { getComponentIcon } from '@/lib/design/component-icons';
-import { getHealthIndicator } from '../utils/component-styles';
-import type { CustomNodeData } from '../types';
-import type { UseNodePresenterResult } from '../hooks/useNodePresenter';
-import type { DesignComponent } from '../@shared/contracts';
+} from "../../ui/components/ui/context-menu";
+import type { UseNodePresenterResult } from "../hooks/useNodePresenter";
+import type { CustomNodeData } from "../types";
+import { getHealthIndicator } from "../utils/component-styles";
 
 function defaultStickerForType(type: string): string {
   const map: Record<string, string> = {
-    'api-gateway': '🚀',
-    'load-balancer': '🎯',
-    server: '🧩',
-    microservice: '📦',
-    database: '🧪',
-    postgresql: '🧪',
-    mongodb: '🧪',
-    cache: '⚡',
-    redis: '⚡',
-    'message-queue': '🌈',
-    monitoring: '📈',
-    security: '🛡️',
+    "api-gateway": "🚀",
+    "load-balancer": "🎯",
+    server: "🧩",
+    microservice: "📦",
+    database: "🧪",
+    postgresql: "🧪",
+    mongodb: "🧪",
+    cache: "⚡",
+    redis: "⚡",
+    "message-queue": "🌈",
+    monitoring: "📈",
+    security: "🛡️",
   };
-  return map[type] || '⭐';
+  return map[type] || "⭐";
 }
 
 // Component Icon utility - keeping it local as it's simple
@@ -45,7 +45,7 @@ const ComponentIcon = ({
   type,
   className,
 }: {
-  type: DesignComponent['type'];
+  type: DesignComponent["type"];
   className?: string;
 }) => {
   const iconMapping = getComponentIcon(type);
@@ -60,7 +60,11 @@ interface CustomNodeViewProps {
   selected: boolean;
 }
 
-function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewProps) {
+function CustomNodeViewInner({
+  presenter,
+  nodeData,
+  selected,
+}: CustomNodeViewProps) {
   const { state, actions, computed } = presenter;
   const {
     component,
@@ -75,9 +79,9 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
     onCopy,
     onShowProperties,
     onDelete,
-    visualTheme = 'serious',
+    visualTheme = "serious",
   } = nodeData;
-  const playful = visualTheme === 'playful';
+  const playful = visualTheme === "playful";
 
   // Hide component if not visible
   if (!isVisible) {
@@ -94,109 +98,149 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
       const [, color, intensity] = colorMatch;
       return `bg-${color}-100/60`; // More visible background with higher opacity
     }
-    return 'bg-gray-100/60'; // fallback
+    return "bg-gray-100/60"; // fallback
   };
   const customHex = (component.properties as any)?.bgHex as string | undefined;
-  const bodyBgHex = (component.properties as any)?.bodyBgHex as string | undefined;
-  const subtleHeaderBg = customHex ? '' : getSubtleBackgroundColor(iconInfo.color);
+  const bodyBgHex = (component.properties as any)?.bodyBgHex as
+    | string
+    | undefined;
+  const subtleHeaderBg = customHex
+    ? ""
+    : getSubtleBackgroundColor(iconInfo.color);
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           className={cx(
-            'w-44 h-28 cursor-move group canvas-component touch-friendly',
-            computed.visualStateClasses,
-            getElevation(selected || state.visualState.isSelected ? 4 : 2),
-            animations.hoverRaise,
-            playful ? animations.pulseGlow : '',
-            playful ? 'transition-[transform,box-shadow] duration-200 hover:-rotate-[0.5deg] hover:shadow-[0_0_0_4px_rgba(168,85,247,0.12)]' : '',
-            computed.architecturalStyling.borderColor
+            "w-56 h-36 cursor-move group canvas-component touch-friendly relative overflow-hidden",
+            "border-2 border-gray-900 bg-white shadow-lg", // High contrast black border, white background
+            selected || state.visualState.isSelected
+              ? "border-black shadow-2xl ring-4 ring-gray-300"
+              : "border-gray-800 shadow-md hover:shadow-xl",
+            "transition-all duration-200 hover:shadow-2xl hover:border-black",
+            playful ? "hover:scale-105" : ""
           )}
           onMouseEnter={actions.handleMouseEnter}
           onMouseLeave={actions.handleMouseLeave}
         >
           <div
             className={cx(
-              'w-full h-full rounded-xl border',
-              designSystem.glass.surface,
-              'bg-[var(--component-bg)]',
-              subtleHeaderBg,
-              playful ? 'ring-1 ring-primary/20' : ''
+              "w-full h-full rounded-lg bg-white border border-gray-900",
+              playful ? "ring-2 ring-gray-400" : ""
             )}
             style={bodyBgHex ? { background: bodyBgHex } : undefined}
           >
             <div
               className={cx(
-                'w-full h-9 rounded-t-xl flex items-center justify-between px-2 text-white shadow-sm',
-                'border-b border-white/10',
-                'bg-gradient-to-br',
-                computed.gradient,
-                playful ? 'relative overflow-hidden' : ''
+                "w-full h-12 rounded-t-lg flex items-center justify-between px-3 text-white shadow-md relative",
+                "border-b border-gray-300 bg-gray-900", // High contrast black header
+                playful
+                  ? "overflow-hidden bg-gradient-to-r from-gray-800 to-gray-900"
+                  : ""
               )}
             >
+              {/* Background overlay */}
               {customHex && (
-                <div className='absolute inset-0 opacity-70' style={{ background: customHex }} />
+                <div
+                  className="absolute inset-0 opacity-75"
+                  style={{ background: customHex }}
+                />
               )}
               {playful && (
-                <div className='absolute inset-0 opacity-70' style={{
-                  background:
-                    'linear-gradient(120deg, hsla(280,90%,60%,0.25), hsla(200,90%,60%,0.25), hsla(340,90%,60%,0.25))',
-                  backgroundSize: '200% 200%',
-                  animation: 'archiGradientShift 6s ease-in-out infinite',
-                }} />
-              )}
-              <Suspense fallback={<div className='w-5 h-5 rounded-md bg-white/40' />}>
                 <div
-                  className={`w-5 h-5 rounded-md ${computed.iconInfo.color} flex items-center justify-center shadow-sm ${playful ? 'ring-2 ring-white/50' : ''}`}
+                  className="absolute inset-0 opacity-70"
+                  style={{
+                    background:
+                      "linear-gradient(120deg, hsla(280,90%,60%,0.25), hsla(200,90%,60%,0.25), hsla(340,90%,60%,0.25))",
+                    backgroundSize: "200% 200%",
+                    animation: "archiGradientShift 6s ease-in-out infinite",
+                  }}
+                />
+              )}
+
+              {/* Subtle glass effect */}
+              <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
+
+              {/* Icon container - larger and more prominent */}
+              <Suspense
+                fallback={
+                  <div className="w-8 h-8 rounded-lg bg-white/40 animate-pulse" />
+                }
+              >
+                <div
+                  className={cx(
+                    "w-8 h-8 rounded-lg flex items-center justify-center shadow-md relative z-10",
+                    "bg-white border-2 border-gray-600", // White background with dark border
+                    playful ? "ring-2 ring-gray-400 animate-pulse" : "",
+                    "transform hover:scale-110 transition-transform duration-200"
+                  )}
                 >
-                  <ComponentIcon type={component.type} className='w-3 h-3 text-white' />
+                  <ComponentIcon
+                    type={component.type}
+                    className="w-5 h-5 text-gray-900 drop-shadow-sm"
+                  />
                 </div>
               </Suspense>
 
-              {/* Health status indicator */}
-              <div className='text-xs opacity-90'>
-                {getHealthIndicator(healthStatusProp || state.healthStatus)}
+              {/* Component title - in header now */}
+              <div className="flex-1 mx-3 relative z-10">
+                <div
+                  className={cx(
+                    "text-sm font-bold text-white truncate",
+                    "drop-shadow-sm"
+                  )}
+                >
+                  {component.label ||
+                    `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, " ")}`}
+                </div>
+                {component.description && (
+                  <div className="text-xs text-white/80 truncate">
+                    {component.description}
+                  </div>
+                )}
               </div>
 
-              {/* Component type badge - hidden as requested */}
-              {/* <div className="absolute -top-1 -right-1 text-[8px] bg-background/90 text-foreground px-1 rounded-full border border-border/50">
-                {component.type.split('-')[0].toUpperCase()}
-              </div> */}
+              {/* Health status indicator - more prominent */}
+              <div className="text-sm opacity-95 relative z-10 flex items-center">
+                {getHealthIndicator(healthStatusProp || state.healthStatus)}
+              </div>
             </div>
-            <div className='px-2.5 py-1.5 text-center relative'>
-              {component.properties?.showLabel !== false && (
-                <div className='relative'>
-                  <div
-                    className={cx(
-                      'w-full text-[13px] font-semibold truncate text-foreground/90 leading-tight',
-                      playful ? '[text-shadow:0_1px_0_rgba(255,255,255,0.4)]' : ''
-                    )}
-                    title={
-                      component.label ||
-                      `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, ' ')}`
-                    }
-                  >
-                    {component.label ||
-                      `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, ' ')}`}
-                  </div>
-                </div>
-              )}
+            <div className="px-3 py-2 text-center relative flex-1 flex flex-col justify-center bg-white">
+              {/* Component metadata and status */}
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-600">
+                {component.properties?.version && (
+                  <span className="px-2 py-1 bg-white rounded-full border border-gray-800 text-gray-900 font-medium">
+                    v{component.properties.version}
+                  </span>
+                )}
+                {connectionCount > 0 && (
+                  <span className="px-2 py-1 bg-white rounded-full border border-gray-800 text-gray-900 font-medium flex items-center gap-1">
+                    <div className="w-1 h-1 rounded-full bg-gray-900" />
+                    {connectionCount}
+                  </span>
+                )}
+              </div>
 
               {/* Playful sparkles on hover */}
               {playful && state.isHovered && (
-                <div className='pointer-events-none absolute inset-0'>
+                <div className="pointer-events-none absolute inset-0">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <span
                       key={i}
                       style={{
-                        position: 'absolute',
-                        left: `${(i * 17) % 90 + 5}%`,
-                        top: `${10 + (i * 7) % 60}%`,
+                        position: "absolute",
+                        left: `${((i * 17) % 90) + 5}%`,
+                        top: `${10 + ((i * 7) % 60)}%`,
                         width: 4,
                         height: 4,
                         borderRadius: 999,
-                        background: ['#f59e0b', '#22c55e', '#3b82f6', '#a855f7'][i % 4],
+                        background: [
+                          "#f59e0b",
+                          "#22c55e",
+                          "#3b82f6",
+                          "#a855f7",
+                        ][i % 4],
                         opacity: 0.8,
                         animation: `archiSparkle ${900 + i * 60}ms ease-out ${i * 40}ms both`,
                       }}
@@ -206,97 +250,115 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
               )}
 
               {/* Playful sticker badge */}
-              {(((component.properties as any)?.sticker) || (component.properties as any)?.stickerEmoji || (playful && !((component.properties as any)?.sticker === false))) && (
-                <div className='absolute -top-2 -left-2 w-6 h-6 rounded-full bg-white/80 shadow flex items-center justify-center border border-border/30'>
-                  <span role='img' aria-label='sticker'>
-                    {(component.properties as any)?.stickerEmoji || defaultStickerForType(component.type)}
+              {((component.properties as any)?.sticker ||
+                (component.properties as any)?.stickerEmoji ||
+                (playful &&
+                  !((component.properties as any)?.sticker === false))) && (
+                <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-white/90 shadow-lg flex items-center justify-center border-2 border-primary/20">
+                  <span role="img" aria-label="sticker" className="text-lg">
+                    {(component.properties as any)?.stickerEmoji ||
+                      defaultStickerForType(component.type)}
                   </span>
                 </div>
               )}
 
               {/* Enhanced status indicators */}
               {isMultiSelected && (
-                <div className='absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500/90 shadow ring-1 ring-white/30 flex items-center justify-center'>
-                  <div className='w-2 h-2 bg-white rounded-full' />
-                </div>
-              )}
-
-              {/* Architecture-specific metadata */}
-              {component.properties?.version && (
-                <div className='absolute bottom-0 right-1 text-[8px] text-muted-foreground opacity-75'>
-                  v{component.properties.version}
-                </div>
-              )}
-
-              {/* Connection count indicator */}
-              {state.isHovered && connectionCount > 0 && (
-                <div className='absolute bottom-0 left-1 text-[8px] text-muted-foreground flex items-center gap-1'>
-                  <div className='w-1 h-1 rounded-full bg-current' />
-                  <span>{connectionCount}</span>
+                <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-blue-500 shadow-lg ring-2 ring-white/50 flex items-center justify-center animate-pulse">
+                  <div className="w-3 h-3 bg-white rounded-full" />
                 </div>
               )}
             </div>
           </div>
 
           {/* React Flow Handles for connection points */}
+          {/* React Flow Handles for connection points - Enhanced for better visibility */}
           <Handle
-            type='target'
+            type="target"
             position={Position.Top}
-            id='top'
+            id="top"
             className={cx(
-              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
+              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
               isSelected || state.visualState.isConnectionStart
-                ? 'opacity-80 scale-110'
-                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
+                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
+                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
+              playful ? "animate-pulse" : ""
             )}
-            onMouseDown={e => {
+            style={{
+              top: "-10px",
+              boxShadow:
+                "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
+            }}
+            onMouseDown={(e) => {
               e.stopPropagation();
-              actions.handleStartConnection('top');
+              actions.handleStartConnection("top");
             }}
           />
           <Handle
-            type='source'
+            type="source"
             position={Position.Bottom}
-            id='bottom'
+            id="bottom"
             className={cx(
-              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
+              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
               isSelected || state.visualState.isConnectionStart
-                ? 'opacity-80 scale-110'
-                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
+                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
+                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
+              playful ? "animate-pulse" : ""
             )}
-            onMouseDown={e => {
+            style={{
+              bottom: "-10px",
+              boxShadow:
+                "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
+            }}
+            onMouseDown={(e) => {
               e.stopPropagation();
-              actions.handleStartConnection('bottom');
+              actions.handleStartConnection("bottom");
             }}
           />
           <Handle
-            type='target'
+            type="target"
             position={Position.Left}
-            id='left'
+            id="left"
             className={cx(
-              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
+              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
               isSelected || state.visualState.isConnectionStart
-                ? 'opacity-80 scale-110'
-                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
+                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
+                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
+              playful ? "animate-pulse" : ""
             )}
-            onMouseDown={e => {
+            style={{
+              left: "-10px",
+              boxShadow:
+                "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
+            }}
+            onMouseDown={(e) => {
               e.stopPropagation();
-              actions.handleStartConnection('left');
+              actions.handleStartConnection("left");
             }}
           />
           <Handle
-            type='source'
+            type="source"
             position={Position.Right}
-            id='right'
+            id="right"
             className={cx(
-              'w-3 h-3 rounded-full cursor-crosshair !bg-primary shadow-[0_0_0_2px_rgba(255,255,255,0.6)_inset] ring-2 ring-primary/20 transition-all duration-200 nodrag',
+              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
               isSelected || state.visualState.isConnectionStart
-                ? 'opacity-80 scale-110'
-                : 'opacity-30 group-hover:opacity-100 group-hover:scale-110'
+                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
+                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
+              playful ? "animate-pulse" : ""
             )}
-            onMouseDown={e => {
+            style={{
+              right: "-10px",
+              boxShadow:
+                "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
+            }}
+            onMouseDown={(e) => {
               e.stopPropagation();
-              actions.handleStartConnection('right');
+              actions.handleStartConnection("right");
             }}
           />
         </div>
@@ -315,7 +377,7 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
           }
         `}</style>
       )}
-      <ContextMenuContent className='w-56'>
+      <ContextMenuContent className="w-56">
         <ContextMenuItem onClick={() => onShowProperties?.(component.id)}>
           Edit Properties
           <ContextMenuShortcut>F2</ContextMenuShortcut>
@@ -340,7 +402,7 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
         <ContextMenuSeparator />
         <ContextMenuItem
           onClick={() => onDelete?.(component.id)}
-          className='text-destructive focus:text-destructive'
+          className="text-destructive focus:text-destructive"
         >
           Delete
           <ContextMenuShortcut>Del</ContextMenuShortcut>
@@ -351,7 +413,10 @@ function CustomNodeViewInner({ presenter, nodeData, selected }: CustomNodeViewPr
 }
 
 // Shallow comparison function to prevent unnecessary re-renders
-const arePropsEqual = (prevProps: CustomNodeViewProps, nextProps: CustomNodeViewProps): boolean => {
+const arePropsEqual = (
+  prevProps: CustomNodeViewProps,
+  nextProps: CustomNodeViewProps
+): boolean => {
   // Compare basic props
   if (prevProps.selected !== nextProps.selected) return false;
 
@@ -378,4 +443,4 @@ const arePropsEqual = (prevProps: CustomNodeViewProps, nextProps: CustomNodeView
 export const CustomNodeView = memo(CustomNodeViewInner, arePropsEqual);
 
 // Set displayName for better debugging
-CustomNodeView.displayName = 'CustomNodeView';
+CustomNodeView.displayName = "CustomNodeView";

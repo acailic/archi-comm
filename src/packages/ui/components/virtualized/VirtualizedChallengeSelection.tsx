@@ -6,8 +6,6 @@
 
 import React, { useMemo, useCallback, useRef, useState } from 'react';
 import { useGridVirtualization } from '@/shared/hooks/useVirtualization';
-import { useSmartMemo } from '@/shared/hooks/performance/useSmartMemo';
-import { useStableContracts } from '@/shared/hooks/performance/useStableContracts';
 import { componentOptimizer } from '@/lib/performance/ComponentOptimizer';
 import { reactProfilerIntegration } from '@/lib/performance/ReactProfilerIntegration';
 import type { Challenge } from '@shared/contracts';
@@ -72,15 +70,13 @@ const ChallengeCardRenderer: React.FC<{
     }
   };
 
-  const stableProps = useStableContracts({
+  const stableProps = useMemo(() => ({
     challenge,
     style,
     isSelected,
     onSelect,
     onPreview,
-  }, {
-    componentName: 'ChallengeCardRenderer',
-  });
+  }), [challenge, style, isSelected, onSelect, onPreview]);
 
   return (
     <div
@@ -245,7 +241,7 @@ export const VirtualizedChallengeSelection: React.FC<VirtualizedChallengeSelecti
   const actualColumnsPerRow = columnsPerRow || Math.floor(containerWidth / cardWidth);
 
   // Filter challenges
-  const filteredChallenges = useSmartMemo(() => {
+  const filteredChallenges = useMemo(() => {
     let filtered = challenges;
 
     // Apply search filter
@@ -269,13 +265,10 @@ export const VirtualizedChallengeSelection: React.FC<VirtualizedChallengeSelecti
     }
 
     return filtered;
-  }, [challenges, searchQuery, difficultyFilter, categoryFilter], {
-    componentName: 'VirtualizedChallengeSelection',
-    strategy: 'mixed',
-  });
+  }, [challenges, searchQuery, difficultyFilter, categoryFilter]);
 
   // Convert flat list to 2D grid structure
-  const challengeGrid = useSmartMemo(() => {
+  const challengeGrid = useMemo(() => {
     const grid: Challenge[][] = [];
     const totalRows = Math.ceil(filteredChallenges.length / actualColumnsPerRow);
 
@@ -291,10 +284,7 @@ export const VirtualizedChallengeSelection: React.FC<VirtualizedChallengeSelecti
     }
 
     return grid;
-  }, [filteredChallenges, actualColumnsPerRow], {
-    componentName: 'VirtualizedChallengeSelection',
-    strategy: 'deep',
-  });
+  }, [filteredChallenges, actualColumnsPerRow]);
 
   // Determine if virtualization should be enabled
   const shouldVirtualize = enableVirtualization &&
@@ -319,12 +309,10 @@ export const VirtualizedChallengeSelection: React.FC<VirtualizedChallengeSelecti
   );
 
   // Stable callback handlers
-  const stableCallbacks = useStableContracts({
+  const stableCallbacks = useMemo(() => ({
     onChallengeSelect: onChallengeSelect || (() => {}),
     onChallengePreview: onChallengePreview || (() => {}),
-  }, {
-    componentName: 'VirtualizedChallengeSelection',
-  });
+  }), [onChallengeSelect, onChallengePreview]);
 
   // Scroll event handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Info } from 'lucide-react';
 import type { DesignComponent } from '@/shared/contracts';
 import { Badge } from '../ui/badge';

@@ -668,7 +668,7 @@ export function useDesignCanvasCallbacks() {
   });
 
   // Callback metrics tracking for development
-  useEffect(() => {
+  useEffect((): (() => void) | undefined => {
     if (import.meta.env.DEV) {
       const interval = setInterval(() => {
         const metricsReport = {

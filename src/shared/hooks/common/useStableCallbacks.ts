@@ -125,27 +125,31 @@ const trackCallbackStability = (
       );
     }
 
-    // Log to render debug system
-    if (metrics.creationCount % 10 === 0 || metrics.stabilityScore < 60) {
-      renderDebugLogger.logRender({
-        componentName: "StableCallbacks",
-        triggerReason: `callback-instability:${callbackName}`,
-        callbackExecutions: [
-          {
-            callbackName,
-            executionCount: metrics.creationCount,
-            totalExecutionTime: 0,
-            averageExecutionTime: 0,
-            lastExecuted: now,
+    // Log to render debug system (throttled to prevent feedback loops)
+    // Only log on significant events to avoid triggering more renders
+    if (metrics.creationCount === 50 || (metrics.creationCount % 100 === 0 && metrics.stabilityScore < 40)) {
+      // Use setTimeout to defer logging and break the render cycle
+      setTimeout(() => {
+        renderDebugLogger.logRender({
+          componentName: "StableCallbacks",
+          triggerReason: `callback-instability:${callbackName}`,
+          callbackExecutions: [
+            {
+              callbackName,
+              executionCount: metrics.creationCount,
+              totalExecutionTime: 0,
+              averageExecutionTime: 0,
+              lastExecuted: now,
+            },
+          ],
+          performanceMetrics: {
+            renderDuration: 0,
+            componentUpdateTime: 0,
+            diffTime: 0,
+            reconciliationTime: 0,
           },
-        ],
-        performanceMetrics: {
-          renderDuration: 0,
-          componentUpdateTime: 0,
-          diffTime: 0,
-          reconciliationTime: 0,
-        },
-      });
+        });
+      }, 0);
     }
 
     // Record diagnostics
@@ -179,7 +183,10 @@ const generateOptimizationSuggestions = (
     }
 
     callbackMonitoringState.optimizationSuggestions.add(suggestion);
-    console.info("[useStableCallbacks] Optimization suggestion:", suggestion);
+    // Throttle console output to prevent spam
+    if (metrics.creationCount === 20 || metrics.creationCount % 50 === 0) {
+      console.info("[useStableCallbacks] Optimization suggestion:", suggestion);
+    }
   }
 };
 

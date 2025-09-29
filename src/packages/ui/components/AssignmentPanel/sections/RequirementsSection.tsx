@@ -1,4 +1,3 @@
-import React from 'react';
 import { CollapsibleSection } from '../CollapsibleSection';
 import type { Challenge } from '@/shared/contracts';
 

@@ -4,12 +4,8 @@
 // RELEVANT FILES: ComponentPalette.tsx, DesignCanvas.tsx
 
 import React from 'react';
-import {
-  Edit3,
-  Layers,
-  Settings,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Edit3, Layers, Settings } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { wrapSetStateWithGuard } from '../../../lib/performance/StateUpdateGuard';
 import type { DesignComponent } from '@shared/contracts';
 import { ComponentPalette } from '@ui/components/panels/ComponentPalette';
@@ -45,57 +41,95 @@ export const PropertiesPanel = React.memo(function PropertiesPanel({
   onNodeBgChange,
   challengeTags,
 }: PropertiesPanelProps) {
-  const [activeTab, setActiveTab] = useState('components');
+  const [activeTab, setActiveTab] = useState<'components' | 'properties'>('components');
 
-  // Create guarded setter to prevent rapid tab switching loops
-  const guardedSetActiveTab = wrapSetStateWithGuard(setActiveTab, {
-    componentName: 'PropertiesPanel',
-    stateName: 'activeTab',
-    enableDeduplication: true,
-    enableThrottling: true,
-    maxUpdatesPerSecond: 10,
-    debugMode: false,
-  });
+  const guardedSetActiveTab = useMemo(
+    () =>
+      wrapSetStateWithGuard<'components' | 'properties'>(setActiveTab, {
+        componentName: 'PropertiesPanel',
+        stateName: 'activeTab',
+        enableDeduplication: true,
+        enableThrottling: true,
+        maxUpdatesPerSecond: 10,
+        debugMode: false,
+      }),
+    [setActiveTab]
+  );
+
+  const applyTabChange = useCallback(
+    (next: 'components' | 'properties', context: string) => {
+      const result = guardedSetActiveTab(next);
+      if (!result.success && activeTab !== next) {
+        if (context !== 'manual') {
+          setActiveTab(next);
+        }
+        console.warn(
+          `[PropertiesPanel] Tab change (${context}) blocked by guard:`,
+          result.reason
+        );
+      }
+    },
+    [guardedSetActiveTab, activeTab, setActiveTab]
+  );
+
+  const previousSelectedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const previous = previousSelectedRef.current;
+    const current = selectedComponent ?? null;
+    previousSelectedRef.current = current;
+
+    if (current && !previous) {
+      applyTabChange('properties', 'auto-selection');
+      return;
+    }
+
+    if (!current && previous && activeTab === 'properties') {
+      applyTabChange('components', 'selection-cleared');
+    }
+  }, [selectedComponent, activeTab, applyTabChange]);
+
+  const isLibraryView = activeTab === 'components';
+  const HeaderIcon = isLibraryView ? Layers : Settings;
+  const headerLabel = isLibraryView ? 'Component Library' : 'Component Properties';
 
   const selectedComponentData = selectedComponent
     ? components.find(c => c.id === selectedComponent)
     : null;
 
-  // Automatically switch to properties tab when a component is selected
-  useEffect(() => {
-    if (selectedComponent) {
-      const result = guardedSetActiveTab('properties');
-      if (!result.success && result.blocked) {
-        console.warn('PropertiesPanel: Tab switch blocked due to rate limiting');
-      }
-    }
-  }, [selectedComponent, guardedSetActiveTab]);
+  const handleTabChange = useCallback(
+    (value: string) => {
+      const next = value === 'properties' ? 'properties' : 'components';
+      if (next === activeTab) return;
+      applyTabChange(next, 'manual');
+    },
+    [activeTab, applyTabChange]
+  );
 
   return (
     <Tabs
       value={activeTab}
-      onValueChange={(value) => {
-        const result = guardedSetActiveTab(value);
-        if (!result.success) {
-          console.warn('PropertiesPanel: Manual tab change blocked:', result.reason);
-        }
-      }}
+      onValueChange={handleTabChange}
       className="h-full bg-card border-l border-border/30 flex flex-col overflow-hidden"
     >
       {/* Header */}
       <div className="p-3 border-b border-border/30">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-semibold flex items-center gap-1.5 text-sm">
-            <Settings className="w-4 h-4" />
-            Properties
+            <HeaderIcon className="w-4 h-4" />
+            {headerLabel}
           </h3>
-          {selectedComponent ? (
+          {isLibraryView ? (
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 bg-primary/10 text-primary">
+              Browse & drag
+            </Badge>
+          ) : selectedComponent ? (
             <Badge variant="default" className="text-[10px] h-5 px-1.5 bg-primary">
               Selected
             </Badge>
           ) : (
             <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-              {components.length} components
+              {components.length} on canvas
             </Badge>
           )}
         </div>

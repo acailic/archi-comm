@@ -3,7 +3,7 @@
 // Displays recovery progress, results, and provides user actions for recovery cancellation and dismissal
 // RELEVANT FILES: src/shared/ui/ErrorBoundary.tsx, src/components/ui/dialog.tsx
 
-import React from 'react';
+
 import { X, RefreshCw, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { RecoveryProgress, RecoveryResult } from '@/lib/recovery/ErrorRecoverySystem';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@ui/components/ui/dialog';

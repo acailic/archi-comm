@@ -12,13 +12,6 @@ import {
   CanvasState,
   VirtualizationConfig,
 } from "../contexts/CanvasContext";
-import {
-  CanvasStateContextValue,
-  ComponentCallbacksContextValue,
-  ConnectionCallbacksContextValue,
-  InfoCardCallbacksContextValue,
-  OptimizedCanvasProvider,
-} from "../contexts/OptimizedCanvasContext";
 
 export interface CanvasControllerProps {
   components: DesignComponent[];
@@ -172,21 +165,6 @@ export const CanvasController: React.FC<CanvasControllerProps> = ({
     [virtualizationConfig, selectedItems, emergencyPause]
   );
 
-  // Optimized context state
-  const optimizedInitialState = useMemo<CanvasStateContextValue>(
-    () => ({
-      layoutPositions: {},
-      virtualizationConfig,
-      emergencyPause: emergencyPause,
-      reactFlowInstance: null,
-      performance: {
-        renderCount: 0,
-        lastRenderTime: 0,
-        averageRenderTime: 0,
-      },
-    }),
-    [virtualizationConfig, emergencyPause]
-  );
 
   const handleEmergencyResume = React.useCallback(() => {
     setEmergencyPause((prev) => {
@@ -239,51 +217,6 @@ export const CanvasController: React.FC<CanvasControllerProps> = ({
     ]
   );
 
-  // Optimized callback objects for split providers
-  const optimizedComponentCallbacks = useMemo<ComponentCallbacksContextValue>(
-    () => ({
-      onComponentSelect: stableOnComponentSelect,
-      onComponentDeselect: stableOnComponentDeselect,
-      onComponentDrop: stableOnComponentDrop,
-      onComponentPositionChange: stableOnComponentPositionChange,
-      onComponentDelete: stableOnComponentDelete,
-    }),
-    [
-      stableOnComponentSelect,
-      stableOnComponentDeselect,
-      stableOnComponentDrop,
-      stableOnComponentPositionChange,
-      stableOnComponentDelete,
-    ]
-  );
-
-  const optimizedConnectionCallbacks = useMemo<ConnectionCallbacksContextValue>(
-    () => ({
-      onConnectionCreate: stableOnConnectionCreate,
-      onConnectionDelete: stableOnConnectionDelete,
-      onConnectionSelect: stableOnConnectionSelect,
-    }),
-    [
-      stableOnConnectionCreate,
-      stableOnConnectionDelete,
-      stableOnConnectionSelect,
-    ]
-  );
-
-  const optimizedInfoCardCallbacks = useMemo<InfoCardCallbacksContextValue>(
-    () => ({
-      onInfoCardCreate: stableOnInfoCardCreate,
-      onInfoCardUpdate: stableOnInfoCardUpdate,
-      onInfoCardDelete: stableOnInfoCardDelete,
-      onInfoCardSelect: stableOnInfoCardSelect,
-    }),
-    [
-      stableOnInfoCardCreate,
-      stableOnInfoCardUpdate,
-      stableOnInfoCardDelete,
-      stableOnInfoCardSelect,
-    ]
-  );
 
   useEffect(() => {
     if (emergencyPause) {
@@ -350,17 +283,8 @@ export const CanvasController: React.FC<CanvasControllerProps> = ({
   }
 
   return (
-    <OptimizedCanvasProvider
-      initialState={optimizedInitialState}
-      initialSelected={selectedItems}
-      componentCallbacks={optimizedComponentCallbacks}
-      connectionCallbacks={optimizedConnectionCallbacks}
-      infoCardCallbacks={optimizedInfoCardCallbacks}
-    >
-      {/* Provide backward compatibility with legacy context */}
-      <CanvasContextProvider initialState={initialState} callbacks={callbacks}>
-        {children}
-      </CanvasContextProvider>
-    </OptimizedCanvasProvider>
+    <CanvasContextProvider initialState={initialState} callbacks={callbacks}>
+      {children}
+    </CanvasContextProvider>
   );
 };

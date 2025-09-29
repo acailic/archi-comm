@@ -135,42 +135,6 @@ describe('Canvas layers smoke tests (minimal props)', () => {
     expect(screen.getByTestId('edge-count').textContent).toBe('1');
   });
 
-  it('VirtualizationLayer mounts and clones children with filtered nodes/edges', async () => {
-    // Mock useReactFlow to avoid needing a ReactFlow instance, then import layer
-    const mod = await vi.importActual<any>('@xyflow/react');
-    vi.mock('@xyflow/react', async () => ({
-      ...(mod as object),
-      useReactFlow: () => ({ getViewport: () => ({ x: 0, y: 0, zoom: 1 }) }),
-    }));
-    const { VirtualizationLayer } = await import('@/packages/canvas/components/VirtualizationLayer');
-
-    const nodes: any[] = [
-      { id: 'n1', position: { x: 0, y: 0 } },
-      { id: 'n2', position: { x: 10000, y: 10000 } },
-    ];
-    const edges: any[] = [
-      { id: 'e1', source: 'n1', target: 'n2' },
-    ];
-
-    const Child = (props: any) => (
-      <>
-        <div data-testid='virt-node-count'>{props.nodes?.length ?? 0}</div>
-        <div data-testid='virt-edge-count'>{props.edges?.length ?? 0}</div>
-      </>
-    );
-
-    render(
-      <CanvasContextProvider initialState={initialCanvasState} callbacks={noopCallbacks as any}>
-        <VirtualizationLayer nodes={nodes as any} edges={edges as any}>
-          <Child />
-        </VirtualizationLayer>
-      </CanvasContextProvider>
-    );
-
-    // One node is far outside viewport; should be culled when enabled
-    const nodeCount = Number(screen.getByTestId('virt-node-count').textContent || '0');
-    expect(nodeCount).toBeGreaterThanOrEqual(1);
-  });
 
   it('CanvasInteractionLayer mounts with features disabled', () => {
     render(

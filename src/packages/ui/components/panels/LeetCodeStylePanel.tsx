@@ -3,7 +3,7 @@
 // Combines challenge information with solution hints in a vertical layout
 // RELEVANT FILES: DesignCanvas.tsx, SolutionHints.tsx, AssignmentPanel.tsx
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   BookOpen, 
   Target, 

@@ -128,6 +128,7 @@ interface ComponentRenderState {
   triggerPatterns: Map<string, number>;
   propStability: Map<string, { stable: number; unstable: number }>;
   memoryBaseline?: number;
+  lastFrequentRenderWarning?: number;
 }
 
 export class RenderDebugLogger {
@@ -222,16 +223,18 @@ export class RenderDebugLogger {
     // Analyze and report issues
     this.analyzeRenderEntry(completeEntry, componentState);
 
-    // Report to diagnostics
-    RenderLoopDiagnostics.getInstance().record('render-debug-log', {
-      componentName: entry.componentName,
-      entry: completeEntry,
-      componentMetrics: {
-        renderCount: componentState.renderCount,
-        averageRenderTime: componentState.performanceMetrics.averageRenderTime,
-        triggerPatterns: Object.fromEntries(componentState.triggerPatterns),
-      },
-    });
+    // Report to diagnostics (throttled - only every 10th render to reduce overhead)
+    if (componentState.renderCount % 10 === 0) {
+      RenderLoopDiagnostics.getInstance().record('render-debug-log', {
+        componentName: entry.componentName,
+        entry: completeEntry,
+        componentMetrics: {
+          renderCount: componentState.renderCount,
+          averageRenderTime: componentState.performanceMetrics.averageRenderTime,
+          triggerPatterns: Object.fromEntries(componentState.triggerPatterns),
+        },
+      });
+    }
   }
 
   analyzeComponent(componentName: string): RenderAnalysisReport | null {
@@ -398,7 +401,11 @@ export class RenderDebugLogger {
         return sum + (render.timestamp - recentRenders[index - 1].timestamp);
       }, 0) / (recentRenders.length - 1);
 
-      if (avgInterval < 50) {
+      // Throttle warnings to prevent feedback loops - only warn every 5 seconds
+      const now = Date.now();
+      const lastWarning = componentState.lastFrequentRenderWarning || 0;
+      if (avgInterval < 50 && now - lastWarning > 5000) {
+        componentState.lastFrequentRenderWarning = now;
         console.warn(`[RenderDebugLogger] Frequent renders detected for ${entry.componentName}:`, {
           averageInterval: `${avgInterval.toFixed(2)}ms`,
           recentRenders: recentRenders.length,

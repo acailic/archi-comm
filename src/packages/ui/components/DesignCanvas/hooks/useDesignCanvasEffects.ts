@@ -38,6 +38,19 @@ export function useDesignCanvasEffects({
   const idleHandleRef = useRef<number | null>(null);
   const flushInFlightRef = useRef(false);
   const lastFlushReasonRef = useRef<string | null>(null);
+
+  // Use refs to access current values without creating dependencies
+  const currentDataRef = useRef(currentDesignData);
+  const componentsRef = useRef(components);
+  const connectionsRef = useRef(connections);
+  const infoCardsRef = useRef(infoCards);
+
+  // Update refs on each render
+  currentDataRef.current = currentDesignData;
+  componentsRef.current = components;
+  connectionsRef.current = connections;
+  infoCardsRef.current = infoCards;
+
   const { setVisualTheme } = useCanvasActions();
   const { actions } = useAppStore();
 
@@ -87,8 +100,6 @@ export function useDesignCanvasEffects({
         return;
       }
 
-      const pending = currentDesignData;
-
       const executeFlush = () => {
         if (flushInFlightRef.current) {
           return;
@@ -98,13 +109,19 @@ export function useDesignCanvasEffects({
         lastFlushReasonRef.current = reason;
 
         try {
+          // Get current values from refs
+          const pending = currentDataRef.current;
+          const currentComponents = componentsRef.current;
+          const currentConnections = connectionsRef.current;
+          const currentInfoCards = infoCardsRef.current;
+
           if (import.meta.env.DEV) {
             console.debug('[useDesignCanvasEffects] flushPendingDesign: Attempting to flush design data', {
               reason,
               pendingDataKeys: Object.keys(pending),
-              componentsCount: components.length,
-              connectionsCount: connections.length,
-              infoCardsCount: infoCards.length,
+              componentsCount: currentComponents.length,
+              connectionsCount: currentConnections.length,
+              infoCardsCount: currentInfoCards.length,
               timestamp: Date.now(),
             });
           }
@@ -113,9 +130,9 @@ export function useDesignCanvasEffects({
           void storage.setItem('archicomm-design', JSON.stringify(pending));
           RenderLoopDiagnostics.getInstance().recordDesignFlush({
             reason,
-            pendingNodes: components.length,
-            pendingConnections: connections.length,
-            pendingInfoCards: infoCards.length,
+            pendingNodes: currentComponents.length,
+            pendingConnections: currentConnections.length,
+            pendingInfoCards: currentInfoCards.length,
           });
 
           if (import.meta.env.DEV) {
@@ -165,7 +182,7 @@ export function useDesignCanvasEffects({
         schedule();
       }
     },
-    [currentDesignData, components.length, connections.length, infoCards.length]
+    [actions] // Only depend on actions, data is accessed via refs
   );
 
   const cancelScheduledFlush = useCallback(() => {

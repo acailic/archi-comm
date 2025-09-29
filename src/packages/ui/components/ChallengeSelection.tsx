@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Clock, Database, PlayCircle, Search, Target, TrendingUp } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
+import { useGuardedState } from '@/lib/performance/useGuardedState';
 import type { ExtendedChallenge } from '@/lib/config/challenge-config';
 import { challengeManager } from '@/lib/config/challenge-config';
 import { isTauriEnvironment } from '@/lib/config/environment';
@@ -56,12 +57,37 @@ export function ChallengeSelection({
   onChallengeSelect,
   availableChallenges,
 }: ChallengeSelectionProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
-  const [importedChallenges, setImportedChallenges] = useState<ExtendedChallenge[]>([]);
-  const [loadedChallenges, setLoadedChallenges] = useState<ExtendedChallenge[]>([]);
+  // Using guarded state for filtering and selection state with higher limits for dynamic loading
+  const [searchQuery, setSearchQuery] = useGuardedState('', {
+    componentName: 'ChallengeSelection',
+    maxUpdatesPerTick: 20
+  });
+  const [selectedDifficulty, setSelectedDifficulty] = useGuardedState<string>('all', {
+    componentName: 'ChallengeSelection',
+    maxUpdatesPerTick: 20
+  });
+  const [selectedCategory, setSelectedCategory] = useGuardedState<string>('all', {
+    componentName: 'ChallengeSelection',
+    maxUpdatesPerTick: 20
+  });
+  const [hoveredCard, setHoveredCard] = useGuardedState<string | null>(null, {
+    componentName: 'ChallengeSelection',
+    maxUpdatesPerTick: 20
+  });
+  const [importedChallenges, setImportedChallenges] = useGuardedState<ExtendedChallenge[]>([], {
+    componentName: 'ChallengeSelection',
+    maxUpdatesPerTick: 20,
+    onTrip: (count) => {
+      console.warn(`ChallengeSelection importedChallenges state throttled after ${count} updates`);
+    }
+  });
+  const [loadedChallenges, setLoadedChallenges] = useGuardedState<ExtendedChallenge[]>([], {
+    componentName: 'ChallengeSelection',
+    maxUpdatesPerTick: 20,
+    onTrip: (count) => {
+      console.warn(`ChallengeSelection loadedChallenges state throttled after ${count} updates`);
+    }
+  });
 
   // Load challenges from challenge manager
   useEffect(() => {

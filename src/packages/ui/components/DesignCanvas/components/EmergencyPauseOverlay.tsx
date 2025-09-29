@@ -1,23 +1,19 @@
-import React from 'react';
-import type { CircuitBreakerDetails } from '@/lib/performance/RenderGuard';
-import type { StoreCircuitBreakerSnapshot } from '@/lib/performance/StoreCircuitBreaker';
-import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
+import type { CanvasRateLimiterSnapshot } from '@/stores/canvasStore';
+import type { RenderGuardPauseMetadata } from '../hooks/useDesignCanvasPerformance';
 
 interface EmergencyPauseOverlayProps {
   emergencyPauseReason: string;
-  circuitBreakerDetails: CircuitBreakerDetails | null;
+  pauseMetadata: RenderGuardPauseMetadata | null;
   onResumeAfterPause: () => void;
-  storeCircuitBreakerSnapshot?: StoreCircuitBreakerSnapshot | null;
+  storeCircuitBreakerSnapshot?: CanvasRateLimiterSnapshot | null;
 }
 
 export function EmergencyPauseOverlay({
   emergencyPauseReason,
-  circuitBreakerDetails,
+  pauseMetadata,
   onResumeAfterPause,
   storeCircuitBreakerSnapshot,
 }: EmergencyPauseOverlayProps) {
-  const latestReport = InfiniteLoopDetector.getInstance().getLatestReport('DesignCanvasCore');
-
   return (
     <div className='h-full flex flex-col items-center justify-center gap-4 bg-background text-center px-6 py-8'>
       <div className='space-y-2 max-w-md'>
@@ -26,19 +22,18 @@ export function EmergencyPauseOverlay({
           We paused canvas updates because <span className='font-medium'>{emergencyPauseReason}</span>. Any
           unsaved progress has been preserved.
         </p>
-        {circuitBreakerDetails ? (
+        {pauseMetadata ? (
           <p className='text-xs text-muted-foreground'>
-            Render burst detected after {circuitBreakerDetails.renderCount} renders. Cooling down until{' '}
-            {new Date(circuitBreakerDetails.until).toLocaleTimeString()}.
+            Triggered after {pauseMetadata.renderCount} renders.
+            {pauseMetadata.resetAt
+              ? ` Cooldown ends at ${new Date(pauseMetadata.resetAt).toLocaleTimeString()}.`
+              : ''}
           </p>
         ) : null}
         {storeCircuitBreakerSnapshot?.open ? (
           <p className='text-xs text-muted-foreground'>
-            Canvas store updates paused ({storeCircuitBreakerSnapshot.updatesInWindow} updates in {storeCircuitBreakerSnapshot.windowMs}ms window).
+            Canvas store updates paused ({storeCircuitBreakerSnapshot.updatesInWindow} updates in the last 100ms).
           </p>
-        ) : null}
-        {latestReport?.reason ? (
-          <p className='text-xs text-muted-foreground'>Detector insight: {latestReport.reason}</p>
         ) : null}
       </div>
       <button

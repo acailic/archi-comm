@@ -75,17 +75,8 @@ export function useCallbackCollection<T extends Record<string, (...args: any[]) 
 export function useEventHandlers<T extends Record<string, (event: any) => void>>(
   handlers: T
 ): T {
-  const stableHandlers = useMemo(() => {
-    const stabilized = {} as T;
-
-    for (const [key, handler] of Object.entries(handlers)) {
-      stabilized[key as keyof T] = useLatestCallback(handler as any);
-    }
-
-    return stabilized;
-  }, Object.values(handlers));
-
-  return stableHandlers;
+  // Create stable handlers using the collection approach
+  return useStableCallbacks(handlers);
 }
 
 /**
@@ -129,17 +120,12 @@ export function useSmartCallbacks<T extends Record<string, (...args: any[]) => a
     for (const [key, callback] of Object.entries(callbacks)) {
       const usageCount = usageCountRef.current.get(key) || 0;
 
-      if (optimizeFrequent && usageCount > 10) {
-        // High-frequency callbacks get latest callback treatment
-        optimizedCallbacks[key as keyof T] = useLatestCallback(callback as any);
+      // For consistency and to avoid hooks violations, always use the same optimization strategy
+      const prevCallback = previousCallbacksRef.current?.[key as keyof T];
+      if (prevCallback === callback) {
+        optimizedCallbacks[key as keyof T] = prevCallback;
       } else {
-        // Low-frequency callbacks can use normal optimization
-        const prevCallback = previousCallbacksRef.current?.[key as keyof T];
-        if (prevCallback === callback) {
-          optimizedCallbacks[key as keyof T] = prevCallback;
-        } else {
-          optimizedCallbacks[key as keyof T] = callback as any;
-        }
+        optimizedCallbacks[key as keyof T] = callback as any;
       }
 
       if (trackUsage) {
@@ -164,18 +150,8 @@ export function useSmartCallbacks<T extends Record<string, (...args: any[]) => a
 export function useCanvasCallbacks<T extends Record<string, (...args: any[]) => any>>(
   callbacks: T
 ): T {
-  // Canvas callbacks are typically high-frequency, so use latest callback pattern
-  const stableCallbacks = useMemo(() => {
-    const stabilized = {} as T;
-
-    for (const [key, callback] of Object.entries(callbacks)) {
-      stabilized[key as keyof T] = useLatestCallback(callback as any);
-    }
-
-    return stabilized;
-  }, Object.keys(callbacks));
-
-  return stableCallbacks;
+  // Canvas callbacks are typically high-frequency, so use stable callbacks approach
+  return useStableCallbacks(callbacks);
 }
 
 /**

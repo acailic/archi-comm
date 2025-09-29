@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BookOpen, Users, TrendingUp, Award } from 'lucide-react';
 import type { Challenge, DesignComponent } from '@/shared/contracts';
 import { ExtendedChallenge, challengeManager } from '@/lib/config/challenge-config';

@@ -1,6 +1,7 @@
-import React from 'react';
+
 import Confetti from '@ui/components/Confetti';
 import type { Challenge } from '@/shared/contracts';
+import type { PerformanceBudgetStatus } from '../hooks/useDesignCanvasPerformance';
 import { RightOverlays } from './RightOverlays';
 
 interface CanvasOverlaysProps {
@@ -10,10 +11,11 @@ interface CanvasOverlaysProps {
   currentComponents: any[];
   showCommandPalette: boolean;
   onCloseCommandPalette: () => void;
-  onNavigate: () => void;
-  selectedChallenge: Challenge;
+  onNavigate?: () => void;
+  selectedChallenge?: Challenge;
   showConfetti: boolean;
   onConfettiDone: () => void;
+  budgetStatus?: PerformanceBudgetStatus;
 }
 
 export function CanvasOverlays({
@@ -27,6 +29,7 @@ export function CanvasOverlays({
   selectedChallenge,
   showConfetti,
   onConfettiDone,
+  budgetStatus,
 }: CanvasOverlaysProps) {
   return (
     <>
@@ -38,8 +41,14 @@ export function CanvasOverlays({
         showCommandPalette={showCommandPalette}
         onCloseCommandPalette={onCloseCommandPalette}
         onNavigate={onNavigate}
-        selectedChallenge={selectedChallenge}
+        selectedChallenge={selectedChallenge ?? challenge}
       />
+      {budgetStatus?.overBudget && (
+        <div className='absolute bottom-4 right-4 z-10 rounded-md bg-amber-500/10 border border-amber-500/40 px-3 py-2 text-xs text-amber-900 shadow-sm'>
+          High render activity detected ({budgetStatus.rendersPerMinute}/
+          {budgetStatus.limit} rpm). Consider pausing heavy updates.
+        </div>
+      )}
       <Confetti show={showConfetti} onDone={onConfettiDone} />
     </>
   );

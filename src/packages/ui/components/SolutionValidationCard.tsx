@@ -5,7 +5,7 @@
  * RELEVANT FILES: src/components/ReviewScreen.tsx, src/shared/hooks/validation/useDesignValidation.ts, src/shared/contracts/index.ts, src/lib/config/challenge-config.ts
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ChevronDown, ChevronUp, Target, CheckCircle, AlertCircle, XCircle, Eye } from 'lucide-react';
 import type { DesignValidationResult } from '@/shared/contracts';
 import type { ArchitectureTemplate } from '@/lib/config/challenge-config';

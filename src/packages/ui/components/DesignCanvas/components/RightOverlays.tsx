@@ -10,8 +10,8 @@ interface RightOverlaysProps {
   currentComponents: any[];
   showCommandPalette: boolean;
   onCloseCommandPalette: () => void;
-  onNavigate: () => void;
-  selectedChallenge: Challenge;
+  onNavigate?: () => void;
+  selectedChallenge?: Challenge;
   rightContent?: React.ReactNode;
 }
 
@@ -41,8 +41,8 @@ export function RightOverlays({
         isOpen={showCommandPalette}
         onClose={onCloseCommandPalette}
         currentScreen='design'
-        onNavigate={onNavigate}
-        selectedChallenge={selectedChallenge}
+        onNavigate={onNavigate ?? (() => {})}
+        selectedChallenge={selectedChallenge ?? challenge}
       />
     </>
   );

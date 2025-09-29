@@ -5,7 +5,7 @@
  * RELEVANT FILES: useAIReview.ts, CanvasComponent.tsx, ReviewPreviewCanvas.tsx, VerticalSidebar.tsx
  */
 
-import React, { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import {
   ArrowLeft,
   RotateCcw,

@@ -4,8 +4,6 @@
  */
 
 import React, { Suspense, useMemo, useCallback, useState } from 'react';
-import { useSmartMemo } from '@/shared/hooks/performance/useSmartMemo';
-import { useStableContracts } from '@/shared/hooks/performance/useStableContracts';
 import { useLazyComponent, usePreloadComponents } from '@/lib/lazy-loading/ComponentLazyLoader';
 import { reactProfilerIntegration } from '@/lib/performance/ReactProfilerIntegration';
 import { componentOptimizer } from '@/lib/performance/ComponentOptimizer';
@@ -157,7 +155,7 @@ const ComponentTypeSelector: React.FC<{
   onTypeChange: (type: string) => void;
   challengeTags?: string[];
 }> = React.memo(({ currentType, onTypeChange, challengeTags }) => {
-  const componentTypes = useSmartMemo(() => [
+  const componentTypes = useMemo(() => [
     { value: 'server', label: 'Server', icon: '🖥️' },
     { value: 'database', label: 'Database', icon: '🗃️' },
     { value: 'cache', label: 'Cache', icon: '⚡' },
@@ -168,10 +166,7 @@ const ComponentTypeSelector: React.FC<{
     { value: 'client', label: 'Client', icon: '💻' },
     { value: 'monitoring', label: 'Monitoring', icon: '📊' },
     { value: 'storage', label: 'Storage', icon: '💾' },
-  ], [challengeTags], {
-    componentName: 'ComponentTypeSelector',
-    strategy: 'shallow',
-  });
+  ], [challengeTags]);
 
   return (
     <select
@@ -221,17 +216,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   // Preload components that might be used
   usePreloadComponents(['react-hook-form', 'zod']);
 
-  // Find selected component with smart memoization
-  const component = useSmartMemo(() => {
+  // Find selected component with memoization
+  const component = useMemo(() => {
     if (!selectedComponent) return null;
     return components.find(c => c.id === selectedComponent) || null;
-  }, [selectedComponent, components], {
-    componentName: 'PropertiesPanel',
-    strategy: 'shallow',
-  });
+  }, [selectedComponent, components]);
 
-  // Stable contracts for callbacks
-  const stableCallbacks = useStableContracts({
+  // Stable callbacks
+  const stableCallbacks = useMemo(() => ({
     onLabelChange: onLabelChange || (() => {}),
     onDelete: onDelete || (() => {}),
     onShowLabelToggle: onShowLabelToggle || (() => {}),
@@ -239,9 +231,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     onStickerEmojiChange: onStickerEmojiChange || (() => {}),
     onBgColorChange: onBgColorChange || (() => {}),
     onNodeBgChange: onNodeBgChange || (() => {}),
-  }, {
-    componentName: 'PropertiesPanel',
-  });
+  }), [onLabelChange, onDelete, onShowLabelToggle, onStickerToggle, onStickerEmojiChange, onBgColorChange, onNodeBgChange]);
 
   // Validation functions
   const validateLabel = useCallback((value: string): string | null => {

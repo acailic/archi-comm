@@ -1,16 +1,13 @@
-import { StrictMode, Suspense } from 'react';
+// src/main.tsx
+// Main entry point for ArchiComm application
+// Sets up React root with simple error boundary and accessibility provider
+// RELEVANT FILES: src/packages/ui/components/AppContainer/index.tsx, src/lib/config/environment.ts, src/lib/logging/logger.ts, src/packages/ui/components/ErrorBoundary/ErrorBoundary.tsx
+
+import { StrictMode, Suspense, Component } from 'react';
 import { createRoot } from 'react-dom/client';
-import { EnhancedErrorBoundary } from '@ui/components/ErrorBoundary/EnhancedErrorBoundary';
 import { AccessibilityProvider } from '@ui/components/accessibility/AccessibilityProvider';
-import { RecoveryProvider } from './lib/recovery/RecoveryContext';
 import { getLogger, logger, LogLevel } from './lib/logging/logger';
-import { errorStore, addGlobalError } from './lib/logging/errorStore';
-import type { AppError } from './lib/logging/errorStore';
-import { ErrorRecoverySystem } from './lib/recovery/ErrorRecoverySystem';
 import { isDevelopment, isTauriEnvironment, isProduction } from './lib/config/environment';
-import type { Container } from '@/lib/di/Container';
-import { createApplicationContainer } from '@/lib/di/ServiceRegistry';
-import { ServiceProvider } from '@/lib/di/ServiceProvider';
 import './index.css';
 
 // Initialize performance monitoring and profiling infrastructure in development
@@ -130,103 +127,52 @@ if (import.meta.env.DEV) {
 // Initialize logger early in the application lifecycle
 const mainLogger = getLogger('main');
 
-// Enhanced global error handlers with centralized logging and error store integration
-// These are attached only after the recovery system is initialized
-function attachGlobalErrorHandlers() {
-  window.addEventListener('unhandledrejection', async event => {
-    const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+// Simple error boundary component
+class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-    // Log through centralized logger with full context
-    mainLogger.error('Unhandled promise rejection', error, {
-      type: 'unhandledrejection',
-      url: window.location.href,
-      userAgent: navigator.userAgent,
-      timestamp: Date.now(),
-      stack: error.stack,
-      reason: event.reason,
-    });
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
 
-    // Add to error store for development mode tracking (recovery will be triggered automatically)
-    const addedError = addGlobalError(error, {
-      userActions: ['Promise rejection occurred'],
-      additionalData: {
-        type: 'unhandledrejection',
-        reason: event.reason,
-        url: window.location.href,
-      },
-    });
+  componentDidCatch(error: Error, errorInfo: any) {
+    mainLogger.error('React Error Boundary caught error', error, errorInfo);
+  }
 
-    // Trigger recovery in all envs
-    const ers = ErrorRecoverySystem.getInstance();
-    if (addedError) {
-      ers.handleError(addedError);
-    } else {
-      const appError: AppError = {
-        id: `global_${Date.now()}`,
-        message: error.message,
-        stack: error.stack,
-        category: 'global',
-        severity: 'high',
-        timestamp: Date.now(),
-        count: 1,
-        resolved: false,
-        context: { url: window.location.href, userAgent: navigator.userAgent, timestamp: Date.now() },
-        hash: btoa(error.message).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
-      };
-      ers.handleError(appError);
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen w-screen flex items-center justify-center bg-background">
+          <div className="text-center p-6">
+            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
     }
+    return this.props.children;
+  }
+}
 
-    // Prevent default browser error handling
+// Simple global error handlers
+function attachGlobalErrorHandlers() {
+  window.addEventListener('unhandledrejection', event => {
+    const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+    mainLogger.error('Unhandled promise rejection', error);
     event.preventDefault();
   });
 
-  window.addEventListener('error', async event => {
+  window.addEventListener('error', event => {
     const error = event.error || new Error(event.message || 'Unknown error');
-
-    // Log through centralized logger with full context
-    mainLogger.error('Global error caught', error, {
-      type: 'global',
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
-      url: window.location.href,
-      userAgent: navigator.userAgent,
-      timestamp: Date.now(),
-      message: event.message,
-    });
-
-    // Add to error store for development mode tracking (recovery will be triggered automatically)
-    const addedError = addGlobalError(error, {
-      userActions: ['Global error occurred'],
-      additionalData: {
-        type: 'global',
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
-        message: event.message,
-        url: window.location.href,
-      },
-    });
-
-    // Trigger recovery in all envs
-    const ers = ErrorRecoverySystem.getInstance();
-    if (addedError) {
-      ers.handleError(addedError);
-    } else {
-      const appError: AppError = {
-        id: `global_${Date.now()}`,
-        message: error.message,
-        stack: error.stack,
-        category: 'global',
-        severity: 'high',
-        timestamp: Date.now(),
-        count: 1,
-        resolved: false,
-        context: { url: window.location.href, userAgent: navigator.userAgent, timestamp: Date.now() },
-        hash: btoa(error.message).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
-      };
-      ers.handleError(appError);
-    }
+    mainLogger.error('Global error caught', error);
   });
 }
 
@@ -301,10 +247,6 @@ const initializeEnvironment = () => {
     return true;
   } catch (error) {
     envLogger.error('Environment initialization failed', error);
-    addGlobalError(error instanceof Error ? error : new Error(String(error)), {
-      userActions: ['Environment initialization'],
-      additionalData: { phase: 'environment-setup' },
-    });
     return false;
   }
 };
@@ -349,114 +291,6 @@ const initializeLogging = () => {
 const loggingReady = initializeLogging();
 const environmentReady = initializeEnvironment();
 
-// Initialize recovery system with context provider
-const initializeRecoverySystem = async () => {
-  const recoveryLogger = getLogger('recovery');
-
-  try {
-    // Dynamic import to avoid circular dependency
-    const { ErrorRecoverySystem } = await import('./lib/recovery/ErrorRecoverySystem');
-    const { AutoSaveStrategy } = await import('./lib/recovery/strategies/AutoSaveStrategy');
-    const { ComponentResetStrategy } = await import('./lib/recovery/strategies/ComponentResetStrategy');
-    const { BackupRestoreStrategy } = await import('./lib/recovery/strategies/BackupRestoreStrategy');
-    const { SoftReloadStrategy } = await import('./lib/recovery/strategies/SoftReloadStrategy');
-    const { HardResetStrategy } = await import('./lib/recovery/strategies/HardResetStrategy');
-
-    const recoverySystem = ErrorRecoverySystem.getInstance();
-
-    // Register built-in recovery strategies
-    recoverySystem.registerStrategy(new AutoSaveStrategy());
-    // Component reset for controlled remounts
-    recoverySystem.registerStrategy(new ComponentResetStrategy());
-    recoverySystem.registerStrategy(new BackupRestoreStrategy());
-    recoverySystem.registerStrategy(new SoftReloadStrategy());
-    // Last resort hard reset
-    recoverySystem.registerStrategy(new HardResetStrategy());
-
-    // Set up context provider for recovery operations
-    recoverySystem.setContextProvider(async () => {
-      // This will be called when recovery is needed to gather current app state
-      try {
-        // Try to get current application state
-        const currentDesignData = (() => {
-          try {
-            const stored = localStorage.getItem('current_design');
-            return stored ? JSON.parse(stored) : undefined;
-          } catch {
-            return undefined;
-          }
-        })();
-
-        const currentAudioData = (() => {
-          try {
-            const stored = localStorage.getItem('current_audio');
-            return stored ? JSON.parse(stored) : undefined;
-          } catch {
-            return undefined;
-          }
-        })();
-
-        const userPreferences = (() => {
-          try {
-            const stored = localStorage.getItem('user_preferences');
-            return stored ? JSON.parse(stored) : undefined;
-          } catch {
-            return undefined;
-          }
-        })();
-
-        return {
-          currentDesignData,
-          currentAudioData,
-          userPreferences,
-          sessionId: `session_${Date.now()}`,
-          projectId: localStorage.getItem('current_project_id') || undefined,
-        };
-      } catch (error) {
-        recoveryLogger.warn('Failed to gather recovery context', error);
-        return {
-          sessionId: `fallback_${Date.now()}`,
-        };
-      }
-    });
-
-    // Check for recovery data from previous soft reload
-    const { SoftReloadStrategy: SoftReloadClass } = await import('./lib/recovery/strategies/SoftReloadStrategy');
-    const { hasRecovery, recoveryData } = await SoftReloadClass.checkForRecoveryData();
-
-    if (hasRecovery && recoveryData) {
-      recoveryLogger.info('Found recovery data from previous session, restoring...');
-      try {
-        await SoftReloadClass.restoreDataAfterReload(recoveryData);
-        recoveryLogger.info('Recovery data restored successfully');
-      } catch (restoreError) {
-        recoveryLogger.error('Failed to restore recovery data', restoreError);
-      }
-    }
-
-    recoveryLogger.info('Recovery system initialized successfully', {
-      strategies: recoverySystem.getStrategies().map(s => ({ name: s.name, priority: s.priority })),
-      hasRecoveryData: hasRecovery
-    });
-
-    return true;
-  } catch (error) {
-    recoveryLogger.error('Failed to initialize recovery system', error);
-    return false;
-  }
-};
-
-// Initialize recovery system BEFORE attaching global handlers (no top-level await)
-let recoveryReady = false;
-initializeRecoverySystem()
-  .then((ready) => {
-    recoveryReady = ready;
-    attachGlobalErrorHandlers();
-  })
-  .catch((error) => {
-    mainLogger.warn('Recovery system initialization failed', error);
-  });
-
 // Root element validation
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -476,14 +310,6 @@ try {
   const rootError = error instanceof Error ? error : new Error(String(error));
   rootLogger.fatal('Failed to create React root', rootError);
 
-  addGlobalError(rootError, {
-    userActions: ['Application initialization', 'React root creation'],
-    additionalData: {
-      phase: 'react-root-creation',
-      rootElement: rootElement ? 'found' : 'missing',
-    },
-  });
-
   // Fallback to legacy rendering if available
   rootElement.innerHTML = `
     <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui;">
@@ -501,201 +327,68 @@ try {
   throw error;
 }
 
-const renderWith = (AppComponent: any, container?: Container) => {
+const renderApp = (AppComponent: any) => {
   const renderLogger = getLogger('render');
 
   try {
     renderLogger.time('app-render');
 
-    const AppContent = () => (
+    root.render(
       <StrictMode>
-        <RecoveryProvider>
+        <ErrorBoundary>
           <AccessibilityProvider>
-            <EnhancedErrorBoundary boundaryId='app-root'>
-              <Suspense fallback={<LoadingFallback />}>
-                <AppComponent />
-              </Suspense>
-            </EnhancedErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <AppComponent />
+            </Suspense>
           </AccessibilityProvider>
-        </RecoveryProvider>
+        </ErrorBoundary>
       </StrictMode>
     );
 
-    // Render with or without DI based on container availability
-    if (container) {
-      renderLogger.info('Rendering with dependency injection container');
-      root.render(
-        <ServiceProvider container={container}>
-          <AppContent />
-        </ServiceProvider>
-      );
-    } else {
-      renderLogger.info('Rendering without dependency injection (fallback mode)');
-      root.render(<AppContent />);
-    }
-
     renderLogger.timeEnd('app-render');
-
-    // Enhanced performance monitoring with logging
-    if (typeof performance !== 'undefined' && performance.mark) {
-      performance.mark('app-init-complete');
-
-      try {
-        performance.measure('app-initialization', 'app-init-start', 'app-init-complete');
-        const measures = performance.getEntriesByName('app-initialization');
-        if (measures.length > 0) {
-          const initTime = measures[0].duration;
-          renderLogger.info('Application initialization completed', {
-            initializationTime: `${initTime.toFixed(2)}ms`,
-            performanceMarks: performance.getEntriesByType('mark').map(m => m.name),
-          });
-
-          // Log performance warning if initialization is slow
-          if (initTime > 3000) {
-            renderLogger.warn('Slow application initialization detected', {
-              duration: initTime,
-              threshold: 3000,
-            });
-          }
-        }
-      } catch (perfError) {
-        renderLogger.warn('Performance measurement failed', perfError);
-      }
-    }
-
-    renderLogger.info('✅ ArchiComm initialized successfully', {
-      timestamp: new Date().toISOString(),
-      environment: isDevelopment() ? 'development' : 'production',
-      runtime: isTauriEnvironment() ? 'tauri' : 'web',
-    });
+    renderLogger.info('✅ ArchiComm initialized successfully');
   } catch (error) {
     const renderError = error instanceof Error ? error : new Error(String(error));
     renderLogger.fatal('Failed to render application', renderError);
 
-    addGlobalError(renderError, {
-      userActions: ['Application rendering', 'Component mounting'],
-      additionalData: {
-        phase: 'app-render',
-        component: AppComponent?.name || 'Unknown',
-      },
-    });
-
     rootElement.innerHTML = `
-      <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui; background: #f8f9fa;">
-        <div style="text-align: center; max-width: 500px; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-          <h1 style="margin-bottom: 1rem; color: #dc3545;">Application Error</h1>
-          <p style="margin-bottom: 1rem; color: #666; line-height: 1.5;">
-            ArchiComm encountered an error during startup. This might be due to a network issue or a temporary problem.
-          </p>
-          <div style="margin-bottom: 1rem;">
-            <button onclick="window.location.reload()" style="padding: 0.75rem 1.5rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">
-              Refresh Page
-            </button>
-            <button onclick="localStorage.clear(); window.location.reload()" style="padding: 0.75rem 1.5rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
-              Reset & Refresh
-            </button>
-          </div>
-          <details style="text-align: left; margin-top: 1rem;">
-            <summary style="cursor: pointer; color: #666;">Technical Details</summary>
-            <pre style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-size: 0.8rem; overflow-x: auto;">${(window as any).__APP_LOAD_ERROR__?.message || ''}</pre>
-          </details>
+      <div style="height: 100vh; display: flex; align-items: center; justify-center; font-family: system-ui;">
+        <div style="text-center; padding: 2rem;">
+          <h1 style="margin-bottom: 1rem;">Application Error</h1>
+          <p style="margin-bottom: 1rem; color: #666;">ArchiComm failed to start. Please refresh the page.</p>
+          <button onclick="window.location.reload()" style="padding: 0.75rem 1.5rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Refresh Page
+          </button>
         </div>
       </div>
     `;
   }
 };
 
-// Initialize dependency injection container
-async function initializeDIContainer(): Promise<Container | null> {
-  const diLogger = getLogger('dependency-injection');
-
-  try {
-    // Check if DI is enabled via environment variable or localStorage setting
-    const diEnabled =
-      import.meta.env.VITE_ENABLE_DI !== 'false' &&
-      localStorage.getItem('archicomm-disable-di') !== 'true';
-
-    if (!diEnabled) {
-      diLogger.info('Dependency injection disabled via configuration');
-      return null;
-    }
-
-    diLogger.time('di-container-init');
-    diLogger.info('Initializing dependency injection container');
-
-    const container = await createApplicationContainer();
-
-    diLogger.timeEnd('di-container-init');
-    diLogger.info('Dependency injection container initialized successfully', {
-      services: container.getRegisteredServices(),
-      dependencies: container.getDependencyGraph(),
-    });
-
-    return container;
-  } catch (error) {
-    const diError = error instanceof Error ? error : new Error(String(error));
-    diLogger.error('Failed to initialize DI container, falling back to direct instantiation', diError);
-
-    addGlobalError(diError, {
-      userActions: ['Dependency injection initialization'],
-      additionalData: {
-        phase: 'di-container-init',
-        fallbackMode: true,
-      },
-    });
-
-    return null; // Fall back to direct instantiation
-  }
-}
-
-// Load App dynamically with enhanced error handling and DI integration
+// Load and render the app
 function loadAndRenderApp() {
   const loadLogger = getLogger('app-loader');
 
   loadLogger.time('app-load');
-  loadLogger.info('Starting application initialization with DI support');
+  loadLogger.info('Starting application initialization');
 
-  // Load the App component, then try to initialize DI and render with provider
   import('@ui/components/AppContainer')
     .then((appModule) => {
       const AppComponent = appModule.default;
-      return initializeDIContainer()
-        .then(container => {
-          loadLogger.timeEnd('app-load');
-          renderWith(AppComponent, container || undefined);
-        })
-        .catch(err => {
-          console.warn('DI initialization failed, rendering without DI:', err);
-          loadLogger.timeEnd('app-load');
-          renderWith(AppComponent);
-        });
+      loadLogger.timeEnd('app-load');
+      renderApp(AppComponent);
     })
     .catch(error => {
       loadLogger.timeEnd('app-load');
       const loadError = error instanceof Error ? error : new Error(String(error));
       loadLogger.fatal('Failed to load main App component', loadError);
 
-      addGlobalError(loadError, {
-        userActions: ['Application loading', 'Dynamic import'],
-        additionalData: {
-          phase: 'app-import',
-          importPath: '@ui/components/AppContainer',
-        },
-      });
-
-      try {
-        (window as any).__APP_LOAD_ERROR__ = error;
-      } catch {
-        // Ignore error storing failures
-      }
-
       const Fallback = () => (
         <div className='h-screen w-screen flex items-center justify-center bg-background'>
           <div className='max-w-md text-center p-6'>
             <h1 className='text-2xl font-bold text-foreground mb-4'>ArchiComm</h1>
             <p className='text-muted-foreground mb-6'>
-              The application is currently loading. If this message persists, please refresh the
-              page.
+              Failed to load the application. Please refresh the page.
             </p>
             <button
               onClick={() => window.location.reload()}
@@ -703,235 +396,75 @@ function loadAndRenderApp() {
             >
               Refresh Page
             </button>
-            <div className='text-left mt-4'>
-              <details>
-                <summary className='cursor-pointer text-sm text-muted-foreground'>
-                  Technical details
-                </summary>
-                <pre className='mt-2 text-xs overflow-auto max-h-48 p-2 bg-muted rounded'>
-                  {String(
-                    (window as any).__APP_LOAD_ERROR__?.stack ||
-                      (window as any).__APP_LOAD_ERROR__?.message ||
-                      (window as any).__APP_LOAD_ERROR__ ||
-                      ''
-                  )}
-                </pre>
-              </details>
-            </div>
           </div>
         </div>
       );
-      renderWith(Fallback);
+      renderApp(Fallback);
     });
 }
 
-// Start the application with logging
+// Attach global error handlers and start the application
+attachGlobalErrorHandlers();
+
 const startLogger = getLogger('startup');
 startLogger.info('Starting ArchiComm application', {
   timestamp: new Date().toISOString(),
   readiness: {
     logging: loggingReady,
     environment: environmentReady,
-    recovery: recoveryReady,
   },
 });
 
 loadAndRenderApp();
 
-// Enhanced development-only debugging with logging integration
+// Development-only debugging
 if (isDevelopment()) {
   const debugLogger = getLogger('debug');
 
-  // Add helpful debugging information
   debugLogger.info('🔧 Development mode active', {
     loggingReady,
     environmentReady,
-    recoveryReady,
     rootElement: !!rootElement,
     logLevel: logger.getLevel(),
-    errorStoreStats: errorStore.getStats(),
-    recoveryStats: errorStore.getRecoveryStats(),
   });
 
-  // Enhanced debugging utilities with logging integration and DI support
+  // Simple debug utilities
   (window as any).ArchiCommDebug = {
-    // Storage utilities
     clearStorage: () => {
       localStorage.clear();
       sessionStorage.clear();
       debugLogger.info('Storage cleared');
     },
 
-    // Dependency injection utilities
-    dependencyInjection: {
-      isEnabled: () => {
-        return localStorage.getItem('archicomm-disable-di') !== 'true' &&
-               import.meta.env.VITE_ENABLE_DI !== 'false';
-      },
-      enable: () => {
-        localStorage.removeItem('archicomm-disable-di');
-        debugLogger.info('Dependency injection enabled (requires refresh)');
-      },
-      disable: () => {
-        localStorage.setItem('archicomm-disable-di', 'true');
-        debugLogger.info('Dependency injection disabled (requires refresh)');
-      },
-      refreshWithDI: () => {
-        localStorage.removeItem('archicomm-disable-di');
-        window.location.reload();
-      },
-      refreshWithoutDI: () => {
-        localStorage.setItem('archicomm-disable-di', 'true');
-        window.location.reload();
-      },
-      status: () => {
-        const enabled = (window as any).ArchiCommDebug.dependencyInjection.isEnabled();
-        const containerExists = !!(window as any).__ARCHICOMM_DI_CONTAINER__;
-        return {
-          configurationEnabled: enabled,
-          containerInitialized: containerExists,
-          servicesAvailable: containerExists ?
-            (window as any).__ARCHICOMM_DI_CONTAINER__.getRegisteredServices() : [],
-        };
-      },
-    },
-
-    // Profiling utilities
-    profiling: {
-      getActiveSession: () => {
-        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
-        return profiler ? profiler.getActiveSession() : null;
-      },
-      getAllSessions: () => {
-        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
-        return profiler ? profiler.getAllSessions() : [];
-      },
-      startSession: (options: any) => {
-        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
-        return profiler ? profiler.startSession(options) : null;
-      },
-      stopSession: () => {
-        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
-        return profiler ? profiler.stopCurrentSession() : null;
-      },
-      getInsights: () => {
-        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
-        return profiler ? profiler.getOptimizationInsights() : [];
-      },
-      exportSessionData: (sessionId?: string) => {
-        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
-        return profiler ? profiler.exportSessionData(sessionId) : null;
-      },
-      generateReport: () => {
-        const profiler = (window as any).__PROFILER_ORCHESTRATOR__;
-        return profiler ? profiler.generatePerformanceReport() : null;
-      },
-    },
-
-    // Performance utilities
-    getPerformanceMarks: () => {
-      if (performance.getEntriesByType) {
-        return performance.getEntriesByType('mark');
-      }
-      return [];
-    },
-    getPerformanceMeasures: () => {
-      if (performance.getEntriesByType) {
-        return performance.getEntriesByType('measure');
-      }
-      return [];
-    },
-
-    // Logging utilities
     logger: {
       getLevel: () => logger.getLevel(),
       setLevel: (level: LogLevel) => {
         logger.setLevel(level);
         debugLogger.info(`Log level changed to ${LogLevel[level]}`);
       },
-      getLogs: (filter?: any) => logger.getFilteredLogs(filter),
-      exportLogs: (format?: 'json' | 'csv' | 'txt') => logger.exportLogs(format),
-      downloadLogs: (filename?: string, format?: 'json' | 'csv' | 'txt') =>
-        logger.downloadLogs(filename, format),
       clearLogs: () => {
         logger.clearLogs();
         debugLogger.info('Logs cleared');
       },
     },
 
-    // Error store utilities
-    errorStore: {
-      getState: () => errorStore.getState(),
-      getStats: () => errorStore.getStats(),
-      getRecoveryStats: () => errorStore.getRecoveryStats(),
-      isRecoveryEnabled: () => errorStore.isRecoveryEnabled(),
-      enableRecovery: (enabled: boolean) => {
-        errorStore.enableRecovery(enabled);
-        debugLogger.info(`Recovery ${enabled ? 'enabled' : 'disabled'}`);
-      },
-      getRecoveryHistory: () => errorStore.getRecoveryHistory(),
-      isRecoveryInProgress: () => errorStore.isRecoveryInProgress(),
-      clearErrors: () => {
-        errorStore.clearErrors();
-        debugLogger.info('Error store cleared');
-      },
-      exportErrors: () => errorStore.exportErrors(),
-      addTestError: () => {
-        addGlobalError('Test error for debugging', {
-          userActions: ['Debug test'],
-          additionalData: { source: 'ArchiCommDebug' },
-        });
-        debugLogger.info('Test error added');
-      },
-      addTestCriticalError: () => {
-        addGlobalError('Critical test error that should trigger recovery', {
-          userActions: ['Critical debug test'],
-          additionalData: { source: 'ArchiCommDebug', critical: true },
-        });
-        debugLogger.info('Critical test error added (should trigger recovery)');
-      },
-    },
-
-    // System utilities
     getSystemInfo: () => ({
       userAgent: navigator.userAgent,
       platform: navigator.platform,
       language: navigator.language,
-      cookieEnabled: navigator.cookieEnabled,
-      onLine: navigator.onLine,
-      memory: (performance as any).memory,
-      timing: performance.timing,
       url: window.location.href,
-      referrer: document.referrer,
       timestamp: new Date().toISOString(),
     }),
 
-    // Environment utilities
     environment: {
       isDevelopment: isDevelopment(),
       isTauri: isTauriEnvironment(),
       loggingReady,
       environmentReady,
-      recoveryReady,
     },
   };
 
-  // Make logger, error store, and DI container globally accessible for debugging
   (window as any).__ARCHICOMM_LOGGER__ = logger;
-  (window as any).__ARCHICOMM_ERROR_STORE__ = errorStore;
 
-  // DI container will be set when initialized
-  initializeDIContainer().then(container => {
-    if (container) {
-      (window as any).__ARCHICOMM_DI_CONTAINER__ = container;
-      debugLogger.info('DI container available globally as window.__ARCHICOMM_DI_CONTAINER__');
-    }
-  });
-
-  debugLogger.info('🛠️ Enhanced debug utilities available', {
-    ArchiCommDebug: 'window.ArchiCommDebug',
-    logger: 'window.__ARCHICOMM_LOGGER__',
-    errorStore: 'window.__ARCHICOMM_ERROR_STORE__',
-    diContainer: 'window.__ARCHICOMM_DI_CONTAINER__ (when initialized)',
-  });
+  debugLogger.info('🛠️ Debug utilities available at window.ArchiCommDebug');
 }

@@ -81,8 +81,8 @@ export const SmartTooltip = React.forwardRef<HTMLDivElement, SmartTooltipProps>(
   }, [content, learnFromUsage]);
 
   // Accessibility: Keyboard support
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+  useEffect((): (() => void) | undefined => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if (!isVisible) return;
 
       switch (event.key) {

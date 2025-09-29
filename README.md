@@ -148,70 +148,38 @@ New in this build:
 
 ---
 
-## Enhanced Audio Recording & Transcription
+## Audio Features (Community Edition)
 
-ArchiComm now supports multiple audio recording and transcription engines for maximum compatibility and performance:
+ArchiComm Community Edition provides simple, reliable audio recording and manual transcription:
 
-### Recording Engines
+### Recording
+- **MediaRecorder API**: Browser-native recording with pause/resume support
+- **Manual Transcription**: Rich text editor for typing your explanations
+- **Audio Playback**: Listen to your recordings while editing transcripts
 
-- **MediaRecorder API**: Browser-native recording with automatic format detection
-- **RecordRTC**: Enhanced cross-browser recording with pause/resume capabilities
-- **Native Recording**: High-quality desktop recording via Tauri/CPAL (desktop app only)
-
-### Transcription Engines
-
-- **Whisper-rs** (Primary): High-quality offline transcription using OpenAI Whisper models via Rust
-- **Transformers.js**: Browser-based offline transcription using Moonshine models
-- **Whisper.cpp WebAssembly**: High-performance browser-based Whisper implementation
-- **Web Speech API**: Real-time browser transcription for immediate feedback
-
-### Features
-
-- **Automatic Engine Selection**: Chooses the best available engine based on environment
-- **Fallback Support**: Gracefully falls back to alternative engines if primary fails
-- **Real-time Transcription**: Live transcription preview during recording
-- **Multiple Audio Formats**: Support for WebM, OGG, MP4, WAV, and MP3
-- **Audio Processing**: Automatic noise reduction, echo cancellation, and format conversion
-- **Rich Text Editing**: Enhanced transcript editor with formatting, timestamps, and highlighting
-- **Offline Capability**: Full transcription without internet connection (desktop app)
-- **Privacy-Focused**: Audio processing can be done entirely locally
+### Simplified Design
+- Single recording engine for maximum compatibility
+- No complex transcription dependencies
+- Manual transcript editing with word count and analysis
+- Export audio and transcript data together
 
 ### Usage
 
 ```typescript
-import { createAudioManager } from '@audio';
+import { SimpleAudioManager } from '@audio/SimpleAudioManager';
 
-// Initialize with automatic engine selection
-const audioManager = await createAudioManager({
-  enableRealtimeTranscription: true,
-  fallbackToWebSpeech: true
+// Initialize the simple audio manager
+const audioManager = new SimpleAudioManager({
+  maxDuration: 300000 // 5 minutes
 });
 
-// Start recording with real-time transcription
+// Start recording
 await audioManager.startRecording();
 
-// Stop and get both audio and transcript
-const result = await audioManager.stopRecording();
-console.log('Audio:', result.audio);
-console.log('Transcript:', result.transcript);
+// Stop and get audio data
+audioManager.stopRecording();
+// Audio data will be available via event listeners
 ```
-
-### Configuration
-
-The audio system can be configured through the AudioManager options:
-
-- `preferredRecordingEngine`: Choose specific recording engine
-- `preferredTranscriptionEngine`: Choose specific transcription engine
-- `enableRealtimeTranscription`: Enable live transcription during recording
-- `audioProcessingOptions`: Configure audio quality and processing
-
-### Dependencies
-
-New audio libraries added:
-- `@xenova/transformers`: Browser-based ML models
-- `recordrtc`: Enhanced audio recording
-- `lamejs`: MP3 encoding
-- Audio processing utilities for format conversion
 
 ---
 
@@ -226,9 +194,10 @@ ArchiComm Community Edition loads "Tasks" (study modules) that define prompts, a
 
 ## Canvas System Overview
 
-- Three-layer architecture: `DesignCanvas` (orchestration), `CanvasArea` (viewport + interactions), `CanvasComponent` (node rendering)
-- Performance manager: `CanvasPerformanceManager` tracks FPS, render time, memory; optimizes via batching and culling
-- Persistence: Tauri-backed JSON files in `$APPDATA/archicomm/projects/<id>.json` with web fallbacks
+- Simplified architecture: `DesignCanvas` integrates with `SimpleCanvas` (React Flow-based)
+- Simple state management: Zustand store (`SimpleAppStore`) replaces complex RxJS patterns
+- Component rendering: Single React Flow node type with customizable styling
+- Persistence: Local storage and export/import functionality
 
 ### Keyboard Shortcuts
 - V: Select, H: Pan, Z: Zoom, A: Annotate

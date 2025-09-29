@@ -6,7 +6,7 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useReactFlow, useOnViewportChange } from '@xyflow/react';
 import type { DesignComponent } from '../@shared/contracts';
-import { useOptimizedCallback, useOptimizedMemo } from '@/lib/performance/PerformanceOptimizer';
+import { useOptimizedCallback } from '@/lib/performance/PerformanceOptimizer';
 import {
   getComponentColor,
   getNodeStrokeColor,
@@ -108,17 +108,17 @@ export function useEnhancedMinimap({
   });
 
   // Optimized dimension calculations
-  const dimensions = useOptimizedMemo(() => {
+  const dimensions = useMemo(() => {
     return calculateMinimapDimensions(canvasSize);
   }, [canvasSize.width, canvasSize.height]);
 
   // Optimized configuration
-  const config = useOptimizedMemo(() => {
+  const config = useMemo(() => {
     return createMinimapConfig();
   }, [isMobile]);
 
   // Optimized component color mapping
-  const componentColorMap = useOptimizedMemo(() => {
+  const componentColorMap = useMemo(() => {
     const colorMap = new Map<string, string>();
     components.forEach(component => {
       colorMap.set(component.id, getComponentColor(component.type));

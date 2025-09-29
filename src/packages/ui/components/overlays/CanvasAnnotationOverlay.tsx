@@ -68,7 +68,7 @@ export const CanvasAnnotationOverlay = forwardRef<
     const [optimizationEnabled, setOptimizationEnabled] = useState(false);
 
     // Initialize optimizer and annotation manager
-    useEffect(() => {
+    useEffect((): (() => void) | undefined => {
       if (canvasRef.current && !annotationManager.current) {
         const canvas = canvasRef.current;
 
@@ -369,6 +369,7 @@ export const CanvasAnnotationOverlay = forwardRef<
           if (annotationManager.current) {
             return annotationManager.current.addAnnotation(x, y, type, content);
           }
+          return undefined;
         },
         getAnnotations: () => {
           return annotationManager.current?.getAnnotations() || [];

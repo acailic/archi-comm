@@ -32,7 +32,7 @@ export class InfiniteLoopErrorBoundary extends React.Component<
   InfiniteLoopErrorBoundaryProps,
   InfiniteLoopErrorBoundaryState
 > {
-  state: InfiniteLoopErrorBoundaryState = {
+  override state: InfiniteLoopErrorBoundaryState = {
     hasError: false,
     errorMessage: '',
     errorCount: 0,
@@ -63,7 +63,7 @@ export class InfiniteLoopErrorBoundary extends React.Component<
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     const detector = InfiniteLoopDetector.getInstance();
     const report = detector.getLatestReport('DesignCanvasCore');
 
@@ -93,7 +93,7 @@ export class InfiniteLoopErrorBoundary extends React.Component<
     );
   }
 
-  componentWillUnmount() {
+  override componentWillUnmount() {
     this.isUnmounted = true;
   }
 
@@ -178,12 +178,12 @@ export class InfiniteLoopErrorBoundary extends React.Component<
     this.props.onReset();
   };
 
-  render() {
+  override render() {
     if (!this.state.hasError) {
       return this.props.children;
     }
 
-    const { errorMessage, recovering, attemptedStages, syntheticError, lastReport } = this.state;
+    const { errorMessage, recovering, attemptedStages, lastReport } = this.state;
 
     const stageDescriptions: Record<RecoveryStage, string> = {
       flush: 'Flush pending design changes',
@@ -201,20 +201,13 @@ export class InfiniteLoopErrorBoundary extends React.Component<
           </div>
 
           <div className='text-xs text-left bg-muted/60 rounded-md p-3 space-y-1 font-mono whitespace-pre-wrap'>
-            {syntheticError?.meta ? (
-              <>
-                <div>renderCount: {syntheticError.meta.renderCount}</div>
-                <div>sinceFirstRenderMs: {Math.round(syntheticError.meta.sinceFirstRenderMs)}</div>
-                <div>sincePreviousRenderMs: {Math.round(syntheticError.meta.sincePreviousRenderMs)}</div>
-                {syntheticError.meta.memorySample?.deltaSinceBaseline != null ? (
-                  <div>memoryDelta: {syntheticError.meta.memorySample.deltaSinceBaseline}</div>
-                ) : null}
-              </>
-            ) : null}
             {lastReport ? (
-              <div>
-                detectorSeverity: {lastReport.severity} · recentRenders: {lastReport.metrics.renderCount}
-              </div>
+              <>
+                <div>Component: {lastReport.componentName}</div>
+                <div>Severity: {lastReport.severity}</div>
+                <div>Render Count: {lastReport.metrics.renderCount}</div>
+                <div>Since First: {lastReport.metrics.sinceFirstRenderMs}ms</div>
+              </>
             ) : null}
           </div>
 

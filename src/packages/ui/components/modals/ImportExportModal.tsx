@@ -4,6 +4,7 @@
 // RELEVANT FILES: DesignCanvas.tsx, DesignSerializer.ts, ImportExportDropdown.tsx
 
 import React, { useState, useCallback, useRef } from 'react';
+import { useGuardedState } from '@/lib/performance/useGuardedState';
 import {
   Dialog,
   DialogContent,
@@ -80,9 +81,12 @@ export function ImportExportModal({
     filename: challenge?.title ? `${challenge.title}-design` : 'archicomm-design',
   });
 
-  // Import state
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importOptions, setImportOptions] = useState<ImportOptions>({
+  // Import state - using guarded state for complex modal logic
+  const [importFile, setImportFile] = useGuardedState<File | null>(null, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
+  });
+  const [importOptions, setImportOptions] = useGuardedState<ImportOptions>({
     mode: 'replace',
     handleConflicts: 'auto',
     preserveIds: false,
@@ -90,16 +94,43 @@ export function ImportExportModal({
     validateComponents: true,
     importCanvas: true,
     importAnalytics: true,
+  }, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
   });
-  const [importPreview, setImportPreview] = useState<any>(null);
-  const [importConflicts, setImportConflicts] = useState<ImportConflict[]>([]);
+  const [importPreview, setImportPreview] = useGuardedState<any>(null, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
+  });
+  const [importConflicts, setImportConflicts] = useGuardedState<ImportConflict[]>([], {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
+  });
 
-  // UI state
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [dragActive, setDragActive] = useState(false);
+  // UI state - using guarded state for rapid state changes
+  const [isProcessing, setIsProcessing] = useGuardedState(false, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15,
+    onTrip: (count) => {
+      console.warn(`ImportExportModal processing state throttled after ${count} updates`);
+    }
+  });
+  const [progress, setProgress] = useGuardedState(0, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
+  });
+  const [error, setError] = useGuardedState<string | null>(null, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
+  });
+  const [success, setSuccess] = useGuardedState<string | null>(null, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
+  });
+  const [dragActive, setDragActive] = useGuardedState(false, {
+    componentName: 'ImportExportModal',
+    maxUpdatesPerTick: 15
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const serializer = useRef(new DesignSerializer());
