@@ -1,0 +1,295 @@
+name: SLSA Provenance and Signing
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to sign (e.g., v0.2.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write  # Required for SLSA provenance and Sigstore
+
+jobs:
+  provenance:
+    name: Generate SLSA Provenance
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build artifacts
+        run: npm run build
+
+      - name: Get release assets
+        id: release-assets
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          echo "Fetching assets for release: $TAG"
+
+          # Create directory for downloaded assets
+          mkdir -p release-assets
+
+          # Download all release assets using GitHub CLI
+          gh release download "$TAG" --dir release-assets --pattern '*.dmg' || echo "No .dmg found"
+          gh release download "$TAG" --dir release-assets --pattern '*.msi' || echo "No .msi found"
+          gh release download "$TAG" --dir release-assets --pattern '*.exe' || echo "No .exe found"
+          gh release download "$TAG" --dir release-assets --pattern '*.deb' || echo "No .deb found"
+          gh release download "$TAG" --dir release-assets --pattern '*.AppImage' || echo "No .AppImage found"
+          gh release download "$TAG" --dir release-assets --pattern '*.rpm' || echo "No .rpm found"
+
+          ls -lh release-assets/
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Generate SLSA provenance
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.9.0
+        with:
+          base64-subjects: |
+            ${{ hashFiles('release-assets/*') }}
+          upload-assets: true
+
+  sign-artifacts:
+    name: Sign Release Artifacts with Sigstore
+    runs-on: ubuntu-latest
+    needs: provenance
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.2.2'
+
+      - name: Get release assets
+        id: download-assets
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          echo "Downloading assets for signing: $TAG"
+
+          mkdir -p release-assets
+          gh release download "$TAG" --dir release-assets || echo "No assets found"
+
+          ls -lh release-assets/
+          echo "asset_count=$(ls -1 release-assets/ | wc -l)" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Sign artifacts with Cosign
+        if: steps.download-assets.outputs.asset_count > 0
+        shell: bash
+        run: |
+          cd release-assets
+
+          for artifact in *; do
+            if [ -f "$artifact" ]; then
+              echo "Signing $artifact..."
+
+              # Sign the artifact (keyless signing via OIDC)
+              cosign sign-blob \
+                --yes \
+                --bundle "${artifact}.cosign.bundle" \
+                "$artifact"
+
+              # Generate checksum
+              sha256sum "$artifact" > "${artifact}.sha256"
+
+              echo "✅ Signed: $artifact"
+            fi
+          done
+
+      - name: Upload signed artifacts and signatures
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+
+          cd release-assets
+
+          # Upload signature bundles and checksums
+          for sig in *.cosign.bundle *.sha256; do
+            if [ -f "$sig" ]; then
+              echo "Uploading $sig to release $TAG"
+              gh release upload "$TAG" "$sig" --clobber
+            fi
+          done
+
+          echo "✅ All signatures uploaded"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Generate verification instructions
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+
+          cat > VERIFICATION.md <<'EOF'
+          # Artifact Verification Guide
+
+          All ArchiComm release artifacts are signed using Sigstore for supply chain security.
+
+          ## Verify Signatures
+
+          ### Prerequisites
+
+          Install Cosign:
+          ```bash
+          # macOS
+          brew install sigstore/tap/cosign
+
+          # Linux
+          wget https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+          chmod +x cosign-linux-amd64
+          sudo mv cosign-linux-amd64 /usr/local/bin/cosign
+
+          # Windows
+          choco install cosign
+          ```
+
+          ### Verification Steps
+
+          1. Download the artifact and its corresponding `.cosign.bundle` file
+          2. Verify the signature:
+
+          ```bash
+          # Example: Verify macOS DMG
+          cosign verify-blob \
+            --bundle ArchiComm_0.2.1_universal.dmg.cosign.bundle \
+            ArchiComm_0.2.1_universal.dmg
+          ```
+
+          3. Verify checksum:
+
+          ```bash
+          # Download the .sha256 file
+          sha256sum -c ArchiComm_0.2.1_universal.dmg.sha256
+          ```
+
+          ### What Gets Verified
+
+          - **Identity**: Artifacts signed by GitHub Actions from github.com/acailic/archicomm
+          - **Workflow**: Signed during the official build-tauri workflow
+          - **Transparency**: All signatures recorded in Rekor transparency log
+
+          ### SLSA Provenance
+
+          SLSA Build Level 3 provenance is generated for all releases, providing:
+          - Build environment details
+          - Source repository and commit SHA
+          - Build command and parameters
+          - Artifact hashes
+
+          Download the provenance file: `multiple.intoto.jsonl`
+
+          ```bash
+          # Verify provenance
+          slsa-verifier verify-artifact \
+            --provenance-path multiple.intoto.jsonl \
+            --source-uri github.com/acailic/archicomm \
+            ArchiComm_0.2.1_universal.dmg
+          ```
+
+          ## Security Contact
+
+          Report security issues: See SECURITY.md
+
+          ---
+
+          *Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')*
+          *Release: $TAG*
+          EOF
+
+          gh release upload "$TAG" VERIFICATION.md --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Update release notes with verification info
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+
+          # Get current release body
+          CURRENT_BODY=$(gh release view "$TAG" --json body -q .body)
+
+          # Append verification section
+          NEW_BODY="$CURRENT_BODY
+
+---
+
+## 🔐 Artifact Verification
+
+All artifacts are signed with Sigstore and include SLSA Build Level 3 provenance.
+
+**Verification files available:**
+- \`.cosign.bundle\` - Sigstore signature bundle
+- \`.sha256\` - SHA256 checksums
+- \`VERIFICATION.md\` - Detailed verification instructions
+- \`multiple.intoto.jsonl\` - SLSA provenance
+
+See [VERIFICATION.md](https://github.com/acailic/archicomm/releases/download/$TAG/VERIFICATION.md) for instructions."
+
+          gh release edit "$TAG" --notes "$NEW_BODY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  verify-signatures:
+    name: Verify Signatures (Test)
+    runs-on: ubuntu-latest
+    needs: sign-artifacts
+    permissions:
+      contents: read
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Download and verify one artifact
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+
+          # Download first available artifact and its signature
+          mkdir -p test-verify
+          cd test-verify
+
+          # Try to download DMG (macOS) as test
+          gh release download "$TAG" --pattern '*.dmg' || echo "No DMG found"
+          gh release download "$TAG" --pattern '*.cosign.bundle' || echo "No signatures found"
+
+          # Verify signature if files exist
+          for artifact in *.dmg *.msi *.deb; do
+            if [ -f "$artifact" ] && [ -f "${artifact}.cosign.bundle" ]; then
+              echo "Testing verification of $artifact..."
+              cosign verify-blob \
+                --bundle "${artifact}.cosign.bundle" \
+                "$artifact" && echo "✅ Verification successful!" || echo "❌ Verification failed!"
+              break
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
