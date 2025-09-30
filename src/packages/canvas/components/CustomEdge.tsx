@@ -17,8 +17,9 @@ import {
   getStraightPath,
 } from "@xyflow/react";
 import React, { useId, useMemo } from "react";
+import { isDevelopment } from "../../../lib/config/environment";
 
-interface CustomEdgeData {
+interface CustomEdgeData extends Record<string, unknown> {
   connection: Connection;
   connectionStyle: "straight" | "curved" | "stepped";
   isSelected: boolean;
@@ -39,7 +40,6 @@ function CustomEdgeInner({
   sourcePosition,
   targetPosition,
   style = {},
-  markerEnd,
   data,
 }: CustomEdgeProps) {
   const uniqueId = useId();
@@ -106,17 +106,29 @@ function CustomEdgeInner({
     connectionStyle,
   ]);
 
-  // Edge styling
-  const visualStyleColor = connection.visualStyle
-    ? visualStyleColors[
-        connection.visualStyle as keyof typeof visualStyleColors
-      ]
+  // Edge styling with proper type guards
+  const isValidVisualStyle = (
+    style: unknown
+  ): style is keyof typeof visualStyleColors => {
+    return typeof style === "string" && style in visualStyleColors;
+  };
+
+  const isValidConnectionType = (
+    type: unknown
+  ): type is keyof typeof connectionColors => {
+    return typeof type === "string" && type in connectionColors;
+  };
+
+  const visualStyleColor =
+    connection.visualStyle && isValidVisualStyle(connection.visualStyle)
+      ? visualStyleColors[connection.visualStyle]
+      : null;
+
+  const connectionTypeColor = isValidConnectionType(connection.type)
+    ? connectionColors[connection.type]
     : null;
 
-  const color =
-    visualStyleColor ||
-    connectionColors[connection.type as keyof typeof connectionColors] ||
-    "#3b82f6";
+  const color = visualStyleColor || connectionTypeColor || "#3b82f6";
 
   // Determine stroke dash array based on visual style and connection type
   const getStrokeDashArray = () => {
@@ -268,9 +280,6 @@ const edgePropsEquality = (
   if (prev.data.connection.visualStyle !== next.data.connection.visualStyle)
     return false;
 
-  // Check other props
-  if (prev.markerEnd !== next.markerEnd) return false;
-
   return true;
 };
 
@@ -279,7 +288,7 @@ export const CustomEdge = createHotLeafComponent(CustomEdgeInner, {
   equalityFn: edgePropsEquality,
   trackPerformance: true,
   displayName: "CustomEdge",
-  debugMode: import.meta.env.DEV,
+  debugMode: isDevelopment(),
   frequencyThreshold: 10, // Edges can re-render frequently during interactions
 });
 

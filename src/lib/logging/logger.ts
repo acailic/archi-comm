@@ -3,15 +3,20 @@
  * Provides structured logging with environment awareness and performance integration
  */
 
-import { isDevelopment, isProduction, isTauriEnvironment, CONFIG } from '../config/environment';
+import {
+  CONFIG,
+  isDevelopment,
+  isProduction,
+  isTauriEnvironment,
+} from "../config/environment";
 
 // Safe JSON stringify that tolerates circular references and non-serializable values
 export function safeStringify(value: unknown, space?: number): string {
   const seen = new WeakSet();
   const replacer = (_key: string, val: unknown) => {
-    if (typeof val === 'object' && val !== null) {
+    if (typeof val === "object" && val !== null) {
       if (seen.has(val)) {
-        return '[Circular]';
+        return "[Circular]";
       }
       try {
         seen.add(val);
@@ -19,13 +24,14 @@ export function safeStringify(value: unknown, space?: number): string {
         // ignore if cannot add
       }
     }
-    if (typeof val === 'function') return `[Function ${(val as Function).name || 'anonymous'}]`;
+    if (typeof val === "function")
+      return `[Function ${(val as Function).name || "anonymous"}]`;
     if (val instanceof Error) {
       return { name: val.name, message: val.message, stack: val.stack };
     }
     // Let JSON.stringify handle undefined normally so object keys are omitted
     if (val === undefined) return undefined as unknown as string;
-    if (typeof val === 'symbol') return (val as symbol).toString();
+    if (typeof val === "symbol") return (val as symbol).toString();
     return val;
   };
   try {
@@ -34,11 +40,11 @@ export function safeStringify(value: unknown, space?: number): string {
     try {
       return String(value);
     } catch {
-      return '[Unserializable]';
+      return "[Unserializable]";
     }
   }
 }
-import { PerformanceMonitor } from '@lib/performance/PerformanceMonitor';
+// import { PerformanceMonitor } from '@lib/performance/PerformanceMonitor';
 
 // Log levels with numeric values for filtering
 export enum LogLevel {
@@ -101,27 +107,27 @@ export interface LogSink {
 // Console sink implementation
 class ConsoleSink implements LogSink {
   private readonly colors = {
-    [LogLevel.TRACE]: '\x1b[90m', // Gray
-    [LogLevel.DEBUG]: '\x1b[36m', // Cyan
-    [LogLevel.INFO]: '\x1b[32m', // Green
-    [LogLevel.WARN]: '\x1b[33m', // Yellow
-    [LogLevel.ERROR]: '\x1b[31m', // Red
-    [LogLevel.FATAL]: '\x1b[35m', // Magenta
+    [LogLevel.TRACE]: "\x1b[90m", // Gray
+    [LogLevel.DEBUG]: "\x1b[36m", // Cyan
+    [LogLevel.INFO]: "\x1b[32m", // Green
+    [LogLevel.WARN]: "\x1b[33m", // Yellow
+    [LogLevel.ERROR]: "\x1b[31m", // Red
+    [LogLevel.FATAL]: "\x1b[35m", // Magenta
   };
 
-  private readonly reset = '\x1b[0m';
+  private readonly reset = "\x1b[0m";
 
   write(entry: LogEntry): void {
     const color = this.colors[entry.level];
     const timestamp = new Date(entry.timestamp).toISOString();
-    const scope = entry.scope ? `[${entry.scope}]` : '';
+    const scope = entry.scope ? `[${entry.scope}]` : "";
     const level = entry.levelName.padEnd(5);
 
     let message = `${color}${timestamp} ${level}${this.reset} ${scope} ${entry.message}`;
 
     if (
       entry.data &&
-      typeof entry.data === 'object' &&
+      typeof entry.data === "object" &&
       entry.data !== null &&
       Object.keys(entry.data).length > 0
     ) {
@@ -191,35 +197,38 @@ class MemoryBufferSink implements LogSink {
     since?: number;
     search?: string;
   }): LogEntry[] {
-    return this.buffer.filter(entry => {
+    return this.buffer.filter((entry) => {
       if (filter.level !== undefined && entry.level < filter.level) {
         return false;
       }
 
       if (
-        typeof filter.scope === 'string' &&
-        filter.scope !== '' &&
+        typeof filter.scope === "string" &&
+        filter.scope !== "" &&
         !entry.scope.includes(filter.scope)
       ) {
         return false;
       }
 
-      if (typeof filter.since === 'number' && entry.timestamp < filter.since) {
+      if (typeof filter.since === "number" && entry.timestamp < filter.since) {
         return false;
       }
 
-      if (typeof filter.search === 'string') {
+      if (typeof filter.search === "string") {
         const searchLower = filter.search.toLowerCase();
         const messageMatch = entry.message.toLowerCase().includes(searchLower);
         let dataMatch = false;
         try {
           dataMatch = !!(
-            entry.data && safeStringify(entry.data).toLowerCase().includes(searchLower)
+            entry.data &&
+            safeStringify(entry.data).toLowerCase().includes(searchLower)
           );
         } catch {
           dataMatch = false;
         }
-        const errorMatch = entry.error?.message.toLowerCase().includes(searchLower);
+        const errorMatch = entry.error?.message
+          .toLowerCase()
+          .includes(searchLower);
 
         if (!messageMatch && !dataMatch && !errorMatch) {
           return false;
@@ -230,37 +239,41 @@ class MemoryBufferSink implements LogSink {
     });
   }
 
-  exportLogs(format: 'json' | 'csv' | 'txt' = 'json'): string {
+  exportLogs(format: "json" | "csv" | "txt" = "json"): string {
     switch (format) {
-      case 'json':
+      case "json":
         return safeStringify(this.buffer, 2);
 
-      case 'csv': {
-        const headers = 'Timestamp,Level,Scope,Message,Data,Error\n';
+      case "csv": {
+        const headers = "Timestamp,Level,Scope,Message,Data,Error\n";
         const rows = this.buffer
-          .map(entry => {
+          .map((entry) => {
             const timestamp = new Date(entry.timestamp).toISOString();
-            const data = entry.data ? safeStringify(entry.data).replace(/"/g, '""') : '';
-            const error = entry.error ? entry.error.message.replace(/"/g, '""') : '';
+            const data = entry.data
+              ? safeStringify(entry.data).replace(/"/g, '""')
+              : "";
+            const error = entry.error
+              ? entry.error.message.replace(/"/g, '""')
+              : "";
             return `"${timestamp}","${entry.levelName}","${entry.scope}","${entry.message.replace(/"/g, '""')}","${data}","${error}"`;
           })
-          .join('\n');
+          .join("\n");
         return headers + rows;
       }
 
-      case 'txt':
+      case "txt":
         return this.buffer
-          .map(entry => {
+          .map((entry) => {
             const timestamp = new Date(entry.timestamp).toISOString();
-            let line = `${timestamp} [${entry.levelName}] ${entry.scope ? `[${entry.scope}] ` : ''}${entry.message}`;
+            let line = `${timestamp} [${entry.levelName}] ${entry.scope ? `[${entry.scope}] ` : ""}${entry.message}`;
             if (entry.data) line += ` | Data: ${safeStringify(entry.data)}`;
             if (entry.error) line += ` | Error: ${entry.error.message}`;
             return line;
           })
-          .join('\n');
+          .join("\n");
 
       default:
-        return this.exportLogs('json');
+        return this.exportLogs("json");
     }
   }
 
@@ -301,7 +314,7 @@ class FileSink implements LogSink {
   private isWriting = false;
   private available = true;
 
-  constructor(filePath: string = 'archicomm.log') {
+  constructor(filePath: string = "archicomm.log") {
     this.filePath = filePath;
   }
 
@@ -326,14 +339,16 @@ class FileSink implements LogSink {
 
     try {
       // Import Tauri APIs dynamically
-      const { writeTextFile, BaseDirectory } = await import('@tauri-apps/api/fs');
+      const { writeTextFile, BaseDirectory } = await import(
+        "@tauri-apps/api/fs"
+      );
 
       const entries = this.writeQueue.splice(0);
       const logLines =
         entries
-          .map(entry => {
+          .map((entry) => {
             const timestamp = new Date(entry.timestamp).toISOString();
-            const scope = entry.scope ? `[${entry.scope}]` : '';
+            const scope = entry.scope ? `[${entry.scope}]` : "";
             let line = `${timestamp} [${entry.levelName}] ${scope} ${entry.message}`;
 
             if (entry.data) {
@@ -353,7 +368,7 @@ class FileSink implements LogSink {
 
             return line;
           })
-          .join('\n') + '\n';
+          .join("\n") + "\n";
 
       try {
         await writeTextFile(this.filePath, logLines, {
@@ -361,21 +376,21 @@ class FileSink implements LogSink {
           append: true,
         });
       } catch (innerErr: any) {
-        const msg = String(innerErr?.message || innerErr || '');
+        const msg = String(innerErr?.message || innerErr || "");
         // If scope/path not allowed, disable file sink to avoid noisy errors
-        if (msg.includes('path not allowed') || msg.includes('scope')) {
+        if (msg.includes("path not allowed") || msg.includes("scope")) {
           this.available = false;
           console.warn(
-            'File logging disabled (insufficient Tauri fs scope for AppLog). Falling back to memory/console only.'
+            "File logging disabled (insufficient Tauri fs scope for AppLog). Falling back to memory/console only."
           );
           // Swallow remaining queue
           this.writeQueue = [];
         } else {
-          console.error('Failed to write to log file:', innerErr);
+          console.error("Failed to write to log file:", innerErr);
         }
       }
     } catch (error) {
-      console.error('Failed to initialize file logging:', error);
+      console.error("Failed to initialize file logging:", error);
     } finally {
       this.isWriting = false;
 
@@ -396,10 +411,14 @@ export class Logger {
   private config: LoggerConfig;
   private sinks: LogSink[] = [];
   private scope: string;
-  private performanceMonitor?: PerformanceMonitor;
+  private performanceMonitor?: any; // PerformanceMonitor;
   private sessionId: string;
 
-  constructor(scope: string = 'app', config?: Partial<LoggerConfig>, sharedSinks?: LogSink[]) {
+  constructor(
+    scope: string = "app",
+    config?: Partial<LoggerConfig>,
+    sharedSinks?: LogSink[]
+  ) {
     this.scope = scope;
     this.sessionId = this.generateSessionId();
 
@@ -428,7 +447,7 @@ export class Logger {
 
   private getDefaultLogLevel(): LogLevel {
     // Check environment variable first
-    const envLevel = import.meta.env.VITE_LOG_LEVEL?.toUpperCase();
+    const envLevel = (import.meta as any).env?.VITE_LOG_LEVEL?.toUpperCase();
     if (envLevel && envLevel in LogLevel) {
       return LogLevel[envLevel as keyof typeof LogLevel];
     }
@@ -450,7 +469,12 @@ export class Logger {
     }
 
     if (this.config.enableMemoryBuffer) {
-      sinks.push(new MemoryBufferSink(this.config.maxBufferSize, this.config.bufferFlushInterval));
+      sinks.push(
+        new MemoryBufferSink(
+          this.config.maxBufferSize,
+          this.config.bufferFlushInterval
+        )
+      );
     }
 
     if (this.config.enableFileLogging) {
@@ -463,7 +487,7 @@ export class Logger {
   private initializePerformanceMonitor(): void {
     if (this.config.includePerformanceMetrics) {
       try {
-        this.performanceMonitor = PerformanceMonitor.getInstance('basic');
+        // this.performanceMonitor = PerformanceMonitor.getInstance('basic');
       } catch (error) {
         // Performance monitor not available, continue without it
       }
@@ -474,7 +498,12 @@ export class Logger {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private createLogEntry(level: LogLevel, message: string, data?: any, error?: Error): LogEntry {
+  private createLogEntry(
+    level: LogLevel,
+    message: string,
+    data?: any,
+    error?: Error
+  ): LogEntry {
     const entry: LogEntry = {
       timestamp: Date.now(),
       level,
@@ -484,8 +513,9 @@ export class Logger {
       data,
       error,
       context: {
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-        url: typeof window !== 'undefined' ? window.location.href : undefined,
+        userAgent:
+          typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        url: typeof window !== "undefined" ? window.location.href : undefined,
         sessionId: this.sessionId,
       },
     };
@@ -500,9 +530,9 @@ export class Logger {
       try {
         const perf: any = {};
         const fps = this.performanceMonitor.getCurrentFPS();
-        if (typeof fps === 'number') perf.fps = fps;
+        if (typeof fps === "number") perf.fps = fps;
         const mem = (performance as any).memory?.usedJSHeapSize;
-        if (typeof mem === 'number') perf.memory = mem;
+        if (typeof mem === "number") perf.memory = mem;
         if (Object.keys(perf).length > 0) {
           entry.performance = perf;
         }
@@ -519,11 +549,11 @@ export class Logger {
       return; // Skip if below configured level
     }
 
-    const writePromises = this.sinks.map(async sink => {
+    const writePromises = this.sinks.map(async (sink) => {
       try {
         await sink.write(entry);
       } catch (error) {
-        console.error('Failed to write to sink:', error);
+        console.error("Failed to write to sink:", error);
       }
     });
 
@@ -583,7 +613,8 @@ export class Logger {
 
       this.debug(`Operation completed: ${label}`, {
         duration: Math.round(duration * 100) / 100,
-        memoryDelta: endMemory && startMemory ? endMemory - startMemory : undefined,
+        memoryDelta:
+          endMemory && startMemory ? endMemory - startMemory : undefined,
       });
 
       return result;
@@ -594,7 +625,10 @@ export class Logger {
     }
   }
 
-  async measureAsync<T>(label: string, operation: () => Promise<T>): Promise<T> {
+  async measureAsync<T>(
+    label: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
     const start = performance.now();
     const startMemory = (performance as any).memory?.usedJSHeapSize;
 
@@ -605,7 +639,8 @@ export class Logger {
 
       this.debug(`Async operation completed: ${label}`, {
         duration: Math.round(duration * 100) / 100,
-        memoryDelta: endMemory && startMemory ? endMemory - startMemory : undefined,
+        memoryDelta:
+          endMemory && startMemory ? endMemory - startMemory : undefined,
       });
 
       return result;
@@ -639,7 +674,7 @@ export class Logger {
   // Memory buffer access
   getMemoryBuffer(): LogEntry[] {
     const memoryBuffer = this.sinks.find(
-      (sink: any) => sink && typeof sink.getBuffer === 'function'
+      (sink: any) => sink && typeof sink.getBuffer === "function"
     ) as any;
     return memoryBuffer ? memoryBuffer.getBuffer() : [];
   }
@@ -651,26 +686,31 @@ export class Logger {
     search?: string;
   }): LogEntry[] {
     const memoryBuffer = this.sinks.find(
-      (sink: any) => sink && typeof sink.getBuffer === 'function'
+      (sink: any) => sink && typeof sink.getBuffer === "function"
     ) as any;
     return memoryBuffer ? memoryBuffer.getFilteredBuffer(filter) : [];
   }
 
-  exportLogs(format: 'json' | 'csv' | 'txt' = 'json'): string {
+  exportLogs(format: "json" | "csv" | "txt" = "json"): string {
     const memoryBuffer = this.sinks.find(
-      (sink: any) => sink && typeof sink.getBuffer === 'function'
+      (sink: any) => sink && typeof sink.getBuffer === "function"
     ) as any;
-    return memoryBuffer ? memoryBuffer.exportLogs(format) : '';
+    return memoryBuffer ? memoryBuffer.exportLogs(format) : "";
   }
 
-  downloadLogs(filename?: string, format: 'json' | 'csv' | 'txt' = 'json'): void {
+  downloadLogs(
+    filename?: string,
+    format: "json" | "csv" | "txt" = "json"
+  ): void {
     const logs = this.exportLogs(format);
     const blob = new Blob([logs], { type: this.getMimeType(format) });
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = filename || `archicomm-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+    a.download =
+      filename ||
+      `archicomm-logs-${new Date().toISOString().split("T")[0]}.${format}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -679,20 +719,20 @@ export class Logger {
 
   private getMimeType(format: string): string {
     switch (format) {
-      case 'json':
-        return 'application/json';
-      case 'csv':
-        return 'text/csv';
-      case 'txt':
-        return 'text/plain';
+      case "json":
+        return "application/json";
+      case "csv":
+        return "text/csv";
+      case "txt":
+        return "text/plain";
       default:
-        return 'text/plain';
+        return "text/plain";
     }
   }
 
   clearLogs(): void {
     const memoryBuffer = this.sinks.find(
-      (sink: any) => sink && typeof sink.getBuffer === 'function'
+      (sink: any) => sink && typeof sink.getBuffer === "function"
     ) as any;
     if (memoryBuffer) {
       memoryBuffer.clear();
@@ -701,12 +741,12 @@ export class Logger {
 
   // Cleanup
   async flush(): Promise<void> {
-    const flushPromises = this.sinks.map(async sink => {
+    const flushPromises = this.sinks.map(async (sink) => {
       if (sink.flush) {
         try {
           await sink.flush();
         } catch (error) {
-          console.error('Failed to flush sink:', error);
+          console.error("Failed to flush sink:", error);
         }
       }
     });
@@ -717,12 +757,12 @@ export class Logger {
   async close(): Promise<void> {
     await this.flush();
 
-    const closePromises = this.sinks.map(async sink => {
+    const closePromises = this.sinks.map(async (sink) => {
       if (sink.close) {
         try {
           await sink.close();
         } catch (error) {
-          console.error('Failed to close sink:', error);
+          console.error("Failed to close sink:", error);
         }
       }
     });
@@ -735,14 +775,17 @@ export class Logger {
 let globalLogger: Logger | null = null;
 
 // Factory function for creating loggers
-export function createLogger(scope?: string, config?: Partial<LoggerConfig>): Logger {
+export function createLogger(
+  scope?: string,
+  config?: Partial<LoggerConfig>
+): Logger {
   return new Logger(scope, config);
 }
 
 // Get or create global logger
 export function getLogger(scope?: string): Logger {
   if (!globalLogger) {
-    globalLogger = new Logger('global');
+    globalLogger = new Logger("global");
   }
 
   return scope ? globalLogger.child(scope) : globalLogger;
@@ -760,7 +803,8 @@ export const logger = {
     getLogger().fatal(message, error, data),
   time: (label: string) => getLogger().time(label),
   timeEnd: (label: string) => getLogger().timeEnd(label),
-  measure: <T>(label: string, operation: () => T) => getLogger().measure(label, operation),
+  measure: <T>(label: string, operation: () => T) =>
+    getLogger().measure(label, operation),
   measureAsync: <T>(label: string, operation: () => Promise<T>) =>
     getLogger().measureAsync(label, operation),
   child: (scope: string) => getLogger().child(scope),
@@ -769,24 +813,42 @@ export const logger = {
   isLevelEnabled: (level: LogLevel) => getLogger().isLevelEnabled(level),
   getMemoryBuffer: () => getLogger().getMemoryBuffer(),
   getFilteredLogs: (filter: any) => getLogger().getFilteredLogs(filter),
-  exportLogs: (format?: 'json' | 'csv' | 'txt') => getLogger().exportLogs(format),
-  downloadLogs: (filename?: string, format?: 'json' | 'csv' | 'txt') =>
+  exportLogs: (format?: "json" | "csv" | "txt") =>
+    getLogger().exportLogs(format),
+  downloadLogs: (filename?: string, format?: "json" | "csv" | "txt") =>
     getLogger().downloadLogs(filename, format),
   clearLogs: () => getLogger().clearLogs(),
   flush: () => getLogger().flush(),
   close: () => getLogger().close(),
+
+  // Additional convenience methods for specific use cases
+  dev: (message: string, data?: unknown) => {
+    if (isDevelopment()) {
+      getLogger().debug(`[DEV] ${message}`, data);
+    }
+  },
+
+  perf: (message: string, data?: unknown) => {
+    if (isDevelopment() || getLogger().isLevelEnabled(LogLevel.DEBUG)) {
+      getLogger().debug(`[PERF] ${message}`, data);
+    }
+  },
+
+  user: (message: string, data?: unknown) => {
+    // User-facing messages that may be displayed in UI
+    getLogger().info(`[USER] ${message}`, data);
+  },
 };
 
 // Initialize global logger in development
 if (isDevelopment()) {
-  globalLogger = new Logger('archicomm');
-  globalLogger.info('ArchiComm logging system initialized', {
-    environment: isDevelopment() ? 'development' : 'production',
-    runtime: isTauriEnvironment() ? 'tauri' : 'web',
+  globalLogger = new Logger("archicomm");
+  globalLogger.info("ArchiComm logging system initialized", {
+    environment: isDevelopment() ? "development" : "production",
+    runtime: isTauriEnvironment() ? "tauri" : "web",
     level: LogLevel[globalLogger.getLevel()],
   });
 }
 
-// Export types and utilities (avoid re-exporting LogLevel to prevent duplicate export)
-export type { LogEntry, LoggerConfig, LogSink };
+// Export types and utilities
 export default logger;

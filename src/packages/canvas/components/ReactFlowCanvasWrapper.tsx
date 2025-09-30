@@ -1,6 +1,3 @@
-import { useAnnouncer } from "@/shared/hooks/useAccessibility";
-import { equalityFunctions } from "@/shared/utils/memoization";
-import { EnhancedErrorBoundary } from "@ui/components/ErrorBoundary/EnhancedErrorBoundary";
 import {
   Background,
   BackgroundVariant,
@@ -11,7 +8,10 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { Connection, DesignComponent, InfoCard } from "../../../types";
+import { useAnnouncer } from "../../../shared/hooks/useAccessibility";
+import { equalityFunctions } from "../../../shared/utils/memoization";
+import { EnhancedErrorBoundary } from "../../ui/components/ErrorBoundary/EnhancedErrorBoundary";
+import { Connection, DesignComponent, InfoCard } from "../types";
 import { CanvasController } from "./CanvasController";
 import { CanvasInteractionLayer } from "./CanvasInteractionLayer";
 import { EdgeLayer } from "./EdgeLayer";
@@ -123,7 +123,7 @@ const ReactFlowCanvasWrapperComponent: React.FC<
     );
     if (connection) {
       announce(
-        `Connection from ${connection.source} to ${connection.target} selected`
+        `Connection from ${connection.from} to ${connection.to} selected`
       );
     }
   }, [announce, connections, selectedConnectionId]);

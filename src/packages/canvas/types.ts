@@ -1,12 +1,19 @@
 /**
- * src/features/canvas/types.ts
+ * src/packages/canvas/types.ts
  * Shared type definitions for canvas components
  * Centralizes CustomNodeData and other canvas types to avoid cyclic dependencies
- * RELEVANT FILES: CustomNode.tsx, CustomNodeView.tsx, useNodePresenter.ts, ReactFlowCanvas.tsx
+ * RELEVANT FILES: CustomNode.tsx, CustomNodeView.tsx, useNodePresenter.ts, ReactFlowCanvas.tsx, ReactFlowCanvasWrapper.tsx
  */
 
-import type { Node } from '@xyflow/react';
-import type { DesignComponent } from '@shared/contracts';
+import type { Node } from "@xyflow/react";
+import type { DesignComponent } from "../../shared/contracts";
+
+// Re-export shared types for convenience
+export type {
+  Connection,
+  DesignComponent,
+  InfoCard,
+} from "../../shared/contracts";
 
 // Define the custom node data type for React Flow
 export interface CustomNodeData extends Record<string, unknown> {
@@ -17,10 +24,13 @@ export interface CustomNodeData extends Record<string, unknown> {
   layerZIndex?: number;
   isVisible?: boolean;
   connectionCount?: number;
-  healthStatus?: 'healthy' | 'warning' | 'error';
-  visualTheme?: 'serious' | 'playful';
+  healthStatus?: "healthy" | "warning" | "error";
+  visualTheme?: "serious" | "playful";
   onSelect: (id: string) => void;
-  onStartConnection: (id: string, position?: 'top' | 'bottom' | 'left' | 'right') => void;
+  onStartConnection: (
+    id: string,
+    position?: "top" | "bottom" | "left" | "right"
+  ) => void;
   onDuplicate?: (componentId: string) => void;
   onBringToFront?: (componentId: string) => void;
   onSendToBack?: (componentId: string) => void;

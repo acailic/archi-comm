@@ -74,7 +74,13 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     []
   );
 
-  const { components, connections, infoCards, selectedComponentId } =
+  const {
+    components,
+    connections,
+    infoCards,
+    selectedComponentId,
+    connectionStart,
+  } =
     useOptimizedSelector(
       canvasSource,
       (state: any) => ({
@@ -82,6 +88,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
         connections: state.connections,
         infoCards: state.infoCards,
         selectedComponentId: state.selectedComponent,
+        connectionStart: state.connectionStart,
       }),
       { debugLabel: "DesignCanvas.canvasState", equalityFn: shallow }
     );
@@ -206,6 +213,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     handleComponentSelect,
     handleDeleteComponent,
     handleCompleteConnection,
+    handleStartConnection,
     handleConnectionDelete,
     handleInfoCardAdd,
     handleInfoCardUpdate,
@@ -248,6 +256,8 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             components={components}
             connections={connections}
             selectedComponent={selectedComponentId ?? null}
+            connectionStart={connectionStart ?? null}
+            onConnectionStart={handleStartConnection}
             onComponentSelect={handleComponentSelect}
             onComponentMove={(id, x, y) => handleComponentMove(id, x, y)}
             onComponentDelete={handleDeleteComponent}
