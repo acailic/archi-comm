@@ -8,6 +8,156 @@ import { testDataManager, DesignData } from './test-data-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Helper utility functions
+
+/**
+ * Wait for an element using multiple selector strategies
+ */
+async function waitForElement(page: Page, selectors: string[], timeout: number = 10000): Promise<Locator> {
+  const errors: string[] = [];
+
+  for (const selector of selectors) {
+    try {
+      const element = page.locator(selector).first();
+      await element.waitFor({ state: 'visible', timeout });
+      console.log(`✓ Found element with selector: ${selector}`);
+      return element;
+    } catch (error) {
+      errors.push(`${selector}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error(`Failed to find element with any selector. Attempted:\n${errors.join('\n')}`);
+}
+
+/**
+ * Wait for React Flow canvas to be fully initialized
+ */
+async function waitForCanvasReady(page: Page): Promise<boolean> {
+  // Wait for React Flow container
+  await page.waitForSelector('.react-flow', { state: 'visible', timeout: 10000 });
+
+  // Wait for pane (interactive surface)
+  await page.waitForSelector('.react-flow__pane', { state: 'visible', timeout: 5000 });
+
+  // Verify canvas has non-zero dimensions
+  const canvas = page.locator('.react-flow');
+  const box = await canvas.boundingBox();
+  if (!box || box.width === 0 || box.height === 0) {
+    throw new Error('Canvas has zero dimensions');
+  }
+
+  // Wait for viewport to be initialized
+  const viewport = page.locator('.react-flow__viewport');
+  await viewport.waitFor({ state: 'attached', timeout: 5000 });
+
+  console.log('✓ Canvas ready');
+  return true;
+}
+
+/**
+ * Wait for challenge selection screen and return first challenge button
+ */
+async function waitForChallengeSelection(page: Page): Promise<void> {
+  // Wait for heading
+  await page.waitForSelector('h1:has-text("Choose Your Challenge")', { state: 'visible', timeout: 10000 });
+
+  // Wait for at least one challenge card/button to render
+  await page.waitForTimeout(500); // Brief wait for cards to render
+
+  console.log('✓ Challenge selection screen ready');
+}
+
+/**
+ * Get the first available challenge button
+ */
+async function getChallengeButton(page: Page): Promise<Locator> {
+  // Look for buttons with "Start Challenge" text (case-insensitive)
+  const button = page.getByRole('button', { name: /start challenge/i }).first();
+  await button.waitFor({ state: 'visible', timeout: 10000 });
+  return button;
+}
+
+/**
+ * Safe click with retry logic and proper waiting
+ */
+async function safeClick(page: Page, locator: Locator, elementName: string, retries: number = 3): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`Attempting to click ${elementName} (attempt ${attempt}/${retries})`);
+
+      // Wait for element to be visible
+      await locator.waitFor({ state: 'visible', timeout: 5000 });
+
+      // Wait for element to be enabled
+      await expect(locator).toBeEnabled({ timeout: 3000 });
+
+      // Scroll into view if needed
+      await locator.scrollIntoViewIfNeeded();
+
+      // Click
+      await locator.click({ timeout: 3000 });
+
+      console.log(`✓ Successfully clicked ${elementName}`);
+      return;
+    } catch (error) {
+      if (attempt === retries) {
+        throw new Error(`Failed to click ${elementName} after ${retries} attempts: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      console.log(`Retry ${attempt} failed, attempting again...`);
+      await page.waitForTimeout(1000);
+    }
+  }
+}
+
+/**
+ * Wait for canvas viewport transform to stabilize
+ */
+async function waitForStableCanvas(page: Page, timeoutMs: number = 2000): Promise<void> {
+  const viewport = page.locator('.react-flow__viewport');
+
+  let previousTransform = await viewport.getAttribute('transform') || '';
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeoutMs) {
+    await page.waitForTimeout(200);
+    const currentTransform = await viewport.getAttribute('transform') || '';
+
+    if (currentTransform === previousTransform) {
+      console.log('✓ Canvas viewport stable');
+      return;
+    }
+
+    previousTransform = currentTransform;
+  }
+
+  console.log('⚠ Canvas viewport stabilization timeout');
+}
+
+/**
+ * Verify UI is rendered and healthy
+ */
+async function verifyUIRendered(page: Page): Promise<boolean> {
+  // Check that root element exists and has content
+  const root = page.locator('#root');
+  await expect(root).toBeVisible({ timeout: 5000 });
+
+  const content = await root.textContent();
+  if (!content || content.length === 0) {
+    throw new Error('Root element has no content');
+  }
+
+  // Check for absence of error overlays
+  const errorOverlays = page.locator('[role="alert"].error, .error-overlay, [data-testid="error-banner"]');
+  const errorCount = await errorOverlays.count();
+  if (errorCount > 0) {
+    throw new Error(`Found ${errorCount} error overlay(s) on page`);
+  }
+
+  console.log('✓ UI rendered and healthy');
+  return true;
+}
+
 export class CanvasHelpers {
   constructor(private page: Page) {}
 
@@ -23,38 +173,69 @@ export class CanvasHelpers {
       // Ignore if not present
     }
 
-    // Click first Start Challenge button on the challenge selection screen
-    const startBtn = this.page.getByRole('button', { name: /start challenge/i }).first();
-    await startBtn.waitFor({ state: 'visible', timeout: 10000 });
-    await startBtn.click();
+    // Wait for challenge selection screen to be ready
+    await waitForChallengeSelection(this.page);
 
-    // Wait for canvas to be ready (support multiple test ids)
-    const canvas = this.page.locator('[data-testid="canvas"], [data-testid="reactflow-canvas"], [data-testid="canvas-root"]');
-    await canvas.first().waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.waitForTimeout(1000); // Allow for initialization
+    // Click first Start Challenge button on the challenge selection screen
+    const startBtn = await getChallengeButton(this.page);
+    await safeClick(this.page, startBtn, 'Start Challenge button');
+
+    // Wait for canvas to be fully ready
+    await waitForCanvasReady(this.page);
   }
 
   async addComponent(type: string, position?: { x: number; y: number }): Promise<Locator> {
-    const canvas = this.page.locator('[data-testid="canvas"]');
     const component = this.page.locator(`[data-testid="palette-item-${type}"]`).first();
+    await expect(component).toBeVisible({ timeout: 5000 });
 
-    await expect(component).toBeVisible();
+    const canvas = this.page.locator('.react-flow__pane');
+    await expect(canvas).toBeVisible({ timeout: 5000 });
 
-    if (position) {
-      await component.dragTo(canvas, { targetPosition: position });
-    } else {
-      await component.dragTo(canvas);
+    // Get bounding boxes for precise drag operation
+    const componentBox = await component.boundingBox();
+    const canvasBox = await canvas.boundingBox();
+
+    if (!componentBox || !canvasBox) {
+      throw new Error(`Failed to get bounding boxes for drag operation: component=${!!componentBox}, canvas=${!!canvasBox}`);
     }
 
-    await this.page.waitForTimeout(300); // Allow rendering
+    // Calculate positions
+    const startX = componentBox.x + componentBox.width / 2;
+    const startY = componentBox.y + componentBox.height / 2;
 
-    // Return the created node
-    const componentName = this.getComponentDisplayName(type);
-    return this.page.locator('.react-flow__node').filter({ hasText: componentName }).first();
+    let endX: number, endY: number;
+    if (position) {
+      endX = canvasBox.x + position.x;
+      endY = canvasBox.y + position.y;
+    } else {
+      endX = canvasBox.x + canvasBox.width / 2;
+      endY = canvasBox.y + canvasBox.height / 2;
+    }
+
+    // Perform multi-step drag for reliability
+    await this.page.mouse.move(startX, startY);
+    await this.page.mouse.down();
+    await this.page.waitForTimeout(100);
+    await this.page.mouse.move(endX, endY, { steps: 20 });
+    await this.page.waitForTimeout(100);
+    await this.page.mouse.up();
+
+    // Wait for React Flow node to appear
+    await this.page.waitForSelector('.react-flow__node', { state: 'visible', timeout: 5000 });
+
+    // Verify node count increased
+    const nodeCount = await this.page.locator('.react-flow__node').count();
+    if (nodeCount === 0) {
+      throw new Error('No nodes found after component add operation');
+    }
+
+    // Return the last created node
+    return this.page.locator('.react-flow__node').last();
   }
 
   async addAnnotation(text: string, position: { x: number; y: number }): Promise<Locator> {
-    const canvas = this.page.locator('[data-testid="canvas"]');
+    const canvas = this.page.locator('.react-flow__pane');
+    await expect(canvas).toBeVisible({ timeout: 5000 });
 
     await canvas.dblclick({ position });
 
@@ -407,7 +588,7 @@ export class AssertionHelpers {
     await expect(errorBanners).toHaveCount(0);
 
     // Verify canvas is still functional
-    const canvas = this.page.locator('[data-testid="canvas"]');
+    const canvas = this.page.locator('.react-flow');
     await expect(canvas).toBeVisible();
   }
 

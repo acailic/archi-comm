@@ -129,50 +129,214 @@ const state = await testDataManager.saveCanvasState(page);
 await testDataManager.restoreCanvasState(page, state);
 ```
 
+## Common Selectors
+
+**Use these verified selectors in your tests:**
+
+### Challenge Selection
+```typescript
+// Wait for challenge screen
+await page.waitForSelector('h1:has-text("Choose Your Challenge")', { state: 'visible' });
+
+// Get challenge button
+const button = page.getByRole('button', { name: /start challenge/i }).first();
+```
+
+### Canvas Elements
+```typescript
+// Canvas container
+const canvas = page.locator('.react-flow');
+
+// Canvas pane (interactive surface)
+const pane = page.locator('.react-flow__pane');
+
+// Canvas viewport
+const viewport = page.locator('.react-flow__viewport');
+```
+
+### Component Palette
+```typescript
+// Palette heading
+const palette = page.locator('h3:has-text("Component Library")');
+
+// Specific palette item
+const serverItem = page.locator('[data-testid="palette-item-server"]');
+const databaseItem = page.locator('[data-testid="palette-item-database"]');
+```
+
+### React Flow Nodes and Edges
+```typescript
+// All nodes
+const nodes = page.locator('.react-flow__node');
+
+// Selected node
+const selectedNode = page.locator('.react-flow__node.selected');
+
+// All edges
+const edges = page.locator('.react-flow__edge');
+```
+
 ## Best Practices
 
-### 1. Test Isolation
+### 1. Always Wait for Elements
 
-Each test should be independent and able to run in any order:
+Wait for elements to be visible before interacting:
 
 ```typescript
-test.beforeEach(async ({ page }) => {
-  // Clean state for each test
-  await page.goto('/');
-  await page.evaluate(() => localStorage.clear());
+// Good - wait for visibility
+await page.waitForSelector('.react-flow', { state: 'visible', timeout: 10000 });
+
+// Bad - arbitrary timeout
+await page.waitForTimeout(2000);
+```
+
+### 2. Use Role-Based Selectors When Possible
+
+More resilient to UI changes:
+
+```typescript
+// Good - semantic selector
+const button = page.getByRole('button', { name: /start challenge/i });
+
+// Acceptable - when data-testid exists
+const item = page.locator('[data-testid="palette-item-server"]');
+
+// Avoid - fragile class-based selectors
+const button = page.locator('.btn-primary');
+```
+
+### 3. Proper Error Handling
+
+Don't suppress errors with `.catch(() => false)`:
+
+```typescript
+// Good - proper error handling
+try {
+  await element.click({ timeout: 3000 });
+} catch (error) {
+  console.log(`Click failed: ${error}`);
+  throw error;
+}
+
+// Bad - hides real errors
+await element.click().catch(() => false);
+```
+
+### 4. Multi-Step Drag Operations
+
+Use multiple steps for reliable drag-and-drop:
+
+```typescript
+// Good - multi-step drag
+await page.mouse.move(startX, startY);
+await page.mouse.down();
+await page.waitForTimeout(100);
+await page.mouse.move(endX, endY, { steps: 20 });
+await page.waitForTimeout(100);
+await page.mouse.up();
+
+// Bad - simple dragTo (unreliable)
+await component.dragTo(canvas);
+```
+
+### 5. Verify State Changes
+
+Always verify that actions had the expected effect:
+
+```typescript
+// After adding component, verify it exists
+await page.waitForSelector('.react-flow__node', { state: 'visible' });
+const nodeCount = await page.locator('.react-flow__node').count();
+expect(nodeCount).toBeGreaterThan(0);
+```
+
+### 6. Take Screenshots at Key Steps
+
+Helpful for debugging failed tests:
+
+```typescript
+await page.screenshot({
+  path: 'e2e/test-results/artifacts/step-name.png',
+  fullPage: true
 });
 ```
 
-### 2. Reliable Selectors
+### 7. Use Descriptive Console Logs
 
-Use data-testid attributes for stable element selection:
-
-```typescript
-// Good - stable selector
-const canvas = page.locator('[data-testid="canvas"]');
-
-// Avoid - fragile selectors
-const canvas = page.locator('.react-flow__renderer');
-```
-
-### 3. Wait Strategies
-
-Use appropriate waiting strategies for dynamic content:
+Track test progress and aid debugging:
 
 ```typescript
-// Wait for element visibility
-await expect(component).toBeVisible();
-
-// Wait for network idle
-await page.waitForLoadState('networkidle');
-
-// Wait for specific conditions
-await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length > 0);
+console.log('✓ Canvas loaded successfully');
+console.log(`Found ${nodeCount} nodes on canvas`);
+console.log('⚠ Palette not found, skipping test');
 ```
 
-### 4. Error Handling
+## Debugging Failed Tests
 
-Implement robust error handling and debugging:
+### Running Tests in Debug Mode
+
+```bash
+# Run in headed mode to see browser
+npm run e2e:headed
+
+# Run specific test
+npm run e2e -- -g "should load the application"
+
+# Run with Playwright Inspector
+PWDEBUG=1 npm run e2e
+
+# Run with trace recording
+npm run e2e -- --trace on
+```
+
+### Viewing Test Artifacts
+
+After test execution, check these locations:
+
+```bash
+# Screenshots on failure
+e2e/test-results/artifacts/*.png
+
+# HTML report
+npx playwright show-report e2e/test-results/html-report
+
+# Debug screenshots (taken manually in tests)
+e2e/test-results/debug/*.png
+
+# Test results JSON
+e2e/test-results/test-results.json
+```
+
+### Common Issues and Solutions
+
+**Element not found:**
+- Verify selector exists in the actual DOM
+- Check if element is rendered conditionally
+- Ensure proper wait strategy is used
+
+**Timeout errors:**
+- Increase timeout value
+- Wait for specific element state instead of arbitrary timeout
+- Check if element is actually rendered
+
+**Drag-drop not working:**
+- Use multi-step mouse movements (20+ steps)
+- Verify bounding boxes are valid
+- Ensure source and target elements are both visible
+
+**Canvas not loading:**
+- Wait for `.react-flow` element
+- Verify React Flow is initialized
+- Check console for JavaScript errors
+
+**Challenge not selecting:**
+- Use `page.getByRole('button', { name: /start challenge/i })`
+- Button text is "Start Challenge" (case-insensitive)
+- Wait for button to be visible and enabled before clicking
+
+## Error Handling Pattern
+
+Implement robust error handling in tests:
 
 ```typescript
 test('canvas operations', async ({ page }) => {

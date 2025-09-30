@@ -3,10 +3,27 @@ import { test, expect } from '@playwright/test';
 test.describe('Canvas functionality', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    // Wait for the canvas to be properly initialized
-    await expect(page.getByTestId('canvas-toolbar')).toBeVisible();
-    // Wait for React Flow to be initialized
+
+    // Handle optional landing CTA
+    try {
+      const cta = page.getByRole('button', { name: /start your journey/i });
+      await cta.waitFor({ state: 'visible', timeout: 1000 });
+      await cta.click();
+    } catch {
+      // Ignore if not present
+    }
+
+    // Wait for challenge selection screen
+    await page.waitForSelector('h1:has-text("Choose Your Challenge")', { state: 'visible', timeout: 10000 });
+
+    // Click Start Challenge button
+    const startBtn = page.getByRole('button', { name: /start challenge/i }).first();
+    await startBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await startBtn.click();
+
+    // Wait for React Flow canvas to be ready
     await expect(page.locator('.react-flow')).toBeVisible();
+    await expect(page.locator('.react-flow__pane')).toBeVisible();
   });
 
   test('loads app and shows canvas toolbar', async ({ page }) => {
@@ -18,14 +35,7 @@ test.describe('Canvas functionality', () => {
   });
 
   test('supports basic component add and move operations', async ({ page }) => {
-    // Find challenge selection and select a challenge
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    await challengeCard.click();
-
-    // Start designing
-    await page.getByRole('button', { name: 'Start Designing' }).click();
-
-    // Wait for React Flow canvas to be visible
+    // React Flow canvas is already ready from beforeEach
     await expect(page.locator('.react-flow')).toBeVisible();
     await expect(page.locator('.react-flow__pane')).toBeVisible();
 
@@ -59,13 +69,7 @@ test.describe('Canvas functionality', () => {
   });
 
   test('supports connection creation between components', async ({ page }) => {
-    // Skip if no challenge selected
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    if (await challengeCard.isVisible()) {
-      await challengeCard.click();
-      await page.getByRole('button', { name: 'Start Designing' }).click();
-    }
-
+    // React Flow canvas is already ready from beforeEach
     await expect(page.locator('.react-flow')).toBeVisible();
 
     // Add two components first for connection testing
@@ -106,13 +110,7 @@ test.describe('Canvas functionality', () => {
   });
 
   test('supports keyboard navigation and shortcuts', async ({ page }) => {
-    // Skip if no challenge selected
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    if (await challengeCard.isVisible()) {
-      await challengeCard.click();
-      await page.getByRole('button', { name: 'Start Designing' }).click();
-    }
-
+    // React Flow canvas is already ready from beforeEach
     const reactFlowPane = page.locator('.react-flow__pane');
     await reactFlowPane.focus();
 
@@ -144,13 +142,7 @@ test.describe('Canvas functionality', () => {
   });
 
   test('maintains accessibility standards', async ({ page }) => {
-    // Skip if no challenge selected
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    if (await challengeCard.isVisible()) {
-      await challengeCard.click();
-      await page.getByRole('button', { name: 'Start Designing' }).click();
-    }
-
+    // React Flow canvas is already ready from beforeEach
     const reactFlow = page.locator('.react-flow');
     const reactFlowPane = page.locator('.react-flow__pane');
 
@@ -181,14 +173,7 @@ test.describe('Canvas functionality', () => {
   });
 
   test('supports export functionality', async ({ page }) => {
-    // Skip if no challenge selected
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    if (await challengeCard.isVisible()) {
-      await challengeCard.click();
-      await page.getByRole('button', { name: 'Start Designing' }).click();
-    }
-
-    // Ensure React Flow is loaded
+    // React Flow canvas is already ready from beforeEach
     await expect(page.locator('.react-flow')).toBeVisible();
 
     // Add a component to have something to export
@@ -215,13 +200,7 @@ test.describe('Canvas functionality', () => {
   });
 
   test('supports zoom and pan functionality', async ({ page }) => {
-    // Skip if no challenge selected
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    if (await challengeCard.isVisible()) {
-      await challengeCard.click();
-      await page.getByRole('button', { name: 'Start Designing' }).click();
-    }
-
+    // React Flow canvas is already ready from beforeEach
     const reactFlowPane = page.locator('.react-flow__pane');
     const reactFlowViewport = page.locator('.react-flow__viewport');
 
@@ -282,13 +261,7 @@ test.describe('Canvas functionality', () => {
     expect(unexpectedErrors).toHaveLength(0);
   });
   test('supports edge selection and editing', async ({ page }) => {
-    // Skip if no challenge selected
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    if (await challengeCard.isVisible()) {
-      await challengeCard.click();
-      await page.getByRole('button', { name: 'Start Designing' }).click();
-    }
-
+    // React Flow canvas is already ready from beforeEach
     await expect(page.locator('.react-flow')).toBeVisible();
 
     // Add components and create a connection
@@ -334,13 +307,7 @@ test.describe('Canvas functionality', () => {
   });
 
   test('supports multi-selection with React Flow', async ({ page }) => {
-    // Skip if no challenge selected
-    const challengeCard = page.locator('[data-testid="challenge-card"]').first();
-    if (await challengeCard.isVisible()) {
-      await challengeCard.click();
-      await page.getByRole('button', { name: 'Start Designing' }).click();
-    }
-
+    // React Flow canvas is already ready from beforeEach
     await expect(page.locator('.react-flow')).toBeVisible();
 
     // Add multiple components

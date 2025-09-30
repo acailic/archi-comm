@@ -24,35 +24,31 @@ async function waitForCanvas(page: Page): Promise<boolean> {
 }
 
 async function findComponentPalette(page: Page) {
-  const selectors = [
-    'text=Component Library',
-    '[data-testid="component-palette"]',
-    '[class*="ComponentPalette"]'
-  ];
+  // Use the correct selector: h3 with "Component Library" text
+  const selector = 'h3:has-text("Component Library")';
+  const element = page.locator(selector).first();
 
-  for (const selector of selectors) {
-    const element = page.locator(selector).first();
-    if (await element.isVisible({ timeout: 3000 }).catch(() => false)) {
-      return element;
-    }
+  try {
+    await element.waitFor({ state: 'visible', timeout: 5000 });
+    return element;
+  } catch (error) {
+    console.log(`Component palette not found: ${error}`);
+    return null;
   }
-  return null;
 }
 
-async function getPaletteComponent(page: Page, index = 0) {
-  const selectors = [
-    '[data-testid^="palette-item"]',
-    '[draggable="true"]',
-    '[class*="draggable"]'
-  ];
+async function getPaletteComponent(page: Page, type: string = 'server') {
+  // Use correct data-testid format: palette-item-{type}
+  const selector = `[data-testid="palette-item-${type}"]`;
+  const element = page.locator(selector).first();
 
-  for (const selector of selectors) {
-    const components = await page.locator(selector).all();
-    if (components.length > index) {
-      return components[index];
-    }
+  try {
+    await element.waitFor({ state: 'visible', timeout: 5000 });
+    return element;
+  } catch (error) {
+    console.log(`Palette component '${type}' not found: ${error}`);
+    return null;
   }
-  return null;
 }
 
 test.describe('Canvas Interactions', () => {
@@ -60,21 +56,25 @@ test.describe('Canvas Interactions', () => {
     // Start the app
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
 
-    // Try to skip welcome/onboarding if present
-    const skipButton = page.locator('button:has-text("Skip")').first();
-    if (await skipButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await skipButton.click();
-      await page.waitForTimeout(500);
+    // Wait for challenge selection screen
+    await page.waitForSelector('h1:has-text("Choose Your Challenge")', { state: 'visible', timeout: 10000 });
+
+    // Select a challenge
+    const challengeButton = page.getByRole('button', { name: /start challenge/i }).first();
+    await challengeButton.waitFor({ state: 'visible', timeout: 10000 });
+
+    try {
+      await challengeButton.click({ timeout: 3000 });
+    } catch (error) {
+      console.log(`Challenge button click error: ${error}`);
+      throw error;
     }
 
-    // Try to select a challenge if on selection screen
-    const challengeButton = page.locator('button:has-text("Select")').first();
-    if (await challengeButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await challengeButton.click();
-      await page.waitForTimeout(1000);
-    }
+    // Wait for canvas to be ready
+    await page.waitForSelector('.react-flow', { state: 'visible', timeout: 10000 });
+    await page.waitForTimeout(500);
   });
 
   test('canvas should be visible and interactive', async ({ page }) => {
@@ -108,8 +108,8 @@ test.describe('Canvas Interactions', () => {
   });
 
   test('should drag component from palette to canvas', async ({ page }) => {
-    // Find component to drag
-    const component = await getPaletteComponent(page, 0);
+    // Find component to drag (use 'server' type)
+    const component = await getPaletteComponent(page, 'server');
 
     if (!component) {
       console.log('⚠ No draggable components found, skipping test');
@@ -117,20 +117,27 @@ test.describe('Canvas Interactions', () => {
       return;
     }
 
+    // Get canvas pane
+    const canvas = page.locator('.react-flow__pane');
+    await expect(canvas).toBeVisible({ timeout: 5000 });
+
     // Get component bounding box
-    const box = await component.boundingBox();
-    expect(box).toBeTruthy();
+    const componentBox = await component.boundingBox();
+    const canvasBox = await canvas.boundingBox();
 
-    if (box) {
-      console.log(`Component position: x=${box.x}, y=${box.y}`);
+    expect(componentBox).toBeTruthy();
+    expect(canvasBox).toBeTruthy();
 
-      // Perform drag operation
-      const startX = box.x + box.width / 2;
-      const startY = box.y + box.height / 2;
-      const endX = 800;
-      const endY = 400;
+    if (componentBox && canvasBox) {
+      console.log(`Component position: x=${componentBox.x}, y=${componentBox.y}`);
 
-      // Drag
+      // Perform drag operation with multi-step movement
+      const startX = componentBox.x + componentBox.width / 2;
+      const startY = componentBox.y + componentBox.height / 2;
+      const endX = canvasBox.x + canvasBox.width / 2;
+      const endY = canvasBox.y + canvasBox.height / 2;
+
+      // Drag with 20 steps for smooth operation
       await page.mouse.move(startX, startY);
       await page.mouse.down();
       await page.waitForTimeout(100);
@@ -140,8 +147,14 @@ test.describe('Canvas Interactions', () => {
 
       console.log('✓ Drag operation completed');
 
-      // Wait for any render updates
-      await page.waitForTimeout(1000);
+      // Wait for React Flow node to appear
+      await page.waitForSelector('.react-flow__node', { state: 'visible', timeout: 5000 });
+
+      // Verify node count
+      const nodeCount = await page.locator('.react-flow__node').count();
+      expect(nodeCount).toBeGreaterThan(0);
+
+      console.log(`✓ ${nodeCount} node(s) on canvas`);
 
       // Take screenshot of result
       await page.screenshot({
