@@ -1,4 +1,5 @@
 // Auto-generated UI components barrel. Edit the generation script if structure changes.
+export * from './accessibility/AccessibilityProvider';
 export * from './DesignCanvas';
 export * from './diagnostics';
 export * from './figma';

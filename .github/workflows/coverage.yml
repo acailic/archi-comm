@@ -28,6 +28,64 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
+      - name: Enforce coverage thresholds
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -f coverage/coverage-summary.json ]; then
+            echo "❌ Coverage summary not found"
+            exit 1
+          fi
+
+          # Extract coverage percentages
+          lines=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)
+          functions=$(jq -r '.total.functions.pct' coverage/coverage-summary.json)
+          branches=$(jq -r '.total.branches.pct' coverage/coverage-summary.json)
+          statements=$(jq -r '.total.statements.pct' coverage/coverage-summary.json)
+
+          echo "📊 Coverage Results:"
+          echo "  Lines:      ${lines}%"
+          echo "  Functions:  ${functions}%"
+          echo "  Branches:   ${branches}%"
+          echo "  Statements: ${statements}%"
+          echo ""
+
+          # Check thresholds (80/80/75/80)
+          THRESHOLD_LINES=80
+          THRESHOLD_FUNCTIONS=80
+          THRESHOLD_BRANCHES=75
+          THRESHOLD_STATEMENTS=80
+
+          failed=0
+
+          if (( $(echo "$lines < $THRESHOLD_LINES" | bc -l) )); then
+            echo "❌ Lines coverage ${lines}% is below threshold ${THRESHOLD_LINES}%"
+            failed=1
+          fi
+
+          if (( $(echo "$functions < $THRESHOLD_FUNCTIONS" | bc -l) )); then
+            echo "❌ Functions coverage ${functions}% is below threshold ${THRESHOLD_FUNCTIONS}%"
+            failed=1
+          fi
+
+          if (( $(echo "$branches < $THRESHOLD_BRANCHES" | bc -l) )); then
+            echo "❌ Branches coverage ${branches}% is below threshold ${THRESHOLD_BRANCHES}%"
+            failed=1
+          fi
+
+          if (( $(echo "$statements < $THRESHOLD_STATEMENTS" | bc -l) )); then
+            echo "❌ Statements coverage ${statements}% is below threshold ${THRESHOLD_STATEMENTS}%"
+            failed=1
+          fi
+
+          if [ $failed -eq 1 ]; then
+            echo ""
+            echo "❌ Coverage thresholds not met"
+            exit 1
+          fi
+
+          echo "✅ All coverage thresholds met"
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4

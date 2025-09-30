@@ -36,7 +36,18 @@ describe('tauri.ts utility functions', () => {
     Object.defineProperty(global, 'window', {
       value: mockWindow,
       writable: true,
+      configurable: true,
     });
+
+    // Mock navigator object
+    Object.defineProperty(global, 'navigator', {
+      value: {
+        userAgent: 'test',
+      },
+      writable: true,
+      configurable: true,
+    });
+
     vi.clearAllMocks();
   });
 

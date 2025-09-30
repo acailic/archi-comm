@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 
-import { AccessibilityContext } from "@ui/components/accessibility/AccessibilityProvider";
+import { AccessibilityContext } from "@ui";
 
 export function useAccessibilityContext() {
   const context = useContext(AccessibilityContext);

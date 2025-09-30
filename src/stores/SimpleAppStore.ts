@@ -7,6 +7,7 @@ import { useCallback } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AudioData, Challenge, DesignData } from "../shared/contracts";
+import { persistenceCoordinator } from "./PersistenceCoordinator";
 
 // Simplified state shape focusing on essential data
 export interface AppState {
@@ -115,83 +116,98 @@ const getPreviousPhase = (
   }
 };
 
+// Wrap the set function to use persistence coordinator
+const createCoordinatedSet = (originalSet: any) => {
+  return (update: any) => {
+    // Enqueue the state update through the coordinator
+    persistenceCoordinator.enqueue(async () => {
+      originalSet(update);
+    });
+  };
+};
+
 // Create the store
 export const useAppStore = create<AppStore>()(
   persist(
-    (set, get) => ({
-      // Spread initial state
-      ...initialState,
+    (set, get) => {
+      // Wrap set to coordinate persistence
+      const coordinatedSet = createCoordinatedSet(set);
 
-      // Challenge actions
-      setSelectedChallenge: (challenge) => {
-        set({ selectedChallenge: challenge });
-        // Auto-advance to design phase when challenge is selected
-        if (challenge && get().phase === "challenge-selection") {
-          set({ phase: "design" });
-        }
-      },
+      return {
+        // Spread initial state
+        ...initialState,
 
-      setAvailableChallenges: (challenges) =>
-        set({ availableChallenges: challenges }),
+        // Challenge actions
+        setSelectedChallenge: (challenge) => {
+          coordinatedSet({ selectedChallenge: challenge });
+          // Auto-advance to design phase when challenge is selected
+          if (challenge && get().phase === "challenge-selection") {
+            coordinatedSet({ phase: "design" });
+          }
+        },
 
-      // Data actions
-      setDesignData: (data) => set({ designData: data }),
+        setAvailableChallenges: (challenges) =>
+          coordinatedSet({ availableChallenges: challenges }),
 
-      setAudioData: (data) => set({ audioData: data }),
+        // Data actions
+        setDesignData: (data) => coordinatedSet({ designData: data }),
 
-      // Phase management
-      setPhase: (phase) => set({ phase }),
+        setAudioData: (data) => coordinatedSet({ audioData: data }),
 
-      nextPhase: () => {
-        const currentPhase = get().phase;
-        const nextPhase = getNextPhase(currentPhase);
-        set({ phase: nextPhase });
-      },
+        // Phase management
+        setPhase: (phase) => coordinatedSet({ phase }),
 
-      previousPhase: () => {
-        const currentPhase = get().phase;
-        const previousPhase = getPreviousPhase(currentPhase);
-        set({ phase: previousPhase });
-      },
+        nextPhase: () => {
+          const currentPhase = get().phase;
+          const nextPhase = getNextPhase(currentPhase);
+          coordinatedSet({ phase: nextPhase });
+        },
 
-      resetToChallenge: () =>
-        set({
-          phase: "challenge-selection",
-          selectedChallenge: null,
-          designData: null,
-          audioData: null,
-          error: null,
-        }),
+        previousPhase: () => {
+          const currentPhase = get().phase;
+          const previousPhase = getPreviousPhase(currentPhase);
+          coordinatedSet({ phase: previousPhase });
+        },
 
-      // UI actions
-      setShowCommandPalette: (show) => set({ showCommandPalette: show }),
+        resetToChallenge: () =>
+          coordinatedSet({
+            phase: "challenge-selection",
+            selectedChallenge: null,
+            designData: null,
+            audioData: null,
+            error: null,
+          }),
 
-      setCurrentScreen: (screen) => set({ currentScreen: screen }),
+        // UI actions
+        setShowCommandPalette: (show) => coordinatedSet({ showCommandPalette: show }),
 
-      setShowDevScenarios: (show) => set({ showDevScenarios: show }),
+        setCurrentScreen: (screen) => coordinatedSet({ currentScreen: screen }),
 
-      setIsDemoMode: (demo) => set({ isDemoMode: demo }),
+        setShowDevScenarios: (show) => coordinatedSet({ showDevScenarios: show }),
 
-      setShowWelcome: (show) => set({ showWelcome: show }),
+        setIsDemoMode: (demo) => coordinatedSet({ isDemoMode: demo }),
 
-      // Utility actions
-      setLoading: (loading) => set({ isLoading: loading }),
+        setShowWelcome: (show) => coordinatedSet({ showWelcome: show }),
 
-      setError: (error) => set({ error }),
+        // Utility actions
+        setLoading: (loading) => coordinatedSet({ isLoading: loading }),
 
-      clearError: () => set({ error: null }),
+        setError: (error) => coordinatedSet({ error }),
 
-      // Reset actions
-      resetDesignData: () => set({ designData: null }),
+        clearError: () => coordinatedSet({ error: null }),
 
-      resetAudioData: () => set({ audioData: null }),
+        // Reset actions
+        resetDesignData: () => coordinatedSet({ designData: null }),
 
-      resetAll: () =>
-        set({
-          ...initialState,
-          availableChallenges: get().availableChallenges, // Keep loaded challenges
-        }),
-    }),
+        resetAudioData: () => coordinatedSet({ audioData: null }),
+
+        resetAll: () =>
+          coordinatedSet({
+            ...initialState,
+            availableChallenges: get().availableChallenges, // Keep loaded challenges
+          }),
+      };
+    },
     {
       name: "archicomm-app-store", // Storage key
       partialize: (state) => ({
