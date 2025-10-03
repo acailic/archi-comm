@@ -1,0 +1,34 @@
+# /CODEOWNERS
+# GitHub CODEOWNERS file for automatic review assignment
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @acailic
+
+# Documentation
+/docs/** @acailic
+
+# Core packages
+/src/packages/core/** @acailic
+/src/packages/ui/** @acailic
+/src/packages/canvas/** @acailic
+/src/packages/audio/** @acailic
+/src/packages/services/** @acailic
+
+# Configuration
+/config/** @acailic
+
+# Testing
+/e2e/** @acailic
+/src/__tests__/** @acailic
+
+# CI/CD
+/.github/** @acailic
+
+# Tauri/Rust backend
+/src-tauri/** @acailic
+
+# Build and tooling
+/tools/** @acailic
+*.config.js @acailic
+*.config.ts @acailic

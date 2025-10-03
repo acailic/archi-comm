@@ -13,7 +13,7 @@ import {
   ExtendedChallenge,
   challengeManager,
 } from "../../../../lib/config/challenge-config";
-import type { Challenge, DesignData } from "../../../../shared/contracts";
+import type { Challenge, DesignData, Connection } from "../../../../shared/contracts";
 import { useOptimizedSelector } from "../../../../shared/hooks/useOptimizedSelector";
 import { useCanvasStore } from "../../../../stores/canvasStore";
 
@@ -27,11 +27,27 @@ import { useDesignCanvasEffects } from "./hooks/useDesignCanvasEffects";
 import { useDesignCanvasImportExport } from "./hooks/useDesignCanvasImportExport";
 import { useDesignCanvasState } from "./hooks/useDesignCanvasState";
 import { useStatusBarMetrics } from "./hooks/useStatusBarMetrics";
+import { useCanvasKeyboardNavigation } from "./hooks/useCanvasKeyboardNavigation";
 
 import { SimpleCanvas } from "../../../canvas/SimpleCanvas";
 import { CanvasOverlays } from "./components/CanvasOverlays";
 import { DesignCanvasLayout } from "./components/DesignCanvasLayout";
 import { DesignCanvasHeader } from "./DesignCanvasHeader";
+import { AnnotationToolbar } from "../canvas/AnnotationToolbar";
+import { AnnotationSidebar } from "../canvas/AnnotationSidebar";
+import { CanvasToolbar } from "../canvas/CanvasToolbar";
+import { QuickConnectOverlay } from "../canvas/QuickConnectOverlay";
+import { CanvasOnboardingTour } from "../canvas/CanvasOnboardingTour";
+import { CanvasContextualHelp } from "../canvas/CanvasContextualHelp";
+import { ConnectionTemplatePanel } from "../canvas/ConnectionTemplatePanel";
+import type { Annotation } from "../../../../shared/contracts";
+import { useQuickConnect } from "../../../canvas/hooks/useQuickConnect";
+import {
+  getTemplatesForComponentPair,
+  applyTemplate,
+  addToRecentlyUsed,
+  type ConnectionTemplate,
+} from "../../../canvas/config/connection-templates";
 
 export interface DesignCanvasProps {
   challenge: Challenge;
@@ -50,6 +66,23 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   const flushDesignDataRef = useRef<
     ((reason: string, options?: { immediate?: boolean }) => void) | undefined
   >(undefined);
+
+  // Annotation state
+  const [annotations, setAnnotations] = useState<Annotation[]>(initialData.annotations ?? []);
+  const [selectedAnnotationTool, setSelectedAnnotationTool] = useState<Annotation['type'] | null>(null);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [showAnnotationSidebar, setShowAnnotationSidebar] = useState(false);
+
+  // Connection template state
+  const [showTemplatePanel, setShowTemplatePanel] = useState(false);
+  const [pendingConnection, setPendingConnection] = useState<{ from: string; to: string } | null>(null);
+
+  // Quick-connect hook
+  const quickConnect = useQuickConnect((connection) => {
+    // Show template panel for connection
+    setPendingConnection({ from: connection.from, to: connection.to });
+    setShowTemplatePanel(true);
+  });
 
   const initialSyncPayload = useMemo(
     () => ({
@@ -128,11 +161,16 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
       components,
       connections,
       infoCards,
+      annotations,
       layers,
       metadata,
     }),
-    [components, connections, infoCards, layers, metadata]
+    [components, connections, infoCards, annotations, layers, metadata]
   );
+
+  const handleAnnotationsImported = useCallback((importedAnnotations: Annotation[]) => {
+    setAnnotations(importedAnnotations);
+  }, []);
 
   const {
     handleImport,
@@ -148,23 +186,28 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     buildDesignSnapshot,
     markDesignModified,
     setCanvasConfig,
+    onAnnotationsImported: handleAnnotationsImported,
   });
 
+  // Use refs to avoid recreating callbacks on every data change
+  const currentDesignDataRef = useRef(currentDesignData);
+  currentDesignDataRef.current = currentDesignData;
+
   const exportCurrentDesign = useCallback(
-    () => handleQuickExport(currentDesignData),
-    [handleQuickExport, currentDesignData]
+    () => handleQuickExport(currentDesignDataRef.current),
+    [handleQuickExport]
   );
   const quickSaveCurrentDesign = useCallback(
-    () => handleQuickSave(currentDesignData),
-    [handleQuickSave, currentDesignData]
+    () => handleQuickSave(currentDesignDataRef.current),
+    [handleQuickSave]
   );
   const copyCurrentDesign = useCallback(
-    () => handleCopyToClipboard(currentDesignData),
-    [handleCopyToClipboard, currentDesignData]
+    () => handleCopyToClipboard(currentDesignDataRef.current),
+    [handleCopyToClipboard]
   );
   const saveCurrentDesign = useCallback(
-    () => handleSave(currentDesignData),
-    [handleSave, currentDesignData]
+    () => handleSave(currentDesignDataRef.current),
+    [handleSave]
   );
   const handleContinue = useCallback(
     () => onComplete(currentDesignData),
@@ -212,6 +255,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     handleComponentMove,
     handleComponentSelect,
     handleDeleteComponent,
+    handleDuplicateComponent,
     handleCompleteConnection,
     handleStartConnection,
     handleConnectionDelete,
@@ -225,6 +269,121 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     handleBgColorChange,
     handleNodeBgChange,
   } = callbacks;
+
+  // Keyboard navigation and shortcuts
+  useCanvasKeyboardNavigation({
+    enabled: true,
+    components,
+    selectedComponentId,
+    onComponentSelect: handleComponentSelect,
+    onComponentDelete: handleDeleteComponent,
+    onComponentDuplicate: handleDuplicateComponent,
+    onComponentMove: handleComponentMove,
+    onUndo: () => useCanvasStore.temporal.getState().undo(),
+    onRedo: () => useCanvasStore.temporal.getState().redo(),
+    onZoomIn: () => {}, // TODO: implement zoom
+    onZoomOut: () => {}, // TODO: implement zoom
+    onFitView: () => {}, // TODO: implement fit view
+    onSetCanvasMode: (mode) => useCanvasStore.getState().setCanvasMode(mode),
+  });
+
+  // Annotation callbacks
+  const handleAnnotationToolSelect = useCallback((tool: Annotation['type'] | null) => {
+    setSelectedAnnotationTool(tool);
+  }, []);
+
+  const handleAnnotationCreate = useCallback((x: number, y: number, type: Annotation['type']) => {
+    const newAnnotation: Annotation = {
+      id: `annotation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      content: '',
+      x,
+      y,
+      width: 200,
+      height: 100,
+      timestamp: Date.now(),
+    };
+    setAnnotations(prev => [...prev, newAnnotation]);
+    setSelectedAnnotationId(newAnnotation.id);
+    setSelectedAnnotationTool(null);
+    markDesignModified();
+  }, [markDesignModified]);
+
+  const handleAnnotationSelect = useCallback((id: string | null) => {
+    setSelectedAnnotationId(id);
+  }, []);
+
+  const handleAnnotationDelete = useCallback((id: string) => {
+    setAnnotations(prev => prev.filter(a => a.id !== id));
+    if (selectedAnnotationId === id) {
+      setSelectedAnnotationId(null);
+    }
+    markDesignModified();
+  }, [selectedAnnotationId, markDesignModified]);
+
+  const handleAnnotationUpdate = useCallback((id: string, updates: Partial<Annotation>) => {
+    setAnnotations(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    markDesignModified();
+  }, [markDesignModified]);
+
+  const handleAnnotationFocus = useCallback((id: string) => {
+    setSelectedAnnotationId(id);
+    // TODO: Implement scroll to annotation using React Flow's fitView
+  }, []);
+
+  // Connection template handlers
+  const handleTemplateSelect = useCallback((template: ConnectionTemplate) => {
+    if (!pendingConnection) return;
+
+    // Apply template to create connection with appropriate properties
+    const connectionData = applyTemplate(template, {
+      from: pendingConnection.from,
+      to: pendingConnection.to,
+    });
+
+    // Add to recently used
+    addToRecentlyUsed(template.id);
+
+    // Create a new connection with ID
+    const newConnection: Connection = {
+      id: `${pendingConnection.from}-${pendingConnection.to}-${Date.now()}`,
+      from: connectionData.from!,
+      to: connectionData.to!,
+      type: connectionData.type || 'data',
+      label: connectionData.label || '',
+      visualStyle: connectionData.visualStyle,
+      metadata: connectionData.metadata,
+    };
+
+    // Update the store with the new connection
+    useCanvasStore.getState().updateConnections(
+      (connections) => [...connections, newConnection]
+    );
+
+    // Close template panel
+    setShowTemplatePanel(false);
+    setPendingConnection(null);
+  }, [pendingConnection]);
+
+  const handleTemplatePanelCancel = useCallback(() => {
+    setShowTemplatePanel(false);
+    setPendingConnection(null);
+  }, []);
+
+  // Get available templates for pending connection
+  const availableTemplates = useMemo(() => {
+    if (!pendingConnection) return [];
+
+    const sourceComponent = components.find(c => c.id === pendingConnection.from);
+    const targetComponent = components.find(c => c.id === pendingConnection.to);
+
+    if (!sourceComponent || !targetComponent) return [];
+
+    return getTemplatesForComponentPair(
+      sourceComponent.type,
+      targetComponent.type
+    );
+  }, [pendingConnection, components]);
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -242,6 +401,9 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             onSave={saveCurrentDesign}
             onShowCommandPalette={() => setShowCommandPalette(true)}
             onImport={handleImport}
+            showAnnotationSidebar={showAnnotationSidebar}
+            onToggleAnnotationSidebar={() => setShowAnnotationSidebar(prev => !prev)}
+            annotationCount={annotations.length}
           />
         }
         assignmentPanel={
@@ -252,19 +414,63 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
           />
         }
         canvas={
-          <SimpleCanvas
-            components={components}
-            connections={connections}
-            selectedComponent={selectedComponentId ?? null}
-            connectionStart={connectionStart ?? null}
-            onConnectionStart={handleStartConnection}
-            onComponentSelect={handleComponentSelect}
-            onComponentMove={(id, x, y) => handleComponentMove(id, x, y)}
-            onComponentDelete={handleDeleteComponent}
-            onConnectionCreate={handleCompleteConnection}
-            onConnectionDelete={handleConnectionDelete}
-            onComponentDrop={handleComponentDrop}
-          />
+          <div className="relative w-full h-full">
+            {/* Canvas Toolbar */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[var(--z-toolbar)]" data-tour="canvas-toolbar">
+              <CanvasToolbar
+                onFitView={() => {
+                  // TODO: Implement fit view using React Flow
+                }}
+                onAutoLayout={() => {
+                  // TODO: Implement auto layout
+                }}
+                onToggleSettings={() => {
+                  // TODO: Implement settings panel
+                }}
+              />
+            </div>
+
+            <SimpleCanvas
+              components={components}
+              connections={connections}
+              selectedComponent={selectedComponentId ?? null}
+              connectionStart={quickConnect.quickConnectSource ?? connectionStart ?? null}
+              selectedAnnotationTool={selectedAnnotationTool}
+              onConnectionStart={(id) => {
+                // In quick-connect mode, use the quick-connect hook
+                if (quickConnect.isQuickConnectMode) {
+                  quickConnect.startQuickConnect(id);
+                } else {
+                  handleStartConnection(id);
+                }
+              }}
+              onComponentSelect={handleComponentSelect}
+              onComponentMove={(id, x, y) => handleComponentMove(id, x, y)}
+              onComponentDelete={handleDeleteComponent}
+              onConnectionCreate={(connection) => {
+                // In quick-connect mode, connections are created via the hook
+                if (quickConnect.isQuickConnectMode && quickConnect.quickConnectSource) {
+                  quickConnect.completeQuickConnect(connection.to);
+                } else {
+                  handleCompleteConnection(connection.from, connection.to);
+                }
+              }}
+              onConnectionDelete={handleConnectionDelete}
+              onComponentDrop={handleComponentDrop}
+              onAnnotationCreate={handleAnnotationCreate}
+              onQuickConnectPreviewUpdate={quickConnect.updatePreview}
+            />
+
+            {/* Quick Connect Overlay */}
+            {quickConnect.isQuickConnectMode && quickConnect.quickConnectSource && (
+              <QuickConnectOverlay
+                sourceNodeId={quickConnect.quickConnectSource}
+                previewPosition={quickConnect.quickConnectPreview}
+                isValidTarget={true}
+                onCancel={quickConnect.cancelQuickConnect}
+              />
+            )}
+          </div>
         }
         propertiesPanel={
           <PropertiesPanel
@@ -272,6 +478,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             components={components}
             onLabelChange={handleComponentLabelChange}
             onDelete={handleDeleteComponent}
+            onDuplicate={handleDuplicateComponent}
             onShowLabelToggle={handleShowLabelToggle}
             onStickerToggle={handleStickerToggle}
             onStickerEmojiChange={handleStickerEmojiChange}
@@ -291,18 +498,55 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
           />
         }
         overlays={
-          <CanvasOverlays
-            showHints={showHints}
-            onCloseHints={() => setShowHints(false)}
-            challenge={extendedChallenge}
-            currentComponents={components}
-            showCommandPalette={showCommandPalette}
-            onCloseCommandPalette={() => setShowCommandPalette(false)}
-            onNavigate={() => {}}
-            selectedChallenge={extendedChallenge}
-            showConfetti={showConfetti}
-            onConfettiDone={() => setShowConfetti(false)}
+          <>
+            <CanvasOverlays
+              showHints={showHints}
+              onCloseHints={() => setShowHints(false)}
+              challenge={extendedChallenge}
+              currentComponents={components}
+              showCommandPalette={showCommandPalette}
+              onCloseCommandPalette={() => setShowCommandPalette(false)}
+              onNavigate={() => {}}
+              selectedChallenge={extendedChallenge}
+              showConfetti={showConfetti}
+              onConfettiDone={() => setShowConfetti(false)}
+            />
+
+            {/* Onboarding Tour */}
+            <CanvasOnboardingTour />
+
+            {/* Contextual Help */}
+            <CanvasContextualHelp />
+
+            {/* Connection Template Panel */}
+            {showTemplatePanel && pendingConnection && (
+              <ConnectionTemplatePanel
+                sourceType={components.find(c => c.id === pendingConnection.from)?.type || ''}
+                targetType={components.find(c => c.id === pendingConnection.to)?.type || ''}
+                templates={availableTemplates}
+                onSelectTemplate={handleTemplateSelect}
+                onCancel={handleTemplatePanelCancel}
+              />
+            )}
+          </>
+        }
+        annotationToolbar={
+          <AnnotationToolbar
+            selectedTool={selectedAnnotationTool}
+            onToolSelect={handleAnnotationToolSelect}
           />
+        }
+        annotationSidebar={
+          showAnnotationSidebar ? (
+            <AnnotationSidebar
+              annotations={annotations}
+              selectedAnnotation={selectedAnnotationId}
+              onAnnotationSelect={handleAnnotationSelect}
+              onAnnotationDelete={handleAnnotationDelete}
+              onAnnotationUpdate={handleAnnotationUpdate}
+              onAnnotationFocus={handleAnnotationFocus}
+            />
+          ) : undefined
         }
       />
     </DndProvider>

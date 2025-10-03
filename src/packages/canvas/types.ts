@@ -26,11 +26,13 @@ export interface CustomNodeData extends Record<string, unknown> {
   connectionCount?: number;
   healthStatus?: "healthy" | "warning" | "error";
   visualTheme?: "serious" | "playful";
+  connectionSourceType?: string; // Type of the component starting the connection (for validation)
   onSelect: (id: string) => void;
   onStartConnection: (
     id: string,
     position?: "top" | "bottom" | "left" | "right"
   ) => void;
+  onCompleteConnection?: (targetId: string) => void;
   onDuplicate?: (componentId: string) => void;
   onBringToFront?: (componentId: string) => void;
   onSendToBack?: (componentId: string) => void;

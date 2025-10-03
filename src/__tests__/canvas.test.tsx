@@ -19,7 +19,7 @@ import {
   updateReactFlowNode,
   type ArchiCommEdge,
   type ArchiCommNode,
-} from '../features/canvas/utils/rf-adapters';
+} from '../packages/canvas/utils/rf-adapters';
 import type { Connection, DesignComponent } from '@shared/contracts';
 
 afterEach(() => {

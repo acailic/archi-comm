@@ -10,8 +10,8 @@ import { Switch } from '@ui/components/ui/switch';
 import { Button } from '@ui/components/ui/button';
 import { Badge } from '@ui/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs';
-import { ArrowLeft, Settings, Paintbrush, Zap, Save, Mic, Shield, Monitor } from 'lucide-react';
-import { loadSettings, saveSettings } from '@/modules/settings';
+import { ArrowLeft, Settings, Paintbrush, Zap, Save, Mic, Shield } from 'lucide-react';
+import { loadSettings, saveSettings, defaultSettings } from '@/modules/settings';
 
 interface ConfigPageProps {
   onBack: () => void;
@@ -35,19 +35,8 @@ export function ConfigPage({
 }: ConfigPageProps) {
   const [localConnectionStyle, setLocalConnectionStyle] = useState(connectionStyle);
   const [localVirtualization, setLocalVirtualization] = useState(virtualizationEnabled);
-  // Persisted settings state
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [audioSettings, setAudioSettings] = useState({
-    preferredRecordingEngine: 'auto',
-    preferredTranscriptionEngine: 'auto',
-    realtimeTranscription: false,
-    quality: 'medium',
-  });
-  const [telemetrySettings, setTelemetrySettings] = useState({
-    enabled: true,
-    errorReporting: true,
-    performanceMetrics: true,
-  });
+  const [audioSettings, setAudioSettings] = useState(() => ({ ...defaultSettings.audio }));
+  const [telemetrySettings, setTelemetrySettings] = useState(() => ({ ...defaultSettings.telemetry }));
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -55,7 +44,6 @@ export function ConfigPage({
       const s = loadSettings();
       setAudioSettings({ ...s.audio });
       setTelemetrySettings({ ...s.telemetry });
-      setSettingsLoaded(true);
     } catch (e) {
       console.warn('Failed to load settings for ConfigPage:', e);
     }
@@ -150,8 +138,11 @@ export function ConfigPage({
               <label className='text-sm font-medium'>Recording Engine</label>
               <Select
                 value={audioSettings.preferredRecordingEngine}
-                onValueChange={(v) => {
-                  const next = { ...audioSettings, preferredRecordingEngine: v } as any;
+                onValueChange={value => {
+                  const next = {
+                    ...audioSettings,
+                    preferredRecordingEngine: value as typeof audioSettings.preferredRecordingEngine,
+                  };
                   setAudioSettings(next);
                   persist({ audio: next });
                 }}
@@ -173,8 +164,11 @@ export function ConfigPage({
               <label className='text-sm font-medium'>Transcription Engine</label>
               <Select
                 value={audioSettings.preferredTranscriptionEngine}
-                onValueChange={(v) => {
-                  const next = { ...audioSettings, preferredTranscriptionEngine: v } as any;
+                onValueChange={value => {
+                  const next = {
+                    ...audioSettings,
+                    preferredTranscriptionEngine: value as typeof audioSettings.preferredTranscriptionEngine,
+                  };
                   setAudioSettings(next);
                   persist({ audio: next });
                 }}
@@ -212,8 +206,11 @@ export function ConfigPage({
               <label className='text-sm font-medium'>Audio Quality</label>
               <Select
                 value={audioSettings.quality}
-                onValueChange={(v) => {
-                  const next = { ...audioSettings, quality: v } as any;
+                onValueChange={value => {
+                  const next = {
+                    ...audioSettings,
+                    quality: value as typeof audioSettings.quality,
+                  };
                   setAudioSettings(next);
                   persist({ audio: next });
                 }}

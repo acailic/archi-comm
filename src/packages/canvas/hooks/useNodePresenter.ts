@@ -23,6 +23,7 @@ export interface UseNodePresenterResult {
     labelDraft: string;
     healthStatus: 'healthy' | 'warning' | 'error';
     visualState: ComponentVisualState;
+    isValidConnectionTarget: boolean;
   };
   actions: {
     handleClick: () => void;
@@ -33,13 +34,34 @@ export interface UseNodePresenterResult {
     handleKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
     handleLabelInput: (value: string) => void;
     handleStartConnection: (position: 'top' | 'bottom' | 'left' | 'right') => void;
+    handleCompleteConnection: () => void;
   };
   computed: {
     visualStateClasses: string;
     architecturalStyling: ReturnType<typeof getArchitecturalStyling>;
     gradient: string;
     iconInfo: ReturnType<typeof getComponentIcon>;
+    canConnectTo: (targetType: string) => boolean;
   };
+}
+
+// Connection validation rules - defines which component types can connect
+const CONNECTION_RULES: Record<string, string[]> = {
+  client: ['api-gateway', 'load-balancer', 'cdn', 'web-app'],
+  'api-gateway': ['microservice', 'serverless', 'lambda', 'authentication', 'load-balancer'],
+  'load-balancer': ['server', 'microservice', 'container'],
+  server: ['database', 'cache', 'message-queue', 'storage'],
+  microservice: ['database', 'cache', 'message-queue', 'microservice', 'rest-api', 'grpc'],
+  database: ['storage', 'cache'],
+  cache: ['database'],
+  'message-queue': ['microservice', 'serverless', 'consumer', 'producer'],
+  // Allow any component to connect if not explicitly defined
+  default: ['*'],
+};
+
+function canConnect(sourceType: string, targetType: string): boolean {
+  const rules = CONNECTION_RULES[sourceType] || CONNECTION_RULES.default;
+  return rules.includes('*') || rules.includes(targetType);
 }
 
 export function useNodePresenter(
@@ -54,7 +76,9 @@ export function useNodePresenter(
     healthStatus: healthStatusProp,
     onSelect,
     onStartConnection,
+    onCompleteConnection,
     onLabelChange,
+    connectionSourceType,
   } = nodeData;
 
   // State management
@@ -62,6 +86,12 @@ export function useNodePresenter(
   const healthStatus: 'healthy' | 'warning' | 'error' = healthStatusProp ?? 'healthy';
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft] = useState(component.label || '');
+
+  // Connection validation - is this node a valid target for the current connection?
+  const isValidConnectionTarget = useMemo(() => {
+    if (!connectionSourceType) return false;
+    return canConnect(connectionSourceType, component.type);
+  }, [connectionSourceType, component.type]);
 
   // Computed values
   const architecturalStyling = useMemo(
@@ -137,6 +167,18 @@ export function useNodePresenter(
     [onStartConnection, component.id]
   );
 
+  const handleCompleteConnection = useCallback(() => {
+    if (onCompleteConnection && isValidConnectionTarget) {
+      onCompleteConnection(component.id);
+    }
+  }, [onCompleteConnection, component.id, isValidConnectionTarget]);
+
+  // Helper function for checking if connection to target type is valid
+  const canConnectTo = useCallback(
+    (targetType: string) => canConnect(component.type, targetType),
+    [component.type]
+  );
+
   // Effect for label synchronization
   useEffect(() => {
     if (!isEditingLabel) {
@@ -152,6 +194,7 @@ export function useNodePresenter(
         labelDraft,
         healthStatus,
         visualState,
+        isValidConnectionTarget,
       },
       actions: {
         handleClick,
@@ -162,12 +205,14 @@ export function useNodePresenter(
         handleKeyDown,
         handleLabelInput,
         handleStartConnection,
+        handleCompleteConnection,
       },
       computed: {
         visualStateClasses,
         architecturalStyling,
         gradient,
         iconInfo,
+        canConnectTo,
       },
     }),
     [
@@ -176,6 +221,7 @@ export function useNodePresenter(
       labelDraft,
       healthStatus,
       visualState,
+      isValidConnectionTarget,
       handleClick,
       handleMouseEnter,
       handleMouseLeave,
@@ -184,10 +230,12 @@ export function useNodePresenter(
       handleKeyDown,
       handleLabelInput,
       handleStartConnection,
+      handleCompleteConnection,
       visualStateClasses,
       architecturalStyling,
       gradient,
       iconInfo,
+      canConnectTo,
     ]
   );
 }

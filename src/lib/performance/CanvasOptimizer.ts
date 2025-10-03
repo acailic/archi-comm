@@ -46,6 +46,10 @@ export class CanvasOptimizer {
     this.queuedCommands.push(command);
   }
 
+  hasPendingWork(): boolean {
+    return this.queuedCommands.length > 0 || this.dirtyRegions.length > 0;
+  }
+
   flushRenderQueue(): void {
     if (!this.ctx) {
       this.queuedCommands = [];

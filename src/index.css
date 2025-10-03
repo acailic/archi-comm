@@ -6936,3 +6936,22 @@ body.resizing-panel .resize-handle * {
 .h-full.bg-card\/30 [data-radix-scroll-area-thumb]:hover {
   background-color: hsl(var(--primary) / 0.8) !important;
 }
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 1rem;
+  z-index: 1000;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  box-shadow: 0 10px 25px -10px rgba(15, 23, 42, 0.4);
+}
+
+.skip-link:focus {
+  left: 1rem;
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 4px;
+}

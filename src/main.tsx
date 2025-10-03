@@ -9,6 +9,7 @@ import { AccessibilityProvider } from '@ui/components/accessibility/Accessibilit
 import { getLogger, logger, LogLevel } from './lib/logging/logger';
 import { isDevelopment, isTauriEnvironment, isProduction } from './lib/config/environment';
 import './index.css';
+import '@/modules/onboarding';
 
 // Initialize performance monitoring and profiling infrastructure in development
 if (import.meta.env.DEV) {

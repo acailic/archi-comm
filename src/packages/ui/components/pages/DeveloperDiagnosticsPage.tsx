@@ -20,10 +20,10 @@ import {
 import { errorStore } from '@/lib/logging/errorStore';
 import { isDevelopment, isTauriEnvironment } from '@/lib/config/environment';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
-import { EnvironmentTab } from './diagnostics/tabs/EnvironmentTab';
-import { PerformanceTab } from './diagnostics/tabs/PerformanceTab';
-import { ErrorLogsTab } from './diagnostics/tabs/ErrorLogsTab';
-import { AppLogsTab } from './diagnostics/tabs/AppLogsTab';
+import { EnvironmentTab } from '../diagnostics/tabs/EnvironmentTab';
+import { PerformanceTab } from '../diagnostics/tabs/PerformanceTab';
+import { ErrorLogsTab } from '../diagnostics/tabs/ErrorLogsTab';
+import { AppLogsTab } from '../diagnostics/tabs/AppLogsTab';
 
 // Types
 interface TabConfig {

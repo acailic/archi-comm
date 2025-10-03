@@ -222,7 +222,9 @@ interface SimpleNodeData extends Record<string, unknown> {
   visual: NodeVisualPreset;
   readonly?: boolean;
   isConnectionStart?: boolean;
+  isValidTarget?: boolean;
   onConnectionStart?: (id: string) => void;
+  onNodeClick?: (id: string) => void;
 }
 
 // Props interface
@@ -231,6 +233,7 @@ export interface SimpleCanvasProps {
   connections: AppConnection[];
   selectedComponent?: string | null;
   connectionStart?: string | null;
+  selectedAnnotationTool?: string | null;
   onConnectionStart?: (id: string) => void;
   onComponentSelect?: (id: string | null) => void;
   onComponentMove?: (id: string, x: number, y: number) => void;
@@ -243,6 +246,8 @@ export interface SimpleCanvasProps {
     y: number
   ) => void;
   onCanvasClick?: () => void;
+  onAnnotationCreate?: (x: number, y: number, type: string) => void;
+  onQuickConnectPreviewUpdate?: (position: { x: number; y: number } | null) => void;
   readonly?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -253,36 +258,33 @@ const SimpleNode: React.FC<{ data: SimpleNodeData; selected: boolean }> = ({
   data,
   selected,
 }) => {
-  const visual = data.visual ?? resolveVisualPreset(data.type);
-  const Icon = visual.icon;
-  const description = data.description
-    ? String(data.description)
-    : "Drag this onto the canvas and connect it to related systems.";
   const isConnectionStart = Boolean(data.isConnectionStart);
+  const isValidTarget = Boolean(data.isValidTarget);
   const isReadonly = Boolean(data.readonly);
 
   const cardClasses = cn(
-    "group relative w-56 rounded-2xl px-4 py-3 transition-all duration-300 backdrop-blur-sm",
-    "border border-white/10",
-    visual.backgroundClass,
-    visual.borderClass,
-    visual.textClass,
-    selected ? "scale-[1.02] shadow-lg" : "shadow-md",
+    "group relative w-56 rounded-lg px-4 py-3 transition-all duration-200 bg-white",
+    "border-2 border-gray-800",
+    "text-gray-900",
+    selected ? "shadow-xl border-black ring-2 ring-gray-300" : "shadow-md",
     isConnectionStart
-      ? "ring-2 ring-sky-400/70 ring-offset-2 ring-offset-slate-900"
-      : "ring-0"
+      ? "ring-2 ring-blue-400 border-blue-500"
+      : "",
+    isValidTarget
+      ? "ring-2 ring-green-400 border-green-500 cursor-pointer"
+      : ""
   );
 
   const handleBaseClasses = cn(
-    "pointer-events-auto w-4 h-4 rounded-full border border-white/40 bg-white/90",
-    "shadow-[0_6px_12px_-6px_rgba(15,23,42,0.55)] transition-all duration-200",
-    "focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300",
-    "hover:scale-110 hover:border-white/70"
+    "pointer-events-auto w-5 h-5 rounded-full border-3 border-gray-900 bg-white",
+    "shadow-lg transition-all duration-200",
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+    "hover:scale-125 hover:border-blue-600 hover:bg-blue-50 hover:shadow-xl"
   );
 
   const inactiveHandleClasses = selected || isConnectionStart
     ? "opacity-100"
-    : "opacity-0 group-hover:opacity-95";
+    : "opacity-80 group-hover:opacity-100";
 
   const handleDescriptors = [
     {
@@ -342,53 +344,43 @@ const SimpleNode: React.FC<{ data: SimpleNodeData; selected: boolean }> = ({
     data.onConnectionStart?.(data.id);
   };
 
+  const handleNodeClick = (event: React.MouseEvent) => {
+    if (isReadonly || !isValidTarget) {
+      return;
+    }
+    event.stopPropagation();
+    data.onNodeClick?.(data.id);
+  };
+
+  const visual = data.visual ?? resolveVisualPreset(data.type);
+  const Icon = visual.icon;
+
   return (
     <div
       className={cardClasses}
       data-component-id={data.id}
       role="group"
       aria-label={announceLabel}
+      onClick={handleNodeClick}
     >
       <span className="sr-only">
         {announceLabel} Use the connection handles around the node to link it
         to other components.
       </span>
 
-      <div className="flex items-start justify-between gap-2">
-        <span
-          className={cn(
-            "text-[10px] font-semibold uppercase tracking-[0.2em] rounded-full px-2 py-1 shadow-inner",
-            "bg-white/5 text-white/80",
-            visual.chipClass
-          )}
-        >
-          {data.type}
-        </span>
-        <div
-          className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-xl backdrop-blur-lg",
-            "border border-white/20 shadow-inner",
-            visual.accentClass
-          )}
-        >
-          <Icon className={cn("h-4 w-4", visual.accentIconClass)} />
+      {/* Simple node content - icon, label and type */}
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 border-2 border-gray-800 flex items-center justify-center">
+          <Icon className="w-5 h-5 text-gray-900" />
         </div>
-      </div>
-
-      <div className="mt-3 space-y-1.5">
-        <p className="text-sm font-semibold leading-tight">
-          {data.label || data.type}
-        </p>
-        <p className="text-xs text-white/80 leading-snug">
-          {description}
-        </p>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] uppercase tracking-wide text-white/70">
-        <span className="rounded-full bg-white/10 px-2 py-0.5">drag</span>
-        <span className="rounded-full bg-white/10 px-2 py-0.5">
-          drop to connect
-        </span>
+        <div className="flex-1 space-y-1 min-w-0">
+          <p className="text-base font-bold text-gray-900 truncate">
+            {data.label || data.type}
+          </p>
+          <p className="text-xs text-gray-600 uppercase tracking-wide font-medium truncate">
+            {data.type}
+          </p>
+        </div>
       </div>
 
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -421,17 +413,13 @@ const SimpleNode: React.FC<{ data: SimpleNodeData; selected: boolean }> = ({
   );
 };
 
-// Node types
-const nodeTypes: NodeTypes = {
-  simple: SimpleNode,
-};
-
 // Convert app components to React Flow nodes
 interface NodeConversionOptions {
   selectedComponent?: string | null;
   connectionStart?: string | null;
   readonly?: boolean;
   onConnectionStart?: (id: string) => void;
+  onNodeClick?: (id: string) => void;
 }
 
 const convertComponentsToNodes = (
@@ -443,10 +431,17 @@ const convertComponentsToNodes = (
     connectionStart,
     readonly,
     onConnectionStart,
+    onNodeClick,
   } = options;
 
   return components.map((component) => {
     const visual = resolveVisualPreset(String(component.type));
+
+    // Mark as valid target if we're in quick-connect mode and this isn't the source
+    const isValidTarget = Boolean(
+      connectionStart &&
+      connectionStart !== component.id
+    );
 
     const data: SimpleNodeData = {
       id: component.id,
@@ -457,7 +452,9 @@ const convertComponentsToNodes = (
       color: visual.minimapColor,
       readonly,
       isConnectionStart: connectionStart === component.id,
+      isValidTarget,
       onConnectionStart,
+      onNodeClick,
     };
 
     return {
@@ -472,14 +469,40 @@ const convertComponentsToNodes = (
 
 // Convert app connections to React Flow edges
 const convertConnectionsToEdges = (connections: AppConnection[]): Edge[] => {
-  return connections.map((connection) => ({
-    id: connection.id,
-    source: connection.from,
-    target: connection.to,
-    label: connection.label,
-    type: "default",
-    animated: false,
-  }));
+  return connections.map((connection) => {
+    // Determine arrow configuration based on connection properties
+    const markerEnd = connection.properties?.arrowEnd !== false ? {
+      type: 'arrowclosed' as const,
+      color: '#000000',
+      width: 20,
+      height: 20,
+    } : undefined;
+
+    const markerStart = connection.properties?.arrowStart === true ? {
+      type: 'arrowclosed' as const,
+      color: '#000000',
+      width: 20,
+      height: 20,
+    } : undefined;
+
+    return {
+      id: connection.id,
+      source: connection.from,
+      target: connection.to,
+      label: connection.label,
+      type: "default", // Use default for straight lines with arrows
+      animated: false,
+      style: {
+        stroke: '#000000', // Pure black
+        strokeWidth: 3,
+      },
+      markerEnd,
+      markerStart,
+      // Ensure edges are always visible
+      hidden: false,
+      zIndex: 1000,
+    };
+  });
 };
 
 // Convert React Flow edge back to app connection
@@ -490,7 +513,16 @@ const convertEdgeToConnection = (edge: Edge | Connection): AppConnection => {
     to: edge.target,
     label: "Connection",
     type: "data",
+    properties: {
+      arrowEnd: true,  // Arrow at end by default
+      arrowStart: false, // No arrow at start by default
+    },
   };
+};
+
+// Node types - memoized outside component to prevent re-creation
+const nodeTypes: NodeTypes = {
+  simple: SimpleNode,
 };
 
 // Main canvas component
@@ -499,6 +531,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   connections = [],
   selectedComponent,
   connectionStart,
+  selectedAnnotationTool,
   onConnectionStart,
   onComponentSelect,
   onComponentMove,
@@ -507,12 +540,19 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   onConnectionDelete,
   onComponentDrop,
   onCanvasClick,
+  onAnnotationCreate,
+  onQuickConnectPreviewUpdate,
   readonly = false,
   className = "",
   style,
 }) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const lastEdgeClickRef = useRef(0);
+  const reactFlowInstanceRef = useRef<any>(null);
+
+  // Internal state for quick-connect mode
+  const [internalConnectionStart, setInternalConnectionStart] = React.useState<string | null>(null);
+  const activeConnectionStart = connectionStart ?? internalConnectionStart;
 
   const readonlyFlag = Boolean(readonly);
 
@@ -521,19 +561,94 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       if (readonlyFlag) {
         return;
       }
-      onConnectionStart?.(id);
+
+      // If external handler exists, use it; otherwise, use internal state
+      if (onConnectionStart) {
+        onConnectionStart(id);
+      } else {
+        setInternalConnectionStart(id);
+      }
     },
     [onConnectionStart, readonlyFlag]
   );
 
-  const nodeOptions = useMemo(
+  const clearConnectionStart = useCallback(() => {
+    if (readonlyFlag) {
+      return;
+    }
+
+    // Clear both internal and external state
+    if (onConnectionStart) {
+      onConnectionStart(null as any);
+    } else {
+      setInternalConnectionStart(null);
+    }
+  }, [onConnectionStart, readonlyFlag]);
+
+  // Track mouse position for quick-connect preview
+  const [mousePosition, setMousePosition] = React.useState<{ x: number; y: number } | null>(null);
+
+  const handleMouseMove = useCallback((event: React.MouseEvent) => {
+    if (!activeConnectionStart || !reactFlowInstanceRef.current || !reactFlowWrapper.current) {
+      return;
+    }
+
+    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+    const flowPosition = reactFlowInstanceRef.current.screenToFlowPosition({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+
+    setMousePosition(flowPosition);
+    onQuickConnectPreviewUpdate?.(flowPosition);
+  }, [activeConnectionStart, onQuickConnectPreviewUpdate]);
+
+  // Handle node click during quick-connect mode to complete the connection
+  const handleNodeClick = useCallback(
+    (targetId: string) => {
+      if (readonlyFlag || !activeConnectionStart) {
+        return;
+      }
+
+      // Prevent self-connections
+      if (activeConnectionStart === targetId) {
+        return;
+      }
+
+      // Create the connection
+      const newConnection: AppConnection = {
+        id: `${activeConnectionStart}-${targetId}`,
+        from: activeConnectionStart,
+        to: targetId,
+        label: 'Connection',
+        type: 'data',
+      };
+
+      // Validate: prevent duplicate connections
+      const exists = connections.some(
+        conn => conn.from === activeConnectionStart && conn.to === targetId
+      );
+
+      if (!exists) {
+        onConnectionCreate?.(newConnection);
+      }
+
+      // Clear the connection start state
+      clearConnectionStart();
+    },
+    [readonlyFlag, activeConnectionStart, connections, onConnectionCreate, clearConnectionStart]
+  );
+
+  // Memoize node options with stable callback references
+  const nodeOptions = React.useMemo(
     () => ({
       selectedComponent,
-      connectionStart,
+      connectionStart: activeConnectionStart,
       readonly: readonlyFlag,
       onConnectionStart: handleConnectionStart,
+      onNodeClick: handleNodeClick,
     }),
-    [selectedComponent, connectionStart, readonlyFlag, handleConnectionStart]
+    [selectedComponent, activeConnectionStart, readonlyFlag, handleConnectionStart, handleNodeClick]
   );
 
   // Convert props to React Flow format
@@ -547,18 +662,33 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     [connections]
   );
 
-  // React Flow state
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // Convert props to React Flow format - simple and direct
+  const nodes = React.useMemo(
+    () => convertComponentsToNodes(components, nodeOptions),
+    [components, nodeOptions]
+  );
 
-  // Sync external changes
-  React.useEffect(() => {
-    setNodes(convertComponentsToNodes(components, nodeOptions));
-  }, [components, nodeOptions, setNodes]);
+  const edges = React.useMemo(
+    () => {
+      const result = convertConnectionsToEdges(connections);
+      console.log('[SimpleCanvas] Converting connections to edges:', {
+        connections: connections.length,
+        edges: result.length,
+        edgeDetails: result,
+      });
+      return result;
+    },
+    [connections]
+  );
 
-  React.useEffect(() => {
-    setEdges(convertConnectionsToEdges(connections));
-  }, [connections, setEdges]);
+  // Use React Flow's built-in state management
+  const [reactFlowInstance, setReactFlowInstance] = React.useState<any>(null);
+
+  const onInit = React.useCallback((instance: any) => {
+    console.log('[SimpleCanvas] React Flow initialized');
+    setReactFlowInstance(instance);
+    reactFlowInstanceRef.current = instance;
+  }, []);
 
   // Drop functionality for adding components from palette
   const [{ isOver, canDrop }, drop] = useDrop(
@@ -598,11 +728,34 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     [onComponentSelect, readonlyFlag]
   );
 
-  // Handle node drag stop (position change)
+  // Handle node position changes
+  const onNodesChange = React.useCallback(
+    (changes: any[]) => {
+      // Only handle position changes, ignore selection and other changes
+      changes.forEach((change) => {
+        if (change.type === 'position' && change.position && !change.dragging) {
+          onComponentMove?.(change.id, change.position.x, change.position.y);
+        }
+      });
+    },
+    [onComponentMove]
+  );
+
+  // Handle edge changes (required for React Flow to render edges properly)
+  const onEdgesChange = React.useCallback(
+    (changes: any[]) => {
+      // Log edge changes for debugging
+      console.log('[SimpleCanvas] Edge changes:', changes);
+      // We don't need to do anything here since edges are controlled via props
+      // But React Flow needs this handler to be present
+    },
+    []
+  );
+
+  // Handle node drag stop (position change) - backup handler
   const onNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       if (readonlyFlag) return;
-
       onComponentMove?.(node.id, node.position.x, node.position.y);
     },
     [onComponentMove, readonlyFlag]
@@ -613,13 +766,15 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     (params: Edge | Connection) => {
       if (readonlyFlag) return;
 
-      const newConnection = convertEdgeToConnection(params);
-      onConnectionCreate?.(newConnection);
+      console.log('[SimpleCanvas] onConnect called with params:', params);
 
-      // Also update local state
-      setEdges((eds) => addEdge(params, eds));
+      const newConnection = convertEdgeToConnection(params);
+      console.log('[SimpleCanvas] Created new connection:', newConnection);
+
+      // Send to parent - DON'T update local state, let it flow back from props
+      onConnectionCreate?.(newConnection);
     },
-    [onConnectionCreate, readonlyFlag, setEdges]
+    [onConnectionCreate, readonlyFlag]
   );
 
   // Handle edge deletion
@@ -632,28 +787,67 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       const lastClick = lastEdgeClickRef.current;
 
       if (now - lastClick < 300) {
-        // Double-click within 300ms
+        // Double-click within 300ms - just notify parent, don't manipulate local state
         onConnectionDelete?.(edge.id);
-        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
       }
 
       lastEdgeClickRef.current = now;
     },
-    [onConnectionDelete, readonlyFlag, setEdges]
+    [onConnectionDelete, readonlyFlag]
   );
 
   // Handle canvas click
-  const onPaneClick = useCallback(() => {
+  const onPaneClick = useCallback((event: React.MouseEvent) => {
     if (readonlyFlag) return;
+
+    // If annotation tool is selected, create annotation at click position
+    if (selectedAnnotationTool && onAnnotationCreate && reactFlowInstanceRef.current) {
+      const bounds = reactFlowWrapper.current?.getBoundingClientRect();
+      if (!bounds) return;
+
+      // Get the click position relative to the canvas
+      const position = reactFlowInstanceRef.current.screenToFlowPosition({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      });
+
+      onAnnotationCreate(position.x, position.y, selectedAnnotationTool);
+      return;
+    }
+
+    // Clear connection start if active
+    if (activeConnectionStart) {
+      clearConnectionStart();
+      setMousePosition(null);
+      onQuickConnectPreviewUpdate?.(null);
+    }
 
     onCanvasClick?.();
     onComponentSelect?.(null); // Deselect when clicking empty space
-  }, [onCanvasClick, onComponentSelect, readonlyFlag]);
+  }, [
+    onCanvasClick,
+    onComponentSelect,
+    readonlyFlag,
+    activeConnectionStart,
+    clearConnectionStart,
+    selectedAnnotationTool,
+    onAnnotationCreate,
+    onQuickConnectPreviewUpdate,
+  ]);
 
   // Handle keyboard shortcuts
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (readonlyFlag) return;
+
+      // Cancel quick-connect mode with Escape
+      if (event.key === "Escape" && activeConnectionStart) {
+        event.preventDefault();
+        clearConnectionStart();
+        setMousePosition(null);
+        onQuickConnectPreviewUpdate?.(null);
+        return;
+      }
 
       if (event.key === "Delete" || event.key === "Backspace") {
         const selectedNodes = nodes.filter((node) => node.selected);
@@ -666,7 +860,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         }
       }
     },
-    [nodes, onComponentDelete, readonlyFlag]
+    [nodes, onComponentDelete, readonlyFlag, activeConnectionStart, clearConnectionStart]
   );
 
   // Combine refs using callback ref approach
@@ -681,29 +875,34 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     [drop]
   );
 
+  // Debug log to see what's being rendered
+  console.log('[SimpleCanvas] Rendering with:', {
+    nodesCount: nodes.length,
+    edgesCount: edges.length,
+    nodes: nodes.map(n => ({ id: n.id, position: n.position })),
+    edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target })),
+  });
+
   return (
     <div
       ref={setRefs}
       className={cn(
-        "simple-canvas relative overflow-hidden rounded-[24px] border border-slate-800/40 transition-shadow duration-300",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        "simple-canvas relative overflow-hidden rounded-lg border-2 border-gray-300 transition-shadow duration-300",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
         isOver && canDrop
-          ? "ring-2 ring-primary/40 shadow-[0_35px_120px_-60px_rgba(56,189,248,0.65)]"
-          : "shadow-[0_30px_110px_-70px_rgba(15,23,42,0.85)]",
+          ? "ring-2 ring-blue-500/40 shadow-lg border-blue-500"
+          : "shadow-md",
         className
       )}
       style={{
         width: "100%",
         height: "100%",
-        backgroundImage:
-          "radial-gradient(160% 160% at 0% 0%, rgba(56,189,248,0.18), transparent 58%), radial-gradient(140% 140% at 90% 12%, rgba(168,85,247,0.14), transparent 60%), linear-gradient(135deg, #0f172a 0%, #111827 52%, #0b1120 100%)",
+        backgroundColor: "#ffffff",
         ...style,
       }}
       onKeyDown={onKeyDown}
       tabIndex={0}
     >
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_35%_25%,rgba(56,189,248,0.18),transparent_70%)]" />
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_75%_10%,rgba(236,72,153,0.12),transparent_72%)]" />
       <div
         className={cn(
           "pointer-events-none absolute inset-0 z-10 rounded-[24px] border-2 border-primary/40 transition-opacity duration-200",
@@ -716,6 +915,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         style={{ backgroundColor: "transparent" }}
         nodes={nodes}
         edges={edges}
+        onInit={onInit}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -723,23 +923,40 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         onNodeDragStop={onNodeDragStop}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
+        onMouseMove={handleMouseMove}
         nodeTypes={nodeTypes}
+        defaultEdgeOptions={{
+          type: 'default',
+          animated: false,
+          style: { stroke: '#000000', strokeWidth: 3 },
+          markerEnd: {
+            type: 'arrowclosed',
+            color: '#000000',
+            width: 20,
+            height: 20,
+          },
+        }}
         fitView
         fitViewOptions={{ padding: 0.1 }}
         nodesDraggable={!readonlyFlag}
         nodesConnectable={!readonlyFlag}
+        edgesUpdatable={!readonlyFlag}
+        edgesFocusable={!readonlyFlag}
         elementsSelectable={!readonlyFlag}
         panOnDrag={!readonlyFlag}
         zoomOnScroll={true}
         zoomOnPinch={true}
         deleteKeyCode={readonlyFlag ? null : ["Delete", "Backspace"]}
         multiSelectionKeyCode={readonlyFlag ? null : "Meta"}
+        proOptions={{ hideAttribution: true }}
+        connectionLineStyle={{ stroke: '#000000', strokeWidth: 2 }}
+        connectionLineType="default"
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={22}
-          size={1}
-          color="rgba(148, 163, 184, 0.35)"
+          gap={20}
+          size={1.5}
+          color="#d1d5db"
         />
 
         <Controls

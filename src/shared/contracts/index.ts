@@ -80,6 +80,7 @@ export interface DesignComponent {
   description?: string;
   properties?: ComponentProperties;
   layerId?: string;
+  typeSpecificProperties?: Record<string, any>;
 }
 
 export interface GridConfig {
@@ -98,6 +99,7 @@ export interface Connection {
   protocol?: string;
   direction?: ConnectionDirection;
   visualStyle?: VisualStyle;
+  properties?: Record<string, unknown>;
 }
 
 export interface Layer {
@@ -125,11 +127,26 @@ export interface InfoCard {
   isEditing?: boolean;
 }
 
+export interface Annotation {
+  id: string;
+  type: 'comment' | 'note' | 'label' | 'arrow' | 'highlight';
+  content: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  timestamp: number;
+  author?: string;
+  resolved?: boolean;
+  style?: Record<string, any>;
+}
+
 export interface DesignData {
   schemaVersion?: number;
   components: DesignComponent[];
   connections: Connection[];
   infoCards?: InfoCard[];
+  annotations?: Annotation[];
   layers: Layer[];
   gridConfig?: GridConfig;
   activeTool?: ToolType;
@@ -158,6 +175,7 @@ export interface Challenge {
   category: 'system-design' | 'architecture' | 'scaling';
   referenceTranscript?: string;
   keyConcepts?: string[];
+  tags?: string[];
 }
 
 export interface AudioData {

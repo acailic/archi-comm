@@ -57,6 +57,7 @@ export const defaultSettings = {
     completedFlows: [] as string[],
     skillLevel: 'intermediate' as 'beginner' | 'intermediate' | 'advanced',
     preferredLearningStyle: 'contextual' as 'progressive' | 'contextual' | 'practice',
+    enableProgressiveTips: false,
   },
   shortcuts: {
     customShortcuts: {} as Record<string, string>,
@@ -130,6 +131,14 @@ export const validateSettings = (settings: any): boolean => {
       }
     }
 
+    // Validate onboarding settings
+    if (settings.onboarding) {
+      const { enableProgressiveTips } = settings.onboarding;
+      if (enableProgressiveTips !== undefined && typeof enableProgressiveTips !== 'boolean') {
+        return false;
+      }
+    }
+
     return true;
   } catch {
     return false;
@@ -196,11 +205,42 @@ export const loadSettings = (): typeof defaultSettings => {
       workflow: { ...defaultSettings.workflow, ...parsed.workflow },
       audio: { ...defaultSettings.audio, ...parsed.audio },
       telemetry: { ...defaultSettings.telemetry, ...parsed.telemetry },
-      onboarding: { ...defaultSettings.onboarding, ...parsed.onboarding },
+      onboarding: {
+        ...defaultSettings.onboarding,
+        ...parsed.onboarding,
+        completedFlows: parsed.onboarding?.completedFlows || [],
+      },
       shortcuts: { ...defaultSettings.shortcuts, ...parsed.shortcuts },
     };
   } catch (error) {
     console.error('Failed to load settings:', error);
     return defaultSettings;
   }
+};
+
+// Onboarding Helper Functions
+
+export const shouldShowWelcome = (): boolean => {
+  const settings = loadSettings();
+  return settings.onboarding.showWelcomeOnStartup &&
+         !settings.onboarding.completedFlows.includes('welcome');
+};
+
+export const isOnboardingFlowCompleted = (flowId: string): boolean => {
+  const settings = loadSettings();
+  return settings.onboarding.completedFlows.includes(flowId);
+};
+
+export const markOnboardingFlowCompleted = (flowId: string): void => {
+  const settings = loadSettings();
+  if (!settings.onboarding.completedFlows.includes(flowId)) {
+    settings.onboarding.completedFlows.push(flowId);
+    saveSettings(settings);
+  }
+};
+
+export const updateOnboardingSettings = (updates: Partial<typeof defaultSettings.onboarding>): void => {
+  const settings = loadSettings();
+  settings.onboarding = { ...settings.onboarding, ...updates };
+  saveSettings(settings);
 };

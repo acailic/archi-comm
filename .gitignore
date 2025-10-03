@@ -351,8 +351,10 @@ dev.config.*
 *.local.*
 
 # Local development documentation (ignored by git)
-docs/development/
-docs/development/**
+# Note: We track TAURI_SETUP.md and ESLINT_FIXES.md as they are essential docs
+docs/development/*
+!docs/development/TAURI_SETUP.md
+!docs/development/ESLINT_FIXES.md
 docs/react-learning/
 
 # Development-specific files (kept local only)
@@ -399,3 +401,23 @@ tools/temp/
 tools/scratch/
 tools/local/
 .playwright-mcp/
+
+# ArchiComm specific
+.archicomm/
+!.archicomm/ac-config.json
+!.archicomm/review-config.json
+
+# AI cache
+.ai-cache/
+
+# Traceability data (generated)
+.traceability/
+
+# CLI tool cache
+.cli-cache/
+
+# Documentation files - keep only essential ones
+IMPLEMENTATION_SUMMARY.md1
+*_SUMMARY.md
+docs/**/*.md
+!docs/README.md

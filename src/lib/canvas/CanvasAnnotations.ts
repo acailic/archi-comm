@@ -4,12 +4,8 @@
  */
 
 import RBush from 'rbush';
-import {
-  CanvasOptimizer,
-  PerformanceMonitor,
-  MemoryOptimizer,
-  PerformanceOptimizer,
-} from '../performance/PerformanceOptimizer';
+import { CanvasOptimizer } from '../performance/CanvasOptimizer';
+import { PerformanceMonitor, MemoryOptimizer, PerformanceOptimizer } from '../performance/PerformanceOptimizer';
 
 export interface CanvasAnnotation {
   id: string;

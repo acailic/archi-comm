@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { ScenarioViewer } from "../../../../dev";
 import { isDevelopment } from "../../../../lib/config/environment";
+import { isOnboardingFlowCompleted } from "../../../../modules/settings";
 import type {
   AudioData,
   Challenge,
@@ -64,8 +65,8 @@ export function ScreenRouter({
     return <ScenarioViewer />;
   }
 
-  // Show welcome screen first
-  if (showWelcome) {
+  // Show welcome screen first (defense-in-depth: check both app state and persisted settings)
+  if (showWelcome && !isOnboardingFlowCompleted('welcome')) {
     return <WelcomeOverlay onComplete={onWelcomeComplete} />;
   }
 

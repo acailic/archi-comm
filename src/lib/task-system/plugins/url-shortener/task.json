@@ -2,33 +2,140 @@
   "id": "url-shortener-basic",
   "title": "Design a URL Shortener",
   "difficulty": "intermediate",
-  "tags": ["system-design", "scalability", "database", "caching"],
+  "tags": [
+    "system-design",
+    "scalability",
+    "database",
+    "caching"
+  ],
   "estimatedTime": 45,
   "prompt": "Design a production-ready URL shortener service similar to bit.ly. Include API design, data model, redirection flow, rate limiting, observability, and scaling considerations.",
-  "acceptanceCriteria": {
-    "architecture": [
-      "Clearly defined components: API gateway, application/service layer, database, cache",
-      "Redirection flow with minimal latency and high availability",
-      "Strategy for custom aliases and collision handling",
-      "Observability: metrics, logging, tracing"
+  "acceptanceCriteria": [
+    {
+      "id": "url-shortener-basic-ac-001",
+      "title": "As a user, I want to shorten a long URL so that I can share it easily",
+      "description": "Users should be able to submit a long URL and receive a short URL in return that is unique and redirects to the original URL",
+      "type": "functional",
+      "priority": "must-have",
+      "gherkin": {
+        "feature": "URL Shortening",
+        "scenario": "Shorten a valid URL",
+        "given": [
+          "I have a valid long URL"
+        ],
+        "when": [
+          "I submit the URL to the shortening service"
+        ],
+        "then": [
+          "I should receive a short URL",
+          "The short URL should be unique",
+          "The short URL should redirect to the original URL"
+        ]
+      },
+      "testIds": [
+        "src/__tests__/url-shortener/shorten-url.test.ts",
+        "e2e/url-shortener/basic-flow.spec.ts"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "url-shortener-basic-ac-002",
+      "title": "The system should handle 10,000 requests per second",
+      "description": "System must scale to handle high traffic with low latency (<100ms p99) and maintain 99.9% availability",
+      "type": "non-functional",
+      "priority": "must-have",
+      "testIds": [
+        "e2e/performance/load-test.spec.ts"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "url-shortener-basic-ac-003",
+      "title": "As a user, I want custom short URLs so that they are memorable",
+      "description": "Users should be able to specify a custom alias for their short URL if it's available",
+      "type": "functional",
+      "priority": "should-have",
+      "gherkin": {
+        "feature": "Custom URL Aliases",
+        "scenario": "Create custom short URL",
+        "given": [
+          "I have a valid long URL",
+          "I have chosen a custom alias 'mylink'"
+        ],
+        "when": [
+          "I submit the URL with the custom alias"
+        ],
+        "then": [
+          "I should receive a short URL with my custom alias",
+          "The system should validate the alias is available",
+          "The system should reject invalid or taken aliases"
+        ]
+      },
+      "testIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "url-shortener-basic-ac-004",
+      "title": "The API should validate URLs and prevent abuse",
+      "description": "API must validate URL format, implement rate limiting (100 req/min per IP), and prevent malicious URLs",
+      "type": "technical",
+      "priority": "must-have",
+      "testIds": [
+        "src/__tests__/url-shortener/url-validation.test.ts",
+        "src/__tests__/url-shortener/rate-limiting.test.ts"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "url-shortener-basic-ac-005",
+      "title": "Users should be able to see analytics for their shortened URLs",
+      "description": "Users can view click counts, geographic distribution, and referrer information for their shortened URLs",
+      "type": "functional",
+      "priority": "nice-to-have",
+      "gherkin": {
+        "feature": "URL Analytics",
+        "scenario": "View URL click statistics",
+        "given": [
+          "I have created a shortened URL"
+        ],
+        "when": [
+          "I navigate to the analytics page"
+        ],
+        "then": [
+          "I should see total click count",
+          "I should see geographic distribution",
+          "I should see referrer sources",
+          "I should see click history over time"
+        ]
+      },
+      "testIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "url-shortener-basic-ac-006",
+      "title": "The system architecture should be clearly documented with component diagrams",
+      "description": "Architecture documentation must include API gateway, service layer, database, cache, and their interactions with data flow diagrams",
+      "type": "technical",
+      "priority": "must-have",
+      "testIds": [
+        "src/__tests__/architecture/diagram-generation.test.ts"
+      ],
+      "status": "verified"
+    }
+  ],
+  "testCoverage": {
+    "required": 80,
+    "unit": [
+      "src/__tests__/url-shortener/shorten-url.test.ts",
+      "src/__tests__/url-shortener/url-validation.test.ts",
+      "src/__tests__/url-shortener/rate-limiting.test.ts"
     ],
-    "apis": [
-      "POST /shorten with URL validation and optional custom alias",
-      "GET /:alias redirect to target URL",
-      "Rate limiting and abuse prevention",
-      "Consider auth for admin/analytics endpoints"
+    "integration": [
+      "src/__tests__/url-shortener/database-integration.test.ts"
     ],
-    "storage": [
-      "Efficient key generation scheme (e.g., base62)",
-      "Data model for URL, alias, TTL/expiration, owner, analytics",
-      "Caching strategy for hot aliases",
-      "Backup/restore considerations"
-    ],
-    "scaling": [
-      "Horizontal scaling plan for reads and writes",
-      "Traffic patterns and CDN considerations",
-      "Hot key mitigation, sharding/partitioning options",
-      "Disaster recovery and multi-region approach"
+    "e2e": [
+      "e2e/url-shortener/basic-flow.spec.ts",
+      "e2e/performance/load-test.spec.ts"
     ]
   },
   "hints": [

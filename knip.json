@@ -1,0 +1,40 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "config/vite.config.ts",
+    "config/playwright.config.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "config/**/*.{ts,js}", "e2e/**/*.{ts,tsx}"],
+  "ignore": [
+    "**/*.test.{ts,tsx}",
+    "**/__tests__/**",
+    "**/test/**",
+    "dist/**",
+    "build/**",
+    "node_modules/**",
+    "src-tauri/target/**",
+    "coverage/**",
+    "test-results/**",
+    "e2e/demo-videos/**",
+    "e2e/processed-videos/**",
+    "e2e/temp-videos/**"
+  ],
+  "ignoreDependencies": ["@tauri-apps/cli", "husky", "lint-staged"],
+  "ignoreExportsUsedInFile": true,
+  "vite": {
+    "config": ["config/vite.config.ts"]
+  },
+  "vitest": {
+    "config": ["config/vite.config.ts"]
+  },
+  "playwright": {
+    "config": ["config/playwright.config.ts"]
+  },
+  "typescript": {
+    "config": ["config/tsconfig.json"]
+  },
+  "eslint": {
+    "config": ["config/eslint.config.js"]
+  }
+}

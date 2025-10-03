@@ -20,6 +20,7 @@ interface PropertiesPanelProps {
   components: DesignComponent[];
   onLabelChange: (id: string, label: string) => void;
   onDelete: (id: string) => void;
+  onDuplicate?: (id: string) => void;
   onShowLabelToggle?: (id: string, visible: boolean) => void;
   onStickerToggle?: (id: string, enabled: boolean) => void;
   onStickerEmojiChange?: (id: string, emoji: string) => void;
@@ -34,6 +35,7 @@ export const PropertiesPanel = React.memo(function PropertiesPanel({
   components,
   onLabelChange,
   onDelete,
+  onDuplicate,
   onShowLabelToggle,
   onStickerToggle,
   onStickerEmojiChange,
@@ -161,6 +163,7 @@ export const PropertiesPanel = React.memo(function PropertiesPanel({
                 selectedComponentData={selectedComponentData}
                 onLabelChange={onLabelChange}
                 onDelete={onDelete}
+                onDuplicate={onDuplicate}
                 onShowLabelToggle={onShowLabelToggle}
                 onStickerToggle={onStickerToggle}
                 onStickerEmojiChange={onStickerEmojiChange}

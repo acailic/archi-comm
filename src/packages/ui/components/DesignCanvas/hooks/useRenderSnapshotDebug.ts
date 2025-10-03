@@ -30,6 +30,18 @@ interface RenderPatternAnalysis {
   predictedNextRender?: number;
 }
 
+interface RenderGuardMetrics {
+  renderCount: number;
+  sincePreviousRenderMs: number;
+  sinceFirstRenderMs: number;
+  circuitBreakerActive: boolean;
+  shouldPause: boolean;
+  memorySample?: {
+    usedJSHeapSize?: number;
+    deltaSinceBaseline?: number;
+  } | null;
+}
+
 const analyzeSnapshotComparison = (
   currentSnapshot: any,
   previousSnapshot: any
@@ -114,7 +126,7 @@ const calculateImpact = (key: string, oldValue: any, newValue: any, changeSize: 
 
 const analyzeRenderTrigger = (
   changes: DetailedSnapshotComparison[],
-  renderGuard: any
+  renderGuard: RenderGuardMetrics
 ): RenderTriggerAnalysis => {
   const significantChanges = changes.filter(change => change.isSignificant);
   const evidence: string[] = [];
@@ -165,7 +177,7 @@ const analyzeRenderTrigger = (
 
 const analyzeRenderPattern = (
   renderHistory: Array<{ timestamp: number; changes: DetailedSnapshotComparison[] }>,
-  renderGuard: any
+  renderGuard: RenderGuardMetrics
 ): RenderPatternAnalysis => {
   const recentRenders = renderHistory.slice(-10);
   let isOscillating = false;
@@ -212,13 +224,19 @@ const analyzeRenderPattern = (
     }
   }
 
+  const predictedNextRender = oscillationPeriod
+    ? Date.now() + oscillationPeriod
+    : renderGuard.sincePreviousRenderMs > 0
+      ? Date.now() + renderGuard.sincePreviousRenderMs
+      : undefined;
+
   return {
     isOscillating,
     oscillationPeriod,
     isRapidFire,
     rapidFireCount,
     pattern,
-    predictedNextRender: oscillationPeriod ? Date.now() + oscillationPeriod : undefined,
+    predictedNextRender,
   };
 };
 
@@ -229,17 +247,7 @@ interface RenderSnapshotParams {
   selectedComponent: string | null;
   challengeId: string;
   isSynced: boolean;
-  renderGuard: {
-    renderCount: number;
-    sincePreviousRenderMs: number;
-    sinceFirstRenderMs: number;
-    circuitBreakerActive: boolean;
-    shouldPause: boolean;
-    memorySample?: {
-      usedJSHeapSize?: number;
-      deltaSinceBaseline?: number;
-    } | null;
-  };
+  renderGuard: RenderGuardMetrics;
   lastRenderSnapshotRef: React.MutableRefObject<{
     componentsLength: number;
     connectionsLength: number;
@@ -392,8 +400,7 @@ export function useRenderSnapshotDebug({
       });
 
       // Record diagnostics
-      RenderLoopDiagnostics.getInstance().record('render-snapshot-analysis', {
-        componentName: 'DesignCanvasCore',
+      RenderLoopDiagnostics.getInstance().recordRenderSnapshotAnalysis('DesignCanvasCore', {
         renderCount: renderGuard.renderCount,
         significantChanges: significantChanges.length,
         triggerAnalysis,
@@ -435,7 +442,7 @@ const generateOptimizationSuggestions = (
   changes: DetailedSnapshotComparison[],
   triggerAnalysis: RenderTriggerAnalysis,
   patternAnalysis: RenderPatternAnalysis,
-  renderGuard: any
+  renderGuard: RenderGuardMetrics
 ): string[] => {
   const suggestions: string[] = [];
 
@@ -453,6 +460,16 @@ const generateOptimizationSuggestions = (
   // Suggest prop stability for oscillating patterns
   if (patternAnalysis.isOscillating) {
     suggestions.push('Consider stabilizing props and callbacks with useCallback/useMemo to prevent oscillating renders');
+  }
+
+  if (triggerAnalysis.triggerType === 'prop-change') {
+    suggestions.push(
+      `Consider memoizing props related to ${triggerAnalysis.relatedChanges.map(change => change.property).join(', ') || 'frequent prop updates'} to reduce prop-driven renders`
+    );
+  }
+
+  if (triggerAnalysis.triggerType === 'forced-update' && triggerAnalysis.confidence < 0.6) {
+    suggestions.push('Investigate forced updates; review refs or external subscriptions that may trigger renders');
   }
 
   // Suggest selective subscriptions for high-impact state changes

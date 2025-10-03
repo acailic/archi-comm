@@ -1,6 +1,6 @@
 
 import { motion } from 'framer-motion';
-import { Edit3, Eye, EyeOff, Info, Palette, Trash2 } from 'lucide-react';
+import { Edit3, Eye, EyeOff, Info, Palette, Trash2, Copy } from 'lucide-react';
 import type { DesignComponent } from '@/shared/contracts';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -14,6 +14,7 @@ interface ComponentPropertiesTabProps {
   selectedComponentData: DesignComponent | null;
   onLabelChange: (id: string, label: string) => void;
   onDelete: (id: string) => void;
+  onDuplicate?: (id: string) => void;
   onShowLabelToggle?: (id: string, visible: boolean) => void;
   onStickerToggle?: (id: string, enabled: boolean) => void;
   onStickerEmojiChange?: (id: string, emoji: string) => void;
@@ -25,6 +26,7 @@ export function ComponentPropertiesTab({
   selectedComponentData,
   onLabelChange,
   onDelete,
+  onDuplicate,
   onShowLabelToggle,
   onStickerToggle,
   onStickerEmojiChange,
@@ -193,6 +195,17 @@ export function ComponentPropertiesTab({
 
           {/* Actions */}
           <div className="pt-2 border-t border-border/30">
+            {!!onDuplicate && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onDuplicate(selectedComponentData.id)}
+                className="w-full text-[11px] h-8 mb-2"
+              >
+                <Copy className="w-3 h-3 mr-2" />
+                Duplicate Component
+              </Button>
+            )}
             <Button
               variant="destructive"
               size="sm"

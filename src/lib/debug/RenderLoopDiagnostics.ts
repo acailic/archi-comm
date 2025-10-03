@@ -90,6 +90,10 @@ export class RenderLoopDiagnostics {
     this.record('canvas-layer-interaction', { fromLayer, toLayer, ...payload });
   }
 
+  recordRenderSnapshotAnalysis(componentName: string, payload: unknown) {
+    this.record('render-snapshot-analysis', { componentName, ...payload });
+  }
+
   exportDiagnosticData() {
     const data = {
       timestamp: Date.now(),
@@ -142,7 +146,8 @@ export class RenderLoopDiagnostics {
       this.events.shift();
     }
 
-    if (import.meta.env.DEV) {
+    // Only log critical events in development to reduce console noise
+    if (import.meta.env.DEV && ['circuit-breaker', 'synthetic-error'].includes(type)) {
       // eslint-disable-next-line no-console
       console.debug(`[RenderDiagnostics:${type}]`, payload);
     }

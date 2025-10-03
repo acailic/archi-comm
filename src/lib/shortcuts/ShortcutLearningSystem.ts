@@ -1,5 +1,5 @@
 import { UXOptimizer } from '../user-experience/UXOptimizer';
-import { getGlobalShortcutManager, ShortcutAction, ShortcutCategory } from './KeyboardShortcuts';
+import { formatShortcutKey, getGlobalShortcutManager, ShortcutAction, ShortcutCategory } from './KeyboardShortcuts';
 
 export interface ShortcutUsageMetrics {
   shortcutId: string;
@@ -57,6 +57,54 @@ export interface WorkflowPattern {
   efficiencyScore: number;
 }
 
+export interface InlineCheatSheetEntry {
+  shortcutId: string;
+  description: string;
+  combination: string;
+  category: ShortcutCategory;
+  adoptionRate: number;
+  averageTimeSaved: number;
+  recommendedReason: string;
+}
+
+export interface InlineCheatSheetOptions {
+  limit?: number;
+  focus?: 'priority' | 'struggling' | 'recent';
+  category?: ShortcutCategory;
+  categories?: ShortcutCategory[];
+  context?: string;
+}
+
+export interface LearnModeOptions {
+  focus?: 'priority' | 'struggling' | 'recent';
+  limit?: number;
+  includeCategories?: ShortcutCategory[];
+}
+
+export interface LearnModeChallenge {
+  shortcutId: string;
+  description: string;
+  combination: string;
+  prompt: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  attempts: number;
+  mastered: boolean;
+}
+
+export interface LearnModeState {
+  active: boolean;
+  startedAt: number;
+  currentIndex: number;
+  focus: LearnModeOptions['focus'];
+  challenges: LearnModeChallenge[];
+}
+
+interface LearnModeAttemptDetail {
+  shortcutId?: string;
+  success: boolean;
+  timeTaken?: number;
+}
+
 export class ShortcutLearningSystem {
   private static instance: ShortcutLearningSystem | null = null;
 
@@ -64,6 +112,30 @@ export class ShortcutLearningSystem {
   private actionTracking: ActionTrackingData[] = [];
   private workflowPatterns: Map<string, WorkflowPattern> = new Map();
   private learningProgress: LearningProgress;
+  private inlineCheatSheetVisible = false;
+  private inlineCheatSheetContext: string | null = null;
+  private cachedCheatSheet: InlineCheatSheetEntry[] = [];
+  private lastCheatSheetOptions: InlineCheatSheetOptions = {};
+  private learnModeState: LearnModeState | null = null;
+
+  private readonly handleToggleCheatSheet = (event: Event) => {
+    const options = (event as CustomEvent<InlineCheatSheetOptions>).detail;
+    this.toggleInlineCheatSheet(options);
+  };
+
+  private readonly handleEnterLearnMode = (event: Event) => {
+    const options = (event as CustomEvent<LearnModeOptions>).detail;
+    this.enterLearnMode(options);
+  };
+
+  private readonly handleLearnModeAnswer = (event: Event) => {
+    const detail = (event as CustomEvent<LearnModeAttemptDetail>).detail;
+    this.completeLearnModeChallenge(detail?.shortcutId, detail.success, detail.timeTaken);
+  };
+
+  private readonly handleLearnModeExit = () => {
+    this.exitLearnMode();
+  };
 
   private readonly storageKeys = {
     metrics: 'archicomm_shortcut_metrics',
@@ -84,6 +156,7 @@ export class ShortcutLearningSystem {
     this.loadStoredData();
     this.initializeLearningProgress();
     this.setupShortcutTracking();
+    this.setupLearningIntegrations();
   }
 
   public static getInstance(): ShortcutLearningSystem {
@@ -156,6 +229,11 @@ export class ShortcutLearningSystem {
     // Update learning progress
     this.updateLearningProgress();
     this.saveData();
+
+    if (this.inlineCheatSheetVisible) {
+      this.cachedCheatSheet = this.getInlineCheatSheet(this.lastCheatSheetOptions);
+      this.emitCheatSheetUpdate(this.cachedCheatSheet);
+    }
   }
 
   public trackManualAction(actionType: string, executionTime: number, context: string = ''): void {
@@ -198,6 +276,11 @@ export class ShortcutLearningSystem {
     });
 
     this.saveData();
+
+    if (this.inlineCheatSheetVisible) {
+      this.cachedCheatSheet = this.getInlineCheatSheet(this.lastCheatSheetOptions);
+      this.emitCheatSheetUpdate(this.cachedCheatSheet);
+    }
   }
 
   // Learning recommendation generation
@@ -373,6 +456,209 @@ export class ShortcutLearningSystem {
     });
 
     return recommendations;
+  }
+
+  // Inline cheat sheet & learn mode helpers
+  public getInlineCheatSheet(options: InlineCheatSheetOptions = {}): InlineCheatSheetEntry[] {
+    const manager = getGlobalShortcutManager();
+    if (!manager) {
+      return [];
+    }
+
+    const { limit = 6, focus = 'priority', category, categories, context } = options;
+    const allowedCategories =
+      categories && categories.length > 0 ? categories : category ? [category] : undefined;
+
+    const now = Date.now();
+    const shortcuts = manager
+      .getAllShortcuts()
+      .filter(shortcut =>
+        allowedCategories ? allowedCategories.includes(shortcut.category) : true
+      );
+
+    if (shortcuts.length === 0) {
+      return [];
+    }
+
+    type RankedEntry = InlineCheatSheetEntry & { score: number };
+
+    const entries: RankedEntry[] = shortcuts.map(shortcut => {
+      const shortcutId = this.normalizeShortcutId(shortcut.description);
+      const metrics = this.shortcutMetrics.get(shortcutId);
+      const adoption = metrics?.adoptionRate ?? 0;
+      const averageTimeSaved = metrics?.averageTimeSaved ?? 250;
+      const totalUsage = metrics?.totalUsageCount ?? 0;
+      const lastUsedAt = metrics?.lastUsedAt ?? 0;
+      const daysSinceUse = lastUsedAt
+        ? (now - lastUsedAt) / (1000 * 60 * 60 * 24)
+        : Number.POSITIVE_INFINITY;
+
+      let recommendedReason = 'High-impact productivity booster';
+      if (!metrics) {
+        recommendedReason = 'New shortcut to discover';
+      } else if (
+        adoption < this.learningThresholds.adoptionRate &&
+        totalUsage >= this.learningThresholds.discoveryUsage
+      ) {
+        recommendedReason = 'Perfect candidate to practice next';
+      } else if (daysSinceUse > this.learningThresholds.retentionDays) {
+        recommendedReason = `Refresh after ${Math.round(daysSinceUse)} idle days`;
+      }
+
+      const combination = formatShortcutKey(shortcut.key, shortcut.modifiers);
+
+      return {
+        shortcutId,
+        description: shortcut.description,
+        combination,
+        category: shortcut.category,
+        adoptionRate: adoption,
+        averageTimeSaved,
+        recommendedReason,
+        score: this.computeCheatSheetScore({
+          focus,
+          adoption,
+          averageTimeSaved,
+          totalUsage,
+          daysSinceUse,
+          lastUsedAt,
+        }),
+      };
+    });
+
+    const ranked = entries
+      .filter(entry => Number.isFinite(entry.score))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ score, ...rest }) => rest);
+
+    if (context && this.inlineCheatSheetVisible) {
+      this.inlineCheatSheetContext = context;
+    }
+
+    return ranked;
+  }
+
+  public getInlineCheatSheetState(): {
+    visible: boolean;
+    entries: InlineCheatSheetEntry[];
+    context: string | null;
+  } {
+    return {
+      visible: this.inlineCheatSheetVisible,
+      entries: [...this.cachedCheatSheet],
+      context: this.inlineCheatSheetContext,
+    };
+  }
+
+  public toggleInlineCheatSheet(
+    options: InlineCheatSheetOptions = {}
+  ): { visible: boolean; entries: InlineCheatSheetEntry[] } {
+    const nextVisible = !this.inlineCheatSheetVisible;
+    return this.setInlineCheatSheetVisibility(nextVisible, options);
+  }
+
+  public setInlineCheatSheetVisibility(
+    visible: boolean,
+    options: InlineCheatSheetOptions = {}
+  ): { visible: boolean; entries: InlineCheatSheetEntry[] } {
+    this.inlineCheatSheetVisible = visible;
+
+    if (visible) {
+      this.lastCheatSheetOptions = { ...this.lastCheatSheetOptions, ...options };
+      if (options.context) {
+        this.inlineCheatSheetContext = options.context;
+      }
+      this.cachedCheatSheet = this.getInlineCheatSheet(this.lastCheatSheetOptions);
+    } else {
+      this.cachedCheatSheet = [];
+      this.inlineCheatSheetContext = options.context ?? null;
+    }
+
+    this.emitCheatSheetUpdate(this.cachedCheatSheet);
+    return { visible: this.inlineCheatSheetVisible, entries: this.cachedCheatSheet };
+  }
+
+  public enterLearnMode(options: LearnModeOptions = {}): LearnModeState | null {
+    const challenges = this.buildLearnModeChallenges(options);
+    if (challenges.length === 0) {
+      this.exitLearnMode();
+      return null;
+    }
+
+    this.learnModeState = {
+      active: true,
+      startedAt: Date.now(),
+      currentIndex: 0,
+      focus: options.focus ?? 'priority',
+      challenges,
+    };
+
+    this.emitLearnModeUpdate();
+    return this.learnModeState;
+  }
+
+  public getLearnModeState(): LearnModeState | null {
+    return this.learnModeState
+      ? { ...this.learnModeState, challenges: this.learnModeState.challenges.map(challenge => ({ ...challenge })) }
+      : null;
+  }
+
+  public completeLearnModeChallenge(
+    shortcutId?: string,
+    success = false,
+    timeTaken?: number
+  ): void {
+    if (!this.learnModeState) {
+      return;
+    }
+
+    const state = this.learnModeState;
+    const index =
+      typeof shortcutId === 'string' && shortcutId.length > 0
+        ? state.challenges.findIndex(challenge => challenge.shortcutId === shortcutId)
+        : state.currentIndex;
+
+    if (index < 0 || !state.challenges[index]) {
+      return;
+    }
+
+    const challenge = state.challenges[index];
+    challenge.attempts += 1;
+
+    this.recordLearnModeAttempt(challenge.shortcutId, success, timeTaken);
+
+    if (success) {
+      challenge.mastered = true;
+      if (!this.learningProgress.completedChallenges.includes(challenge.shortcutId)) {
+        this.learningProgress.completedChallenges = [
+          ...this.learningProgress.completedChallenges,
+          challenge.shortcutId,
+        ];
+      }
+
+      const nextIndex = this.findNextLearnModeIndex(index);
+      if (nextIndex === -1) {
+        this.learnModeState = null;
+        this.emitLearnModeUpdate();
+        this.saveData();
+        return;
+      }
+      state.currentIndex = nextIndex;
+    } else if (index !== state.currentIndex) {
+      state.currentIndex = index;
+    }
+
+    this.emitLearnModeUpdate();
+    this.saveData();
+  }
+
+  public exitLearnMode(): void {
+    if (!this.learnModeState) {
+      return;
+    }
+    this.learnModeState = null;
+    this.emitLearnModeUpdate();
   }
 
   // Analytics and reporting
@@ -581,6 +867,129 @@ export class ShortcutLearningSystem {
 
       this.workflowPatterns.set(patternId, pattern);
     }
+  }
+
+  private setupLearningIntegrations(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.addEventListener('shortcuts:toggle-inline-cheatsheet', this.handleToggleCheatSheet as EventListener);
+    window.addEventListener('shortcuts:enter-learn-mode', this.handleEnterLearnMode as EventListener);
+    window.addEventListener('shortcuts:learn-mode:answer', this.handleLearnModeAnswer as EventListener);
+    window.addEventListener('shortcuts:learn-mode:exit', this.handleLearnModeExit as EventListener);
+  }
+
+  private emitCheatSheetUpdate(entries: InlineCheatSheetEntry[]): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('shortcuts:inline-cheatsheet:update', {
+        detail: {
+          visible: this.inlineCheatSheetVisible,
+          entries,
+          context: this.inlineCheatSheetContext,
+        },
+      })
+    );
+  }
+
+  private emitLearnModeUpdate(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('shortcuts:learn-mode:update', {
+        detail: { state: this.learnModeState },
+      })
+    );
+  }
+
+  private buildLearnModeChallenges(options: LearnModeOptions): LearnModeChallenge[] {
+    const { limit = 5, focus = 'priority', includeCategories } = options;
+    const cheatSheet = this.getInlineCheatSheet({
+      limit: limit * 2,
+      focus,
+      categories: includeCategories && includeCategories.length > 0 ? includeCategories : undefined,
+    });
+
+    return cheatSheet.slice(0, limit).map(entry => ({
+      shortcutId: entry.shortcutId,
+      description: entry.description,
+      combination: entry.combination,
+      prompt: `Press ${entry.combination} to ${entry.description.toLowerCase()}`,
+      difficulty: entry.adoptionRate < 0.3 ? 'hard' : entry.adoptionRate < 0.6 ? 'medium' : 'easy',
+      attempts: 0,
+      mastered: false,
+    }));
+  }
+
+  private computeCheatSheetScore(params: {
+    focus: InlineCheatSheetOptions['focus'];
+    adoption: number;
+    averageTimeSaved: number;
+    totalUsage: number;
+    daysSinceUse: number;
+    lastUsedAt: number;
+  }): number {
+    const { focus = 'priority', adoption, averageTimeSaved, totalUsage, lastUsedAt, daysSinceUse } = params;
+
+    switch (focus) {
+      case 'struggling':
+        return (1 - adoption) * 6 + Math.min(totalUsage, 5);
+      case 'recent':
+        return lastUsedAt || 0;
+      case 'priority':
+      default:
+        const recencyBoost = Number.isFinite(daysSinceUse)
+          ? Math.max(0, 3 - daysSinceUse / 7)
+          : 1;
+        return (
+          (1 - adoption) * 5 +
+          Math.min(averageTimeSaved / 150, 4) +
+          Math.min(totalUsage, 4) +
+          recencyBoost
+        );
+    }
+  }
+
+  private findNextLearnModeIndex(startIndex: number): number {
+    if (!this.learnModeState) {
+      return -1;
+    }
+
+    const { challenges } = this.learnModeState;
+
+    for (let i = startIndex + 1; i < challenges.length; i += 1) {
+      if (!challenges[i].mastered) {
+        return i;
+      }
+    }
+
+    for (let i = 0; i < challenges.length; i += 1) {
+      if (!challenges[i].mastered) {
+        return i;
+      }
+    }
+
+    return -1;
+  }
+
+  private normalizeShortcutId(description: string): string {
+    return description.toLowerCase().replace(/\s+/g, '_');
+  }
+
+  private recordLearnModeAttempt(shortcutId: string, success: boolean, timeTaken?: number): void {
+    if (!shortcutId) {
+      return;
+    }
+
+    const normalizedTime = typeof timeTaken === 'number' && timeTaken > 0 ? timeTaken : 0;
+    const simulatedTimeSaved = success ? Math.max(900 - normalizedTime, 0) : 0;
+    this.trackShortcutUsage(shortcutId, success, simulatedTimeSaved, 'learn-mode');
   }
 
   private updateLearningProgress(): void {

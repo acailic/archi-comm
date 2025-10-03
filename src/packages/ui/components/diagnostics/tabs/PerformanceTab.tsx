@@ -51,14 +51,18 @@ export const PerformanceTab: React.FC = () => {
     fps: 60,
     memory: { used: 50, total: 100 },
     renderTime: 16,
+    avgRenderTime: 16,
+    memoryUsage: 50,
     componentRenders: 0,
-    healthScore: 90
+    activeMeasurements: 0,
+    healthScore: 90,
   };
   const controls = {
     start: () => setIsMonitoring(true),
     stop: () => setIsMonitoring(false),
-    reset: () => {},
-    exportData: () => {}
+    reset: () => console.log('Performance metrics reset'),
+    exportData: () => data,
+    clearHistory: () => console.log('Cleared performance history'),
   };
 
   const createBaseline = useCallback(() => {
@@ -71,8 +75,8 @@ export const PerformanceTab: React.FC = () => {
   }, [data]);
 
   const exportData = useCallback(() => {
-    const exportData = controls.exportData();
-    triggerDownload(`performance-data-${Date.now()}.json`, JSON.stringify(exportData, null, 2));
+    const exportPayload = controls.exportData();
+    triggerDownload(`performance-data-${Date.now()}.json`, JSON.stringify(exportPayload, null, 2));
   }, [controls]);
 
   return (
@@ -80,6 +84,17 @@ export const PerformanceTab: React.FC = () => {
       <div className='flex items-center justify-between'>
         <h3 className='text-lg font-semibold'>Performance Metrics</h3>
         <div className='flex items-center space-x-2'>
+          <span
+            className={`px-2 py-1 text-xs font-medium rounded ${isMonitoring ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}
+          >
+            {isMonitoring ? 'Monitoring active' : 'Monitoring paused'}
+          </span>
+          <button
+            onClick={isMonitoring ? controls.stop : controls.start}
+            className='px-3 py-1 text-sm bg-muted text-foreground rounded hover:bg-muted/80'
+          >
+            {isMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
+          </button>
           <button
             onClick={createBaseline}
             className='px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600'

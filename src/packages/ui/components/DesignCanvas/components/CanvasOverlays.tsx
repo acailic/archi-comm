@@ -3,6 +3,9 @@ import Confetti from '@ui/components/Confetti';
 import type { Challenge } from '@/shared/contracts';
 import type { PerformanceBudgetStatus } from '../hooks/useDesignCanvasPerformance';
 import { RightOverlays } from './RightOverlays';
+import { CanvasAnnotationOverlay } from '@/packages/ui/components/overlays/CanvasAnnotationOverlay';
+import { useState, useCallback } from 'react';
+import type { AnnotationTool } from '@/packages/ui/components/canvas/AnnotationToolbar';
 
 interface CanvasOverlaysProps {
   showHints: boolean;
@@ -16,6 +19,8 @@ interface CanvasOverlaysProps {
   showConfetti: boolean;
   onConfettiDone: () => void;
   budgetStatus?: PerformanceBudgetStatus;
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
 export function CanvasOverlays({
@@ -30,9 +35,39 @@ export function CanvasOverlays({
   showConfetti,
   onConfettiDone,
   budgetStatus,
+  canvasWidth = 1920,
+  canvasHeight = 1080,
 }: CanvasOverlaysProps) {
+  // Annotation tool state
+  const [selectedTool, setSelectedTool] = useState<AnnotationTool>(null);
+  const [annotationCount, setAnnotationCount] = useState(0);
+
+  const handleToolSelect = useCallback((tool: AnnotationTool) => {
+    setSelectedTool(tool);
+  }, []);
+
+  const handleAnnotationCreate = useCallback(() => {
+    setAnnotationCount(prev => prev + 1);
+  }, []);
+
+  const handleAnnotationDelete = useCallback(() => {
+    setAnnotationCount(prev => Math.max(0, prev - 1));
+  }, []);
+
   return (
     <>
+      {/* Annotation overlay - covers canvas for annotation interactions */}
+      <CanvasAnnotationOverlay
+        width={canvasWidth}
+        height={canvasHeight}
+        selectedTool={selectedTool || undefined}
+        isActive={selectedTool !== null}
+        enableQuickConnect={true}
+        targetHighlightEnabled={true}
+        onAnnotationCreate={handleAnnotationCreate}
+        onAnnotationDelete={handleAnnotationDelete}
+      />
+
       <RightOverlays
         showHints={showHints}
         onCloseHints={onCloseHints}

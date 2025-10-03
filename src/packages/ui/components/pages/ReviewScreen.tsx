@@ -525,10 +525,10 @@ export function ReviewScreen({
                 </Tooltip>
 
               <div>
-                <h2 className='flex items-center gap-2'>
+                <h1 className='flex items-center gap-2 text-lg font-semibold'>
                   <CheckCircle className='w-5 h-5 text-green-500' />
                   Session Complete
-                </h2>
+                </h1>
                 <p className='text-sm text-muted-foreground'>
                   Review your system design and explanation for {challenge.title}
                 </p>

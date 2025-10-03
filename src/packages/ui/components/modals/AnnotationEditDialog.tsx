@@ -33,10 +33,10 @@ import { Slider } from '@ui/components/ui/slider';
 import { RichTextEditor } from '@ui/components/ui/rich-text-editor';
 import { ColorPicker } from '@ui/components/ui/color-picker';
 import { Annotation, AnnotationStyle } from '@/lib/canvas/CanvasAnnotations';
-import { useAutoSave } from '@hooks/useAutoSave';
-import { useUndoRedo } from '@hooks/useUndoRedo';
+import { useAutoSave } from '@/shared/hooks/common/useAutoSave';
+import { useUndoRedo } from '@/shared/hooks/canvas/useUndoRedo';
 import { ANNOTATION_PRESETS, getPresetById } from '@/lib/canvas/annotation-presets';
-import { useUXTracker } from '@hooks/useUXTracker';
+import { useUXTracker } from '@/shared/hooks/common/useUXTracker';
 
 interface AnnotationEditDialogProps {
   annotation: Annotation | null;
@@ -92,7 +92,7 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   // UX Tracking integration
-  const { trackDialogAction, trackKeyboardShortcut } = useUXTracker();
+  const { trackDialogAction } = useUXTracker();
 
   // Auto-save state
   const dialogState = { content, author, style, replies };
@@ -219,18 +219,20 @@ export const AnnotationEditDialog: React.FC<AnnotationEditDialogProps> = ({
       style,
     };
 
+    trackDialogAction('save', 'annotation-edit', { annotationId: annotation.id });
     onSave(updatedAnnotation);
     onClose();
-  }, [annotation, content, author, style, replies, onSave, onClose]);
+  }, [annotation, content, author, style, replies, onSave, onClose, trackDialogAction]);
 
   const handleDelete = useCallback(() => {
     if (!annotation) return;
 
     if (confirm('Are you sure you want to delete this annotation?')) {
+      trackDialogAction('delete', 'annotation-edit', { annotationId: annotation.id });
       onDelete(annotation.id);
       onClose();
     }
-  }, [annotation, onDelete, onClose]);
+  }, [annotation, onDelete, onClose, trackDialogAction]);
 
   const handleAddReply = useCallback(() => {
     if (!newReply.trim() || !replyAuthor.trim()) return;

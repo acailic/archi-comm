@@ -4,6 +4,7 @@ import { canvasAreaScenarios } from './canvas-area.tsx';
 import { audioRecordingScenarios } from './audio-recording.tsx';
 import { uiComponentScenarios } from './ui-components.tsx';
 import { architectureDiagramScenarios } from './architecture-diagrams.tsx';
+import { devExperienceScenarios } from './dev-experience.tsx';
 
 // Runtime validation utilities
 function validateScenarioStructure(definition: Record<string, any>): void {
@@ -119,6 +120,7 @@ export const scenarios: EnhancedScenarioDefinition = {
   ...audioRecordingScenarios,
   ...uiComponentScenarios,
   ...architectureDiagramScenarios,
+  ...devExperienceScenarios,
 };
 
 // Run validations

@@ -9,10 +9,12 @@ interface DesignCanvasLayoutProps {
   propertiesPanel: React.ReactNode;
   statusBar: React.ReactNode;
   overlays?: React.ReactNode;
+  annotationToolbar?: React.ReactNode;
+  annotationSidebar?: React.ReactNode;
 }
 
 export const DesignCanvasLayout: React.FC<DesignCanvasLayoutProps> = React.memo(
-  ({ header, assignmentPanel, canvas, propertiesPanel, statusBar, overlays }) => {
+  ({ header, assignmentPanel, canvas, propertiesPanel, statusBar, overlays, annotationToolbar, annotationSidebar }) => {
     return (
       <div className='h-screen flex flex-col'>
         {header}
@@ -28,7 +30,29 @@ export const DesignCanvasLayout: React.FC<DesignCanvasLayoutProps> = React.memo(
             {assignmentPanel}
           </ResizablePanel>
 
-          <div className='flex-1 relative overflow-hidden'>{canvas}</div>
+          <div className='flex-1 relative overflow-hidden'>
+            {canvas}
+
+            {/* Annotation toolbar floating in top-right corner of canvas */}
+            {annotationToolbar && (
+              <div className='absolute top-4 right-4 z-[var(--z-toolbar)] shadow-lg'>
+                {annotationToolbar}
+              </div>
+            )}
+          </div>
+
+          {/* Annotation sidebar - conditional render */}
+          {annotationSidebar && (
+            <ResizablePanel
+              side='right'
+              defaultWidth={280}
+              minWidth={200}
+              maxWidth={400}
+              className='border-l border-border/20 bg-card'
+            >
+              {annotationSidebar}
+            </ResizablePanel>
+          )}
 
           <ResizablePanel
             side='right'

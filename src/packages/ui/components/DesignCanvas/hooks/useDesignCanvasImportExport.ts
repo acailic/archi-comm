@@ -13,6 +13,7 @@ interface UseDesignCanvasImportExportProps {
   buildDesignSnapshot: (data: DesignData, options?: { updateTimestamp?: boolean }) => DesignData;
   markDesignModified: (timestamp?: string) => void;
   setCanvasConfig: (config: any) => void;
+  onAnnotationsImported?: (annotations: any[]) => void;
 }
 
 export function useDesignCanvasImportExport({
@@ -22,6 +23,7 @@ export function useDesignCanvasImportExport({
   buildDesignSnapshot,
   markDesignModified,
   setCanvasConfig,
+  onAnnotationsImported,
 }: UseDesignCanvasImportExportProps) {
   const canvasActions = useCanvasActions();
 
@@ -35,6 +37,11 @@ export function useDesignCanvasImportExport({
 
       if (result.canvas) {
         setCanvasConfig(result.canvas);
+      }
+
+      // Propagate imported annotations back to DesignCanvasCore
+      if (result.data.annotations && onAnnotationsImported) {
+        onAnnotationsImported(result.data.annotations);
       }
 
       canvasActions.setSelectedComponent(null);

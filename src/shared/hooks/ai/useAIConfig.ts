@@ -5,6 +5,7 @@ import {
   ConnectionTestResult,
   getDefaultConfig,
   validateApiKeyFormat,
+  AIProvider,
 } from '@/lib/types/AIConfig';
 
 interface UseAIConfigState {
@@ -45,7 +46,7 @@ export function useAIConfig(): UseAIConfigReturn {
     return (
       state.config.openai.enabled &&
       state.config.openai.apiKey.trim() !== '' &&
-      validateApiKeyFormat(state.config.openai.apiKey)
+      validateApiKeyFormat(AIProvider.OPENAI, state.config.openai.apiKey)
     );
   }, [state.config]);
 

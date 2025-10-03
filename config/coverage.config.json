@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "thresholds": {
+    "global": {
+      "lines": 80,
+      "branches": 75,
+      "functions": 80,
+      "statements": 80
+    },
+    "perFile": {
+      "lines": 70,
+      "branches": 65,
+      "functions": 70,
+      "statements": 70
+    }
+  },
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/test/**",
+    "**/__tests__/**",
+    "**/e2e/**",
+    "**/dev/**",
+    "**/*.d.ts",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "reporters": ["text", "html", "json", "lcov"],
+  "reportDir": "coverage",
+  "acceptanceCriteria": {
+    "requireTestsForAllCriteria": true,
+    "minimumCriterionCoverage": 100,
+    "allowManualTests": false
+  },
+  "enforcement": {
+    "failOnThresholdViolation": true,
+    "failOnUncoveredCriteria": true,
+    "warnOnOrphanedTests": true
+  }
+}

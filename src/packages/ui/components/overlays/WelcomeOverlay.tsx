@@ -1,6 +1,11 @@
+// src/packages/ui/components/overlays/WelcomeOverlay.tsx
+// Welcome screen shown to first-time users
+// Provides options for guided tour, simplified tour, or skip
+// RELEVANT FILES: OnboardingManager.ts, ScreenRouter.tsx, modules/settings/index.tsx, OnboardingOverlay.tsx
 
-import { ArrowRight, Users } from 'lucide-react';
+import { ArrowRight, Users, Book, Zap } from 'lucide-react';
 import { useOnboarding } from '@/lib/onboarding/OnboardingManager';
+import { markOnboardingFlowCompleted } from '@/modules/settings';
 import { Button } from '@ui/components/ui/button';
 
 interface WelcomeOverlayProps {
@@ -10,14 +15,24 @@ interface WelcomeOverlayProps {
 export function WelcomeOverlay({ onComplete }: WelcomeOverlayProps) {
   const { startOnboarding } = useOnboarding();
 
-  const handleGetStarted = () => {
-    const success = startOnboarding('first-time-user');
-    if (success) {
-      onComplete();
-    }
+  const handleFullTour = () => {
+    markOnboardingFlowCompleted('welcome');
+    startOnboarding('guided-tour');
+    onComplete();
   };
 
-  const handleSkipTour = () => {
+  const handleSimplifiedTour = () => {
+    markOnboardingFlowCompleted('welcome');
+    startOnboarding('simplified-tour');
+    onComplete();
+  };
+
+  const handleSkipAll = () => {
+    // Mark all tutorial flows as completed
+    markOnboardingFlowCompleted('welcome');
+    markOnboardingFlowCompleted('guided-tour');
+    markOnboardingFlowCompleted('canvas-tour');
+    markOnboardingFlowCompleted('simplified-tour');
     onComplete();
   };
 
@@ -48,13 +63,19 @@ export function WelcomeOverlay({ onComplete }: WelcomeOverlayProps) {
 
         {/* Action Buttons */}
         <div className='space-y-3 pt-4'>
-          <Button onClick={handleGetStarted} size='lg' className='w-full'>
-            Start Your Journey
+          <Button onClick={handleFullTour} size='lg' className='w-full'>
+            <Book className='w-4 h-4 mr-2' />
+            Take the Full Tour
             <ArrowRight className='w-4 h-4 ml-2' />
           </Button>
 
-          <Button variant='outline' onClick={handleSkipTour} className='w-full'>
-            Skip Tutorial
+          <Button variant='secondary' onClick={handleSimplifiedTour} size='lg' className='w-full'>
+            <Zap className='w-4 h-4 mr-2' />
+            Just the Basics
+          </Button>
+
+          <Button variant='outline' onClick={handleSkipAll} className='w-full'>
+            Skip All Tutorials
           </Button>
         </div>
 

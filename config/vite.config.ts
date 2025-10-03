@@ -91,7 +91,6 @@ export default defineConfig(({ command, mode }) => {
       hmr: {
         protocol: 'ws',
         host: host || 'localhost',
-        port: 5174,
         overlay: true,
       },
       watch: {
@@ -194,6 +193,7 @@ export default defineConfig(({ command, mode }) => {
         '@audio': path.resolve(PACKAGES_DIR, 'audio'),
         '@services': path.resolve(PACKAGES_DIR, 'services'),
         '@test': path.resolve(SRC_DIR, 'test'),
+        'web-worker': path.resolve(ROOT_DIR, 'node_modules/elkjs/lib/elk-worker.js'),
       },
       dedupe: ['react', 'react-dom'],
     },

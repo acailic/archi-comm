@@ -5,6 +5,7 @@
  * RELEVANT FILES: src/lib/design/design-comparison.ts, src/shared/contracts/index.ts, src/lib/config/challenge-config.ts
  */
 
+import { describe, it, expect } from 'vitest';
 import { compareDesigns } from '../lib/design/design-comparison';
 import type { ArchitectureTemplate } from '../lib/config/challenge-config';
 import type { DesignData } from '@/shared/contracts';

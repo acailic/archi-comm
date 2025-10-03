@@ -1,0 +1,50 @@
+#!/bin/sh
+# .husky/pre-push
+# Pre-push hook that runs before code is pushed to remote
+# Runs tests and checks to catch issues before CI
+# RELEVANT FILES: .husky/pre-commit, package.json, config/coverage.config.json
+
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🚀 Running pre-push checks..."
+echo ""
+
+# Run type checking
+echo "📝 Type checking..."
+npm run type-check || {
+  echo "❌ Type check failed"
+  echo "💡 Fix type errors before pushing"
+  exit 1
+}
+echo "✅ Type check passed"
+echo ""
+
+# Run unit tests
+echo "🧪 Running unit tests..."
+npm run test:run || {
+  echo "❌ Unit tests failed"
+  echo "💡 Fix failing tests before pushing"
+  exit 1
+}
+echo "✅ Unit tests passed"
+echo ""
+
+# Check for unused code
+echo "🔍 Checking for unused code..."
+npm run unused:check || {
+  echo "⚠️  Unused code detected"
+  echo "💡 Consider removing unused code or use --no-verify to skip"
+}
+echo ""
+
+# Verify test coverage
+echo "📊 Verifying test coverage..."
+npm run test:coverage:check || {
+  echo "❌ Coverage thresholds not met"
+  echo "💡 Add tests to improve coverage or update thresholds in config/coverage.config.json"
+  exit 1
+}
+echo "✅ Coverage thresholds met"
+echo ""
+
+echo "✨ All pre-push checks passed! Ready to push."

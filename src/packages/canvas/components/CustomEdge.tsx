@@ -2,7 +2,7 @@
  * src/features/canvas/components/CustomEdge.tsx
  * Custom React Flow edge component that replicates ConnectionSvgLayer functionality
  * Supports different connection styles, colors, labels, and click handling
- * RELEVANT FILES: ConnectionSvgLayer.tsx, connection-paths.ts, rf-adapters.ts
+ * RELEVANT FILES: ConnectionSvgLayer.tsx, connection-paths.ts, rf-adapters.ts, canvas-colors.ts
  */
 
 import type { Connection } from "@/shared/contracts";
@@ -18,6 +18,7 @@ import {
 } from "@xyflow/react";
 import React, { useId, useMemo } from "react";
 import { isDevelopment } from "../../../lib/config/environment";
+import { getConnectionColor, getVisualStyleColor } from "@/lib/design/canvas-colors";
 
 interface CustomEdgeData extends Record<string, unknown> {
   connection: Connection;
@@ -54,28 +55,6 @@ function CustomEdgeInner({
     onConnectionSelect,
   } = data;
 
-  // Connection colors mapping - High contrast black/white theme
-  const connectionColors = useMemo(
-    () => ({
-      data: "#374151", // gray-700 - High contrast
-      control: "#1f2937", // gray-800 - Darker for control flows
-      sync: "#111827", // gray-900 - Darkest for sync
-      async: "#4b5563", // gray-600 - Medium for async
-    }),
-    []
-  );
-
-  // Visual style colors for queue message flows - High contrast
-  const visualStyleColors = useMemo(
-    () => ({
-      default: null, // Use connection type color
-      ack: "#059669", // emerald-600 - Dark green for success
-      retry: "#ea580c", // orange-600 - Dark orange for retry
-      error: "#dc2626", // red-600 - Dark red for error
-    }),
-    []
-  );
-
   // Generate the appropriate path based on connection style
   const [edgePath, labelX, labelY] = useMemo(() => {
     const pathParams = {
@@ -106,27 +85,12 @@ function CustomEdgeInner({
     connectionStyle,
   ]);
 
-  // Edge styling with proper type guards
-  const isValidVisualStyle = (
-    style: unknown
-  ): style is keyof typeof visualStyleColors => {
-    return typeof style === "string" && style in visualStyleColors;
-  };
-
-  const isValidConnectionType = (
-    type: unknown
-  ): type is keyof typeof connectionColors => {
-    return typeof type === "string" && type in connectionColors;
-  };
-
-  const visualStyleColor =
-    connection.visualStyle && isValidVisualStyle(connection.visualStyle)
-      ? visualStyleColors[connection.visualStyle]
-      : null;
-
-  const connectionTypeColor = isValidConnectionType(connection.type)
-    ? connectionColors[connection.type]
+  // Edge styling using centralized canvas colors
+  const visualStyleColor = connection.visualStyle
+    ? getVisualStyleColor(connection.visualStyle as any)
     : null;
+
+  const connectionTypeColor = getConnectionColor(connection.type as any);
 
   const color = visualStyleColor || connectionTypeColor || "#3b82f6";
 
@@ -139,8 +103,8 @@ function CustomEdgeInner({
   };
 
   const strokeDasharray = getStrokeDashArray();
-  const strokeWidth = isSelected ? 4 : 3; // Thicker lines for better visibility
-  const opacity = isStartConnection ? 0.6 : 1; // Better contrast for connection preview
+  const strokeWidth = isSelected ? 5 : 3.5; // Thicker lines for better visibility on white
+  const opacity = isStartConnection ? 0.7 : 1; // Better contrast for connection preview
 
   // Stable styles for better performance
   const svgContainerStyle = useStableStyleEx(
@@ -197,11 +161,11 @@ function CustomEdgeInner({
             refX="9"
             refY="5"
             markerUnits="strokeWidth"
-            markerWidth="10"
-            markerHeight="10"
+            markerWidth="12"
+            markerHeight="12"
             orient="auto-start-reverse"
           >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill={color} />
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={color} stroke={color} strokeWidth="0.5" />
           </marker>
 
           <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
@@ -238,11 +202,11 @@ function CustomEdgeInner({
           >
             <div
               className={`
-                px-3 py-1 rounded bg-background/90 border border-border text-xs
-                ${isSelected ? "border-2 shadow-lg" : "border-1"}
-                transition-all duration-200
+                px-3 py-1.5 rounded-md bg-white border-2 text-xs font-medium
+                ${isSelected ? "border-gray-900 shadow-lg ring-2 ring-gray-300" : "border-gray-600 shadow-md"}
+                transition-all duration-200 hover:shadow-lg hover:border-gray-900
               `}
-              style={labelStyle}
+              style={{ ...labelStyle, color: color }}
             >
               {connection.label}
             </div>

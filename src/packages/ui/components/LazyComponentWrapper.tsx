@@ -12,6 +12,7 @@ import {
   useEffect,
   useCallback,
   lazy,
+  createElement,
   type FC,
   type ErrorInfo,
 } from 'react';
@@ -189,7 +190,7 @@ class LazyErrorBoundary extends Component<
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
 
     if (this.props.onError) {
@@ -216,7 +217,7 @@ class LazyErrorBoundary extends Component<
     }
   }
 
-  componentWillUnmount() {
+  override componentWillUnmount() {
     if (this.retryTimeoutId) {
       window.clearTimeout(this.retryTimeoutId);
     }
@@ -261,7 +262,7 @@ class LazyErrorBoundary extends Component<
     ); // Exponential backoff
   };
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       const { fallback, componentName } = this.props;
 
@@ -394,17 +395,21 @@ export const LazyComponentWrapper: FC<LazyComponentWrapperProps> = ({
 };
 
 // Higher-order component for creating lazy components with wrapper
-export function createLazyComponent<P extends {}>(
+export function createLazyComponent<P extends Record<string, unknown>>(
   importFunc: () => Promise<{ default: ComponentType<P> }>,
   options: LazyWrapperOptions & { componentName: string }
-): React.FC<P> {
+): React.ComponentType<P> {
   const LazyComponent = lazy(importFunc);
 
-  return (props: P) => (
+  const WrappedLazyComponent = (props: P) => (
     <LazyComponentWrapper {...options}>
-      <LazyComponent {...props} />
+      {createElement(LazyComponent, props)}
     </LazyComponentWrapper>
   );
+
+  WrappedLazyComponent.displayName = `Lazy(${options.componentName})`;
+
+  return WrappedLazyComponent;
 }
 
 // Preloader utility

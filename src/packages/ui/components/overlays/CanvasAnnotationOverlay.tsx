@@ -12,7 +12,8 @@ import {
   AnnotationType,
   AnnotationStyle,
 } from '@/lib/canvas/CanvasAnnotations';
-import { CanvasOptimizer, PerformanceMonitor } from '@/lib/performance/PerformanceOptimizer';
+import { CanvasOptimizer } from '@/lib/performance/CanvasOptimizer';
+import { PerformanceMonitor } from '@/lib/performance/PerformanceOptimizer';
 import { Textarea } from '@ui/components/ui/textarea';
 
 export interface CanvasAnnotationOverlayProps {
@@ -20,10 +21,13 @@ export interface CanvasAnnotationOverlayProps {
   height: number;
   selectedTool?: string;
   isActive: boolean;
+  enableQuickConnect?: boolean;
+  targetHighlightEnabled?: boolean;
   onAnnotationCreate?: (annotation: Annotation) => void;
   onAnnotationUpdate?: (annotation: Annotation) => void;
   onAnnotationDelete?: (annotationId: string) => void;
   onAnnotationSelect?: (annotation: Annotation | null) => void;
+  onQuickConnect?: (fromAnnotationId: string, toAnnotationId: string) => void;
 }
 
 export interface CanvasAnnotationOverlayRef {
@@ -46,16 +50,23 @@ export const CanvasAnnotationOverlay = forwardRef<
       height,
       selectedTool,
       isActive,
+      enableQuickConnect = false,
+      targetHighlightEnabled = true,
       onAnnotationCreate,
       onAnnotationUpdate,
       onAnnotationDelete,
       onAnnotationSelect,
+      onQuickConnect,
     },
     ref
   ) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const annotationManager = useRef<CanvasAnnotationManager | null>(null);
-    const optimizerRef = useRef<CanvasOptimizer | null>(null);
+    type OptimizerWithStatus = CanvasOptimizer & {
+      hasPendingWork?: () => boolean;
+    };
+
+    const optimizerRef = useRef<OptimizerWithStatus | null>(null);
     const performanceMonitor = useRef<PerformanceMonitor>(PerformanceMonitor.getInstance());
     const animationFrameRef = useRef<number | null>(null);
     const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
@@ -66,9 +77,11 @@ export const CanvasAnnotationOverlay = forwardRef<
       null
     );
     const [optimizationEnabled, setOptimizationEnabled] = useState(false);
+    const [quickConnectSource, setQuickConnectSource] = useState<string | null>(null);
+    const [highlightedTarget, setHighlightedTarget] = useState<string | null>(null);
 
     // Initialize optimizer and annotation manager
-    useEffect((): (() => void) | undefined => {
+    useEffect(() => {
       if (canvasRef.current && !annotationManager.current) {
         const canvas = canvasRef.current;
 
@@ -79,7 +92,7 @@ export const CanvasAnnotationOverlay = forwardRef<
           const hasWorkerSupport = typeof Worker !== 'undefined';
 
           if (hasOffscreenCanvas && hasWorkerSupport) {
-            optimizerRef.current = new CanvasOptimizer(canvas);
+            optimizerRef.current = new CanvasOptimizer(canvas) as OptimizerWithStatus;
             setOptimizationEnabled(true);
 
             if (import.meta.env.DEV) {
@@ -152,7 +165,7 @@ export const CanvasAnnotationOverlay = forwardRef<
           });
         };
 
-        const handleAnnotationEditEnd = (event: CustomEvent) => {
+        const handleAnnotationEditEnd = () => {
           performanceMonitor.current.measure('annotation-edit-end', () => {
             setEditingAnnotation(null);
             setEditContent('');
@@ -283,6 +296,44 @@ export const CanvasAnnotationOverlay = forwardRef<
       }
     }, [width, height, optimizationEnabled]);
 
+    // Quick-connect: Handle annotation selection for connecting
+    const handleAnnotationClick = useCallback(
+      (annotationId: string) => {
+        if (!enableQuickConnect) return;
+
+        if (quickConnectSource === null) {
+          // Start connection
+          setQuickConnectSource(annotationId);
+          setHighlightedTarget(null);
+        } else if (quickConnectSource !== annotationId) {
+          // Complete connection
+          onQuickConnect?.(quickConnectSource, annotationId);
+          setQuickConnectSource(null);
+          setHighlightedTarget(null);
+        } else {
+          // Cancel connection (clicked same annotation)
+          setQuickConnectSource(null);
+          setHighlightedTarget(null);
+        }
+      },
+      [enableQuickConnect, quickConnectSource, onQuickConnect]
+    );
+
+    // Target highlighting on hover
+    const handleAnnotationHover = useCallback(
+      (annotationId: string | null) => {
+        if (!targetHighlightEnabled || !quickConnectSource) return;
+
+        // Only highlight if we have a source and hovering over a different annotation
+        if (annotationId && annotationId !== quickConnectSource) {
+          setHighlightedTarget(annotationId);
+        } else {
+          setHighlightedTarget(null);
+        }
+      },
+      [targetHighlightEnabled, quickConnectSource]
+    );
+
     // Handle canvas click for creating annotations
     const handleCanvasClick = useCallback(
       (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -301,6 +352,19 @@ export const CanvasAnnotationOverlay = forwardRef<
           const scaleY = canvas.height / rect.height;
           const canvasX = x * scaleX;
           const canvasY = y * scaleY;
+
+          // Check if clicking on an existing annotation for quick-connect
+          const clickedAnnotation = annotationManager.current?.getAnnotations().find(ann => {
+            const distance = Math.sqrt(
+              Math.pow(ann.x - canvasX, 2) + Math.pow(ann.y - canvasY, 2)
+            );
+            return distance < 50; // 50px click radius
+          });
+
+          if (clickedAnnotation && enableQuickConnect) {
+            handleAnnotationClick(clickedAnnotation.id);
+            return;
+          }
 
           // Create annotation based on selected tool
           let type: AnnotationType;
@@ -326,7 +390,7 @@ export const CanvasAnnotationOverlay = forwardRef<
             case 'arrow':
               type = 'arrow';
               content = '';
-              style = { strokeColor: '#ef4444', strokeWidth: 2 };
+              style = { borderColor: '#ef4444', borderWidth: 2, backgroundColor: 'transparent' };
               break;
             case 'highlight':
               type = 'highlight';
@@ -358,7 +422,7 @@ export const CanvasAnnotationOverlay = forwardRef<
           }
         });
       },
-      [isActive, selectedTool]
+      [isActive, selectedTool, enableQuickConnect, handleAnnotationClick]
     );
 
     // Expose methods via ref
@@ -453,6 +517,24 @@ export const CanvasAnnotationOverlay = forwardRef<
             zIndex: isActive ? 10 : 5,
           }}
           onClick={handleCanvasClick}
+          onMouseMove={(e) => {
+            if (!enableQuickConnect || !quickConnectSource) return;
+
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            // Find hovered annotation
+            const hoveredAnnotation = annotationManager.current?.getAnnotations().find(ann => {
+              const distance = Math.sqrt(Math.pow(ann.x - x, 2) + Math.pow(ann.y - y, 2));
+              return distance < 50;
+            });
+
+            handleAnnotationHover(hoveredAnnotation?.id || null);
+          }}
         />
 
         {editingAnnotation && editInputPosition && (
@@ -474,6 +556,23 @@ export const CanvasAnnotationOverlay = forwardRef<
               padding: '8px',
             }}
           />
+        )}
+
+        {/* Quick-connect mode indicator */}
+        {enableQuickConnect && quickConnectSource && (
+          <div className='absolute top-2 left-2 bg-blue-500 text-white px-3 py-1.5 rounded-md shadow-lg text-sm font-medium flex items-center gap-2'>
+            <div className='w-2 h-2 bg-white rounded-full animate-pulse' />
+            Click another annotation to connect
+            <button
+              onClick={() => {
+                setQuickConnectSource(null);
+                setHighlightedTarget(null);
+              }}
+              className='ml-1 text-white/80 hover:text-white'
+            >
+              ✕
+            </button>
+          </div>
         )}
 
         {/* Development mode performance indicator */}

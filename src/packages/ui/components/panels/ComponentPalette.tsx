@@ -6,8 +6,6 @@ import {
   Box,
   Boxes,
   Brain,
-  Building,
-  Cable,
   CheckCircle,
   Cloud,
   CloudCog,
@@ -19,14 +17,12 @@ import {
   Database,
   Database as DB,
   FileText,
-  Filter,
   FolderOpen,
   GitBranch,
   Globe,
   HardDrive,
   Key,
   Layers,
-  Link,
   Lock,
   MessageSquare,
   Monitor,
@@ -34,7 +30,6 @@ import {
   Play,
   Radio,
   Repeat,
-  Router,
   Search,
   Send,
   Server,
@@ -43,7 +38,6 @@ import {
   Smartphone,
   Target,
   Timer,
-  Truck,
   UserCheck,
   Users,
   Webhook,
@@ -56,11 +50,8 @@ import { useDrag } from "react-dnd";
 import type { DesignComponent } from "../../../../shared/contracts";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { CardContent, CardHeader, CardTitle } from "../ui/card";
-import { EnhancedCard } from "../ui/enhanced-card";
 import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
-import { Tabs } from "../ui/tabs";
 
 interface ComponentType {
   type: DesignComponent["type"];
@@ -983,7 +974,10 @@ const DraggableComponent = React.memo(function DraggableComponent({
           </span>
         </div>
         {isRecommended && (
-          <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" title="Recommended" />
+          <div
+            className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"
+            title="Recommended"
+          />
         )}
       </div>
     </div>
@@ -1118,7 +1112,8 @@ export const ComponentPalette = React.memo(function ComponentPalette({
   }, []);
 
   const recommendedHighlights = React.useMemo(() => {
-    if (!shouldHighlightRecommendations) return [] as Array<ComponentType["type"]>;
+    if (!shouldHighlightRecommendations)
+      return [] as Array<ComponentType["type"]>;
     return Array.from(recommendedTypes).slice(0, 6);
   }, [recommendedTypes, shouldHighlightRecommendations]);
 
@@ -1140,7 +1135,7 @@ export const ComponentPalette = React.memo(function ComponentPalette({
         (token) =>
           component.label.toLowerCase().includes(token) ||
           component.description.toLowerCase().includes(token) ||
-          component.type.toLowerCase().includes(token)
+          component.type.toLowerCase().includes(token),
       );
     });
   }, [activeCategory, searchQuery]);
@@ -1186,7 +1181,7 @@ export const ComponentPalette = React.memo(function ComponentPalette({
                 setSearchQuery(e.target.value);
                 setActiveCategory("all");
               },
-              []
+              [],
             )}
             className="h-8 text-xs pl-8 bg-background"
           />
@@ -1231,7 +1226,7 @@ export const ComponentPalette = React.memo(function ComponentPalette({
             <div>
               {categories.slice(1).map((category) => {
                 const categoryComponents = visibleComponents.filter(
-                  (c) => c.category === category.id
+                  (c) => c.category === category.id,
                 );
                 if (categoryComponents.length === 0) return null;
 
@@ -1284,3 +1279,6 @@ export const ComponentPalette = React.memo(function ComponentPalette({
     </div>
   );
 });
+
+// Export componentTypes for external usage
+export { componentTypes };

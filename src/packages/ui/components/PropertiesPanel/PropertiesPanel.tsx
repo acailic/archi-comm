@@ -13,7 +13,12 @@ export interface PropertiesPanelProps {
   selectedComponent: string | null;
   components: DesignComponent[];
   onLabelChange?: (componentId: string, label: string) => void;
+  onTypeChange?: (componentId: string, type: string) => void;
+  onDescriptionChange?: (componentId: string, description: string) => void;
+  onLayerChange?: (componentId: string, layerId: string) => void;
+  onPositionChange?: (componentId: string, x: number, y: number) => void;
   onDelete?: (componentId: string) => void;
+  onDuplicate?: (componentId: string) => void;
   onShowLabelToggle?: (componentId: string) => void;
   onStickerToggle?: (componentId: string) => void;
   onStickerEmojiChange?: (componentId: string, emoji: string) => void;
@@ -155,18 +160,89 @@ const ComponentTypeSelector: React.FC<{
   onTypeChange: (type: string) => void;
   challengeTags?: string[];
 }> = React.memo(({ currentType, onTypeChange, challengeTags }) => {
-  const componentTypes = useMemo(() => [
-    { value: 'server', label: 'Server', icon: '🖥️' },
-    { value: 'database', label: 'Database', icon: '🗃️' },
-    { value: 'cache', label: 'Cache', icon: '⚡' },
-    { value: 'api-gateway', label: 'API Gateway', icon: '🚪' },
-    { value: 'load-balancer', label: 'Load Balancer', icon: '⚖️' },
-    { value: 'microservice', label: 'Microservice', icon: '🔧' },
-    { value: 'message-queue', label: 'Message Queue', icon: '📨' },
-    { value: 'client', label: 'Client', icon: '💻' },
-    { value: 'monitoring', label: 'Monitoring', icon: '📊' },
-    { value: 'storage', label: 'Storage', icon: '💾' },
-  ], [challengeTags]);
+  const componentTypesByCategory = useMemo(() => ({
+    'Compute & Infrastructure': [
+      { value: 'server', label: 'Server' },
+      { value: 'microservice', label: 'Microservice' },
+      { value: 'serverless', label: 'Serverless' },
+      { value: 'lambda', label: 'Lambda' },
+      { value: 'cloud-function', label: 'Cloud Function' },
+    ],
+    'Containers & Orchestration': [
+      { value: 'container', label: 'Container' },
+      { value: 'docker', label: 'Docker' },
+      { value: 'kubernetes', label: 'Kubernetes' },
+    ],
+    'Databases & Storage': [
+      { value: 'database', label: 'Database' },
+      { value: 'postgresql', label: 'PostgreSQL' },
+      { value: 'mysql', label: 'MySQL' },
+      { value: 'mongodb', label: 'MongoDB' },
+      { value: 'redis', label: 'Redis' },
+      { value: 'cache', label: 'Cache' },
+      { value: 'storage', label: 'Storage' },
+      { value: 's3', label: 'S3' },
+      { value: 'blob-storage', label: 'Blob Storage' },
+      { value: 'file-system', label: 'File System' },
+    ],
+    'Networking & Traffic': [
+      { value: 'load-balancer', label: 'Load Balancer' },
+      { value: 'api-gateway', label: 'API Gateway' },
+      { value: 'cdn', label: 'CDN' },
+      { value: 'firewall', label: 'Firewall' },
+    ],
+    'Messaging & Communication': [
+      { value: 'message-queue', label: 'Message Queue' },
+      { value: 'producer', label: 'Producer' },
+      { value: 'consumer', label: 'Consumer' },
+      { value: 'broker', label: 'Broker' },
+      { value: 'dead-letter-queue', label: 'Dead Letter Queue' },
+      { value: 'websocket', label: 'WebSocket' },
+      { value: 'grpc', label: 'gRPC' },
+    ],
+    'APIs & Services': [
+      { value: 'rest-api', label: 'REST API' },
+      { value: 'graphql', label: 'GraphQL' },
+      { value: 'webhook', label: 'Webhook' },
+    ],
+    'Client Applications': [
+      { value: 'client', label: 'Client' },
+      { value: 'web-app', label: 'Web App' },
+      { value: 'mobile-app', label: 'Mobile App' },
+      { value: 'desktop-app', label: 'Desktop App' },
+      { value: 'iot-device', label: 'IoT Device' },
+    ],
+    'Security & Auth': [
+      { value: 'security', label: 'Security' },
+      { value: 'authentication', label: 'Authentication' },
+      { value: 'authorization', label: 'Authorization' },
+      { value: 'oauth', label: 'OAuth' },
+      { value: 'jwt', label: 'JWT' },
+    ],
+    'Monitoring & Observability': [
+      { value: 'monitoring', label: 'Monitoring' },
+      { value: 'logging', label: 'Logging' },
+      { value: 'metrics', label: 'Metrics' },
+      { value: 'alerting', label: 'Alerting' },
+      { value: 'elasticsearch', label: 'Elasticsearch' },
+      { value: 'kibana', label: 'Kibana' },
+    ],
+    'Data Processing': [
+      { value: 'data-warehouse', label: 'Data Warehouse' },
+      { value: 'data-lake', label: 'Data Lake' },
+      { value: 'etl', label: 'ETL' },
+      { value: 'stream-processing', label: 'Stream Processing' },
+    ],
+    'Patterns & Architectures': [
+      { value: 'event-sourcing', label: 'Event Sourcing' },
+      { value: 'cqrs', label: 'CQRS' },
+      { value: 'edge-computing', label: 'Edge Computing' },
+    ],
+    'Emerging Technologies': [
+      { value: 'blockchain', label: 'Blockchain' },
+      { value: 'ai-ml', label: 'AI/ML' },
+    ],
+  }), []);
 
   return (
     <select
@@ -182,10 +258,14 @@ const ComponentTypeSelector: React.FC<{
         outline: 'none',
       }}
     >
-      {componentTypes.map((type) => (
-        <option key={type.value} value={type.value}>
-          {type.icon} {type.label}
-        </option>
+      {Object.entries(componentTypesByCategory).map(([category, types]) => (
+        <optgroup key={category} label={category}>
+          {types.map((type) => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </optgroup>
       ))}
     </select>
   );
@@ -197,7 +277,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   selectedComponent,
   components,
   onLabelChange,
+  onTypeChange,
+  onDescriptionChange,
+  onLayerChange,
+  onPositionChange,
   onDelete,
+  onDuplicate,
   onShowLabelToggle,
   onStickerToggle,
   onStickerEmojiChange,
@@ -225,13 +310,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   // Stable callbacks
   const stableCallbacks = useMemo(() => ({
     onLabelChange: onLabelChange || (() => {}),
+    onTypeChange: onTypeChange || (() => {}),
+    onDescriptionChange: onDescriptionChange || (() => {}),
+    onLayerChange: onLayerChange || (() => {}),
+    onPositionChange: onPositionChange || (() => {}),
     onDelete: onDelete || (() => {}),
+    onDuplicate: onDuplicate || (() => {}),
     onShowLabelToggle: onShowLabelToggle || (() => {}),
     onStickerToggle: onStickerToggle || (() => {}),
     onStickerEmojiChange: onStickerEmojiChange || (() => {}),
     onBgColorChange: onBgColorChange || (() => {}),
     onNodeBgChange: onNodeBgChange || (() => {}),
-  }), [onLabelChange, onDelete, onShowLabelToggle, onStickerToggle, onStickerEmojiChange, onBgColorChange, onNodeBgChange]);
+  }), [onLabelChange, onTypeChange, onDescriptionChange, onLayerChange, onPositionChange, onDelete, onDuplicate, onShowLabelToggle, onStickerToggle, onStickerEmojiChange, onBgColorChange, onNodeBgChange]);
 
   // Validation functions
   const validateLabel = useCallback((value: string): string | null => {
@@ -260,9 +350,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   }, [component, stableCallbacks.onLabelChange]);
 
   const handleTypeChange = useCallback((newType: string) => {
-    // Type change would need to be implemented as a separate callback
-    console.log('Type change:', newType);
-  }, []);
+    if (component && stableCallbacks.onTypeChange) {
+      stableCallbacks.onTypeChange(component.id, newType);
+    }
+  }, [component, stableCallbacks.onTypeChange]);
 
   const handleDelete = useCallback(() => {
     if (component && stableCallbacks.onDelete) {
@@ -412,8 +503,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <textarea
               value={component.description || ''}
               onChange={(e) => {
-                // Description change would need a callback
-                console.log('Description change:', e.target.value);
+                if (stableCallbacks.onDescriptionChange) {
+                  stableCallbacks.onDescriptionChange(component.id, e.target.value);
+                }
               }}
               placeholder="Enter component description"
               rows={3}
@@ -519,8 +611,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <BasicTextEditor
               value={component.layerId || 'default'}
               onChange={(value) => {
-                // Layer change would need a callback
-                console.log('Layer change:', value);
+                if (stableCallbacks.onLayerChange) {
+                  stableCallbacks.onLayerChange(component.id, value);
+                }
               }}
               placeholder="default"
             />
@@ -542,8 +635,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   type="number"
                   value={Math.round(component.x)}
                   onChange={(e) => {
-                    // Position change would need a callback
-                    console.log('X position change:', e.target.value);
+                    const newX = parseFloat(e.target.value) || 0;
+                    if (stableCallbacks.onPositionChange) {
+                      stableCallbacks.onPositionChange(component.id, newX, component.y);
+                    }
                   }}
                   placeholder="X"
                   style={{
@@ -561,8 +656,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   type="number"
                   value={Math.round(component.y)}
                   onChange={(e) => {
-                    // Position change would need a callback
-                    console.log('Y position change:', e.target.value);
+                    const newY = parseFloat(e.target.value) || 0;
+                    if (stableCallbacks.onPositionChange) {
+                      stableCallbacks.onPositionChange(component.id, component.x, newY);
+                    }
                   }}
                   placeholder="Y"
                   style={{
@@ -590,8 +687,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <button
             onClick={() => {
-              // Duplicate component action
-              console.log('Duplicate component:', component.id);
+              if (stableCallbacks.onDuplicate) {
+                stableCallbacks.onDuplicate(component.id);
+              }
             }}
             style={{
               padding: '10px 16px',

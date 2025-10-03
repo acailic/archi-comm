@@ -4,13 +4,13 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { isDevelopment } from '@/lib/config/environment';
 import { errorStore, type AppError, type ErrorSeverity } from '@/lib/logging/errorStore';
 import { useGuardedState } from '@/lib/performance/useGuardedState';
 
 // Animation variants for smooth transitions
-const overlayVariants = {
+const overlayVariants: Variants = {
   hidden: {
     opacity: 0,
     backdropFilter: 'blur(0px)',
@@ -20,7 +20,7 @@ const overlayVariants = {
     backdropFilter: 'blur(4px)',
     transition: {
       duration: 0.3,
-      ease: 'easeOut',
+      ease: [0.16, 1, 0.3, 1],
     },
   },
   exit: {
@@ -28,12 +28,12 @@ const overlayVariants = {
     backdropFilter: 'blur(0px)',
     transition: {
       duration: 0.2,
-      ease: 'easeIn',
+      ease: [0.4, 0, 1, 1],
     },
   },
 };
 
-const errorBoxVariants = {
+const errorBoxVariants: Variants = {
   hidden: {
     opacity: 0,
     scale: 0.9,
@@ -44,7 +44,7 @@ const errorBoxVariants = {
     scale: 1,
     y: 0,
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       damping: 25,
       stiffness: 300,
       duration: 0.4,
@@ -56,7 +56,7 @@ const errorBoxVariants = {
     y: -10,
     transition: {
       duration: 0.2,
-      ease: 'easeIn',
+      ease: [0.4, 0, 1, 1],
     },
   },
 };
@@ -177,9 +177,13 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
   }, [currentError, isVisible]);
 
   // Keyboard shortcuts
-  useEffect((): (() => void) | undefined => {
+  useEffect(() => {
+    if (!isVisible) {
+      return;
+    }
+
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (!isVisible || !currentError) return;
+      if (!currentError) return;
 
       switch (event.key) {
         case 'Escape':
@@ -219,11 +223,12 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
       }
     };
 
-    if (isVisible) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isVisible, currentError, errorQueue, currentErrorIndex]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, currentError, errorQueue.length]);
 
   // Auto-focus overlay for keyboard navigation
   useEffect(() => {
@@ -314,11 +319,6 @@ export const DevOverlay: React.FC<DevOverlayProps> = ({ onOpenDiagnostics }) => 
       .slice(1)
       .map(line => line.trim())
       .filter(Boolean);
-  };
-
-  const truncateMessage = (message: string, maxLength: number = 200): string => {
-    if (message.length <= maxLength) return message;
-    return message.substring(0, maxLength) + '...';
   };
 
   if (!currentError) return null;

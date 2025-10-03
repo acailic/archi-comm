@@ -213,10 +213,11 @@ const ReactFlowCanvasWrapperComponent: React.FC<
                       >
                         {showBackground && (
                           <Background
-                            color="#d1d5db"
+                            color="#e5e7eb"
                             gap={20}
-                            size={2}
+                            size={1}
                             variant={BackgroundVariant.Dots}
+                            style={{ backgroundColor: '#ffffff' }}
                           />
                         )}
                         {showControls && <Controls />}

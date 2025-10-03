@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { ArrowLeft, Zap, Image, Download, Save, Search } from 'lucide-react';
 import { cx, designSystem, getElevation } from '@/lib/design/design-system';
 import { Button } from '@ui/components/ui/button';
@@ -98,10 +97,12 @@ export function TopBar(props: TopBarProps) {
                 {challengeDescription}
               </p>
             )}
-            <div className='text-[11px] text-muted-foreground mt-0.5' aria-live='polite'>
+            <div className='text-[11px] text-muted-foreground mt-0.5 flex flex-wrap gap-x-2' aria-live='polite'>
+              <span>{componentCount} components</span>
+              <span>• {connectionCount} connections</span>
               {isSaving && <span className='text-blue-600'>• Saving…</span>}
               {designComplexity !== undefined && designComplexity > 70 && (
-                <span className='ml-2 text-amber-600'>• Large design</span>
+                <span className='text-amber-600'>• Large design</span>
               )}
             </div>
           </div>

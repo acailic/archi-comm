@@ -13,7 +13,7 @@ import {
 import type { Challenge } from '@/shared/contracts';
 // Lazy-load and memoize ComponentPalette to improve performance
 const ComponentPalette = React.lazy(() =>
-  import('./ComponentPalette').then(m => ({ default: React.memo(m.ComponentPalette) }))
+  import('../panels/ComponentPalette').then(m => ({ default: React.memo(m.ComponentPalette) }))
 );
 
 interface VerticalSidebarProps {

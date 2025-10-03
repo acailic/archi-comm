@@ -7,7 +7,7 @@ import { ImportExportDropdown } from '@ui/components/ImportExportDropdown';
 import { Button } from '@ui/components/ui/button';
 import type { CanvasConfig } from '@/lib/import-export/types';
 import type { Challenge, DesignData } from '@/shared/contracts';
-import { ArrowLeft, Lightbulb, Save, Search, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Save, Search, Settings as SettingsIcon, MessageSquare } from 'lucide-react';
 
 
 interface DesignCanvasHeaderProps {
@@ -22,6 +22,9 @@ interface DesignCanvasHeaderProps {
   onSave: () => void;
   onShowCommandPalette: () => void;
   onImport: (result: any) => void;
+  showAnnotationSidebar?: boolean;
+  onToggleAnnotationSidebar?: () => void;
+  annotationCount?: number;
 }
 
 export function DesignCanvasHeader({
@@ -36,6 +39,9 @@ export function DesignCanvasHeader({
   onSave,
   onShowCommandPalette,
   onImport,
+  showAnnotationSidebar,
+  onToggleAnnotationSidebar,
+  annotationCount = 0,
 }: DesignCanvasHeaderProps) {
   return (
     <div className='border-b bg-card/50 backdrop-blur-sm p-4'>
@@ -52,7 +58,7 @@ export function DesignCanvasHeader({
             <ArrowLeft className='w-4 h-4' />
           </Button>
           <div>
-            <h2 className='font-semibold'>{challenge.title}</h2>
+            <h1 className='font-semibold text-lg'>{challenge.title}</h1>
             <p className='text-sm text-muted-foreground'>Design your system architecture</p>
           </div>
         </div>
@@ -75,9 +81,29 @@ export function DesignCanvasHeader({
             className='bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700 px-3'
             aria-label={showHints ? 'Hide Hints' : 'Show Hints'}
             title={showHints ? 'Hide Hints' : 'Show Hints'}
+            aria-pressed={showHints}
           >
             <Lightbulb className='w-4 h-4' />
           </Button>
+
+          {onToggleAnnotationSidebar && (
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={onToggleAnnotationSidebar}
+              className={`px-3 relative ${showAnnotationSidebar ? 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700' : ''}`}
+              aria-label='Toggle Annotations Sidebar'
+              title='Show/Hide Annotations (Shift+A)'
+              aria-pressed={showAnnotationSidebar}
+            >
+              <MessageSquare className='w-4 h-4' />
+              {annotationCount > 0 && (
+                <span className='absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center'>
+                  {annotationCount}
+                </span>
+              )}
+            </Button>
+          )}
 
           <Button
             variant='outline'

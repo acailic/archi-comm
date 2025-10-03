@@ -110,8 +110,8 @@ const trackCallbackStability = (
     // Generate optimization suggestions
     generateOptimizationSuggestions(metrics);
 
-    // Log warnings for problematic callbacks
-    if (metrics.stabilityScore < 50 && metrics.creationCount > 10) {
+    // Log warnings for problematic callbacks (only severe cases)
+    if (metrics.stabilityScore < 30 && metrics.creationCount > 100) {
       console.warn(
         `[useStableCallbacks] Unstable callback detected: ${callbackName}`,
         {

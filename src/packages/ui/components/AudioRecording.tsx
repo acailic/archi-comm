@@ -273,7 +273,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
               Back to Design
             </Button>
             <div>
-              <h2>Record Your Explanation</h2>
+              <h1 className='text-lg font-semibold'>Record Your Explanation</h1>
               <p className='text-sm text-muted-foreground'>
                 Explain your system design for {challenge.title}
               </p>

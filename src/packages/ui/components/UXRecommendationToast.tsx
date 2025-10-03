@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { Lightbulb, TrendingUp, Zap, AlertCircle } from 'lucide-react';
 import { useUXOptimizer } from '@/lib/user-experience/UXOptimizer';
-import { useUXTracker } from '../hooks/useUXTracker';
+import { useUXTracker } from '@/shared/hooks/common/useUXTracker';
 
 export interface UXRecommendation {
   id: string;

@@ -3,4 +3,4 @@
 // Maintains backward compatibility with existing imports
 // RELEVANT FILES: ../DeveloperDiagnosticsPage.tsx, tabs/EnvironmentTab.tsx, tabs/PerformanceTab.tsx, tabs/ErrorLogsTab.tsx
 
-export { DeveloperDiagnosticsPage as default } from '../DeveloperDiagnosticsPage';
+export { default as DeveloperDiagnosticsPage } from '../pages/DeveloperDiagnosticsPage';

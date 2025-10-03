@@ -1,3 +1,12 @@
+// src/lib/onboarding/OnboardingManager.ts
+// Zustand-based onboarding state management
+// Manages onboarding flows and steps with React reactivity
+// RELEVANT FILES: OnboardingOverlay.tsx, WelcomeOverlay.tsx, modules/onboarding/index.ts, modules/settings/index.tsx
+
+import { create } from 'zustand';
+import { markOnboardingFlowCompleted } from '../../modules/settings';
+import { simplifiedTourFlow } from './SimplifiedTour';
+
 export interface OnboardingStep {
   id: string;
   title: string;
@@ -18,174 +27,213 @@ export interface OnboardingState {
   currentStep: OnboardingStep | null;
   currentStepIndex: number;
   isVisible: boolean;
+  registeredFlows: Record<string, OnboardingFlow>;
 }
 
-export class OnboardingManager {
-  private static instance: OnboardingManager | null = null;
+export interface OnboardingActions {
+  registerFlow: (flow: OnboardingFlow) => void;
+  startOnboarding: (flowId: string) => boolean;
+  nextStep: () => boolean;
+  previousStep: () => boolean;
+  completeOnboarding: () => void;
+  cancelOnboarding: () => void;
+  setVisible: (visible: boolean) => void;
+}
 
-  private flows: Map<string, OnboardingFlow> = new Map();
-  private state: OnboardingState = {
-    isActive: false,
-    currentFlow: null,
-    currentStep: null,
-    currentStepIndex: 0,
-    isVisible: false,
+export type OnboardingStore = OnboardingState & OnboardingActions;
+
+// Register default flows
+const registerDefaultFlows = (): Record<string, OnboardingFlow> => {
+  const flows: Record<string, OnboardingFlow> = {};
+
+  // Guided tour flow
+  flows['guided-tour'] = {
+    id: 'guided-tour',
+    name: 'Complete Guided Tour',
+    steps: [
+      {
+        id: 'welcome',
+        title: 'Welcome to ArchiComm!',
+        content: "Let's take a complete tour to get you started with creating architectural designs.",
+        targetSelector: '',
+        placement: 'center',
+      },
+      {
+        id: 'canvas-intro',
+        title: 'Design Canvas',
+        content: "This is your main workspace where you'll create and edit your architectural designs.",
+        targetSelector: '[data-testid="design-canvas"]',
+        placement: 'top',
+      },
+      {
+        id: 'component-palette',
+        title: 'Component Palette',
+        content: 'Use this palette to add architectural components to your design.',
+        targetSelector: '[data-testid="component-palette"]',
+        placement: 'right',
+      },
+      {
+        id: 'properties-panel',
+        title: 'Properties Panel',
+        content: 'Configure selected components here. Adjust colors, sizes, and other properties.',
+        targetSelector: '[data-testid="properties-panel"]',
+        placement: 'left',
+      },
+      {
+        id: 'toolbar',
+        title: 'Canvas Toolbar',
+        content: 'Access canvas tools like zoom, pan, and export options.',
+        targetSelector: '[data-testid="canvas-toolbar"]',
+        placement: 'bottom',
+      },
+      {
+        id: 'command-palette',
+        title: 'Command Palette',
+        content: 'Press Ctrl/⌘+K anytime to access commands, search, and get help.',
+        targetSelector: '[data-testid="command-palette-trigger"]',
+        placement: 'bottom',
+      },
+    ],
   };
 
-  private constructor() {
-    this.registerDefaultFlows();
-  }
+  // Register simplified tour
+  flows['simplified-tour'] = simplifiedTourFlow;
 
-  public static getInstance(): OnboardingManager {
-    if (!OnboardingManager.instance) {
-      OnboardingManager.instance = new OnboardingManager();
-    }
-    return OnboardingManager.instance;
-  }
+  return flows;
+};
 
-  // Flow management
-  public registerFlow(flow: OnboardingFlow): void {
-    this.flows.set(flow.id, flow);
-  }
+// Create the Zustand store
+export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
+  // Initial state
+  isActive: false,
+  currentFlow: null,
+  currentStep: null,
+  currentStepIndex: 0,
+  isVisible: false,
+  registeredFlows: registerDefaultFlows(),
 
-  public getFlow(flowId: string): OnboardingFlow | null {
-    return this.flows.get(flowId) || null;
-  }
+  // Actions
+  registerFlow: (flow: OnboardingFlow) => {
+    set((state) => ({
+      registeredFlows: {
+        ...state.registeredFlows,
+        [flow.id]: flow,
+      },
+    }));
+  },
 
-  // Onboarding control
-  public startOnboarding(flowId: string): boolean {
-    const flow = this.getFlow(flowId);
+  startOnboarding: (flowId: string) => {
+    const state = get();
+    const flow = state.registeredFlows[flowId];
+
     if (!flow || flow.steps.length === 0) {
       return false;
     }
 
-    this.state.isActive = true;
-    this.state.currentFlow = flow;
-    this.state.currentStepIndex = 0;
-    this.state.currentStep = flow.steps[0];
-    this.state.isVisible = true;
-
-    return true;
-  }
-
-  public nextStep(): boolean {
-    if (!this.state.currentFlow) {
-      return false;
-    }
-
-    if (this.state.currentStepIndex >= this.state.currentFlow.steps.length - 1) {
-      // Always allow continuing - cycle back to first step or stay on last step
-      this.state.currentStepIndex = 0;
-      this.state.currentStep = this.state.currentFlow.steps[0];
-    } else {
-      this.state.currentStepIndex++;
-      this.state.currentStep = this.state.currentFlow.steps[this.state.currentStepIndex];
-    }
-    return true;
-  }
-
-  public previousStep(): boolean {
-    if (this.state.currentStepIndex <= 0 || !this.state.currentFlow) {
-      return false;
-    }
-
-    this.state.currentStepIndex--;
-    this.state.currentStep = this.state.currentFlow.steps[this.state.currentStepIndex];
-    return true;
-  }
-
-  public skipStep(): boolean {
-    return this.nextStep();
-  }
-
-  public completeOnboarding(): boolean {
-    this.state.isActive = false;
-    this.state.isVisible = false;
-    this.state.currentFlow = null;
-    this.state.currentStep = null;
-    this.state.currentStepIndex = 0;
-    return true;
-  }
-
-  public cancelOnboarding(): void {
-    this.completeOnboarding();
-  }
-
-  // State getters
-  public getState(): Readonly<OnboardingState> {
-    return { ...this.state };
-  }
-
-  public isActive(): boolean {
-    return this.state.isActive;
-  }
-
-  public isVisible(): boolean {
-    return this.state.isVisible;
-  }
-
-  public setVisible(visible: boolean): void {
-    this.state.isVisible = visible;
-  }
-
-  public getCurrentFlow(): OnboardingFlow | null {
-    return this.state.currentFlow;
-  }
-
-  public getCurrentStep(): OnboardingStep | null {
-    return this.state.currentStep;
-  }
-
-  // Private methods
-  private registerDefaultFlows(): void {
-    this.registerFlow({
-      id: 'first-time-user',
-      name: 'Welcome to ArchiComm',
-      steps: [
-        {
-          id: 'welcome',
-          title: 'Welcome to ArchiComm!',
-          content:
-            "Let's take a quick tour to get you started with creating your first architectural design.",
-          targetSelector: 'center',
-          placement: 'center',
-        },
-        {
-          id: 'canvas-intro',
-          title: 'Design Canvas',
-          content:
-            "This is your main workspace where you'll create and edit your architectural designs.",
-          targetSelector: '[data-testid="design-canvas"]',
-          placement: 'top',
-        },
-        {
-          id: 'component-palette',
-          title: 'Component Palette',
-          content:
-            'Use this palette to add architectural components like walls, doors, and windows to your design.',
-          targetSelector: '[data-testid="component-palette"]',
-          placement: 'right',
-        },
-      ],
+    set({
+      isActive: true,
+      currentFlow: flow,
+      currentStepIndex: 0,
+      currentStep: flow.steps[0],
+      isVisible: true,
     });
-  }
-}
 
-// React hook for easy integration
+    return true;
+  },
+
+  nextStep: () => {
+    const state = get();
+    const { currentFlow, currentStepIndex } = state;
+
+    if (!currentFlow) {
+      return false;
+    }
+
+    // Check if we're at the last step
+    if (currentStepIndex >= currentFlow.steps.length - 1) {
+      // Complete the onboarding instead of cycling
+      get().completeOnboarding();
+      return true;
+    }
+
+    // Move to next step
+    const nextIndex = currentStepIndex + 1;
+    set({
+      currentStepIndex: nextIndex,
+      currentStep: currentFlow.steps[nextIndex],
+    });
+
+    return true;
+  },
+
+  previousStep: () => {
+    const state = get();
+    const { currentFlow, currentStepIndex } = state;
+
+    if (currentStepIndex <= 0 || !currentFlow) {
+      return false;
+    }
+
+    const prevIndex = currentStepIndex - 1;
+    set({
+      currentStepIndex: prevIndex,
+      currentStep: currentFlow.steps[prevIndex],
+    });
+
+    return true;
+  },
+
+  completeOnboarding: () => {
+    const state = get();
+    const currentFlowId = state.currentFlow?.id;
+
+    // Mark the flow as completed in settings
+    if (currentFlowId) {
+      markOnboardingFlowCompleted(currentFlowId);
+    }
+
+    // Reset state
+    set({
+      isActive: false,
+      isVisible: false,
+      currentFlow: null,
+      currentStep: null,
+      currentStepIndex: 0,
+    });
+  },
+
+  cancelOnboarding: () => {
+    // Cancel without marking as completed
+    set({
+      isActive: false,
+      isVisible: false,
+      currentFlow: null,
+      currentStep: null,
+      currentStepIndex: 0,
+    });
+  },
+
+  setVisible: (visible: boolean) => {
+    set({ isVisible: visible });
+  },
+}));
+
+// React hook for easy integration (wrapper around the store)
 export const useOnboarding = () => {
-  const manager = OnboardingManager.getInstance();
+  const store = useOnboardingStore();
 
   return {
-    startOnboarding: (flowId: string) => manager.startOnboarding(flowId),
-    nextStep: () => manager.nextStep(),
-    previousStep: () => manager.previousStep(),
-    skipStep: () => manager.skipStep(),
-    completeOnboarding: () => manager.completeOnboarding(),
-    cancelOnboarding: () => manager.cancelOnboarding(),
-    isActive: () => manager.isActive(),
-    isVisible: () => manager.isVisible(),
-    setVisible: (visible: boolean) => manager.setVisible(visible),
-    getCurrentFlow: () => manager.getCurrentFlow(),
-    getCurrentStep: () => manager.getCurrentStep(),
+    startOnboarding: store.startOnboarding,
+    nextStep: store.nextStep,
+    previousStep: store.previousStep,
+    completeOnboarding: store.completeOnboarding,
+    cancelOnboarding: store.cancelOnboarding,
+    isActive: store.isActive,
+    isVisible: store.isVisible,
+    setVisible: store.setVisible,
+    currentFlow: store.currentFlow,
+    currentStep: store.currentStep,
+    currentStepIndex: store.currentStepIndex,
+    registerFlow: store.registerFlow,
   };
 };

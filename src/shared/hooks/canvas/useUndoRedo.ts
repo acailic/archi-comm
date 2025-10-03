@@ -96,9 +96,10 @@ export function useUndoRedo<T>(
   // For non-canvas use cases, return a simplified version
   return {
     state: initialState,
+    currentState: initialState,
     canUndo: false,
     canRedo: false,
-    pushState: () => {},
+    pushState: (_state?: T) => {},
     undo: () => {},
     redo: () => {},
     clearHistory: () => {},

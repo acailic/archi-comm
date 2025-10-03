@@ -6,7 +6,7 @@
  */
 
 import { Handle, Position } from "@xyflow/react";
-import { Suspense, memo } from "react";
+import { Suspense, memo, useState, useEffect, useRef } from "react";
 import { getComponentIcon } from "../../../lib/design/component-icons";
 import { cx } from "../../../lib/design/design-system";
 import type { DesignComponent } from "../../../shared/contracts";
@@ -66,6 +66,7 @@ function CustomNodeViewInner({
   selected,
 }: CustomNodeViewProps) {
   const { state, actions, computed } = presenter;
+  const inputRef = useRef<HTMLInputElement>(null);
   const {
     component,
     isSelected,
@@ -82,6 +83,45 @@ function CustomNodeViewInner({
     visualTheme = "serious",
   } = nodeData;
   const playful = visualTheme === "playful";
+
+  // First-use handle pulse effect - only shows once per session, independent of theme
+  const [showHandlePulse, setShowHandlePulse] = useState(() => {
+    const hasSeenHandles = sessionStorage.getItem('archicomm_handles_seen');
+    return !hasSeenHandles;
+  });
+
+  useEffect(() => {
+    if (showHandlePulse) {
+      // Mark as complete on first interaction (hover or mousedown on any handle)
+      const handleInteraction = () => {
+        setShowHandlePulse(false);
+        sessionStorage.setItem('archicomm_handles_seen', 'true');
+      };
+
+      // Listen for first handle interaction globally
+      window.addEventListener('mousedown', handleInteraction, { once: true, capture: true });
+      window.addEventListener('touchstart', handleInteraction, { once: true, capture: true });
+
+      // Also hide after 8 seconds as fallback
+      const timer = setTimeout(() => {
+        setShowHandlePulse(false);
+        sessionStorage.setItem('archicomm_handles_seen', 'true');
+      }, 8000);
+
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('mousedown', handleInteraction, true);
+        window.removeEventListener('touchstart', handleInteraction, true);
+      };
+    }
+  }, [showHandlePulse]);
+
+  useEffect(() => {
+    if (state.isEditingLabel && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [state.isEditingLabel]);
 
   // Hide component if not visible
   if (!isVisible) {
@@ -118,11 +158,21 @@ function CustomNodeViewInner({
             selected || state.visualState.isSelected
               ? "border-black shadow-2xl ring-4 ring-gray-300"
               : "border-gray-800 shadow-md hover:shadow-xl",
+            // Highlight valid connection targets
+            state.isValidConnectionTarget && state.visualState.isConnectionStart
+              ? "ring-4 ring-green-400 border-green-500 animate-pulse"
+              : "",
             "transition-all duration-200 hover:shadow-2xl hover:border-black",
             playful ? "hover:scale-105" : ""
           )}
           onMouseEnter={actions.handleMouseEnter}
           onMouseLeave={actions.handleMouseLeave}
+          onClick={() => {
+            // Click to complete connection if in connection mode
+            if (state.isValidConnectionTarget && state.visualState.isConnectionStart) {
+              actions.handleCompleteConnection();
+            }
+          }}
         >
           <div
             className={cx(
@@ -184,16 +234,36 @@ function CustomNodeViewInner({
               </Suspense>
 
               {/* Component title - in header now */}
-              <div className="flex-1 mx-3 relative z-10">
-                <div
-                  className={cx(
-                    "text-sm font-bold text-white truncate",
-                    "drop-shadow-sm"
-                  )}
-                >
-                  {component.label ||
-                    `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, " ")}`}
-                </div>
+              <div
+                className="flex-1 mx-3 relative z-10"
+                onDoubleClick={actions.startEdit}
+              >
+                {state.isEditingLabel ? (
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={state.labelDraft}
+                    onChange={(event) => actions.handleLabelInput(event.target.value)}
+                    onBlur={actions.commitEdit}
+                    onKeyDown={actions.handleKeyDown}
+                    onClick={(event) => event.stopPropagation()}
+                    className={cx(
+                      "nodrag w-full bg-transparent border-none text-sm font-bold text-white truncate",
+                      "focus:outline-none focus:ring-0 placeholder:text-white/60"
+                    )}
+                    autoFocus
+                  />
+                ) : (
+                  <div
+                    className={cx(
+                      "text-sm font-bold text-white truncate",
+                      "drop-shadow-sm"
+                    )}
+                  >
+                    {component.label ||
+                      `${component.type.charAt(0).toUpperCase() + component.type.slice(1).replace(/-/g, " ")}`}
+                  </div>
+                )}
                 {component.description && (
                   <div className="text-xs text-white/80 truncate">
                     {component.description}
@@ -278,18 +348,20 @@ function CustomNodeViewInner({
             position={Position.Top}
             id="top"
             className={cx(
-              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
-              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
+              "w-6 h-6 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-blue-100 hover:shadow-xl hover:scale-125 hover:border-blue-600 hover:ring-2 hover:ring-blue-300",
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
-                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
-              playful ? "animate-pulse" : ""
+                ? "opacity-100 scale-125 bg-blue-50 ring-4 ring-blue-400/50 border-blue-600"
+                : "opacity-90 group-hover:opacity-100 group-hover:scale-110",
+              // Onboarding pulse takes precedence over playful animation
+              showHandlePulse ? "animate-pulse ring-4 ring-blue-400/70 scale-110" : (playful ? "animate-pulse" : "")
             )}
             style={{
-              top: "-10px",
+              top: "-12px",
               boxShadow:
                 "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
             }}
+            title="Drag to connect"
             onMouseDown={(e) => {
               e.stopPropagation();
               actions.handleStartConnection("top");
@@ -300,18 +372,20 @@ function CustomNodeViewInner({
             position={Position.Bottom}
             id="bottom"
             className={cx(
-              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
-              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
+              "w-6 h-6 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-blue-100 hover:shadow-xl hover:scale-125 hover:border-blue-600 hover:ring-2 hover:ring-blue-300",
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
-                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
-              playful ? "animate-pulse" : ""
+                ? "opacity-100 scale-125 bg-blue-50 ring-4 ring-blue-400/50 border-blue-600"
+                : "opacity-90 group-hover:opacity-100 group-hover:scale-110",
+              // Onboarding pulse takes precedence over playful animation
+              showHandlePulse ? "animate-pulse ring-4 ring-blue-400/70 scale-110" : (playful ? "animate-pulse" : "")
             )}
             style={{
-              bottom: "-10px",
+              bottom: "-12px",
               boxShadow:
                 "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
             }}
+            title="Drag to connect"
             onMouseDown={(e) => {
               e.stopPropagation();
               actions.handleStartConnection("bottom");
@@ -322,18 +396,20 @@ function CustomNodeViewInner({
             position={Position.Left}
             id="left"
             className={cx(
-              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
-              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
+              "w-6 h-6 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-blue-100 hover:shadow-xl hover:scale-125 hover:border-blue-600 hover:ring-2 hover:ring-blue-300",
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
-                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
-              playful ? "animate-pulse" : ""
+                ? "opacity-100 scale-125 bg-blue-50 ring-4 ring-blue-400/50 border-blue-600"
+                : "opacity-90 group-hover:opacity-100 group-hover:scale-110",
+              // Onboarding pulse takes precedence over playful animation
+              showHandlePulse ? "animate-pulse ring-4 ring-blue-400/70 scale-110" : (playful ? "animate-pulse" : "")
             )}
             style={{
-              left: "-10px",
+              left: "-12px",
               boxShadow:
                 "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
             }}
+            title="Drag to connect"
             onMouseDown={(e) => {
               e.stopPropagation();
               actions.handleStartConnection("left");
@@ -344,18 +420,20 @@ function CustomNodeViewInner({
             position={Position.Right}
             id="right"
             className={cx(
-              "w-5 h-5 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
-              "hover:bg-gray-100 hover:shadow-xl hover:scale-125 hover:border-black",
+              "w-6 h-6 rounded-full cursor-crosshair border-3 border-gray-900 bg-white shadow-lg transition-all duration-200 nodrag",
+              "hover:bg-blue-100 hover:shadow-xl hover:scale-125 hover:border-blue-600 hover:ring-2 hover:ring-blue-300",
               isSelected || state.visualState.isConnectionStart
-                ? "opacity-100 scale-125 bg-gray-200 ring-4 ring-gray-400/50 border-black"
-                : "opacity-60 group-hover:opacity-100 group-hover:scale-110",
-              playful ? "animate-pulse" : ""
+                ? "opacity-100 scale-125 bg-blue-50 ring-4 ring-blue-400/50 border-blue-600"
+                : "opacity-90 group-hover:opacity-100 group-hover:scale-110",
+              // Onboarding pulse takes precedence over playful animation
+              showHandlePulse ? "animate-pulse ring-4 ring-blue-400/70 scale-110" : (playful ? "animate-pulse" : "")
             )}
             style={{
-              right: "-10px",
+              right: "-12px",
               boxShadow:
                 "0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
             }}
+            title="Drag to connect"
             onMouseDown={(e) => {
               e.stopPropagation();
               actions.handleStartConnection("right");

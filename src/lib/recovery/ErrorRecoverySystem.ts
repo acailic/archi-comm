@@ -16,13 +16,19 @@ export interface RecoveryContext {
   currentAudioData?: unknown;
 }
 
+export interface RecoveryPreservedData {
+  saved?: string[];
+  failed?: string[];
+  restored?: string[];
+}
+
 export interface RecoveryResult {
   success: boolean;
   strategy: string;
   message: string;
   requiresUserAction?: boolean;
   nextAction?: 'reload' | 'reset' | 'continue';
-  preservedData?: unknown;
+  preservedData?: RecoveryPreservedData;
 }
 
 export interface RecoveryAttempt {

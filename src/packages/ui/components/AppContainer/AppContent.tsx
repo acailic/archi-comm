@@ -15,6 +15,7 @@ import { useAppStore, type AppState } from "../../../../stores/SimpleAppStore";
 import { CommandPalette } from "../CommandPalette";
 import { TooltipProvider } from "../ui/tooltip";
 import { ScreenRouter } from "./ScreenRouter";
+import { OnboardingOverlay } from "../overlays/OnboardingOverlay";
 
 export function AppContent() {
   // Use a simple state object to avoid Zustand selector issues
@@ -133,9 +134,10 @@ export function AppContent() {
   }, [setCurrentScreen, setPhase]);
 
   const handleBackToSelection = useCallback(() => {
+    setSelectedChallenge(null);
     setCurrentScreen("challenge-selection");
     setPhase("challenge-selection");
-  }, [setCurrentScreen, setPhase]);
+  }, [setSelectedChallenge, setCurrentScreen, setPhase]);
 
   const handleWelcomeComplete = useCallback(
     () => setShowWelcome(false),
@@ -230,31 +232,39 @@ export function AppContent() {
 
   return (
     <TooltipProvider>
+      <a href="#app-main-content" className="skip-link">
+        Skip to main content
+      </a>
       <div className="w-full h-full">
         <Suspense fallback={<div className="p-4">Loading…</div>}>
-          <ScreenRouter
-            showDevScenarios={showDevScenarios}
-            showWelcome={showWelcome}
-            selectedChallenge={selectedChallenge}
-            availableChallenges={availableChallenges}
-            phase={phase}
-            audioData={audioData}
-            currentScreen={currentScreen}
-            designData={designData}
-            onChallengeSelect={navigation.handleChallengeSelect}
-            onComplete={handleComplete}
-            onAudioComplete={handleAudioComplete}
-            onBackFromAudio={navigation.handleBackFromAudio}
-            onStartOver={navigation.handleStartOver}
-            onBackToDesign={navigation.handleBackToDesign}
-            onBackToAudio={navigation.handleBackToAudio}
-            onConfigBack={navigation.handleConfigBack}
-            onBackToSelection={navigation.handleBackToSelection}
-            onWelcomeComplete={navigation.handleWelcomeComplete}
-            onInfiniteLoopReset={() => {}}
-            onRequestRecovery={() => {}}
-          />
+          <main id="app-main-content" className="w-full h-full focus:outline-none" tabIndex={-1}>
+            <ScreenRouter
+              showDevScenarios={showDevScenarios}
+              showWelcome={showWelcome}
+              selectedChallenge={selectedChallenge}
+              availableChallenges={availableChallenges}
+              phase={phase}
+              audioData={audioData}
+              currentScreen={currentScreen}
+              designData={designData}
+              onChallengeSelect={navigation.handleChallengeSelect}
+              onComplete={handleComplete}
+              onAudioComplete={handleAudioComplete}
+              onBackFromAudio={navigation.handleBackFromAudio}
+              onStartOver={navigation.handleStartOver}
+              onBackToDesign={navigation.handleBackToDesign}
+              onBackToAudio={navigation.handleBackToAudio}
+              onConfigBack={navigation.handleConfigBack}
+              onBackToSelection={navigation.handleBackToSelection}
+              onWelcomeComplete={navigation.handleWelcomeComplete}
+              onInfiniteLoopReset={() => {}}
+              onRequestRecovery={() => {}}
+            />
+          </main>
         </Suspense>
+
+        {/* Onboarding Overlay */}
+        <OnboardingOverlay />
 
         {/* Command Palette */}
         {features.commandPalette && (

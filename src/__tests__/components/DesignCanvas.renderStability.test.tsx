@@ -7,7 +7,7 @@ import { RenderStabilityTracker } from '@/lib/performance/RenderStabilityTracker
 import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { RenderLoopDiagnostics } from '@/lib/debug/RenderLoopDiagnostics';
 import { ReactFlowCanvas } from '../../packages/canvas/components/ReactFlowCanvas';
-import type { DesignComponent, Connection, InfoCard } from '../../types';
+import type { DesignComponent, Connection, InfoCard } from '@shared/contracts';
 
 // Mock ReactFlow to avoid complex rendering setup
 vi.mock('@xyflow/react', () => ({
@@ -390,12 +390,12 @@ describe('DesignCanvas render stability instrumentation (Modular Architecture)',
       expect(screen.getByTestId('minimap')).toBeInTheDocument();
 
       // Each layer should register with the detector when mounted
-      expect(detector.hasComponent('ReactFlowCanvas.Controller')).toBe(true);
-      expect(detector.hasComponent('ReactFlowCanvas.NodeLayer')).toBe(true);
-      expect(detector.hasComponent('ReactFlowCanvas.EdgeLayer')).toBe(true);
-      expect(detector.hasComponent('ReactFlowCanvas.LayoutEngine')).toBe(true);
-      expect(detector.hasComponent('ReactFlowCanvas.Virtualization')).toBe(true);
-      expect(detector.hasComponent('ReactFlowCanvas.Interactions')).toBe(true);
+      expect(detector.getLatestReport('ReactFlowCanvas.Controller')).not.toBeNull();
+      expect(detector.getLatestReport('ReactFlowCanvas.NodeLayer')).not.toBeNull();
+      expect(detector.getLatestReport('ReactFlowCanvas.EdgeLayer')).not.toBeNull();
+      expect(detector.getLatestReport('ReactFlowCanvas.LayoutEngine')).not.toBeNull();
+      expect(detector.getLatestReport('ReactFlowCanvas.Virtualization')).not.toBeNull();
+      expect(detector.getLatestReport('ReactFlowCanvas.Interactions')).not.toBeNull();
     });
 
     it('wrapper responds to circuit breaker coordination', async () => {
@@ -543,7 +543,7 @@ describe('DesignCanvas render stability instrumentation (Modular Architecture)',
       expect(screen.queryByText('Resume Canvas')).not.toBeInTheDocument();
 
       // The emergency mechanism should be ready to trigger if needed
-      expect(detector.hasComponent('ReactFlowCanvas.Controller')).toBe(true);
+      expect(detector.getLatestReport('ReactFlowCanvas.Controller')).not.toBeNull();
     });
 
     it('wrapper demonstrates layer-specific render guard thresholds', async () => {
@@ -564,12 +564,12 @@ describe('DesignCanvas render stability instrumentation (Modular Architecture)',
 
       // Verify that different layers are using the correct preset thresholds
       // This tests that the RenderGuardPresets.canvasLayers are being applied
-      const controllerMetrics = detector.getMetrics('ReactFlowCanvas.Controller');
-      const nodeLayerMetrics = detector.getMetrics('ReactFlowCanvas.NodeLayer');
-      const edgeLayerMetrics = detector.getMetrics('ReactFlowCanvas.EdgeLayer');
-      const layoutEngineMetrics = detector.getMetrics('ReactFlowCanvas.LayoutEngine');
-      const virtualizationMetrics = detector.getMetrics('ReactFlowCanvas.Virtualization');
-      const interactionMetrics = detector.getMetrics('ReactFlowCanvas.Interactions');
+      const controllerMetrics = detector.getLatestReport('ReactFlowCanvas.Controller')?.metrics;
+      const nodeLayerMetrics = detector.getLatestReport('ReactFlowCanvas.NodeLayer')?.metrics;
+      const edgeLayerMetrics = detector.getLatestReport('ReactFlowCanvas.EdgeLayer')?.metrics;
+      const layoutEngineMetrics = detector.getLatestReport('ReactFlowCanvas.LayoutEngine')?.metrics;
+      const virtualizationMetrics = detector.getLatestReport('ReactFlowCanvas.Virtualization')?.metrics;
+      const interactionMetrics = detector.getLatestReport('ReactFlowCanvas.Interactions')?.metrics;
 
       // All layers should be tracked independently
       expect(controllerMetrics || nodeLayerMetrics || edgeLayerMetrics ||

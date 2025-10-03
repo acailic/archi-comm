@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AudioData, Challenge, DesignData } from "../shared/contracts";
 import { persistenceCoordinator } from "./PersistenceCoordinator";
+import { shouldShowWelcome, updateOnboardingSettings } from "../modules/settings";
 
 // Simplified state shape focusing on essential data
 export interface AppState {
@@ -78,7 +79,7 @@ const initialState: AppState = {
   currentScreen: "challenge-selection",
   showDevScenarios: false,
   isDemoMode: false,
-  showWelcome: true,
+  showWelcome: shouldShowWelcome(),
   isLoading: false,
   error: null,
 };
@@ -187,7 +188,12 @@ export const useAppStore = create<AppStore>()(
 
         setIsDemoMode: (demo) => coordinatedSet({ isDemoMode: demo }),
 
-        setShowWelcome: (show) => coordinatedSet({ showWelcome: show }),
+        setShowWelcome: (show) => {
+          coordinatedSet({ showWelcome: show });
+          if (!show) {
+            updateOnboardingSettings({ showWelcomeOnStartup: false });
+          }
+        },
 
         // Utility actions
         setLoading: (loading) => coordinatedSet({ isLoading: loading }),

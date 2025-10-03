@@ -12,15 +12,13 @@ import React, {
   ReactNode,
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DEBUG as ENV_DEBUG, isTauriEnvironment as detectTauriEnvironment } from '@/lib/config/environment';
+import { DEBUG as ENV_DEBUG } from '@/lib/config/environment';
 import {
   WebNotificationManager,
   webNotificationManager as defaultWebNotificationManager,
 } from '@services/web-fallback';
 
 const DEBUG = ENV_DEBUG ?? { logPerformance: () => {} };
-const isTauriEnvironment =
-  typeof detectTauriEnvironment === 'function' ? detectTauriEnvironment : () => false;
 const webNotificationManager =
   defaultWebNotificationManager ?? new WebNotificationManager();
 
@@ -57,6 +55,7 @@ export interface Challenge {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   estimatedTime: number;
   category: 'system-design' | 'architecture' | 'scaling';
+  tags?: string[];
 }
 
 // Router context
@@ -111,7 +110,7 @@ const screenTransitions = {
   initial: { opacity: 0, x: 20 },
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -20 },
-  transition: { duration: 0.3, ease: 'easeInOut' },
+  transition: { duration: 0.3, ease: 'easeInOut' as const },
 };
 
 // Navigation validation rules

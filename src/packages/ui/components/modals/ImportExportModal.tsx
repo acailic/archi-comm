@@ -16,7 +16,6 @@ import { Button } from '@ui/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs';
 import { Input } from '@ui/components/ui/input';
 import { Label } from '@ui/components/ui/label';
-import { Textarea } from '@ui/components/ui/textarea';
 import { Switch } from '@ui/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@ui/components/ui/select';
 import { Alert, AlertDescription } from '@ui/components/ui/alert';
@@ -697,6 +696,7 @@ export function ImportExportModal({
                          },
                          conflicts: [],
                          errors: [],
+                         warnings: [],
                        };
                        onImportComplete?.(result);
                        onClose();
@@ -730,6 +730,7 @@ export function ImportExportModal({
                          },
                          conflicts: [],
                          errors: [],
+                         warnings: [],
                        };
                        onImportComplete?.(result);
                        onClose();
@@ -763,6 +764,7 @@ export function ImportExportModal({
                          },
                          conflicts: [],
                          errors: [],
+                         warnings: [],
                        };
                        onImportComplete?.(result);
                        onClose();

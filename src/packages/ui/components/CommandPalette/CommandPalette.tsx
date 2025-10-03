@@ -20,13 +20,17 @@ interface CommandPaletteProps {
   selectedChallenge: unknown;
 }
 
-type CommandSection = 'navigation' | 'actions' | 'help';
+type CommandSection = 'navigation' | 'actions' | 'workspace' | 'learning' | 'help';
 
 const sectionLabels: Record<CommandSection, string> = {
   navigation: 'Navigate',
   actions: 'Actions',
+  workspace: 'Workspace',
+  learning: 'Learning',
   help: 'Help',
 };
+
+const sectionOrder: CommandSection[] = ['navigation', 'actions', 'workspace', 'learning', 'help'];
 
 export function CommandPalette({
   isOpen,
@@ -124,7 +128,13 @@ export function CommandPalette({
     }
   }, [filteredCommands, listboxId, selectedIndex]);
 
-  const visibleSections = useMemo(() => Object.entries(groupedCommands) as [CommandSection, typeof filteredCommands][], [groupedCommands]);
+  const visibleSections = useMemo(
+    () =>
+      sectionOrder
+        .map(section => [section, groupedCommands[section]] as [CommandSection, typeof filteredCommands])
+        .filter(([, commands]) => commands.length > 0),
+    [groupedCommands]
+  );
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (filteredCommands.length === 0 && event.key !== 'Escape') {
@@ -209,7 +219,7 @@ export function CommandPalette({
               </div>
 
               <div className='px-4 py-2 text-xs text-muted-foreground' id={helperTextId}>
-                Use the arrow keys to navigate and Enter to run a command.
+                Search by feature, action, or keyword. Use arrow keys to navigate and Enter to run a command.
               </div>
 
               <div className='flex-1 overflow-auto px-2 pb-4' role='presentation'>
@@ -221,11 +231,12 @@ export function CommandPalette({
                   </div>
                 ) : (
                   <ul id={listboxId} role='listbox' aria-label='Command results' className='space-y-4'>
-                    {visibleSections.map(([section, commands]) => {
+                    {visibleSections.map(([section, commands], sectionIndex) => {
                       if (!commands.length) {
                         return null;
                       }
 
+                      const isLastSection = sectionIndex === visibleSections.length - 1;
                       return (
                         <li key={section} className='list-none'>
                           <div className='px-3 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider'>
@@ -254,7 +265,7 @@ export function CommandPalette({
                               );
                             })}
                           </div>
-                          {section !== 'help' && <Separator className='my-2' />}
+                          {!isLastSection && <Separator className='my-2' />}
                         </li>
                       );
                     })}

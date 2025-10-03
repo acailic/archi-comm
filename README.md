@@ -3,9 +3,11 @@
 <img src="src-tauri/icons/128x128@2x.png" width="110" height="110" alt="ArchiComm logo">
 
 # ArchiComm Community Edition
+
 ### A desktop companion for learning and practicing system design
 
 <!-- Badges -->
+
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/0000/badge)](https://www.bestpractices.dev/projects/0000)
 [![Build Status](https://github.com/acailic/archi-comm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/acailic/archi-comm/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=acailic_archicomm&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=acailic_archicomm)
@@ -18,7 +20,6 @@
 <img alt="Prettier" src="https://img.shields.io/badge/code_style-Prettier-ff69b4?logo=prettier&logoColor=white">
 <a href="https://tauri.app"><img alt="Tauri" src="https://img.shields.io/badge/Desktop-Tauri-FFC131?logo=tauri&logoColor=white"></a>
 <a href="https://react.dev"><img alt="React" src="https://img.shields.io/badge/UI-React-61DAFB?logo=react&logoColor=white"></a>
-
 
 Learn, practice, and teach system design fundamentals through guided scenarios, interactive diagrams, and repeatable exercises. This is the Community Edition, focused on core features for learners and interview practice. Upgrade to ArchiComm Pro for advanced features.
 
@@ -61,10 +62,13 @@ See also: [src/docs/SystemDesignPractice.md](src/docs/SystemDesignPractice.md)
 ## Installation
 
 ### Direct Download (All Platforms)
+
 Download the latest signed release for your platform from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
 
 ### macOS
+
 Using Homebrew (recommended):
+
 ```bash
 # Binary installation
 brew install --cask archi-comm
@@ -74,12 +78,15 @@ brew install archi-comm
 ```
 
 ### Windows
+
 Download and run the signed installer from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
 
 ### Linux
+
 Download the AppImage or .deb package from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
 
 ### Development Setup
+
 ```bash
 # Clone and launch the desktop app
 git clone https://github.com/acailic/archicomm.git
@@ -97,7 +104,9 @@ Build binaries: `npm run build` (creates signed Tauri bundles for your OS).
 We standardize on npm for dependency management. Commit updates to `package-lock.json` and avoid adding alternative lockfiles (`yarn.lock`, `pnpm-lock.yaml`). Vite's canonical configuration lives at `config/vite.config.ts`; update that file when changing dev server or build behavior.
 
 ### Auto-Updates
+
 ArchiComm includes an automatic update system that securely downloads and installs updates. You can:
+
 - Enable/disable automatic update checks in preferences
 - Manually check for updates from the Help menu
 - View update history and release notes
@@ -133,6 +142,7 @@ For a deeper dive into the system and developer guidance, see the Architecture G
 - Exports: diagrams (SVG/PNG), notes (Markdown), and ADR templates
 
 New in this build:
+
 - File-based custom challenges (import JSON via Challenge Selection > Import Challenge)
 - Architecture templates pre-seeding (load suggested components and links)
 - Progressive solution hints (manual toggle or contextual prompts)
@@ -148,6 +158,7 @@ New in this build:
 - Offline transcription and enhanced export options
 
 [Learn more about ArchiComm Pro](https://archicomm.com/pro)
+
 </details>
 
 ---
@@ -157,11 +168,13 @@ New in this build:
 ArchiComm Community Edition provides simple, reliable audio recording and manual transcription:
 
 ### Recording
+
 - **MediaRecorder API**: Browser-native recording with pause/resume support
 - **Manual Transcription**: Rich text editor for typing your explanations
 - **Audio Playback**: Listen to your recordings while editing transcripts
 
 ### Simplified Design
+
 - Single recording engine for maximum compatibility
 - No complex transcription dependencies
 - Manual transcript editing with word count and analysis
@@ -170,11 +183,11 @@ ArchiComm Community Edition provides simple, reliable audio recording and manual
 ### Usage
 
 ```typescript
-import { SimpleAudioManager } from '@audio/SimpleAudioManager';
+import { SimpleAudioManager } from "@audio/SimpleAudioManager";
 
 // Initialize the simple audio manager
 const audioManager = new SimpleAudioManager({
-  maxDuration: 300000 // 5 minutes
+  maxDuration: 300000, // 5 minutes
 });
 
 // Start recording
@@ -204,23 +217,27 @@ ArchiComm Community Edition loads "Tasks" (study modules) that define prompts, a
 - Persistence: Local storage and export/import functionality
 
 ### Keyboard Shortcuts
+
 - V: Select, H: Pan, Z: Zoom, A: Annotate
 - Space + Drag: Pan viewport
 - Ctrl/Cmd+A: Select all; Del/Backspace: Delete
 - Arrow keys: Nudge; Ctrl/Cmd+Arrow: Fine nudge
 
 ### Task Plugins
+
 - Plugins live under `src/lib/task-system/plugins/<task-id>`
 - Example: `url-shortener` with `task.json` and `assets/`
 - Loaded via `src/lib/task-system/templates/index.ts`
 
 ### Developer Diagnostics
+
 - `DeveloperDiagnosticsPage` shows live canvas metrics (FPS, score, workers, memory)
 - Export diagnostics as JSON for debugging
 
 - Optional assets: diagrams, seed data, or reference links
 
 Example scenarios included:
+
 - URL shortener at scale
 - Twitter/Instagram news feed
 - Real-time chat and presence
@@ -236,17 +253,18 @@ Example scenarios included:
 - Advanced challenge types
 
 [Upgrade to Pro](https://archicomm.com/pro)
+
 </details>
 
 ---
 
 ## System Design Practice Workflow
 
-1) Select or import a challenge in Challenge Selection.
-2) Start designing on the canvas. Optionally load the architecture template when prompted.
-3) Toggle Solution Hints for progressive guidance. Hints group by topic and difficulty.
-4) Your work auto-saves to the local Tauri backend (no network required).
-5) Record your explanation, then review your session and export.
+1. Select or import a challenge in Challenge Selection.
+2. Start designing on the canvas. Optionally load the architecture template when prompted.
+3. Toggle Solution Hints for progressive guidance. Hints group by topic and difficulty.
+4. Your work auto-saves to the local Tauri backend (no network required).
+5. Record your explanation, then review your session and export.
 
 ### Importing Custom Challenges (File-Based)
 
@@ -319,6 +337,7 @@ You can request basic rubric-based feedback using a local Tauri command that pro
 - Company-specific review criteria
 
 [Upgrade to Pro](https://archicomm.com/pro)
+
 </details>
 
 ## Shortcuts
@@ -341,10 +360,36 @@ Press `?` in the app for the full list.
 - Testing: Vitest (unit/integration) + Playwright (E2E)
 - Canvas and interactions: custom canvas engine, Motion/Framer animations
 
+## Developer Tools
+
+ArchiComm uses modern development tools to ensure code quality and consistency:
+
+- **Knip** — Detects unused files, dependencies, and exports (`npm run unused:check`)
+- **commitlint** — Enforces conventional commit message format
+- **Dependabot** — Automated dependency updates via GitHub
+- **EditorConfig** — Consistent editor settings across IDEs
+- **VS Code Integration** — Recommended extensions, debug configurations, and tasks
+
+**Commit Format:** All commits must follow conventional commit format:
+
+```bash
+feat(canvas): Add node auto-layout
+fix(audio): Resolve recording buffer overflow
+docs: Update installation instructions
+```
+
+**Structure Validation:** Repository structure is validated on pre-commit:
+
+```bash
+npm run validate:structure
+```
+
+For complete tooling documentation, see `docs/TOOLING.md`.
+
 ## Repository Layout
 
 - `config/` — centralised configuration for Vite, ESLint, Playwright, TypeScript, semantic-release, and Sonar
-- `docs/` — tracked docs; `docs/development/` is git-ignored for personal notes
+- `docs/` — tracked documentation (essential docs in `docs/development/` are tracked; personal notes are git-ignored)
 - `src/packages/core/` (`@core`) — domain primitives, shared types, and core business logic
 - `src/packages/ui/` (`@ui`) — component library and design system primitives for the desktop app
 - `src/packages/canvas/` (`@canvas`) — diagram engine, interactions, and canvas-specific utilities
@@ -355,10 +400,16 @@ Press `?` in the app for the full list.
 - `tools/` — development scripts and structure validators (`npm run validate:structure`)
 
 Useful scripts:
+
 - `npm run dev` — web dev server (Vite)
 - `npm run tauri:dev` — desktop dev shell
 - `npm run test:coverage` — generate coverage report
 - `npm run e2e` — run Playwright tests locally
+- `npm run validate:structure` — validate repository structure
+- `npm run deps:check` — check for outdated dependencies
+- `npm run unused:check` — detect unused code and dependencies
+
+For complete tooling documentation, see `docs/TOOLING.md`.
 
 ---
 
@@ -369,14 +420,18 @@ We welcome improvements to modules, patterns, checklists, and study flows for th
 - Start here: `CONTRIBUTING.md` for a quick start checklist, local dev workflow, and PR standards
 - Explore the architecture: `docs/ARCHITECTURE.md`
 - Consult the API reference: `docs/API_REFERENCE.md`
+- Development tooling: `docs/TOOLING.md` for all tools and their usage
+- Security policy: `docs/SECURITY.md`
+- API stability: `docs/API_STABILITY.md`
+- Maintainers: `docs/MAINTAINERS.md`
 
 Ideas that help learners most:
+
 - New study modules with clear acceptance criteria and hints
 - Trade-off explorers (e.g., sharding vs. hashing strategies)
 - Estimation worksheets and rubric improvements
 - Better exports (ADR templates, interview scorecards)
 - Audio and speech-to-text enhancements (see `TODO.md`)
-
 
 ---
 
@@ -398,7 +453,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ by the ArchiComm Team**
 
-*Empowering architects to design the future, one component at a time.*
+_Empowering architects to design the future, one component at a time._
 
 ⭐ **Star us on GitHub** • 🐦 **Follow on Twitter** • 💬 **Join Discord**
 
