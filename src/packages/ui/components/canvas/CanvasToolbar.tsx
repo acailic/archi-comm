@@ -510,7 +510,7 @@ interface ToolbarButtonProps {
 function ToolbarButton({
   icon: Icon,
   label,
-  active = false,
+  active,
   onClick,
   tooltip,
   disabled = false,
@@ -519,6 +519,9 @@ function ToolbarButton({
   shortcutBadge,
 }: ToolbarButtonProps) {
   const isPrimary = variant === 'primary';
+  const isActive = Boolean(active);
+  const ariaPressed =
+    typeof active === 'boolean' && !isPrimary ? active : undefined;
 
   return (
     <button
@@ -531,18 +534,18 @@ function ToolbarButton({
         "transition-all duration-200",
         "border-2",
         isPrimary ? primaryAction.base : "w-9 h-9",
-        isPrimary && active && primaryAction.gradient,
+        isPrimary && isActive && primaryAction.gradient,
         isPrimary && primaryAction.hover,
         isPrimary && primaryAction.active,
-        active && !isPrimary
+        isActive && !isPrimary
           ? "bg-blue-500 border-blue-600 text-white shadow-md"
-          : !active && "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400",
-        active && isPrimary && "border-blue-700 text-white shadow-xl",
+          : !isActive && "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400",
+        isActive && isPrimary && "border-blue-700 text-white shadow-xl",
         disabled && "opacity-50 cursor-not-allowed",
         !disabled && "hover:shadow-md",
       )}
       aria-label={label}
-      aria-pressed={active}
+      aria-pressed={ariaPressed}
     >
       <Icon className={cx(isPrimary ? "w-6 h-6" : "w-5 h-5")} />
       {indicator}
