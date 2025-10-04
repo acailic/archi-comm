@@ -6,8 +6,13 @@
  */
 
 import {
+  CheckCircle,
+  Download,
+  FileJson,
   Grid3x3,
   Hand,
+  HelpCircle,
+  Image,
   Layers,
   Link2,
   Magnet,
@@ -19,15 +24,18 @@ import {
   Play,
   RotateCcw,
   Settings,
+  Target,
   Zap,
 } from "lucide-react";
 import { memo, type ReactNode, useCallback, useEffect, useState } from "react";
-import { cx } from "../../../../lib/design/design-system";
+import { cx, primaryAction, sectionDivider, toolbarSectionBg } from "../../../../lib/design/design-system";
+import { openShortcutsModal } from "./KeyboardShortcutsReference";
 import type { CanvasMode } from "../../../../stores/canvasStore";
 import {
   useCanvasActions,
   useCanvasStore,
 } from "../../../../stores/canvasStore";
+import { useAppStore } from "../../../../stores/SimpleAppStore";
 
 /**
  * Quick add toolbar support:
@@ -41,6 +49,12 @@ interface CanvasToolbarProps {
   onFitView?: () => void;
   onAutoLayout?: () => void;
   onToggleSettings?: () => void;
+  onQuickValidate?: () => void;
+  onSelfAssessment?: () => void;
+  onExportJSON?: () => void;
+  onExportPNG?: () => void;
+  onExportWithNotes?: () => void;
+  onShowHelp?: (section?: string) => void;
   className?: string;
 }
 
@@ -51,6 +65,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
   onFitView,
   onAutoLayout,
   onToggleSettings,
+  onQuickValidate,
+  onSelfAssessment,
+  onExportJSON,
+  onExportPNG,
+  onExportWithNotes,
+  onShowHelp,
   className,
 }) => {
   // Get actions from the store - these are stable references
@@ -76,6 +96,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
 
   const [quickAddActive, setQuickAddActive] = useState(false);
   const [showQuickAddHint, setShowQuickAddHint] = useState(false);
+  const [showShortcutsHint, setShowShortcutsHint] = useState(false);
 
   const markQuickAddUsed = useCallback(() => {
     setShowQuickAddHint(false);
@@ -101,6 +122,28 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       }
     } catch {
       setShowQuickAddHint(false);
+    }
+  }, []);
+
+  // Show shortcuts hint on first visit
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    try {
+      const SHORTCUTS_HINT_KEY = "archicomm_shortcuts_hint_dismissed";
+      const dismissed = window.localStorage.getItem(SHORTCUTS_HINT_KEY);
+      if (!dismissed) {
+        setShowShortcutsHint(true);
+        // Auto-dismiss after 5 seconds
+        const timer = setTimeout(() => {
+          setShowShortcutsHint(false);
+          window.localStorage.setItem(SHORTCUTS_HINT_KEY, "1");
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    } catch {
+      setShowShortcutsHint(false);
     }
   }, []);
 
@@ -207,6 +250,13 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
     useCanvasStore.temporal.getState().undo();
   }, []);
 
+  // Session progress indicators
+  const isDesignDone = useAppStore(s => s.completedPhases.has('design'));
+  const isRecordingDone = useAppStore(s => s.completedPhases.has('recording'));
+  const isReviewDone = useAppStore(s => s.completedPhases.has('review'));
+  const skippedRecording = useAppStore(s => s.skippedPhases.has('recording'));
+  const skippedReview = useAppStore(s => s.skippedPhases.has('review'));
+
   return (
     <div
       className={cx(
@@ -215,7 +265,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       )}
     >
       {/* Mode toggles */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
+      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.modes)}>
         <ToolbarButton
           icon={MousePointer2}
           label="Select (V)"
@@ -230,6 +280,8 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
             active={quickAddActive}
             onClick={handleQuickAddClick}
             tooltip="Quick add component - Press / to open"
+            variant="primary"
+            shortcutBadge="/"
             indicator={
               showQuickAddHint ? (
                 <span className="pointer-events-none absolute top-1 right-1 flex h-3 w-3 items-center justify-center">
@@ -246,6 +298,8 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
           active={canvasMode === "quick-connect"}
           onClick={() => setCanvasMode("quick-connect")}
           tooltip="Quick connect - Click source, then target"
+          variant="primary"
+          shortcutBadge="Q"
         />
         <ToolbarButton
           icon={Hand}
@@ -261,10 +315,13 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
           onClick={() => setCanvasMode("annotation")}
           tooltip="Annotation mode - Add notes to canvas"
         />
+        <SectionHelpButton section="Canvas Modes" onShowHelp={onShowHelp} />
       </div>
 
+      <SectionDivider />
+
       {/* View controls */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
+      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.view)}>
         <ToolbarButton
           icon={Grid3x3}
           label="Grid"
@@ -286,10 +343,13 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
           onClick={toggleMinimap}
           tooltip="Toggle minimap"
         />
+        <SectionHelpButton section="View" onShowHelp={onShowHelp} />
       </div>
 
+      <SectionDivider />
+
       {/* Animation controls */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
+      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.animation)}>
         <ToolbarButton
           icon={animationsEnabled ? Play : Pause}
           label="Animations"
@@ -301,8 +361,10 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
         />
       </div>
 
+      <SectionDivider />
+
       {/* Layout actions */}
-      <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
+      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.layout)}>
         <ToolbarButton
           icon={RotateCcw}
           label="Undo"
@@ -321,7 +383,90 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
           onClick={onAutoLayout}
           tooltip="Automatically arrange components"
         />
+        <SectionHelpButton section="Layout" onShowHelp={onShowHelp} />
       </div>
+
+      <SectionDivider />
+
+      {/* Validation & Assessment */}
+      {isDesignCanvas && (
+        <>
+          <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.validation)}>
+            <ToolbarButton
+              icon={Target}
+              label="Quick Validate"
+              onClick={onQuickValidate}
+              tooltip="Quick validation of design"
+            />
+            <ToolbarButton
+              icon={CheckCircle}
+              label="Self-Assessment"
+              onClick={onSelfAssessment}
+              tooltip="Open self-assessment overlay"
+            />
+          </div>
+
+          <SectionDivider />
+        </>
+      )}
+
+      {/* Export Options */}
+      {isDesignCanvas && (
+        <>
+          <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.export)}>
+            <ToolbarButton
+              icon={FileJson}
+              label="Export JSON"
+              onClick={onExportJSON}
+              tooltip="Export design as JSON"
+            />
+            <ToolbarButton
+              icon={Image}
+              label="Export PNG"
+              onClick={onExportPNG}
+              tooltip="Export design as PNG"
+            />
+            <ToolbarButton
+              icon={Download}
+              label="Export with Notes"
+              onClick={onExportWithNotes}
+              tooltip="Export design with annotations"
+            />
+          </div>
+
+          <SectionDivider />
+        </>
+      )}
+
+      {/* Session Progress Indicator */}
+      {isDesignCanvas && (
+        <>
+          <div className="flex items-center gap-1.5 px-2">
+            <span className="text-xs font-medium text-gray-600">Session:</span>
+            <div className="flex items-center gap-1">
+              <SessionPhaseIndicator
+                label="Design"
+                completed={isDesignDone}
+                skipped={false}
+              />
+              <span className="text-gray-400">|</span>
+              <SessionPhaseIndicator
+                label="Recording"
+                completed={isRecordingDone}
+                skipped={skippedRecording}
+              />
+              <span className="text-gray-400">|</span>
+              <SessionPhaseIndicator
+                label="Review"
+                completed={isReviewDone}
+                skipped={skippedReview}
+              />
+            </div>
+          </div>
+
+          <SectionDivider />
+        </>
+      )}
 
       {/* Settings */}
       <div className="flex items-center gap-1">
@@ -332,6 +477,14 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
           tooltip="Canvas settings"
         />
       </div>
+
+      {/* Shortcuts hint */}
+      {showShortcutsHint && (
+        <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2 z-[var(--z-tooltip)]">
+          Press <kbd className="px-1.5 py-0.5 bg-white/20 rounded mx-1">?</kbd> to see all shortcuts
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-600 rotate-45" />
+        </div>
+      )}
     </div>
   );
 };
@@ -346,6 +499,8 @@ interface ToolbarButtonProps {
   tooltip?: string;
   disabled?: boolean;
   indicator?: ReactNode;
+  variant?: 'default' | 'primary';
+  shortcutBadge?: string;
 }
 
 function ToolbarButton({
@@ -356,7 +511,11 @@ function ToolbarButton({
   tooltip,
   disabled = false,
   indicator,
+  variant = 'default',
+  shortcutBadge,
 }: ToolbarButtonProps) {
+  const isPrimary = variant === 'primary';
+
   return (
     <button
       onClick={onClick}
@@ -364,20 +523,32 @@ function ToolbarButton({
       title={tooltip}
       className={cx(
         "relative group flex items-center justify-center",
-        "w-9 h-9 rounded-md",
+        "rounded-md",
         "transition-all duration-200",
         "border-2",
-        active
+        isPrimary ? primaryAction.base : "w-9 h-9",
+        isPrimary && active && primaryAction.gradient,
+        isPrimary && primaryAction.hover,
+        isPrimary && primaryAction.active,
+        active && !isPrimary
           ? "bg-blue-500 border-blue-600 text-white shadow-md"
-          : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400",
+          : !active && "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400",
+        active && isPrimary && "border-blue-700 text-white shadow-xl",
         disabled && "opacity-50 cursor-not-allowed",
         !disabled && "hover:shadow-md",
       )}
       aria-label={label}
       aria-pressed={active}
     >
-      <Icon className="w-5 h-5" />
+      <Icon className={cx(isPrimary ? "w-6 h-6" : "w-5 h-5")} />
       {indicator}
+
+      {/* Keyboard shortcut badge */}
+      {shortcutBadge && (
+        <span className="absolute -bottom-1 -right-1 px-1 py-0.5 text-[9px] font-bold bg-white/90 text-blue-600 border border-blue-200 rounded shadow-sm">
+          {shortcutBadge}
+        </span>
+      )}
 
       {/* Tooltip on hover */}
       {tooltip && (
@@ -396,5 +567,79 @@ function ToolbarButton({
         </div>
       )}
     </button>
+  );
+}
+
+/**
+ * Section divider component for visual separation
+ */
+function SectionDivider() {
+  return <div className={sectionDivider} aria-hidden="true" />;
+}
+
+/**
+ * Section help button component
+ */
+interface SectionHelpButtonProps {
+  section: string;
+  onShowHelp?: (section: string) => void;
+}
+
+function SectionHelpButton({ section, onShowHelp }: SectionHelpButtonProps) {
+  const handleClick = useCallback(() => {
+    if (onShowHelp) {
+      onShowHelp(section);
+    } else {
+      openShortcutsModal(section);
+    }
+  }, [section, onShowHelp]);
+
+  return (
+    <button
+      onClick={handleClick}
+      className={cx(
+        "w-6 h-6 rounded-full flex items-center justify-center",
+        "text-gray-400 hover:text-blue-600 hover:bg-blue-50",
+        "transition-colors duration-200"
+      )}
+      title={`Help for ${section}`}
+      aria-label={`Show help for ${section}`}
+    >
+      <HelpCircle className="w-4 h-4" />
+    </button>
+  );
+}
+
+/**
+ * Session phase indicator component
+ * Shows the completion status of each phase in the session
+ */
+interface SessionPhaseIndicatorProps {
+  label: string;
+  completed: boolean;
+  skipped: boolean;
+}
+
+function SessionPhaseIndicator({ label, completed, skipped }: SessionPhaseIndicatorProps) {
+  return (
+    <div
+      className={cx(
+        "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium",
+        completed && "bg-green-100 text-green-800",
+        skipped && "bg-gray-200 text-gray-600 line-through",
+        !completed && !skipped && "bg-gray-100 text-gray-500"
+      )}
+      title={
+        completed
+          ? `${label} completed`
+          : skipped
+          ? `${label} skipped`
+          : `${label} not started`
+      }
+    >
+      {completed && <CheckCircle className="w-3 h-3" />}
+      {skipped && <span className="w-3 h-3 flex items-center justify-center">−</span>}
+      <span>{label}</span>
+    </div>
   );
 }

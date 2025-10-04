@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Clock, Database, PlayCircle, Search, Target, TrendingUp } from 'lucide-react';
+import { ArrowRight, Clock, Database, PlayCircle, Search, Settings, Target, TrendingUp } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useGuardedState } from '@/lib/performance/useGuardedState';
 import type { ExtendedChallenge } from '@/lib/config/challenge-config';
@@ -36,6 +36,7 @@ interface ChallengeSelectionProps {
   onChallengeSelect: (challenge: Challenge) => void;
   availableChallenges?: Challenge[];
   onNavigateToPro?: () => void;
+  onNavigateToConfig?: () => void;
 }
 
 // Load challenges dynamically from challenge manager
@@ -56,6 +57,7 @@ const categoryIcons = {
 export function ChallengeSelection({
   onChallengeSelect,
   availableChallenges,
+  onNavigateToConfig,
 }: ChallengeSelectionProps) {
   // Using guarded state for filtering and selection state with higher limits for dynamic loading
   const [searchQuery, setSearchQuery] = useGuardedState('', {
@@ -315,8 +317,8 @@ export function ChallengeSelection({
             >
               <div className='text-sm text-muted-foreground mb-1'>Available Challenges</div>
               <div className='text-3xl font-bold text-primary'>{allChallenges.length}</div>
-              {isTauriEnvironment() && (
-                <div className='mt-3'>
+              <div className='mt-3 flex gap-2 justify-end'>
+                {isTauriEnvironment() && (
                   <Button
                     size='sm'
                     variant='outline'
@@ -342,8 +344,19 @@ export function ChallengeSelection({
                   >
                     Import Challenge
                   </Button>
-                </div>
-              )}
+                )}
+                {onNavigateToConfig && (
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    onClick={onNavigateToConfig}
+                    className='gap-2'
+                  >
+                    <Settings className='w-4 h-4' />
+                    Settings
+                  </Button>
+                )}
+              </div>
             </motion.div>
           </div>
 

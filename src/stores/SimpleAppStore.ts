@@ -19,6 +19,11 @@ export interface AppState {
   phase: "challenge-selection" | "design" | "recording" | "review";
   availableChallenges: Challenge[];
 
+  // Optional phase tracking
+  completedPhases: Set<'design' | 'recording' | 'review'>;
+  skippedPhases: Set<'recording' | 'review'>;
+  sessionMode: 'full' | 'design-only' | 'design-and-review' | 'design-and-recording';
+
   // UI state
   showCommandPalette: boolean;
   currentScreen: string;
@@ -46,6 +51,15 @@ export interface AppActions {
   nextPhase: () => void;
   previousPhase: () => void;
   resetToChallenge: () => void;
+
+  // Optional phase tracking
+  markPhaseCompleted: (phase: 'design' | 'recording' | 'review') => void;
+  markPhaseSkipped: (phase: 'recording' | 'review') => void;
+  setSessionMode: (mode: 'full' | 'design-only' | 'design-and-review' | 'design-and-recording') => void;
+  finishSession: () => void;
+  isPhaseCompleted: (phase: 'design' | 'recording' | 'review') => boolean;
+  isPhaseSkipped: (phase: 'recording' | 'review') => boolean;
+  canSkipToReview: () => boolean;
 
   // UI actions
   setShowCommandPalette: (show: boolean) => void;
@@ -75,6 +89,9 @@ const initialState: AppState = {
   audioData: null,
   phase: "challenge-selection",
   availableChallenges: [],
+  completedPhases: new Set(),
+  skippedPhases: new Set(),
+  sessionMode: 'full',
   showCommandPalette: false,
   currentScreen: "challenge-selection",
   showDevScenarios: false,
@@ -177,7 +194,46 @@ export const useAppStore = create<AppStore>()(
             designData: null,
             audioData: null,
             error: null,
+            completedPhases: new Set(),
+            skippedPhases: new Set(),
+            sessionMode: 'full',
           }),
+
+        // Optional phase tracking
+        markPhaseCompleted: (phase) => {
+          const newCompleted = new Set(get().completedPhases);
+          newCompleted.add(phase);
+          coordinatedSet({ completedPhases: newCompleted });
+        },
+
+        markPhaseSkipped: (phase) => {
+          const newSkipped = new Set(get().skippedPhases);
+          newSkipped.add(phase);
+          coordinatedSet({ skippedPhases: newSkipped });
+        },
+
+        setSessionMode: (mode) => coordinatedSet({ sessionMode: mode }),
+
+        finishSession: () => {
+          coordinatedSet({
+            phase: "challenge-selection",
+            selectedChallenge: null,
+            designData: null,
+            audioData: null,
+            completedPhases: new Set(),
+            skippedPhases: new Set(),
+            sessionMode: 'full',
+          });
+        },
+
+        isPhaseCompleted: (phase) => get().completedPhases.has(phase),
+
+        isPhaseSkipped: (phase) => get().skippedPhases.has(phase),
+
+        canSkipToReview: () => {
+          const state = get();
+          return state.completedPhases.has('design') || !!state.designData?.components?.length;
+        },
 
         // UI actions
         setShowCommandPalette: (show) => coordinatedSet({ showCommandPalette: show }),
@@ -211,6 +267,9 @@ export const useAppStore = create<AppStore>()(
           coordinatedSet({
             ...initialState,
             availableChallenges: get().availableChallenges, // Keep loaded challenges
+            completedPhases: new Set(),
+            skippedPhases: new Set(),
+            sessionMode: 'full',
           }),
       };
     },
@@ -223,7 +282,57 @@ export const useAppStore = create<AppStore>()(
         audioData: state.audioData,
         phase: state.phase,
         availableChallenges: state.availableChallenges,
+        // Convert Sets to arrays for persistence
+        completedPhases: Array.from(state.completedPhases),
+        skippedPhases: Array.from(state.skippedPhases),
+        sessionMode: state.sessionMode,
       }),
+      // Custom storage to handle Set serialization
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+          const data = JSON.parse(str);
+          // Convert arrays back to Sets and verify they are instances of Set
+          if (data.state) {
+            if (data.state.completedPhases) {
+              const completedPhases = Array.isArray(data.state.completedPhases)
+                ? new Set(data.state.completedPhases)
+                : new Set();
+              // Verify it's a Set instance
+              if (!(completedPhases instanceof Set)) {
+                console.warn('completedPhases rehydration failed, using empty Set');
+                data.state.completedPhases = new Set();
+              } else {
+                data.state.completedPhases = completedPhases;
+              }
+            } else {
+              data.state.completedPhases = new Set();
+            }
+            if (data.state.skippedPhases) {
+              const skippedPhases = Array.isArray(data.state.skippedPhases)
+                ? new Set(data.state.skippedPhases)
+                : new Set();
+              // Verify it's a Set instance
+              if (!(skippedPhases instanceof Set)) {
+                console.warn('skippedPhases rehydration failed, using empty Set');
+                data.state.skippedPhases = new Set();
+              } else {
+                data.state.skippedPhases = skippedPhases;
+              }
+            } else {
+              data.state.skippedPhases = new Set();
+            }
+          }
+          return data;
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name);
+        },
+      },
     }
   )
 );

@@ -144,6 +144,25 @@ export const componentTypeToRole: Record<string, keyof typeof colorRoles> = {
   'ai-ml': 'secondary',
 };
 
+// Toolbar-specific design tokens
+export const toolbarSectionBg = {
+  modes: 'bg-blue-50/30',
+  view: 'bg-gray-50/30',
+  animation: 'bg-purple-50/30',
+  layout: 'bg-green-50/30',
+  validation: 'bg-amber-50/30',
+  export: 'bg-indigo-50/30',
+} as const;
+
+export const primaryAction = {
+  base: 'w-11 h-11 shadow-lg',
+  gradient: 'bg-gradient-to-br from-blue-500 to-blue-600',
+  hover: 'hover:shadow-xl hover:scale-105',
+  active: 'active:scale-100',
+} as const;
+
+export const sectionDivider = 'w-0.5 h-8 mx-3 bg-gradient-to-b from-transparent via-gray-300 to-transparent' as const;
+
 // Helpers
 export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
@@ -183,6 +202,9 @@ export const designSystem = {
   animations,
   colorRoles,
   componentTypeToRole,
+  toolbarSectionBg,
+  primaryAction,
+  sectionDivider,
   cx,
   getElevation,
   getSize,

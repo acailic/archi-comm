@@ -176,6 +176,111 @@ describe('CanvasToolbar', () => {
     });
   });
 
+  describe('Primary Action Styling', () => {
+    it('should render Quick Add with primary action styling', () => {
+      renderWithAppProviders(<CanvasToolbar />);
+      const quickAddButton = screen.getByRole('button', { name: /quick add/i });
+
+      // Check that button has primary action classes
+      expect(quickAddButton).toHaveClass('w-11', 'h-11', 'shadow-lg');
+    });
+
+    it('should render Quick Connect with primary action styling', () => {
+      renderWithAppProviders(<CanvasToolbar />);
+      const quickConnectButton = screen.getByRole('button', { name: /quick connect/i });
+
+      // Check that button has primary action classes
+      expect(quickConnectButton).toHaveClass('w-11', 'h-11', 'shadow-lg');
+    });
+
+    it('should display keyboard shortcut badges on primary actions', () => {
+      renderWithAppProviders(<CanvasToolbar />);
+      const quickAddButton = screen.getByRole('button', { name: /quick add/i });
+      const quickConnectButton = screen.getByRole('button', { name: /quick connect/i });
+
+      // Check for shortcut badges
+      expect(quickAddButton.querySelector('span')).toHaveTextContent('/');
+      expect(quickConnectButton.querySelector('span')).toHaveTextContent('Q');
+    });
+  });
+
+  describe('Section Help Buttons', () => {
+    const mockOnShowHelp = vi.fn();
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should render help buttons in toolbar sections', () => {
+      renderWithAppProviders(<CanvasToolbar onShowHelp={mockOnShowHelp} />);
+
+      // Look for help buttons by their aria-label pattern
+      const helpButtons = screen.getAllByRole('button', { name: /show help for/i });
+      expect(helpButtons.length).toBeGreaterThan(0);
+    });
+
+    it('should call onShowHelp with section name when help button clicked', () => {
+      renderWithAppProviders(<CanvasToolbar onShowHelp={mockOnShowHelp} />);
+
+      const canvasModesHelp = screen.getByRole('button', { name: /show help for canvas modes/i });
+      fireEvent.click(canvasModesHelp);
+
+      expect(mockOnShowHelp).toHaveBeenCalledWith('Canvas Modes');
+    });
+
+    it('should dispatch custom event when no onShowHelp handler provided', () => {
+      const eventSpy = vi.fn();
+      window.addEventListener('open-keyboard-shortcuts', eventSpy);
+
+      renderWithAppProviders(<CanvasToolbar />);
+      const helpButton = screen.getAllByRole('button', { name: /show help for/i })[0];
+      fireEvent.click(helpButton);
+
+      expect(eventSpy).toHaveBeenCalled();
+
+      window.removeEventListener('open-keyboard-shortcuts', eventSpy);
+    });
+  });
+
+  describe('Keyboard Shortcuts Hint', () => {
+    beforeEach(() => {
+      // Clear localStorage before each test
+      localStorage.clear();
+    });
+
+    it('should show shortcuts hint on first visit', () => {
+      renderWithAppProviders(<CanvasToolbar />);
+
+      // Check for hint text
+      expect(screen.getByText(/press/i)).toBeInTheDocument();
+      expect(screen.getByText(/to see all shortcuts/i)).toBeInTheDocument();
+    });
+
+    it('should auto-dismiss shortcuts hint after timeout', async () => {
+      vi.useFakeTimers();
+      renderWithAppProviders(<CanvasToolbar />);
+
+      expect(screen.getByText(/to see all shortcuts/i)).toBeInTheDocument();
+
+      // Fast-forward 5 seconds
+      vi.advanceTimersByTime(5000);
+
+      await vi.waitFor(() => {
+        expect(screen.queryByText(/to see all shortcuts/i)).not.toBeInTheDocument();
+      });
+
+      vi.useRealTimers();
+    });
+
+    it('should not show hint if previously dismissed', () => {
+      localStorage.setItem('archicomm_shortcuts_hint_dismissed', '1');
+
+      renderWithAppProviders(<CanvasToolbar />);
+
+      expect(screen.queryByText(/to see all shortcuts/i)).not.toBeInTheDocument();
+    });
+  });
+
   describe('Accessibility', () => {
     const accessibilityScenarios: Array<{ label: RegExp; aria: string; title?: string }> = [
       { label: /select/i, aria: 'Select (V)', title: 'Select mode - Click to select components' },

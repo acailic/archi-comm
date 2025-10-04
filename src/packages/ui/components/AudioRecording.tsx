@@ -1,6 +1,6 @@
 // src/packages/ui/components/AudioRecording.tsx
-// Audio recording component that uses SimpleAudioManager for recording
-// Provides simple recording, playback, and manual transcript editing
+// Audio recording component that uses SimpleAudioManager for recording (now optional)
+// Provides simple recording, playback, manual transcript editing, and skip options
 // RELEVANT FILES: src/packages/audio/SimpleAudioManager.ts, src/shared/contracts/index.ts, src/packages/ui/components/TranscriptEditor.tsx, src/packages/ui/components/ui/button.tsx
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -13,11 +13,20 @@ import {
   FileText,
   AlertTriangle,
   Info,
+  Eye,
+  CheckCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { SimpleAudioManager, type RecordingResult } from '@audio/SimpleAudioManager';
 import { Button } from '@ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@ui/components/ui/card';
 import { Badge } from '@ui/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@ui/components/ui/dropdown-menu';
 import { TranscriptEditor } from './TranscriptEditor';
 import type {
   Challenge,
@@ -41,9 +50,11 @@ interface AudioRecordingProps {
   designData: DesignData;
   onComplete: (data: AudioData) => void;
   onBack: () => void;
+  onSkipReview?: () => void;
+  onBackToCanvas?: () => void;
 }
 
-export function AudioRecording({ challenge, designData, onComplete, onBack }: AudioRecordingProps) {
+export function AudioRecording({ challenge, designData, onComplete, onBack, onSkipReview, onBackToCanvas }: AudioRecordingProps) {
   const log = getLogger('audio-recording');
   const mountedRef = useRef(true);
 
@@ -232,7 +243,7 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
       return;
     }
 
-    // If the user proceeds with neither audio nor transcript, show a small, non-blocking notice
+    // If the user proceeds with neither audio nor transcript, show a small encouraging notice
     if (!audioBlob && !transcript.trim()) {
       setShowNoAudioWarning(true);
       window.setTimeout(() => setShowNoAudioWarning(false), 3500);
@@ -276,6 +287,10 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
               <h1 className='text-lg font-semibold'>Record Your Explanation</h1>
               <p className='text-sm text-muted-foreground'>
                 Explain your system design for {challenge.title}
+              </p>
+              <p className='text-xs text-blue-600 mt-1 flex items-center gap-1'>
+                <Info className='w-3 h-3' />
+                Recording is optional. You can skip to review or return to canvas anytime.
               </p>
             </div>
           </div>
@@ -425,17 +440,49 @@ export function AudioRecording({ challenge, designData, onComplete, onBack }: Au
             </CardContent>
           </Card>
 
-          {/* Continue Button */}
+          {/* Continue Button with split options */}
           <div className='flex justify-end items-center gap-3'>
             {showNoAudioWarning && (
-              <div className='text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded px-2 py-1 flex items-center gap-1'>
-                <AlertTriangle className='w-3 h-3' />
-                Proceeding without audio or transcript
+              <div className='text-xs bg-blue-50 text-blue-800 border border-blue-200 rounded px-2 py-1 flex items-center gap-1'>
+                <Info className='w-3 h-3' />
+                You can add audio or transcript later
               </div>
             )}
-            <Button onClick={handleContinue} size='lg'>
-              Continue to Review
-            </Button>
+            <div className='flex items-center gap-0'>
+              <Button onClick={handleContinue} size='lg' className='rounded-r-none'>
+                <Eye className='w-4 h-4' />
+                Continue to Review
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size='lg'
+                    className='rounded-l-none border-l border-l-primary-foreground/20 px-2'
+                    aria-label='More options'
+                  >
+                    <ChevronDown className='w-4 h-4' />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end' className='w-56'>
+                  <DropdownMenuItem onClick={handleContinue}>
+                    <Eye className='w-4 h-4' />
+                    Continue to Review
+                  </DropdownMenuItem>
+                  {onSkipReview && (
+                    <DropdownMenuItem onClick={onSkipReview}>
+                      <CheckCircle className='w-4 h-4' />
+                      Skip Review & Finish
+                    </DropdownMenuItem>
+                  )}
+                  {onBackToCanvas && (
+                    <DropdownMenuItem onClick={onBackToCanvas}>
+                      <ArrowLeft className='w-4 h-4' />
+                      Back to Canvas
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>

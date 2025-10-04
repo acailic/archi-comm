@@ -8,17 +8,21 @@
 import { getAllShortcuts } from "@/shared/hooks/canvas/useCanvasKeyboardShortcuts";
 import { cn } from "@core/utils";
 import { Keyboard, X } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 
 export interface KeyboardShortcutsReferenceProps {
   isOpen: boolean;
   onClose: () => void;
+  initialSection?: string;
+  highlightShortcuts?: string[];
 }
 
 export const KeyboardShortcutsReference: React.FC<
   KeyboardShortcutsReferenceProps
-> = ({ isOpen, onClose }) => {
+> = ({ isOpen, onClose, initialSection, highlightShortcuts = [] }) => {
   const shortcuts = useMemo(() => getAllShortcuts(), []);
+  const [selectedSection, setSelectedSection] = useState<string | undefined>(initialSection);
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const groupedShortcuts = useMemo(() => {
     const groups: Record<string, typeof shortcuts> = {};
@@ -30,6 +34,17 @@ export const KeyboardShortcutsReference: React.FC<
     });
     return groups;
   }, [shortcuts]);
+
+  // Scroll to section when initialSection changes
+  useEffect(() => {
+    if (initialSection && sectionRefs.current[initialSection]) {
+      sectionRefs.current[initialSection]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+      setSelectedSection(initialSection);
+    }
+  }, [initialSection]);
 
   const quickComponentShortcuts = useMemo(
     () => [
@@ -102,45 +117,86 @@ export const KeyboardShortcutsReference: React.FC<
           </div>
         </div>
 
+        {/* Section Tabs */}
+        <div className="sticky top-[73px] z-[var(--z-sidebar)] bg-gray-50 border-b border-gray-200 px-6 py-2 overflow-x-auto">
+          <div className="flex gap-2">
+            {Object.keys(groupedShortcuts).map((category) => (
+              <button
+                key={category}
+                onClick={() => {
+                  sectionRefs.current[category]?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  });
+                  setSelectedSection(category);
+                }}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors",
+                  selectedSection === category
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-white text-gray-600 hover:bg-gray-100"
+                )}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6">
+        <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {Object.entries(groupedShortcuts).map(
               ([category, categoryShortcuts]) => (
-                <div key={category} className="space-y-3">
+                <div
+                  key={category}
+                  className="space-y-3"
+                  ref={(el) => { sectionRefs.current[category] = el; }}
+                >
                   <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide border-b border-gray-200 pb-2">
                     {category}
                   </h3>
                   <div className="space-y-2">
-                    {categoryShortcuts.map((shortcut, index) => (
-                      <div
-                        key={`${shortcut.action}-${index}`}
-                        className="flex items-center justify-between gap-4"
-                      >
-                        <span className="text-sm text-gray-700">
-                          {shortcut.description}
-                        </span>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {shortcut.keys.split("+").map((key, i, arr) => (
-                            <React.Fragment key={i}>
-                              <kbd
-                                className={cn(
-                                  "px-2 py-1 min-w-[2rem] text-center",
-                                  "text-xs font-mono font-semibold",
-                                  "bg-gray-100 border border-gray-300 rounded",
-                                  "shadow-sm",
+                    {categoryShortcuts.map((shortcut, index) => {
+                      const isHighlighted = highlightShortcuts.includes(shortcut.action);
+                      return (
+                        <div
+                          key={`${shortcut.action}-${index}`}
+                          className={cn(
+                            "flex items-center justify-between gap-4 rounded p-2",
+                            isHighlighted && "bg-amber-50 border border-amber-200"
+                          )}
+                        >
+                          <span className="text-sm text-gray-700">
+                            {shortcut.description}
+                            {isHighlighted && (
+                              <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-200 text-amber-900 rounded">
+                                Featured
+                              </span>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {shortcut.keys.split("+").map((key, i, arr) => (
+                              <React.Fragment key={i}>
+                                <kbd
+                                  className={cn(
+                                    "px-2 py-1 min-w-[2rem] text-center",
+                                    "text-xs font-mono font-semibold",
+                                    "bg-gray-100 border border-gray-300 rounded",
+                                    "shadow-sm",
+                                  )}
+                                >
+                                  {key}
+                                </kbd>
+                                {i < arr.length - 1 && (
+                                  <span className="text-gray-400 text-xs">+</span>
                                 )}
-                              >
-                                {key}
-                              </kbd>
-                              {i < arr.length - 1 && (
-                                <span className="text-gray-400 text-xs">+</span>
-                              )}
-                            </React.Fragment>
-                          ))}
+                              </React.Fragment>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {category === "Connections" && (
                     <div className="mt-3 rounded-md border border-blue-100 bg-blue-50/60 px-3 py-3 text-xs text-blue-900 shadow-sm">
@@ -318,6 +374,17 @@ export const KeyboardShortcutsReference: React.FC<
         </div>
       </div>
     </div>
+  );
+};
+
+// Helper function to open shortcuts modal with optional section
+export const openShortcutsModal = (section?: string) => {
+  if (typeof window === 'undefined') return;
+
+  window.dispatchEvent(
+    new CustomEvent('open-keyboard-shortcuts', {
+      detail: { section },
+    })
   );
 };
 

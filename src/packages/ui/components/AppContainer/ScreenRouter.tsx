@@ -36,6 +36,12 @@ interface ScreenRouterProps {
   onWelcomeComplete: () => void;
   onInfiniteLoopReset: () => void;
   onRequestRecovery: () => void;
+  onNavigateToConfig?: () => void;
+  onSkipToReview?: () => void;
+  onFinishAndExport?: () => void;
+  onSkipReview?: () => void;
+  onFinishSession?: () => void;
+  onBackToCanvas?: () => void;
 }
 
 export function ScreenRouter({
@@ -59,6 +65,12 @@ export function ScreenRouter({
   onWelcomeComplete,
   onInfiniteLoopReset,
   onRequestRecovery,
+  onNavigateToConfig,
+  onSkipToReview,
+  onFinishAndExport,
+  onSkipReview,
+  onFinishSession,
+  onBackToCanvas,
 }: ScreenRouterProps) {
   // Development-only scenario viewer
   if (isDevelopment() && showDevScenarios) {
@@ -75,30 +87,38 @@ export function ScreenRouter({
       <ChallengeSelection
         availableChallenges={availableChallenges}
         onChallengeSelect={onChallengeSelect}
+        onNavigateToConfig={onNavigateToConfig}
       />
     );
   }
 
-  if (phase === "audio-recording") {
+  if (phase === "recording") {
     return (
       <AudioRecording
         challenge={selectedChallenge}
         designData={designData}
         onComplete={onAudioComplete}
         onBack={onBackFromAudio}
+        onSkipReview={onSkipReview}
+        onBackToCanvas={onBackToCanvas}
       />
     );
   }
 
-  if (phase === "review" && audioData) {
+  // Users can skip recording and go directly to review
+  // Review phase now handles cases where audioData might be null (recording was skipped)
+  if (phase === "review") {
+    const skipRecording = !audioData || !audioData.blob;
     return (
       <ReviewScreen
         challenge={selectedChallenge}
         designData={designData}
-        audioData={audioData}
+        audioData={audioData || { blob: null, transcript: '', duration: 0, wordCount: 0, businessValueTags: [], analysisMetrics: { clarityScore: 0, technicalDepth: 0, businessFocus: 0 } }}
         onStartOver={onStartOver}
         onBackToDesign={onBackToDesign}
         onBackToAudio={onBackToAudio}
+        onFinishSession={onFinishSession}
+        skipRecording={skipRecording}
       />
     );
   }
@@ -132,6 +152,8 @@ export function ScreenRouter({
         initialData={memoizedDesignData}
         onComplete={onComplete}
         onBack={onBackToSelection}
+        onSkipToReview={onSkipToReview}
+        onFinishAndExport={onFinishAndExport}
       />
     </InfiniteLoopErrorBoundary>
   );

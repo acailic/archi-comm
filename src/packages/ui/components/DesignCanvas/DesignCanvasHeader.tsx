@@ -5,9 +5,15 @@
 
 import { ImportExportDropdown } from '@ui/components/ImportExportDropdown';
 import { Button } from '@ui/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@ui/components/ui/dropdown-menu';
 import type { CanvasConfig } from '@/lib/import-export/types';
 import type { Challenge, DesignData } from '@/shared/contracts';
-import { ArrowLeft, Lightbulb, Save, Search, Settings as SettingsIcon, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Save, Search, Settings as SettingsIcon, MessageSquare, Mic, Eye, Download, ChevronDown } from 'lucide-react';
 
 
 interface DesignCanvasHeaderProps {
@@ -25,6 +31,8 @@ interface DesignCanvasHeaderProps {
   showAnnotationSidebar?: boolean;
   onToggleAnnotationSidebar?: () => void;
   annotationCount?: number;
+  onSkipToReview?: () => void;
+  onFinishAndExport?: () => void;
 }
 
 export function DesignCanvasHeader({
@@ -42,7 +50,10 @@ export function DesignCanvasHeader({
   showAnnotationSidebar,
   onToggleAnnotationSidebar,
   annotationCount = 0,
+  onSkipToReview,
+  onFinishAndExport,
 }: DesignCanvasHeaderProps) {
+  const isDisabled = components.length === 0;
   return (
     <div className='border-b bg-card/50 backdrop-blur-sm p-4'>
       <div className='flex items-center justify-between'>
@@ -133,9 +144,42 @@ export function DesignCanvasHeader({
             <SettingsIcon className='w-4 h-4' />
           </Button>
 
-          <Button onClick={onContinue} disabled={components.length === 0}>
-            Continue to Recording
-          </Button>
+          {/* Split button with multiple continuation options */}
+          <div className='flex items-center gap-0'>
+            <Button onClick={onContinue} disabled={isDisabled} className='rounded-r-none'>
+              <Mic className='w-4 h-4' />
+              Continue to Recording
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={isDisabled}
+                  className='rounded-l-none border-l border-l-primary-foreground/20 px-2'
+                  aria-label='More continuation options'
+                >
+                  <ChevronDown className='w-4 h-4' />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end' className='w-56'>
+                <DropdownMenuItem onClick={onContinue} disabled={isDisabled}>
+                  <Mic className='w-4 h-4' />
+                  Record Explanation
+                </DropdownMenuItem>
+                {onSkipToReview && (
+                  <DropdownMenuItem onClick={onSkipToReview} disabled={isDisabled}>
+                    <Eye className='w-4 h-4' />
+                    Skip to Review
+                  </DropdownMenuItem>
+                )}
+                {onFinishAndExport && (
+                  <DropdownMenuItem onClick={onFinishAndExport} disabled={isDisabled}>
+                    <Download className='w-4 h-4' />
+                    Finish & Export
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
     </div>

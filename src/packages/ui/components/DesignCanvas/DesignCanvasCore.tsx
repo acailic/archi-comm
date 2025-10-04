@@ -40,6 +40,9 @@ import { QuickConnectOverlay } from "../canvas/QuickConnectOverlay";
 import { CanvasOnboardingTour } from "../canvas/CanvasOnboardingTour";
 import { CanvasContextualHelp } from "../canvas/CanvasContextualHelp";
 import { ConnectionTemplatePanel } from "../canvas/ConnectionTemplatePanel";
+import { QuickValidationPanel } from "../canvas/QuickValidationPanel";
+import { CanvasSelfAssessment } from "../canvas/CanvasSelfAssessment";
+import { KeyboardShortcutsReference } from "../canvas/KeyboardShortcutsReference";
 import type { Annotation } from "../../../../shared/contracts";
 import { useQuickConnect } from "../../../canvas/hooks/useQuickConnect";
 import {
@@ -54,6 +57,8 @@ export interface DesignCanvasProps {
   initialData: DesignData;
   onComplete: (data: DesignData) => void;
   onBack: () => void;
+  onSkipToReview?: () => void;
+  onFinishAndExport?: () => void;
 }
 
 const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
@@ -61,6 +66,8 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   initialData,
   onComplete,
   onBack,
+  onSkipToReview,
+  onFinishAndExport,
 }) => {
   const [sessionStartTime] = useState(() => new Date());
   const flushDesignDataRef = useRef<
@@ -76,6 +83,14 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   // Connection template state
   const [showTemplatePanel, setShowTemplatePanel] = useState(false);
   const [pendingConnection, setPendingConnection] = useState<{ from: string; to: string } | null>(null);
+
+  // Validation and assessment overlay state
+  const [showValidation, setShowValidation] = useState(false);
+  const [showAssessment, setShowAssessment] = useState(false);
+
+  // Keyboard shortcuts modal state
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [shortcutsInitialSection, setShortcutsInitialSection] = useState<string | undefined>();
 
   // Quick-connect hook
   const quickConnect = useQuickConnect((connection) => {
@@ -214,6 +229,23 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     [onComplete, currentDesignData]
   );
 
+  // Handlers for optional flow
+  const handleSkipToReview = useCallback(() => {
+    if (onSkipToReview) {
+      // Save current design data before skipping
+      onComplete(currentDesignData);
+      onSkipToReview();
+    }
+  }, [onSkipToReview, onComplete, currentDesignData]);
+
+  const handleFinishAndExport = useCallback(() => {
+    if (onFinishAndExport) {
+      // Save current design data before finishing
+      onComplete(currentDesignData);
+      onFinishAndExport();
+    }
+  }, [onFinishAndExport, onComplete, currentDesignData]);
+
   const designCanvasEffects = useDesignCanvasEffects({
     components,
     connections,
@@ -285,7 +317,25 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     onZoomOut: () => {}, // TODO: implement zoom
     onFitView: () => {}, // TODO: implement fit view
     onSetCanvasMode: (mode) => useCanvasStore.getState().setCanvasMode(mode),
+    onHelp: () => {
+      setShortcutsInitialSection(undefined);
+      setShowKeyboardShortcuts(true);
+    },
   });
+
+  // Listen for custom event to open keyboard shortcuts modal
+  useEffect(() => {
+    const handleOpenShortcuts = (event: Event) => {
+      const customEvent = event as CustomEvent<{ section?: string }>;
+      setShortcutsInitialSection(customEvent.detail?.section);
+      setShowKeyboardShortcuts(true);
+    };
+
+    window.addEventListener('open-keyboard-shortcuts', handleOpenShortcuts);
+    return () => {
+      window.removeEventListener('open-keyboard-shortcuts', handleOpenShortcuts);
+    };
+  }, []);
 
   // Annotation callbacks
   const handleAnnotationToolSelect = useCallback((tool: Annotation['type'] | null) => {
@@ -404,6 +454,8 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             showAnnotationSidebar={showAnnotationSidebar}
             onToggleAnnotationSidebar={() => setShowAnnotationSidebar(prev => !prev)}
             annotationCount={annotations.length}
+            onSkipToReview={onSkipToReview ? handleSkipToReview : undefined}
+            onFinishAndExport={onFinishAndExport ? handleFinishAndExport : undefined}
           />
         }
         assignmentPanel={
@@ -426,6 +478,39 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
                 }}
                 onToggleSettings={() => {
                   // TODO: Implement settings panel
+                }}
+                onQuickValidate={() => setShowValidation(true)}
+                onSelfAssessment={() => setShowAssessment(true)}
+                onExportJSON={() => {
+                  handleQuickExport(currentDesignData);
+                }}
+                onExportPNG={() => {
+                  // TODO: Implement PNG export
+                }}
+                onShowHelp={(section) => {
+                  setShortcutsInitialSection(section);
+                  setShowKeyboardShortcuts(true);
+                }}
+                onExportWithNotes={() => {
+                  // Export with annotations and self-assessment
+                  const exportData = {
+                    ...currentDesignData,
+                    annotations: annotations,
+                  };
+
+                  // Try to attach self-assessment if available
+                  try {
+                    const storageKey = `archicomm_self_assessment_${challenge.id}`;
+                    const savedAssessment = localStorage.getItem(storageKey);
+                    if (savedAssessment) {
+                      const assessment = JSON.parse(savedAssessment);
+                      (exportData as any).selfAssessment = assessment;
+                    }
+                  } catch (error) {
+                    console.warn('Failed to attach self-assessment to export:', error);
+                  }
+
+                  handleQuickExport(exportData);
                 }}
               />
             </div>
@@ -518,6 +603,16 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             {/* Contextual Help */}
             <CanvasContextualHelp />
 
+            {/* Keyboard Shortcuts Modal */}
+            <KeyboardShortcutsReference
+              isOpen={showKeyboardShortcuts}
+              onClose={() => {
+                setShowKeyboardShortcuts(false);
+                setShortcutsInitialSection(undefined);
+              }}
+              initialSection={shortcutsInitialSection}
+            />
+
             {/* Connection Template Panel */}
             {showTemplatePanel && pendingConnection && (
               <ConnectionTemplatePanel
@@ -526,6 +621,37 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
                 templates={availableTemplates}
                 onSelectTemplate={handleTemplateSelect}
                 onCancel={handleTemplatePanelCancel}
+              />
+            )}
+
+            {/* Quick Validation Panel */}
+            {showValidation && (
+              <QuickValidationPanel
+                isOpen={showValidation}
+                onClose={() => setShowValidation(false)}
+                designData={currentDesignData}
+                challenge={extendedChallenge}
+                onRunFullReview={() => {
+                  setShowValidation(false);
+                  if (onSkipToReview) {
+                    onComplete(currentDesignData);
+                    onSkipToReview();
+                  }
+                }}
+              />
+            )}
+
+            {/* Self-Assessment Overlay */}
+            {showAssessment && (
+              <CanvasSelfAssessment
+                isOpen={showAssessment}
+                onClose={() => setShowAssessment(false)}
+                challenge={extendedChallenge}
+                designData={currentDesignData}
+                onComplete={(assessment) => {
+                  // Assessment is saved to localStorage by the component
+                  console.log('Self-assessment completed:', assessment);
+                }}
               />
             )}
           </>

@@ -9,6 +9,54 @@ import { getBoxToBoxArrow } from 'perfect-arrows';
 import type { Connection, DesignComponent } from '@/shared/contracts';
 import type { ConnectionPoint, Point } from '@core/types';
 
+const DEFAULT_COMPONENT_WIDTH = 220;
+const DEFAULT_COMPONENT_HEIGHT = 140;
+
+type HandleKey = 'top' | 'right' | 'bottom' | 'left';
+type ConnectionPointMap = Record<HandleKey, ConnectionPoint>;
+
+function resolveDimension(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function resolveComponentDimensions(component: DesignComponent): {
+  width: number;
+  height: number;
+} {
+  const properties = component.properties as Record<string, unknown> | undefined;
+  const width = resolveDimension(
+    (properties as any)?.width ??
+      (properties as { dimensions?: { width?: number | string } })?.dimensions?.width ??
+      (properties as { size?: { width?: number | string } })?.size?.width,
+    DEFAULT_COMPONENT_WIDTH
+  );
+  const height = resolveDimension(
+    (properties as any)?.height ??
+      (properties as { dimensions?: { height?: number | string } })?.dimensions?.height ??
+      (properties as { size?: { height?: number | string } })?.size?.height,
+    DEFAULT_COMPONENT_HEIGHT
+  );
+
+  return { width, height };
+}
+
+function getComponentCenter(component: DesignComponent): Point {
+  const { width, height } = resolveComponentDimensions(component);
+  return {
+    x: component.x + width / 2,
+    y: component.y + height / 2,
+  };
+}
+
 export interface ConnectionEndpoints {
   from: Point;
   to: Point;
@@ -17,15 +65,14 @@ export interface ConnectionEndpoints {
 /**
  * Calculate the connection points on a component's edges
  */
-export function calculateConnectionPoints(component: DesignComponent): Record<string, ConnectionPoint> {
-  const width = 220; // Default component width
-  const height = 140; // Default component height
+export function calculateConnectionPoints(component: DesignComponent): ConnectionPointMap {
+  const { width, height } = resolveComponentDimensions(component);
 
   return {
     top: { x: component.x + width / 2, y: component.y },
     right: { x: component.x + width, y: component.y + height / 2 },
     bottom: { x: component.x + width / 2, y: component.y + height },
-    left: { x: component.x, y: component.y + height / 2 }
+    left: { x: component.x, y: component.y + height / 2 },
   };
 }
 
@@ -85,11 +132,44 @@ function getConnectionEndpoints(connection: Connection, components: DesignCompon
 
   const fromPoints = calculateConnectionPoints(fromComponent);
   const toPoints = calculateConnectionPoints(toComponent);
+  const fromCenter = getComponentCenter(fromComponent);
+  const toCenter = getComponentCenter(toComponent);
 
-  // Default to connecting bottom-to-top
+  const dx = toCenter.x - fromCenter.x;
+  const dy = toCenter.y - fromCenter.y;
+
+  const preferHorizontal = Math.abs(dx) >= Math.abs(dy);
+
+  const fromHandle: HandleKey = preferHorizontal
+    ? dx >= 0
+      ? 'right'
+      : 'left'
+    : dy >= 0
+      ? 'bottom'
+      : 'top';
+
+  const toHandle: HandleKey = preferHorizontal
+    ? dx >= 0
+      ? 'left'
+      : 'right'
+    : dy >= 0
+      ? 'top'
+      : 'bottom';
+
+  const selectedFrom = fromPoints[fromHandle];
+  const selectedTo = toPoints[toHandle];
+
+  if (selectedFrom && selectedTo) {
+    return {
+      from: selectedFrom,
+      to: selectedTo,
+    };
+  }
+
+  // Fallback to default bottom-to-top if for some reason the handles are missing
   return {
     from: fromPoints.bottom,
-    to: toPoints.top
+    to: toPoints.top,
   };
 }
 

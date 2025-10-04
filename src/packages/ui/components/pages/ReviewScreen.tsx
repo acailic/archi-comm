@@ -18,6 +18,10 @@ import {
   Eye,
   Layers,
   GitBranch,
+  X,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useAIReview } from '@hooks/useAIReview';
 import { compareTranscripts } from '@/lib/analysis/transcript-comparison';
@@ -26,20 +30,29 @@ import { Button } from '@ui/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@ui/components/ui/card';
 import { Badge } from '@ui/components/ui/badge';
 import { Progress } from '@ui/components/ui/progress';
+import { Alert, AlertDescription } from '@ui/components/ui/alert';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@ui/components/ui/collapsible';
 import { SidebarProvider } from '@ui/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/components/ui/tooltip';
 import { CanvasComponent } from '@ui/components/canvas/CanvasComponent';
 import { SolutionValidationCard } from '@ui/components/SolutionValidationCard';
-import type { DesignData, AudioData, TranscriptFeedback } from '@/shared/contracts';
+import type { DesignData, AudioData, TranscriptFeedback, Challenge } from '@/shared/contracts';
 import type { ExtendedChallenge } from '@/lib/config/challenge-config';
 
 interface ReviewScreenProps {
-  challenge: ExtendedChallenge;
+  challenge: Challenge | ExtendedChallenge;
   designData: DesignData;
   audioData: AudioData;
   onStartOver: () => void;
   onBackToDesign: () => void;
   onBackToAudio: () => void;
+  onFinishSession?: () => void;
+  skipRecording?: boolean;
+  skipReview?: boolean;
 }
 
 export function ReviewScreen({
@@ -49,10 +62,17 @@ export function ReviewScreen({
   onStartOver,
   onBackToDesign,
   onBackToAudio,
+  onFinishSession,
+  skipRecording = false,
+  skipReview = false,
 }: ReviewScreenProps) {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [reviewMode, setReviewMode] = useState<'overview' | 'detailed'>('overview');
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [showOptionalBanner, setShowOptionalBanner] = useState(true);
+  // Collapse AI Review and detailed panel when skipReview is true
+  const [isAIReviewExpanded, setIsAIReviewExpanded] = useState(!skipReview);
+  const [isDetailedPanelExpanded, setIsDetailedPanelExpanded] = useState(!skipReview);
 
   // Design validation hook
   const { validationResult, isValidationAvailable, hasTemplate } = useDesignValidation({
@@ -111,7 +131,7 @@ export function ReviewScreen({
 
   // Transcript comparison analysis
   const transcriptFeedback: TranscriptFeedback | null = useMemo(() => {
-    if (!challenge.referenceTranscript || !challenge.keyConcepts) {
+    if (!('referenceTranscript' in challenge) || !challenge.referenceTranscript || !challenge.keyConcepts) {
       return null;
     }
     return compareTranscripts(audioData.transcript, challenge);
@@ -241,22 +261,31 @@ export function ReviewScreen({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className='flex flex-row items-center justify-between space-y-0'>
-              <CardTitle>AI Review</CardTitle>
-              <div className='flex items-center gap-2'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  disabled={aiLoading}
-                  onClick={() => requestAIReview(challenge.id, solutionText)}
-                >
-                  {aiLoading ? 'Reviewing…' : 'Request Review'}
-                </Button>
-                {aiResult && <Button variant='ghost' size='sm' onClick={resetAI}>Clear</Button>}
-              </div>
-            </CardHeader>
-            <CardContent>
+          <Collapsible open={isAIReviewExpanded} onOpenChange={setIsAIReviewExpanded}>
+            <Card>
+              <CardHeader className='flex flex-row items-center justify-between space-y-0'>
+                <CardTitle className='flex items-center gap-2'>
+                  AI Review (Optional)
+                  <CollapsibleTrigger asChild>
+                    <Button variant='ghost' size='sm' className='h-6 w-6 p-0'>
+                      {isAIReviewExpanded ? <ChevronUp className='h-4 w-4' /> : <ChevronDown className='h-4 w-4' />}
+                    </Button>
+                  </CollapsibleTrigger>
+                </CardTitle>
+                <div className='flex items-center gap-2'>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    disabled={aiLoading}
+                    onClick={() => requestAIReview(challenge.id, solutionText)}
+                  >
+                    {aiLoading ? 'Reviewing…' : 'Request Review'}
+                  </Button>
+                  {aiResult && <Button variant='ghost' size='sm' onClick={resetAI}>Clear</Button>}
+                </div>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent>
               {aiError && (
                 <div className='text-sm text-red-600 mb-2'>
                   {aiError}{' '}
@@ -366,14 +395,16 @@ export function ReviewScreen({
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
           {/* Solution Validation Card */}
-          {hasTemplate && validationResult && (
+          {hasTemplate && validationResult && 'architectureTemplate' in challenge && challenge.architectureTemplate && (
             <SolutionValidationCard
               validationResult={validationResult}
-              template={challenge.architectureTemplate!}
+              template={challenge.architectureTemplate}
             />
           )}
 
@@ -489,7 +520,26 @@ export function ReviewScreen({
   return (
     <SidebarProvider>
       <div className='h-full flex flex-col'>
-        
+        {/* Optional review banner */}
+        {showOptionalBanner && (
+          <Alert className='rounded-none border-x-0 border-t-0 bg-blue-50'>
+            <Info className='h-4 w-4 text-blue-600' />
+            <AlertDescription className='flex items-center justify-between'>
+              <span className='text-blue-800'>
+                Review is optional. You can export your work and finish anytime.
+              </span>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={() => setShowOptionalBanner(false)}
+                className='h-6 w-6 p-0'
+              >
+                <X className='h-4 w-4' />
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className='border-b bg-card p-4'>
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-3'>
@@ -790,17 +840,31 @@ export function ReviewScreen({
                 <ArrowLeft className='w-4 h-4 mr-2' />
                 Back to Design
               </Button>
-              <Button variant='outline' onClick={onBackToAudio}>
-                <ArrowLeft className='w-4 h-4 mr-2' />
-                Back to Recording
-              </Button>
+              {!skipRecording && (
+                <Button variant='outline' onClick={onBackToAudio}>
+                  <ArrowLeft className='w-4 h-4 mr-2' />
+                  Back to Recording
+                </Button>
+              )}
+              {skipRecording && (
+                <div className='text-sm text-muted-foreground flex items-center gap-2 px-3'>
+                  <Info className='w-4 h-4' />
+                  No recording was made for this session.
+                </div>
+              )}
             </div>
-            
+
             <div className='flex gap-2'>
               <Button variant='outline' onClick={handleExport}>
                 <Download className='w-4 h-4 mr-2' />
                 Export Session
               </Button>
+              {onFinishSession && (
+                <Button variant='outline' onClick={onFinishSession}>
+                  <CheckCircle className='w-4 h-4 mr-2' />
+                  Finish Session
+                </Button>
+              )}
               <Button onClick={onStartOver}>
                 <TrendingUp className='w-4 h-4 mr-2' />
                 Try Another Challenge

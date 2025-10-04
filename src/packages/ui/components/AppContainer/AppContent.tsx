@@ -25,6 +25,9 @@ export function AppContent() {
     audioData: null,
     phase: "challenge-selection",
     availableChallenges: [],
+    completedPhases: new Set(),
+    skippedPhases: new Set(),
+    sessionMode: 'full',
     showCommandPalette: false,
     currentScreen: "challenge-selection",
     showDevScenarios: false,
@@ -133,6 +136,10 @@ export function AppContent() {
     setPhase("challenge-selection");
   }, [setCurrentScreen, setPhase]);
 
+  const handleNavigateToConfig = useCallback(() => {
+    setCurrentScreen("config");
+  }, [setCurrentScreen]);
+
   const handleBackToSelection = useCallback(() => {
     setSelectedChallenge(null);
     setCurrentScreen("challenge-selection");
@@ -143,6 +150,73 @@ export function AppContent() {
     () => setShowWelcome(false),
     [setShowWelcome]
   );
+
+  // New handlers for optional flow
+  const handleSkipToReview = useCallback(() => {
+    const store = useAppStore.getState();
+    // Mark design as completed and recording as skipped
+    store.markPhaseCompleted('design');
+    store.markPhaseSkipped('recording');
+    store.setSessionMode('design-and-review');
+    // Create empty audio data
+    const emptyAudioData: AudioData = {
+      blob: null,
+      transcript: '',
+      duration: 0,
+      wordCount: 0,
+      businessValueTags: [],
+      analysisMetrics: { clarityScore: 0, technicalDepth: 0, businessFocus: 0 },
+    };
+    setAudioData(emptyAudioData);
+    setPhase('review');
+    setCurrentScreen('review');
+  }, [setAudioData, setPhase, setCurrentScreen]);
+
+  const handleFinishAndExport = useCallback(() => {
+    const store = useAppStore.getState();
+    // Mark design as completed
+    store.markPhaseCompleted('design');
+    store.markPhaseSkipped('recording');
+    store.markPhaseSkipped('review');
+    store.setSessionMode('design-only');
+    // Export design data
+    if (designData) {
+      const exportData = {
+        challenge: selectedChallenge?.title || 'Unknown',
+        design: designData,
+        timestamp: new Date().toISOString(),
+      };
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `archicomm-design-${selectedChallenge?.id || 'unknown'}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+    // Return to challenge selection
+    store.finishSession();
+  }, [designData, selectedChallenge]);
+
+  const handleSkipReview = useCallback(() => {
+    const store = useAppStore.getState();
+    store.markPhaseCompleted('recording');
+    store.markPhaseSkipped('review');
+    store.setSessionMode('design-and-recording');
+    store.finishSession();
+  }, []);
+
+  const handleFinishSession = useCallback(() => {
+    const store = useAppStore.getState();
+    store.markPhaseCompleted('review');
+    store.finishSession();
+  }, []);
+
+  const handleBackToCanvas = useCallback(() => {
+    setCurrentScreen('design-canvas');
+    setPhase('design');
+  }, [setCurrentScreen, setPhase]);
 
   // Group navigation handlers into a stable object
   const navigation = useMemo(
@@ -157,8 +231,14 @@ export function AppContent() {
       handleBackToDesign,
       handleBackToAudio,
       handleConfigBack,
+      handleNavigateToConfig,
       handleBackToSelection,
       handleWelcomeComplete,
+      handleSkipToReview,
+      handleFinishAndExport,
+      handleSkipReview,
+      handleFinishSession,
+      handleBackToCanvas,
     }),
     [
       handleChallengeSelect,
@@ -171,8 +251,14 @@ export function AppContent() {
       handleBackToDesign,
       handleBackToAudio,
       handleConfigBack,
+      handleNavigateToConfig,
       handleBackToSelection,
       handleWelcomeComplete,
+      handleSkipToReview,
+      handleFinishAndExport,
+      handleSkipReview,
+      handleFinishSession,
+      handleBackToCanvas,
     ]
   );
 
@@ -259,6 +345,12 @@ export function AppContent() {
               onWelcomeComplete={navigation.handleWelcomeComplete}
               onInfiniteLoopReset={() => {}}
               onRequestRecovery={() => {}}
+              onNavigateToConfig={navigation.handleNavigateToConfig}
+              onSkipToReview={navigation.handleSkipToReview}
+              onFinishAndExport={navigation.handleFinishAndExport}
+              onSkipReview={navigation.handleSkipReview}
+              onFinishSession={navigation.handleFinishSession}
+              onBackToCanvas={navigation.handleBackToCanvas}
             />
           </main>
         </Suspense>
