@@ -4,9 +4,11 @@
  */
 
 import React, { Suspense, useMemo, useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useLazyComponent, usePreloadComponents } from '@/lib/lazy-loading/ComponentLazyLoader';
 import { reactProfilerIntegration } from '@/lib/performance/ReactProfilerIntegration';
 import { componentOptimizer } from '@/lib/performance/ComponentOptimizer';
+import { EmptyPropertiesState } from '@/lib/animations/canvas-empty-states';
 import type { DesignComponent } from '@shared/contracts';
 
 export interface PropertiesPanelProps {
@@ -382,6 +384,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   }), []);
 
   // No selection state
+  const handleAddComponent = useCallback(() => {
+    // Trigger quick add overlay
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('shortcut:quick-add-component', {
+          detail: { forceOpen: true },
+        })
+      );
+    }
+  }, []);
+
   if (!component) {
     return (
       <div
@@ -390,23 +403,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         role="complementary"
         aria-label="Component properties"
       >
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '200px',
-          color: '#6b7280',
-          textAlign: 'center',
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎯</div>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600' }}>
-            No Component Selected
-          </h3>
-          <p style={{ margin: 0, fontSize: '14px' }}>
-            Select a component to view and edit its properties
-          </p>
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <EmptyPropertiesState onAddComponent={handleAddComponent} />
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }

@@ -33,13 +33,14 @@ export function useDesignCanvasImportExport({
         components: result.data.components ?? [],
         connections: result.data.connections ?? [],
         infoCards: result.data.infoCards ?? [],
+        annotations: result.data.annotations ?? [],
       });
 
       if (result.canvas) {
         setCanvasConfig(result.canvas);
       }
 
-      // Propagate imported annotations back to DesignCanvasCore
+      // Propagate imported annotations back to DesignCanvasCore if callback exists
       if (result.data.annotations && onAnnotationsImported) {
         onAnnotationsImported(result.data.annotations);
       }
@@ -47,8 +48,9 @@ export function useDesignCanvasImportExport({
       canvasActions.setSelectedComponent(null);
       canvasActions.setConnectionStart(null);
 
+      const annotationCount = result.data.annotations?.length ?? 0;
       toast.success('Design imported successfully!', {
-        description: `Imported ${result.statistics.componentsImported} components and ${result.statistics.connectionsImported} connections`,
+        description: `Imported ${result.statistics.componentsImported} components, ${result.statistics.connectionsImported} connections${annotationCount > 0 ? `, and ${annotationCount} annotations` : ''}`,
       });
 
       markDesignModified(result.data?.metadata?.lastModified);

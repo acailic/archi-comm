@@ -1,5 +1,5 @@
 import { InfiniteLoopDetector } from "@/lib/performance/InfiniteLoopDetector";
-import type { Connection, DesignComponent, InfoCard } from "@shared/contracts";
+import type { Connection, DesignComponent, InfoCard, Annotation } from "@shared/contracts";
 import { temporal } from "zundo";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -19,6 +19,7 @@ interface CanvasStoreState {
   components: DesignComponent[];
   connections: Connection[];
   infoCards: InfoCard[];
+  annotations: Annotation[];
   selectedComponent: string | null;
   connectionStart: string | null;
   visualTheme: "serious" | "playful";
@@ -54,6 +55,12 @@ interface CanvasStoreState {
   recentComponents: string[]; // LRU, most recent first, max 8
   favoriteComponents: string[]; // favorites, max 5
   lastUsedComponent: string | null;
+
+  // Transient animation state (not persisted, not in undo/redo)
+  droppedComponentId: string | null;
+  snappingComponentId: string | null;
+  flowingConnectionIds: string[];
+  draggedComponentId: string | null;
 }
 
 interface BaseActionOptions {
@@ -316,6 +323,7 @@ const initialState: CanvasStoreState = {
   components: [],
   connections: [],
   infoCards: [],
+  annotations: [],
   selectedComponent: null,
   connectionStart: null,
   visualTheme: "serious",
@@ -359,6 +367,12 @@ const initialState: CanvasStoreState = {
       ? (safeLoadJSON<string[]>(LOCAL_KEYS.FAVORITES) as string[])
       : [],
   lastUsedComponent: (safeLoadJSON<string>(LOCAL_KEYS.LAST) as string) || null,
+
+  // Transient animation state defaults (not persisted)
+  droppedComponentId: null,
+  snappingComponentId: null,
+  flowingConnectionIds: [],
+  draggedComponentId: null,
 };
 
 export const useCanvasStore = create<CanvasStoreState>()(
@@ -474,6 +488,56 @@ const mutableCanvasActions = {
       "setInfoCards",
       (draft) => {
         draft.infoCards = infoCards;
+      },
+      options,
+    );
+  },
+  setAnnotations(annotations: Annotation[], options?: ArrayActionOptions) {
+    const current = useCanvasStore.getState().annotations;
+    if (arraysEqual(current, annotations)) return;
+    applyUpdate(
+      "setAnnotations",
+      (draft) => {
+        draft.annotations = annotations;
+      },
+      options,
+    );
+  },
+  addAnnotation(annotation: Annotation, options?: ArrayActionOptions) {
+    applyUpdate(
+      "addAnnotation",
+      (draft) => {
+        draft.annotations.push(annotation);
+      },
+      options,
+    );
+  },
+  updateAnnotation(annotation: Annotation, options?: ArrayActionOptions) {
+    applyUpdate(
+      "updateAnnotation",
+      (draft) => {
+        const index = draft.annotations.findIndex((a) => a.id === annotation.id);
+        if (index !== -1) {
+          draft.annotations[index] = annotation;
+        }
+      },
+      options,
+    );
+  },
+  deleteAnnotation(annotationId: string, options?: ArrayActionOptions) {
+    applyUpdate(
+      "deleteAnnotation",
+      (draft) => {
+        draft.annotations = draft.annotations.filter((a) => a.id !== annotationId);
+      },
+      options,
+    );
+  },
+  clearAnnotations(options?: ArrayActionOptions) {
+    applyUpdate(
+      "clearAnnotations",
+      (draft) => {
+        draft.annotations = [];
       },
       options,
     );
@@ -604,9 +668,24 @@ const mutableCanvasActions = {
       options,
     );
   },
+  updateAnnotations(
+    updater: (annotations: Annotation[]) => Annotation[],
+    options?: ArrayActionOptions,
+  ) {
+    const current = useCanvasStore.getState().annotations;
+    const next = updater(current);
+    if (arraysEqual(current, next)) return;
+    applyUpdate(
+      "updateAnnotations",
+      (draft) => {
+        draft.annotations = next;
+      },
+      options,
+    );
+  },
   updateCanvasData(
     data: Partial<
-      Pick<CanvasStoreState, "components" | "connections" | "infoCards">
+      Pick<CanvasStoreState, "components" | "connections" | "infoCards" | "annotations">
     >,
     options?: UpdateCanvasDataOptions,
   ) {
@@ -645,6 +724,9 @@ const mutableCanvasActions = {
         if (data.infoCards && !arraysEqual(draft.infoCards, data.infoCards)) {
           draft.infoCards = data.infoCards;
         }
+        if (data.annotations && !arraysEqual(draft.annotations, data.annotations)) {
+          draft.annotations = data.annotations;
+        }
       },
       options,
     );
@@ -663,6 +745,7 @@ const mutableCanvasActions = {
       draft.components = [];
       draft.connections = [];
       draft.infoCards = [];
+      draft.annotations = [];
       draft.selectedComponent = null;
       draft.connectionStart = null;
       draft.lastUpdatedAt = Date.now();
@@ -903,6 +986,8 @@ export const useCanvasConnections = () =>
   useCanvasStore((state) => state.connections, shallow);
 export const useCanvasInfoCards = () =>
   useCanvasStore((state) => state.infoCards, shallow);
+export const useCanvasAnnotations = () =>
+  useCanvasStore((state) => state.annotations, shallow);
 export const useCanvasSelectedComponent = () =>
   useCanvasStore((state) => state.selectedComponent ?? null);
 export const useCanvasConnectionStart = () =>
@@ -964,6 +1049,7 @@ export const useNormalizedCanvasData = () =>
     components: state.components,
     connections: state.connections,
     infoCards: state.infoCards,
+    annotations: state.annotations,
   }));
 
 export const useComponentsByType = (type: string) =>

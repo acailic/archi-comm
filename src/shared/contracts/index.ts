@@ -139,6 +139,12 @@ export interface Annotation {
   author?: string;
   resolved?: boolean;
   style?: Record<string, any>;
+  visible?: boolean; // Whether annotation is visible on canvas (default: true)
+  zIndex?: number; // Stacking order for overlapping annotations
+  color?: string; // Override color from preset
+  fontSize?: number; // Text size for note/comment/label types
+  borderWidth?: number; // Border thickness
+  borderStyle?: 'solid' | 'dashed' | 'dotted'; // Border style
 }
 
 export interface DesignData {

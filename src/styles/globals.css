@@ -1204,3 +1204,260 @@ html {
     color: #6b7280 !important;
   }
 }
+
+/* ========================================
+   Delight Features - Animation Keyframes
+   ======================================== */
+
+/* Shimmer effect for skeleton loading */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Data flow animation for connections */
+@keyframes dataFlow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -12;
+  }
+}
+
+/* Magnetic pull effect for grid snap */
+@keyframes magneticPull {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* Gentle bounce for component landing */
+@keyframes gentleBounce {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Pulse glow effect for hover */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+}
+
+/* Fade in from bottom */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade in scale */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ========================================
+   Animation Utility Classes
+   ======================================== */
+
+/* Apply shimmer animation */
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Apply data flow to SVG paths */
+.animate-data-flow {
+  stroke-dasharray: 8 4;
+  animation: dataFlow 1.5s linear infinite;
+}
+
+.animate-data-flow-slow {
+  stroke-dasharray: 8 4;
+  animation: dataFlow 2s linear infinite;
+}
+
+.animate-data-flow-fast {
+  stroke-dasharray: 8 4;
+  animation: dataFlow 1s linear infinite;
+}
+
+/* Apply snap feedback */
+.animate-magnetic-pull {
+  animation: magneticPull 0.3s ease-out;
+}
+
+/* Apply landing animation */
+.animate-gentle-bounce {
+  animation: gentleBounce 0.5s ease-out;
+}
+
+/* Apply glow effect */
+.animate-pulse-glow {
+  animation: pulseGlow 1.5s ease-in-out infinite;
+}
+
+/* Fade in animations */
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.3s ease-out;
+}
+
+/* ========================================
+   Transition Utilities
+   ======================================== */
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 300ms ease-out;
+}
+
+/* Spring-like transition */
+.transition-spring {
+  transition: all 400ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Momentum-based transition */
+.transition-momentum {
+  transition: all 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ========================================
+   Hover Effect Utilities
+   ======================================== */
+
+/* Lift on hover */
+.hover-lift {
+  transition: all 200ms ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Glow on hover */
+.hover-glow {
+  transition: all 200ms ease-out;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Scale on hover */
+.hover-scale {
+  transition: transform 200ms ease-out;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* ========================================
+   Performance Optimizations
+   ======================================== */
+
+/* GPU-accelerated animations */
+.gpu-accelerated {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Animation boundaries */
+.animation-boundary {
+  contain: layout style paint;
+}
+
+/* ========================================
+   Accessibility - Reduced Motion
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all animations for users who prefer reduced motion */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep essential animations but make them instant */
+  .animate-shimmer,
+  .animate-data-flow,
+  .animate-data-flow-slow,
+  .animate-data-flow-fast,
+  .animate-magnetic-pull,
+  .animate-gentle-bounce,
+  .animate-pulse-glow,
+  .animate-fade-in-up,
+  .animate-fade-in-scale {
+    animation: none !important;
+  }
+
+  /* Simplified transitions */
+  .transition-smooth,
+  .transition-spring,
+  .transition-momentum {
+    transition: none !important;
+  }
+
+  /* Keep functional hover effects but remove motion */
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  .hover-scale:hover {
+    transform: none;
+  }
+}

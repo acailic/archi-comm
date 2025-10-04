@@ -33,6 +33,7 @@ Learn, practice, and teach system design fundamentals through guided scenarios, 
 - [Why ArchiComm Community Edition](#why-archicomm-community-edition)
 - [Study Flow](#study-flow)
 - [Community Edition Features](#community-edition-features)
+- [Delight Features](#delight-features-)
 - [Audio Features](#audio-features-community-edition)
 - [Study Modules](#study-modules)
 - [Canvas System Overview](#canvas-system-overview)
@@ -160,6 +161,57 @@ New in this build:
 [Learn more about ArchiComm Pro](https://archicomm.com/pro)
 
 </details>
+
+---
+
+## Delight Features ✨
+
+ArchiComm includes thoughtful UI/UX enhancements designed to make learning system design more engaging and enjoyable:
+
+### Component Personality
+
+- **Hover Effects**: Components scale and glow subtly when you hover over them
+- **Drag Trails**: Semi-transparent trail effect follows components as you drag them
+- **Landing Animations**: Gentle bounce animation when dropping components on the canvas
+- **Connection Flows**: Animated data flow visualization along connection lines
+- **Selection Pulse**: Pulsing ring effect around selected components
+
+### Canvas Delight
+
+- **Empty States**: Beautiful, inspiring illustrations when the canvas is empty
+- **Grid Snap Feedback**: Satisfying magnetic pull animation when components snap to grid
+- **Smooth Zoom/Pan**: Momentum-based scrolling for natural canvas navigation
+- **First Component Celebration**: Special animation when adding your first component
+
+### Learning Tooltips
+
+- **Component Education**: Hover over components to see use cases, best practices, and real-world examples
+- **"Did You Know?" Facts**: Educational system design facts rotate during loading screens
+- **Pattern Library**: Browse and learn from common architecture patterns
+- **Contextual Help**: Smart tooltips appear based on your actions
+
+### Smooth Transitions
+
+- **Loading Skeletons**: Shimmer effect loading states with educational content
+- **Friendly Errors**: Helpful error messages with actionable suggestions instead of generic errors
+- **Beautiful Empty Panels**: Thoughtful empty states across all UI panels
+- **Micro-Interactions**: Polished animations for state changes and user actions
+
+### Configuration
+
+All animations respect your system preferences and can be toggled:
+
+- **Animations Toggle**: Press `Ctrl+Shift+A` to toggle animations on/off
+- **Reduced Motion**: Automatically respects `prefers-reduced-motion` system setting
+- **Performance**: Animations use GPU acceleration and CSS for 60fps performance
+
+### Keyboard Shortcuts
+
+- `Shift+P` - Open pattern library
+- `Shift+?` - Show component education (when component selected)
+- `Ctrl+Shift+A` - Toggle animations
+- `Shift+D` - Show random system design fact
+- `Cmd+K` - Quick add component
 
 ---
 

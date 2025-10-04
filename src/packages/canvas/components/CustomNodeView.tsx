@@ -7,6 +7,7 @@
 
 import { Handle, Position } from "@xyflow/react";
 import { Suspense, memo, useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { getComponentIcon } from "../../../lib/design/component-icons";
 import { cx } from "../../../lib/design/design-system";
 import type { DesignComponent } from "../../../shared/contracts";
@@ -21,6 +22,7 @@ import {
 import type { UseNodePresenterResult } from "../hooks/useNodePresenter";
 import type { CustomNodeData } from "../types";
 import { getHealthIndicator } from "../utils/component-styles";
+import { nodeAnimations, getAnimationVariant } from "@/lib/animations/component-animations";
 
 function defaultStickerForType(type: string): string {
   const map: Record<string, string> = {
@@ -81,6 +83,9 @@ function CustomNodeViewInner({
     onShowProperties,
     onDelete,
     visualTheme = "serious",
+    isBeingDropped = false,
+    isSnapping = false,
+    animationsEnabled = true,
   } = nodeData;
   const playful = visualTheme === "playful";
 
@@ -148,10 +153,45 @@ function CustomNodeViewInner({
     ? ""
     : getSubtleBackgroundColor(iconInfo.color);
 
+  // Determine animation variant based on state
+  const getNodeAnimations = () => {
+    if (!animationsEnabled) return {};
+
+    if (isBeingDropped) {
+      return {
+        initial: "initial",
+        animate: "animate",
+        variants: nodeAnimations.landing,
+      };
+    }
+
+    if (state.isValidConnectionTarget && state.visualState.isConnectionStart) {
+      return {
+        initial: "initial",
+        animate: "animate",
+        variants: nodeAnimations.connecting,
+      };
+    }
+
+    if (selected || state.visualState.isSelected) {
+      return {
+        initial: "initial",
+        animate: "animate",
+        variants: nodeAnimations.selected,
+      };
+    }
+
+    return {};
+  };
+
+  const MotionDiv = animationsEnabled ? motion.div : 'div';
+  const motionProps = animationsEnabled ? getNodeAnimations() : {};
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div
+        <MotionDiv
+          {...motionProps}
           className={cx(
             "w-56 h-36 cursor-move group canvas-component touch-friendly relative overflow-hidden",
             "border-2 border-gray-900 bg-white shadow-lg", // High contrast black border, white background
@@ -162,9 +202,15 @@ function CustomNodeViewInner({
             state.isValidConnectionTarget && state.visualState.isConnectionStart
               ? "ring-4 ring-green-400 border-green-500 animate-pulse"
               : "",
-            "transition-all duration-200 hover:shadow-2xl hover:border-black",
-            playful ? "hover:scale-105" : ""
+            !animationsEnabled && "transition-all duration-200",
+            animationsEnabled && state.isHovered && "shadow-2xl border-black",
+            playful && state.isHovered ? "scale-105" : "",
+            isSnapping ? "ring-2 ring-blue-400" : ""
           )}
+          style={animationsEnabled && state.isHovered ? {
+            transform: 'scale(1.02)',
+            transition: 'transform 0.15s ease-out',
+          } : undefined}
           onMouseEnter={actions.handleMouseEnter}
           onMouseLeave={actions.handleMouseLeave}
           onClick={() => {
@@ -439,7 +485,7 @@ function CustomNodeViewInner({
               actions.handleStartConnection("right");
             }}
           />
-        </div>
+        </MotionDiv>
       </ContextMenuTrigger>
       {playful && (
         <style>{`
