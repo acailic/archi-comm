@@ -101,7 +101,7 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
 
   const appendPoints = useCallback((pointsToAdd: StrokePoint[]) => {
     if (!pointsToAdd.length) return;
-    currentPointsRef.current = [...currentPointsRef.current, ...pointsToAdd];
+    currentPointsRef.current.push(...pointsToAdd);
     setCurrentPoints((prev) => [...prev, ...pointsToAdd]);
   }, []);
 

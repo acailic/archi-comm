@@ -9,14 +9,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  buildStrokeSegmentIndex,
   deserializeStrokes,
   getStrokeOutline,
   getSvgPathFromStroke,
   isPointNearStroke,
   pointsToStroke,
+  pointerEventToFlowPosition,
+  queryStrokeSegmentIndex,
   screenToFlowPosition,
   serializeStrokes,
 } from "../../lib/canvas/drawing-utils";
+import * as drawingUtils from "../../lib/canvas/drawing-utils";
 import { DrawingOverlay } from "../../packages/ui/components/canvas/DrawingOverlay";
 import { DrawingToolbar } from "../../packages/ui/components/canvas/DrawingToolbar";
 import type { DrawingSettings, DrawingStroke } from "../../shared/contracts";
@@ -60,6 +64,7 @@ const mockStroke: DrawingStroke = {
   timestamp: Date.now(),
   visible: true,
   zIndex: 0,
+  tool: "pen",
 };
 
 const mockSettings: DrawingSettings = {
@@ -118,7 +123,9 @@ describe("Drawing Utilities", () => {
         [10, 10],
         [20, 20],
       ];
-      const stroke = pointsToStroke(points, "#ff0000", 6, "test-author");
+      const stroke = pointsToStroke(points, "#ff0000", 6, {
+        author: "test-author",
+      });
 
       expect(stroke).toHaveProperty("id");
       expect(stroke.points).toBe(points);
@@ -180,6 +187,58 @@ describe("Drawing Utilities", () => {
 
       expect(x).toBe(100);
       expect(y).toBe(120);
+    });
+  });
+
+  describe("pointerEventToFlowPosition", () => {
+    it("should delegate to React Flow when available", () => {
+      const mockInstance = {
+        screenToFlowPosition: vi.fn().mockReturnValue({ x: 25, y: 30 }),
+      };
+
+      const event = { clientX: 10, clientY: 15 } as PointerEvent;
+      const [x, y] = pointerEventToFlowPosition(event, mockInstance);
+
+      expect(mockInstance.screenToFlowPosition).toHaveBeenCalledWith({
+        x: 10,
+        y: 15,
+      });
+      expect(x).toBe(25);
+      expect(y).toBe(30);
+    });
+
+    it("should fall back to client coordinates when instance missing", () => {
+      const event = { clientX: 42, clientY: 84 } as PointerEvent;
+      const [x, y] = pointerEventToFlowPosition(event, null);
+
+      expect(x).toBe(42);
+      expect(y).toBe(84);
+    });
+  });
+
+  describe("buildStrokeSegmentIndex", () => {
+    it("should index stroke segments and query hits", () => {
+      const strokes: DrawingStroke[] = [
+        mockStroke,
+        {
+          ...mockStroke,
+          id: "second",
+          points: [
+            [100, 100],
+            [120, 120],
+          ],
+        },
+      ];
+
+      const index = buildStrokeSegmentIndex(strokes, 2);
+      expect(index).not.toBeNull();
+
+      const hitsNearFirst = queryStrokeSegmentIndex(index, 15, 15, 2);
+      expect(hitsNearFirst).toContain(mockStroke.id);
+      expect(hitsNearFirst).not.toContain("second");
+
+      const hitsNearSecond = queryStrokeSegmentIndex(index, 110, 110, 2);
+      expect(hitsNearSecond).toContain("second");
     });
   });
 
@@ -311,7 +370,16 @@ describe("DrawingOverlay Component", () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("should render SVG overlay when enabled", () => {
@@ -346,20 +414,52 @@ describe("DrawingOverlay Component", () => {
     expect(paths).toHaveLength(1);
   });
 
-  it("should handle pointer events for drawing", () => {
+  it("should render without strokes", () => {
+    const { container } = render(
+      <DrawingOverlay {...defaultProps} strokes={[]} />,
+    );
+
+    const paths = container.querySelectorAll("path");
+    expect(paths).toHaveLength(0);
+  });
+
+  it("should handle pointer events for drawing", async () => {
     const onStrokeComplete = vi.fn();
+    const pointerSpy = vi.spyOn(
+      drawingUtils,
+      "pointerEventToFlowPosition",
+    );
+
     const { container } = render(
       <DrawingOverlay {...defaultProps} onStrokeComplete={onStrokeComplete} />,
     );
 
     const svg = container.querySelector("svg")!;
 
-    // Simulate drawing gesture
-    fireEvent.pointerDown(svg, { clientX: 10, clientY: 10, pointerId: 1 });
-    fireEvent.pointerMove(svg, { clientX: 20, clientY: 20, pointerId: 1 });
+    fireEvent.pointerDown(svg, {
+      clientX: 10,
+      clientY: 10,
+      pointerId: 1,
+      pressure: 0.7,
+    });
+    fireEvent.pointerMove(svg, {
+      clientX: 20,
+      clientY: 20,
+      pointerId: 1,
+      pressure: 0.5,
+    });
     fireEvent.pointerUp(svg, { pointerId: 1 });
 
-    expect(onStrokeComplete).toHaveBeenCalled();
+    expect(pointerSpy).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(onStrokeComplete).toHaveBeenCalledTimes(1);
+    });
+
+    const stroke = onStrokeComplete.mock.calls[0][0];
+    expect(stroke.tool).toBe("pen");
+    expect(stroke.color).toBe("#000000");
+    expect(stroke.points[0][2]).toBeCloseTo(0.7);
   });
 
   it("should handle eraser mode", () => {
@@ -376,5 +476,21 @@ describe("DrawingOverlay Component", () => {
     fireEvent.click(path);
 
     expect(onStrokeDelete).toHaveBeenCalledWith(mockStroke.id);
+  });
+
+  it("should render highlighter strokes with reduced opacity", () => {
+    const highlighterStroke: DrawingStroke = {
+      ...mockStroke,
+      id: "highlighter",
+      tool: "highlighter",
+      color: "#ffaa00",
+    };
+
+    const { container } = render(
+      <DrawingOverlay {...defaultProps} strokes={[highlighterStroke]} />,
+    );
+
+    const path = container.querySelector("path")!;
+    expect(path).toHaveAttribute("fill-opacity", "0.5");
   });
 });
