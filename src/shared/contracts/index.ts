@@ -4,35 +4,68 @@
  */
 
 // Tooling
-export type ToolType = 'select' | 'pan' | 'zoom' | 'annotate' | 'connect' | 'erase';
+export type ToolType =
+  | "select"
+  | "pan"
+  | "zoom"
+  | "annotate"
+  | "connect"
+  | "erase"
+  | "draw";
+
+// Drawing types
+export type StrokePoint = [number, number, number?];
+
+export interface DrawingStroke {
+  id: string;
+  points: StrokePoint[];
+  color: string;
+  size: number;
+  timestamp: number;
+  author?: string;
+  visible?: boolean;
+  zIndex?: number;
+  tool?: DrawingTool;
+}
+
+export type DrawingTool = "pen" | "eraser" | "highlighter" | null;
+
+export interface DrawingSettings {
+  color: string;
+  size: number;
+  tool: DrawingTool;
+  smoothing: number;
+  thinning: number;
+  streamline: number;
+}
 
 // Component unions
 export type ComponentType =
-  | 'server'
-  | 'database'
-  | 'cache'
-  | 'api-gateway'
-  | 'load-balancer'
-  | 'microservice'
-  | 'message-queue'
-  | 'producer'
-  | 'consumer'
-  | 'broker'
-  | 'dead-letter-queue'
-  | 'client'
-  | 'monitoring'
-  | 'storage'
-  | 'edge-computing'
-  | 'ai-ml';
+  | "server"
+  | "database"
+  | "cache"
+  | "api-gateway"
+  | "load-balancer"
+  | "microservice"
+  | "message-queue"
+  | "producer"
+  | "consumer"
+  | "broker"
+  | "dead-letter-queue"
+  | "client"
+  | "monitoring"
+  | "storage"
+  | "edge-computing"
+  | "ai-ml";
 
 // Connection unions
-export type ConnectionType = 'data' | 'control' | 'sync' | 'async';
-export type ConnectionDirection = 'none' | 'end' | 'both';
-export type VisualStyle = 'default' | 'ack' | 'retry' | 'error';
+export type ConnectionType = "data" | "control" | "sync" | "async";
+export type ConnectionDirection = "none" | "end" | "both";
+export type VisualStyle = "default" | "ack" | "retry" | "error";
 
 // Strict property groups
 export interface DatabaseProperties {
-  type: 'relational' | 'document' | 'wide-column' | 'graph';
+  type: "relational" | "document" | "wide-column" | "graph";
   replicas?: number;
   backup?: boolean;
 }
@@ -44,7 +77,7 @@ export interface ServiceProperties {
 }
 
 export interface CacheProperties {
-  type: 'redis' | 'memcached';
+  type: "redis" | "memcached";
   ttl?: number;
   size?: string;
 }
@@ -55,7 +88,7 @@ export interface ApiGatewayProperties {
 }
 
 export interface LoadBalancerProperties {
-  algorithm?: 'round-robin' | 'least-connections' | 'ip-hash';
+  algorithm?: "round-robin" | "least-connections" | "ip-hash";
   healthCheck?: boolean;
 }
 
@@ -123,13 +156,13 @@ export interface InfoCard {
   x: number;
   y: number;
   content: string;
-  color?: 'yellow' | 'blue' | 'green' | 'red' | 'purple';
+  color?: "yellow" | "blue" | "green" | "red" | "purple";
   isEditing?: boolean;
 }
 
 export interface Annotation {
   id: string;
-  type: 'comment' | 'note' | 'label' | 'arrow' | 'highlight';
+  type: "comment" | "note" | "label" | "arrow" | "highlight";
   content: string;
   x: number;
   y: number;
@@ -144,7 +177,7 @@ export interface Annotation {
   color?: string; // Override color from preset
   fontSize?: number; // Text size for note/comment/label types
   borderWidth?: number; // Border thickness
-  borderStyle?: 'solid' | 'dashed' | 'dotted'; // Border style
+  borderStyle?: "solid" | "dashed" | "dotted"; // Border style
 }
 
 export interface DesignData {
@@ -153,6 +186,7 @@ export interface DesignData {
   connections: Connection[];
   infoCards?: InfoCard[];
   annotations?: Annotation[];
+  drawings?: DrawingStroke[];
   layers: Layer[];
   gridConfig?: GridConfig;
   activeTool?: ToolType;
@@ -176,9 +210,9 @@ export interface Challenge {
   title: string;
   description: string;
   requirements: string[];
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: "beginner" | "intermediate" | "advanced";
   estimatedTime: number;
-  category: 'system-design' | 'architecture' | 'scaling';
+  category: "system-design" | "architecture" | "scaling";
   referenceTranscript?: string;
   keyConcepts?: string[];
   tags?: string[];
@@ -249,8 +283,8 @@ export interface ConnectionMatch {
 }
 
 export interface ValidationFeedback {
-  category: 'component' | 'connection' | 'architecture';
-  type: 'missing' | 'extra' | 'incorrect' | 'positive';
+  category: "component" | "connection" | "architecture";
+  type: "missing" | "extra" | "incorrect" | "positive";
   message: string;
   suggestion?: string;
 }

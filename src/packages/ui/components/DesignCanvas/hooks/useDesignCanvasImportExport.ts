@@ -34,6 +34,7 @@ export function useDesignCanvasImportExport({
         connections: result.data.connections ?? [],
         infoCards: result.data.infoCards ?? [],
         annotations: result.data.annotations ?? [],
+        drawings: result.data.drawings ?? [],
       });
 
       if (result.canvas) {

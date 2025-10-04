@@ -5,6 +5,7 @@
  * Related: canvasStore.ts, useQuickConnect.ts, DesignCanvasCore.tsx
  */
 
+import * as Popover from "@radix-ui/react-popover";
 import {
   CheckCircle,
   Download,
@@ -21,6 +22,7 @@ import {
   MessageSquare,
   MousePointer2,
   Pause,
+  Pencil,
   Play,
   RotateCcw,
   Settings,
@@ -28,14 +30,25 @@ import {
   Zap,
 } from "lucide-react";
 import { memo, type ReactNode, useCallback, useEffect, useState } from "react";
-import { cx, primaryAction, sectionDivider, toolbarSectionBg } from "../../../../lib/design/design-system";
-import { openShortcutsModal } from "./KeyboardShortcutsReference";
+import {
+  cx,
+  primaryAction,
+  sectionDivider,
+  toolbarSectionBg,
+} from "../../../../lib/design/design-system";
 import type { CanvasMode } from "../../../../stores/canvasStore";
 import {
   useCanvasActions,
+  useCanvasDrawings,
   useCanvasStore,
+  useDrawingColor,
+  useDrawingSettings,
+  useDrawingSize,
+  useDrawingTool,
 } from "../../../../stores/canvasStore";
 import { useAppStore } from "../../../../stores/SimpleAppStore";
+import { DrawingToolbar } from "./DrawingToolbar";
+import { openShortcutsModal } from "./KeyboardShortcutsReference";
 
 /**
  * Quick add toolbar support:
@@ -93,6 +106,13 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
   );
   const isDesignCanvas =
     currentScreen === undefined ? true : currentScreen === "design-canvas";
+
+  // Drawing state
+  const drawingTool = useDrawingTool();
+  const drawingColor = useDrawingColor();
+  const drawingSize = useDrawingSize();
+  const drawingSettings = useDrawingSettings();
+  const drawings = useCanvasDrawings();
 
   const [quickAddActive, setQuickAddActive] = useState(false);
   const [showQuickAddHint, setShowQuickAddHint] = useState(false);
@@ -250,12 +270,40 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
     useCanvasStore.temporal.getState().undo();
   }, []);
 
+  // Drawing callbacks
+  const handleDrawingToolSelect = useCallback(
+    (tool: typeof drawingTool) => {
+      actions.setDrawingTool(tool);
+    },
+    [actions],
+  );
+
+  const handleDrawingColorChange = useCallback(
+    (color: string) => {
+      actions.setDrawingColor(color);
+    },
+    [actions],
+  );
+
+  const handleDrawingSizeChange = useCallback(
+    (size: number) => {
+      actions.setDrawingSize(size);
+    },
+    [actions],
+  );
+
+  const handleClearAllDrawings = useCallback(() => {
+    actions.clearDrawings();
+  }, [actions]);
+
   // Session progress indicators
-  const isDesignDone = useAppStore(s => s.completedPhases.has('design'));
-  const isRecordingDone = useAppStore(s => s.completedPhases.has('recording'));
-  const isReviewDone = useAppStore(s => s.completedPhases.has('review'));
-  const skippedRecording = useAppStore(s => s.skippedPhases.has('recording'));
-  const skippedReview = useAppStore(s => s.skippedPhases.has('review'));
+  const isDesignDone = useAppStore((s) => s.completedPhases.has("design"));
+  const isRecordingDone = useAppStore((s) =>
+    s.completedPhases.has("recording"),
+  );
+  const isReviewDone = useAppStore((s) => s.completedPhases.has("review"));
+  const skippedRecording = useAppStore((s) => s.skippedPhases.has("recording"));
+  const skippedReview = useAppStore((s) => s.skippedPhases.has("review"));
 
   return (
     <div
@@ -265,7 +313,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       )}
     >
       {/* Mode toggles */}
-      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.modes)}>
+      <div
+        className={cx(
+          "flex items-center gap-1 px-2 py-1 rounded-md",
+          toolbarSectionBg.modes,
+        )}
+      >
         <ToolbarButton
           icon={MousePointer2}
           label="Select (V)"
@@ -315,13 +368,53 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
           onClick={() => setCanvasMode("annotation")}
           tooltip="Annotation mode - Add notes to canvas"
         />
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <ToolbarButton
+              icon={Pencil}
+              label="Draw (D)"
+              active={canvasMode === "draw" || drawingTool !== null}
+              onClick={() => {
+                if (drawingTool === null) {
+                  actions.setDrawingTool("pen");
+                } else {
+                  actions.setDrawingTool(null);
+                }
+              }}
+              tooltip="Drawing mode - Draw on canvas"
+            />
+          </Popover.Trigger>
+          {(canvasMode === "draw" || drawingTool !== null) && (
+            <Popover.Content
+              className="z-50 mb-2"
+              sideOffset={8}
+              align="center"
+            >
+              <DrawingToolbar
+                selectedTool={drawingTool}
+                onToolSelect={handleDrawingToolSelect}
+                color={drawingColor}
+                onColorChange={handleDrawingColorChange}
+                size={drawingSize}
+                onSizeChange={handleDrawingSizeChange}
+                strokeCount={drawings.length}
+                onClearAll={handleClearAllDrawings}
+              />
+            </Popover.Content>
+          )}
+        </Popover.Root>
         <SectionHelpButton section="Canvas Modes" onShowHelp={onShowHelp} />
       </div>
 
       <SectionDivider />
 
       {/* View controls */}
-      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.view)}>
+      <div
+        className={cx(
+          "flex items-center gap-1 px-2 py-1 rounded-md",
+          toolbarSectionBg.view,
+        )}
+      >
         <ToolbarButton
           icon={Grid3x3}
           label="Grid"
@@ -349,7 +442,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       <SectionDivider />
 
       {/* Animation controls */}
-      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.animation)}>
+      <div
+        className={cx(
+          "flex items-center gap-1 px-2 py-1 rounded-md",
+          toolbarSectionBg.animation,
+        )}
+      >
         <ToolbarButton
           icon={animationsEnabled ? Play : Pause}
           label="Animations"
@@ -365,7 +463,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       <SectionDivider />
 
       {/* Layout actions */}
-      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.layout)}>
+      <div
+        className={cx(
+          "flex items-center gap-1 px-2 py-1 rounded-md",
+          toolbarSectionBg.layout,
+        )}
+      >
         <ToolbarButton
           icon={RotateCcw}
           label="Undo"
@@ -392,7 +495,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       {/* Validation & Assessment */}
       {isDesignCanvas && (
         <>
-          <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.validation)}>
+          <div
+            className={cx(
+              "flex items-center gap-1 px-2 py-1 rounded-md",
+              toolbarSectionBg.validation,
+            )}
+          >
             <ToolbarButton
               icon={Target}
               label="Quick Validate"
@@ -415,7 +523,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       {/* Export Options */}
       {isDesignCanvas && (
         <>
-          <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.export)}>
+          <div
+            className={cx(
+              "flex items-center gap-1 px-2 py-1 rounded-md",
+              toolbarSectionBg.export,
+            )}
+          >
             <ToolbarButton
               icon={FileJson}
               label="Export JSON"
@@ -472,7 +585,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       )}
 
       {/* Settings */}
-      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.settings)}>
+      <div
+        className={cx(
+          "flex items-center gap-1 px-2 py-1 rounded-md",
+          toolbarSectionBg.settings,
+        )}
+      >
         <ToolbarButton
           icon={Settings}
           label="Settings"
@@ -485,7 +603,8 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       {/* Shortcuts hint */}
       {showShortcutsHint && (
         <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 px-3 py-2 bg-blue-600 text-white text-xs rounded-lg shadow-lg animate-in fade-in slide-in-from-bottom-2 z-[var(--z-tooltip)]">
-          Press <kbd className="px-1.5 py-0.5 bg-white/20 rounded mx-1">?</kbd> to see all shortcuts
+          Press <kbd className="px-1.5 py-0.5 bg-white/20 rounded mx-1">?</kbd>{" "}
+          to see all shortcuts
           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-600 rotate-45" />
         </div>
       )}
@@ -503,7 +622,7 @@ interface ToolbarButtonProps {
   tooltip?: string;
   disabled?: boolean;
   indicator?: ReactNode;
-  variant?: 'default' | 'primary';
+  variant?: "default" | "primary";
   shortcutBadge?: string;
 }
 
@@ -515,13 +634,13 @@ function ToolbarButton({
   tooltip,
   disabled = false,
   indicator,
-  variant = 'default',
+  variant = "default",
   shortcutBadge,
 }: ToolbarButtonProps) {
-  const isPrimary = variant === 'primary';
+  const isPrimary = variant === "primary";
   const isActive = Boolean(active);
   const ariaPressed =
-    typeof active === 'boolean' && !isPrimary ? active : undefined;
+    typeof active === "boolean" && !isPrimary ? active : undefined;
 
   return (
     <button
@@ -539,7 +658,8 @@ function ToolbarButton({
         isPrimary && primaryAction.active,
         isActive && !isPrimary
           ? "bg-blue-500 border-blue-600 text-white shadow-md"
-          : !isActive && "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400",
+          : !isActive &&
+              "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400",
         isActive && isPrimary && "border-blue-700 text-white shadow-xl",
         disabled && "opacity-50 cursor-not-allowed",
         !disabled && "hover:shadow-md",
@@ -607,7 +727,7 @@ function SectionHelpButton({ section, onShowHelp }: SectionHelpButtonProps) {
       className={cx(
         "w-6 h-6 rounded-full flex items-center justify-center",
         "text-gray-400 hover:text-blue-600 hover:bg-blue-50",
-        "transition-colors duration-200"
+        "transition-colors duration-200",
       )}
       title={`Help for ${section}`}
       aria-label={`Show help for ${section}`}
@@ -627,25 +747,31 @@ interface SessionPhaseIndicatorProps {
   skipped: boolean;
 }
 
-function SessionPhaseIndicator({ label, completed, skipped }: SessionPhaseIndicatorProps) {
+function SessionPhaseIndicator({
+  label,
+  completed,
+  skipped,
+}: SessionPhaseIndicatorProps) {
   return (
     <div
       className={cx(
         "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium",
         completed && "bg-green-100 text-green-800",
         skipped && "bg-gray-200 text-gray-600 line-through",
-        !completed && !skipped && "bg-gray-100 text-gray-500"
+        !completed && !skipped && "bg-gray-100 text-gray-500",
       )}
       title={
         completed
           ? `${label} completed`
           : skipped
-          ? `${label} skipped`
-          : `${label} not started`
+            ? `${label} skipped`
+            : `${label} not started`
       }
     >
       {completed && <CheckCircle className="w-3 h-3" />}
-      {skipped && <span className="w-3 h-3 flex items-center justify-center">−</span>}
+      {skipped && (
+        <span className="w-3 h-3 flex items-center justify-center">−</span>
+      )}
       <span>{label}</span>
     </div>
   );

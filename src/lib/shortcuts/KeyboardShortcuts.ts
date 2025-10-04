@@ -9,6 +9,10 @@
  * (see initializeDefaultShortcuts for more)
  */
 
+import { drawingColors } from "@/lib/design/design-system";
+import type { DrawingTool } from "@/shared/contracts";
+import { useCanvasActions, useCanvasStore } from "@/stores/canvasStore";
+
 // Only canonical modifiers; 'cmd' is normalized to 'meta'
 export type KeyModifier = "ctrl" | "meta" | "alt" | "shift";
 export type ShortcutCategory =
@@ -18,7 +22,8 @@ export type ShortcutCategory =
   | "navigation"
   | "project"
   | "system"
-  | "tools";
+  | "tools"
+  | "drawing";
 
 export interface ShortcutConfig {
   key: string;
@@ -37,6 +42,94 @@ export interface ShortcutAction {
   category: ShortcutCategory;
   action: (event?: KeyboardEvent) => void | Promise<void>;
 }
+
+const DEFAULT_DRAWING_TOOL: DrawingTool = "pen";
+const DRAWING_COLOR_VALUES = drawingColors.map((color) => color.value);
+const canvasActions = useCanvasActions();
+
+const isDrawingModeActive = (): boolean => {
+  const state = useCanvasStore.getState();
+  return state.canvasMode === "draw" && state.drawingTool !== null;
+};
+
+const ensureDrawingMode = (tool?: DrawingTool | null): void => {
+  const state = useCanvasStore.getState();
+  const desiredTool =
+    tool ??
+    state.drawingTool ??
+    (state.drawingSettings ? state.drawingSettings.tool : null) ??
+    DEFAULT_DRAWING_TOOL;
+
+  if (state.canvasMode !== "draw") {
+    canvasActions.setCanvasMode("draw");
+  }
+
+  canvasActions.setDrawingTool(desiredTool ?? DEFAULT_DRAWING_TOOL);
+};
+
+const toggleDrawingMode = (): void => {
+  const state = useCanvasStore.getState();
+  const hasActiveTool =
+    state.canvasMode === "draw" && state.drawingTool !== null;
+
+  if (hasActiveTool) {
+    canvasActions.setDrawingTool(null);
+    canvasActions.setCanvasMode("select");
+    return;
+  }
+
+  const previousTool =
+    state.drawingTool ??
+    (state.drawingSettings ? state.drawingSettings.tool : null) ??
+    DEFAULT_DRAWING_TOOL;
+
+  canvasActions.setCanvasMode("draw");
+  canvasActions.setDrawingTool(previousTool ?? DEFAULT_DRAWING_TOOL);
+};
+
+const adjustDrawingSize = (delta: number): void => {
+  if (!isDrawingModeActive()) return;
+
+  const state = useCanvasStore.getState();
+  const nextSize = Math.min(20, Math.max(1, state.drawingSize + delta));
+  if (nextSize !== state.drawingSize) {
+    canvasActions.setDrawingSize(nextSize);
+  }
+};
+
+const selectDrawingColorByIndex = (index: number): void => {
+  const state = useCanvasStore.getState();
+  if (state.canvasMode !== "draw") return;
+
+  const palette = DRAWING_COLOR_VALUES;
+  if (!palette.length) return;
+
+  const normalizedIndex = Math.max(0, Math.min(index, palette.length - 1));
+  const color = palette[normalizedIndex];
+  if (color) {
+    canvasActions.setDrawingColor(color);
+  }
+};
+
+const confirmAndClearDrawings = (): void => {
+  const state = useCanvasStore.getState();
+  if (!state.drawings.length) return;
+
+  if (typeof window === "undefined") {
+    canvasActions.clearDrawings();
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Clear ${state.drawings.length} drawing${
+      state.drawings.length === 1 ? "" : "s"
+    }? This cannot be undone.`,
+  );
+
+  if (confirmed) {
+    canvasActions.clearDrawings();
+  }
+};
 
 export class KeyboardShortcutManager {
   // Map from normalized shortcut key to a single ShortcutConfig handler (no duplicates)
@@ -766,9 +859,20 @@ export class KeyboardShortcutManager {
 
     this.register({
       key: "h",
-      description: "Pan tool",
-      category: "tools",
+      description: "Pan tool / Highlighter",
+      category: "drawing",
+      preventDefault: false,
       action: () => {
+        if (!isCanvasFocused()) {
+          return;
+        }
+
+        const state = useCanvasStore.getState();
+        if (state.canvasMode === "draw") {
+          ensureDrawingMode("highlighter");
+          return;
+        }
+
         void window.dispatchEvent(new CustomEvent("shortcut:tool-pan"));
       },
     });
@@ -788,6 +892,125 @@ export class KeyboardShortcutManager {
       category: "tools",
       action: () => {
         void window.dispatchEvent(new CustomEvent("shortcut:tool-annotate"));
+      },
+    });
+
+    // Drawing shortcuts
+    this.register({
+      key: "d",
+      description: "Toggle drawing mode",
+      category: "drawing",
+      preventDefault: false,
+      action: () => {
+        if (!isCanvasFocused()) return;
+        toggleDrawingMode();
+      },
+    });
+
+    this.register({
+      key: "p",
+      description: "Pen tool",
+      category: "drawing",
+      preventDefault: false,
+      action: () => {
+        if (!isCanvasFocused()) return;
+        ensureDrawingMode("pen");
+      },
+    });
+
+    this.register({
+      key: "e",
+      description: "Eraser tool",
+      category: "drawing",
+      preventDefault: false,
+      action: () => {
+        if (!isCanvasFocused()) return;
+        ensureDrawingMode("eraser");
+      },
+    });
+
+    this.register({
+      key: "[",
+      description: "Decrease brush size",
+      category: "drawing",
+      preventDefault: false,
+      action: () => {
+        if (!isCanvasFocused()) return;
+        adjustDrawingSize(-1);
+      },
+    });
+
+    this.register({
+      key: "]",
+      description: "Increase brush size",
+      category: "drawing",
+      preventDefault: false,
+      action: () => {
+        if (!isCanvasFocused()) return;
+        adjustDrawingSize(1);
+      },
+    });
+
+    const drawingColorKeys = [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+    ] as const;
+    drawingColorKeys.forEach((key, index) => {
+      const colorName = drawingColors[index]?.name ?? "Custom";
+      this.register({
+        key,
+        description: `Quick color: ${colorName}`,
+        category: "drawing",
+        preventDefault: false,
+        action: () => {
+          if (!isCanvasFocused()) return;
+          selectDrawingColorByIndex(index);
+        },
+      });
+    });
+
+    this.register({
+      key: "d",
+      modifiers: ["ctrl", "shift"],
+      description: "Clear all drawings",
+      category: "drawing",
+      action: () => {
+        if (!isCanvasFocused()) return;
+        confirmAndClearDrawings();
+      },
+    });
+
+    this.register({
+      key: "d",
+      modifiers: ["meta", "shift"],
+      description: "Clear all drawings (Cmd)",
+      category: "drawing",
+      action: () => {
+        if (!isCanvasFocused()) return;
+        confirmAndClearDrawings();
+      },
+    });
+
+    // Escape to exit drawing mode
+    this.register({
+      key: "Escape",
+      description: "Exit drawing mode",
+      category: "drawing",
+      preventDefault: false,
+      action: () => {
+        if (!isCanvasFocused()) return;
+        const state = useCanvasStore.getState();
+        if (state.canvasMode === "draw") {
+          canvasActions.setDrawingTool(null);
+          canvasActions.setCanvasMode("select");
+        }
       },
     });
 

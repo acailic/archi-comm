@@ -4,7 +4,6 @@
 // RELEVANT FILES: ReactFlowCanvas.tsx, CanvasArea.tsx, CanvasController.tsx
 
 import {
-  addEdge,
   Background,
   BackgroundVariant,
   Connection,
@@ -17,12 +16,8 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
-  useEdgesState,
-  useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import React, { useCallback, useMemo, useRef } from "react";
-import { useDrop } from "react-dnd";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -36,11 +31,18 @@ import {
   Shield,
   Users,
 } from "lucide-react";
+import React, { useCallback, useMemo, useRef } from "react";
+import { useDrop } from "react-dnd";
 
 import type {
   Connection as AppConnection,
   DesignComponent,
+  DrawingSettings,
+  DrawingStroke,
+  DrawingTool,
 } from "../../shared/contracts";
+import { pointerEventToFlowPosition } from "@/lib/canvas/drawing-utils";
+import { DrawingOverlay } from "../ui/components/canvas/DrawingOverlay";
 import { cn } from "../ui/components/ui/utils";
 
 type NodePresetKey =
@@ -191,14 +193,40 @@ const NODE_VISUAL_PRESETS: Record<NodePresetKey, NodeVisualPreset> = {
 };
 
 const NODE_PRESET_RULES: Array<{ regex: RegExp; preset: NodePresetKey }> = [
-  { regex: /(server|microservice|compute|lambda|function|worker|vm|container|docker|kubernetes|edge)/i, preset: "compute" },
-  { regex: /(db|database|sql|redis|storage|bucket|warehouse|lake|cache)/i, preset: "storage" },
-  { regex: /(api|gateway|cdn|load ?balancer|dns|router|network|proxy|edge)/i, preset: "network" },
-  { regex: /(queue|stream|kafka|rabbit|pub|sub|broker|topic|websocket|bus)/i, preset: "messaging" },
-  { regex: /(auth|oauth|jwt|security|iam|firewall|shield|guard|lock)/i, preset: "security" },
-  { regex: /(monitor|log|metric|alert|telemetry|insight|observability|dashboard)/i, preset: "observability" },
-  { regex: /(etl|pipeline|analytics|report|bi|warehouse|lakehouse|data)/i, preset: "data" },
-  { regex: /(client|app|frontend|mobile|browser|device|ui|portal)/i, preset: "client" },
+  {
+    regex:
+      /(server|microservice|compute|lambda|function|worker|vm|container|docker|kubernetes|edge)/i,
+    preset: "compute",
+  },
+  {
+    regex: /(db|database|sql|redis|storage|bucket|warehouse|lake|cache)/i,
+    preset: "storage",
+  },
+  {
+    regex: /(api|gateway|cdn|load ?balancer|dns|router|network|proxy|edge)/i,
+    preset: "network",
+  },
+  {
+    regex: /(queue|stream|kafka|rabbit|pub|sub|broker|topic|websocket|bus)/i,
+    preset: "messaging",
+  },
+  {
+    regex: /(auth|oauth|jwt|security|iam|firewall|shield|guard|lock)/i,
+    preset: "security",
+  },
+  {
+    regex:
+      /(monitor|log|metric|alert|telemetry|insight|observability|dashboard)/i,
+    preset: "observability",
+  },
+  {
+    regex: /(etl|pipeline|analytics|report|bi|warehouse|lakehouse|data)/i,
+    preset: "data",
+  },
+  {
+    regex: /(client|app|frontend|mobile|browser|device|ui|portal)/i,
+    preset: "client",
+  },
   { regex: /(ai|ml|model|inference|llm|vision|nlp|cognitive)/i, preset: "ai" },
 ];
 
@@ -234,6 +262,11 @@ export interface SimpleCanvasProps {
   selectedComponent?: string | null;
   connectionStart?: string | null;
   selectedAnnotationTool?: string | null;
+  drawings?: DrawingStroke[];
+  drawingTool?: DrawingTool;
+  drawingColor?: string;
+  drawingSize?: number;
+  drawingSettings?: DrawingSettings;
   onConnectionStart?: (id: string) => void;
   onComponentSelect?: (id: string | null) => void;
   onComponentMove?: (id: string, x: number, y: number) => void;
@@ -243,11 +276,15 @@ export interface SimpleCanvasProps {
   onComponentDrop?: (
     componentType: DesignComponent["type"],
     x: number,
-    y: number
+    y: number,
   ) => void;
   onCanvasClick?: () => void;
   onAnnotationCreate?: (x: number, y: number, type: string) => void;
-  onQuickConnectPreviewUpdate?: (position: { x: number; y: number } | null) => void;
+  onQuickConnectPreviewUpdate?: (
+    position: { x: number; y: number } | null,
+  ) => void;
+  onDrawingComplete?: (stroke: DrawingStroke) => void;
+  onDrawingDelete?: (strokeId: string) => void;
   readonly?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -267,24 +304,23 @@ const SimpleNode: React.FC<{ data: SimpleNodeData; selected: boolean }> = ({
     "border-2 border-gray-800",
     "text-gray-900",
     selected ? "shadow-xl border-black ring-2 ring-gray-300" : "shadow-md",
-    isConnectionStart
-      ? "ring-2 ring-blue-400 border-blue-500"
-      : "",
+    isConnectionStart ? "ring-2 ring-blue-400 border-blue-500" : "",
     isValidTarget
       ? "ring-2 ring-green-400 border-green-500 cursor-pointer"
-      : ""
+      : "",
   );
 
   const handleBaseClasses = cn(
     "pointer-events-auto w-5 h-5 rounded-full border-3 border-gray-900 bg-white",
     "shadow-lg transition-all duration-200",
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-    "hover:scale-125 hover:border-blue-600 hover:bg-blue-50 hover:shadow-xl"
+    "hover:scale-125 hover:border-blue-600 hover:bg-blue-50 hover:shadow-xl",
   );
 
-  const inactiveHandleClasses = selected || isConnectionStart
-    ? "opacity-100"
-    : "opacity-80 group-hover:opacity-100";
+  const inactiveHandleClasses =
+    selected || isConnectionStart
+      ? "opacity-100"
+      : "opacity-80 group-hover:opacity-100";
 
   const handleDescriptors = [
     {
@@ -364,8 +400,8 @@ const SimpleNode: React.FC<{ data: SimpleNodeData; selected: boolean }> = ({
       onClick={handleNodeClick}
     >
       <span className="sr-only">
-        {announceLabel} Use the connection handles around the node to link it
-        to other components.
+        {announceLabel} Use the connection handles around the node to link it to
+        other components.
       </span>
 
       {/* Simple node content - icon, label and type */}
@@ -393,7 +429,7 @@ const SimpleNode: React.FC<{ data: SimpleNodeData; selected: boolean }> = ({
             className={cn(
               handleBaseClasses,
               inactiveHandleClasses,
-              isReadonly && "hidden"
+              isReadonly && "hidden",
             )}
             style={handle.style}
             title={handle.title}
@@ -424,7 +460,7 @@ interface NodeConversionOptions {
 
 const convertComponentsToNodes = (
   components: DesignComponent[],
-  options: NodeConversionOptions
+  options: NodeConversionOptions,
 ): Node[] => {
   const {
     selectedComponent,
@@ -439,8 +475,7 @@ const convertComponentsToNodes = (
 
     // Mark as valid target if we're in quick-connect mode and this isn't the source
     const isValidTarget = Boolean(
-      connectionStart &&
-      connectionStart !== component.id
+      connectionStart && connectionStart !== component.id,
     );
 
     const data: SimpleNodeData = {
@@ -471,19 +506,25 @@ const convertComponentsToNodes = (
 const convertConnectionsToEdges = (connections: AppConnection[]): Edge[] => {
   return connections.map((connection) => {
     // Determine arrow configuration based on connection properties
-    const markerEnd = connection.properties?.arrowEnd !== false ? {
-      type: 'arrowclosed' as const,
-      color: '#000000',
-      width: 20,
-      height: 20,
-    } : undefined;
+    const markerEnd =
+      connection.properties?.arrowEnd !== false
+        ? {
+            type: "arrowclosed" as const,
+            color: "#000000",
+            width: 20,
+            height: 20,
+          }
+        : undefined;
 
-    const markerStart = connection.properties?.arrowStart === true ? {
-      type: 'arrowclosed' as const,
-      color: '#000000',
-      width: 20,
-      height: 20,
-    } : undefined;
+    const markerStart =
+      connection.properties?.arrowStart === true
+        ? {
+            type: "arrowclosed" as const,
+            color: "#000000",
+            width: 20,
+            height: 20,
+          }
+        : undefined;
 
     return {
       id: connection.id,
@@ -493,7 +534,7 @@ const convertConnectionsToEdges = (connections: AppConnection[]): Edge[] => {
       type: "default", // Use default for straight lines with arrows
       animated: false,
       style: {
-        stroke: '#000000', // Pure black
+        stroke: "#000000", // Pure black
         strokeWidth: 3,
       },
       markerEnd,
@@ -514,7 +555,7 @@ const convertEdgeToConnection = (edge: Edge | Connection): AppConnection => {
     label: "Connection",
     type: "data",
     properties: {
-      arrowEnd: true,  // Arrow at end by default
+      arrowEnd: true, // Arrow at end by default
       arrowStart: false, // No arrow at start by default
     },
   };
@@ -532,6 +573,18 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   selectedComponent,
   connectionStart,
   selectedAnnotationTool,
+  drawings = [],
+  drawingTool = null,
+  drawingColor = "#000000",
+  drawingSize = 4,
+  drawingSettings = {
+    color: "#000000",
+    size: 4,
+    tool: null,
+    smoothing: 0.5,
+    thinning: 0.5,
+    streamline: 0.5,
+  },
   onConnectionStart,
   onComponentSelect,
   onComponentMove,
@@ -542,6 +595,8 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   onCanvasClick,
   onAnnotationCreate,
   onQuickConnectPreviewUpdate,
+  onDrawingComplete,
+  onDrawingDelete,
   readonly = false,
   className = "",
   style,
@@ -551,7 +606,9 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   const reactFlowInstanceRef = useRef<any>(null);
 
   // Internal state for quick-connect mode
-  const [internalConnectionStart, setInternalConnectionStart] = React.useState<string | null>(null);
+  const [internalConnectionStart, setInternalConnectionStart] = React.useState<
+    string | null
+  >(null);
   const activeConnectionStart = connectionStart ?? internalConnectionStart;
 
   const readonlyFlag = Boolean(readonly);
@@ -569,7 +626,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         setInternalConnectionStart(id);
       }
     },
-    [onConnectionStart, readonlyFlag]
+    [onConnectionStart, readonlyFlag],
   );
 
   const clearConnectionStart = useCallback(() => {
@@ -586,22 +643,32 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   }, [onConnectionStart, readonlyFlag]);
 
   // Track mouse position for quick-connect preview
-  const [mousePosition, setMousePosition] = React.useState<{ x: number; y: number } | null>(null);
+  const [mousePosition, setMousePosition] = React.useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
-  const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    if (!activeConnectionStart || !reactFlowInstanceRef.current || !reactFlowWrapper.current) {
-      return;
-    }
+  const handleMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      if (
+        !activeConnectionStart ||
+        !reactFlowInstanceRef.current ||
+        !reactFlowWrapper.current
+      ) {
+        return;
+      }
 
-    const bounds = reactFlowWrapper.current.getBoundingClientRect();
-    const flowPosition = reactFlowInstanceRef.current.screenToFlowPosition({
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top,
-    });
+      const bounds = reactFlowWrapper.current.getBoundingClientRect();
+      const flowPosition = reactFlowInstanceRef.current.screenToFlowPosition({
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      });
 
-    setMousePosition(flowPosition);
-    onQuickConnectPreviewUpdate?.(flowPosition);
-  }, [activeConnectionStart, onQuickConnectPreviewUpdate]);
+      setMousePosition(flowPosition);
+      onQuickConnectPreviewUpdate?.(flowPosition);
+    },
+    [activeConnectionStart, onQuickConnectPreviewUpdate],
+  );
 
   // Handle node click during quick-connect mode to complete the connection
   const handleNodeClick = useCallback(
@@ -620,13 +687,13 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         id: `${activeConnectionStart}-${targetId}`,
         from: activeConnectionStart,
         to: targetId,
-        label: 'Connection',
-        type: 'data',
+        label: "Connection",
+        type: "data",
       };
 
       // Validate: prevent duplicate connections
       const exists = connections.some(
-        conn => conn.from === activeConnectionStart && conn.to === targetId
+        (conn) => conn.from === activeConnectionStart && conn.to === targetId,
       );
 
       if (!exists) {
@@ -636,7 +703,13 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       // Clear the connection start state
       clearConnectionStart();
     },
-    [readonlyFlag, activeConnectionStart, connections, onConnectionCreate, clearConnectionStart]
+    [
+      readonlyFlag,
+      activeConnectionStart,
+      connections,
+      onConnectionCreate,
+      clearConnectionStart,
+    ],
   );
 
   // Memoize node options with stable callback references
@@ -648,44 +721,47 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       onConnectionStart: handleConnectionStart,
       onNodeClick: handleNodeClick,
     }),
-    [selectedComponent, activeConnectionStart, readonlyFlag, handleConnectionStart, handleNodeClick]
+    [
+      selectedComponent,
+      activeConnectionStart,
+      readonlyFlag,
+      handleConnectionStart,
+      handleNodeClick,
+    ],
   );
 
   // Convert props to React Flow format
   const initialNodes = useMemo(
     () => convertComponentsToNodes(components, nodeOptions),
-    [components, nodeOptions]
+    [components, nodeOptions],
   );
 
   const initialEdges = useMemo(
     () => convertConnectionsToEdges(connections),
-    [connections]
+    [connections],
   );
 
   // Convert props to React Flow format - simple and direct
   const nodes = React.useMemo(
     () => convertComponentsToNodes(components, nodeOptions),
-    [components, nodeOptions]
+    [components, nodeOptions],
   );
 
-  const edges = React.useMemo(
-    () => {
-      const result = convertConnectionsToEdges(connections);
-      console.log('[SimpleCanvas] Converting connections to edges:', {
-        connections: connections.length,
-        edges: result.length,
-        edgeDetails: result,
-      });
-      return result;
-    },
-    [connections]
-  );
+  const edges = React.useMemo(() => {
+    const result = convertConnectionsToEdges(connections);
+    console.log("[SimpleCanvas] Converting connections to edges:", {
+      connections: connections.length,
+      edges: result.length,
+      edgeDetails: result,
+    });
+    return result;
+  }, [connections]);
 
   // Use React Flow's built-in state management
   const [reactFlowInstance, setReactFlowInstance] = React.useState<any>(null);
 
   const onInit = React.useCallback((instance: any) => {
-    console.log('[SimpleCanvas] React Flow initialized');
+    console.log("[SimpleCanvas] React Flow initialized");
     setReactFlowInstance(instance);
     reactFlowInstanceRef.current = instance;
   }, []);
@@ -714,7 +790,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         canDrop: monitor.canDrop(),
       }),
     }),
-    [onComponentDrop, readonlyFlag]
+    [onComponentDrop, readonlyFlag],
   );
 
   // Handle node selection
@@ -725,7 +801,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       const selectedId = selectedNodes.length > 0 ? selectedNodes[0].id : null;
       onComponentSelect?.(selectedId);
     },
-    [onComponentSelect, readonlyFlag]
+    [onComponentSelect, readonlyFlag],
   );
 
   // Handle node position changes
@@ -733,24 +809,21 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     (changes: any[]) => {
       // Only handle position changes, ignore selection and other changes
       changes.forEach((change) => {
-        if (change.type === 'position' && change.position && !change.dragging) {
+        if (change.type === "position" && change.position && !change.dragging) {
           onComponentMove?.(change.id, change.position.x, change.position.y);
         }
       });
     },
-    [onComponentMove]
+    [onComponentMove],
   );
 
   // Handle edge changes (required for React Flow to render edges properly)
-  const onEdgesChange = React.useCallback(
-    (changes: any[]) => {
-      // Log edge changes for debugging
-      console.log('[SimpleCanvas] Edge changes:', changes);
-      // We don't need to do anything here since edges are controlled via props
-      // But React Flow needs this handler to be present
-    },
-    []
-  );
+  const onEdgesChange = React.useCallback((changes: any[]) => {
+    // Log edge changes for debugging
+    console.log("[SimpleCanvas] Edge changes:", changes);
+    // We don't need to do anything here since edges are controlled via props
+    // But React Flow needs this handler to be present
+  }, []);
 
   // Handle node drag stop (position change) - backup handler
   const onNodeDragStop = useCallback(
@@ -758,7 +831,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       if (readonlyFlag) return;
       onComponentMove?.(node.id, node.position.x, node.position.y);
     },
-    [onComponentMove, readonlyFlag]
+    [onComponentMove, readonlyFlag],
   );
 
   // Handle new connections
@@ -766,15 +839,15 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     (params: Edge | Connection) => {
       if (readonlyFlag) return;
 
-      console.log('[SimpleCanvas] onConnect called with params:', params);
+      console.log("[SimpleCanvas] onConnect called with params:", params);
 
       const newConnection = convertEdgeToConnection(params);
-      console.log('[SimpleCanvas] Created new connection:', newConnection);
+      console.log("[SimpleCanvas] Created new connection:", newConnection);
 
       // Send to parent - DON'T update local state, let it flow back from props
       onConnectionCreate?.(newConnection);
     },
-    [onConnectionCreate, readonlyFlag]
+    [onConnectionCreate, readonlyFlag],
   );
 
   // Handle edge deletion
@@ -793,52 +866,68 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
 
       lastEdgeClickRef.current = now;
     },
-    [onConnectionDelete, readonlyFlag]
+    [onConnectionDelete, readonlyFlag],
   );
 
   // Handle canvas click
-  const onPaneClick = useCallback((event: React.MouseEvent) => {
-    if (readonlyFlag) return;
+  const onPaneClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (readonlyFlag) return;
 
-    // If annotation tool is selected, create annotation at click position
-    if (selectedAnnotationTool && onAnnotationCreate && reactFlowInstanceRef.current) {
-      const bounds = reactFlowWrapper.current?.getBoundingClientRect();
-      if (!bounds) return;
+      // If drawing tool is active, let drawing overlay handle it
+      if (drawingTool) {
+        return;
+      }
 
-      // Get the click position relative to the canvas
-      const position = reactFlowInstanceRef.current.screenToFlowPosition({
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top,
-      });
+      // If annotation tool is selected, create annotation at click position
+      if (
+        selectedAnnotationTool &&
+        onAnnotationCreate &&
+        reactFlowInstanceRef.current
+      ) {
+        // Get the click position using direct client coordinates
+        const [flowX, flowY] = pointerEventToFlowPosition(
+          event,
+          reactFlowInstanceRef.current,
+        );
 
-      onAnnotationCreate(position.x, position.y, selectedAnnotationTool);
-      return;
-    }
+        onAnnotationCreate(flowX, flowY, selectedAnnotationTool);
+        return;
+      }
 
-    // Clear connection start if active
-    if (activeConnectionStart) {
-      clearConnectionStart();
-      setMousePosition(null);
-      onQuickConnectPreviewUpdate?.(null);
-    }
+      // Clear connection start if active
+      if (activeConnectionStart) {
+        clearConnectionStart();
+        setMousePosition(null);
+        onQuickConnectPreviewUpdate?.(null);
+      }
 
-    onCanvasClick?.();
-    onComponentSelect?.(null); // Deselect when clicking empty space
-  }, [
-    onCanvasClick,
-    onComponentSelect,
-    readonlyFlag,
-    activeConnectionStart,
-    clearConnectionStart,
-    selectedAnnotationTool,
-    onAnnotationCreate,
-    onQuickConnectPreviewUpdate,
-  ]);
+      onCanvasClick?.();
+      onComponentSelect?.(null); // Deselect when clicking empty space
+    },
+    [
+      onCanvasClick,
+      onComponentSelect,
+      readonlyFlag,
+      activeConnectionStart,
+      clearConnectionStart,
+      selectedAnnotationTool,
+      onAnnotationCreate,
+      onQuickConnectPreviewUpdate,
+      drawingTool,
+    ],
+  );
 
   // Handle keyboard shortcuts
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       if (readonlyFlag) return;
+
+      // Cancel drawing mode with Escape
+      if (event.key === "Escape" && drawingTool) {
+        // Drawing overlay will handle this
+        return;
+      }
 
       // Cancel quick-connect mode with Escape
       if (event.key === "Escape" && activeConnectionStart) {
@@ -860,7 +949,13 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         }
       }
     },
-    [nodes, onComponentDelete, readonlyFlag, activeConnectionStart, clearConnectionStart]
+    [
+      nodes,
+      onComponentDelete,
+      readonlyFlag,
+      activeConnectionStart,
+      clearConnectionStart,
+    ],
   );
 
   // Combine refs using callback ref approach
@@ -872,15 +967,15 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       }
       drop(element);
     },
-    [drop]
+    [drop],
   );
 
   // Debug log to see what's being rendered
-  console.log('[SimpleCanvas] Rendering with:', {
+  console.log("[SimpleCanvas] Rendering with:", {
     nodesCount: nodes.length,
     edgesCount: edges.length,
-    nodes: nodes.map(n => ({ id: n.id, position: n.position })),
-    edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target })),
+    nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
+    edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
   });
 
   return (
@@ -892,7 +987,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         isOver && canDrop
           ? "ring-2 ring-blue-500/40 shadow-lg border-blue-500"
           : "shadow-md",
-        className
+        className,
       )}
       style={{
         width: "100%",
@@ -906,7 +1001,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       <div
         className={cn(
           "pointer-events-none absolute inset-0 z-10 rounded-[24px] border-2 border-primary/40 transition-opacity duration-200",
-          isOver && canDrop ? "opacity-100" : "opacity-0"
+          isOver && canDrop ? "opacity-100" : "opacity-0",
         )}
       />
 
@@ -926,12 +1021,12 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         onMouseMove={handleMouseMove}
         nodeTypes={nodeTypes}
         defaultEdgeOptions={{
-          type: 'default',
+          type: "default",
           animated: false,
-          style: { stroke: '#000000', strokeWidth: 3 },
+          style: { stroke: "#000000", strokeWidth: 3 },
           markerEnd: {
-            type: 'arrowclosed',
-            color: '#000000',
+            type: "arrowclosed",
+            color: "#000000",
             width: 20,
             height: 20,
           },
@@ -943,13 +1038,13 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
         edgesUpdatable={!readonlyFlag}
         edgesFocusable={!readonlyFlag}
         elementsSelectable={!readonlyFlag}
-        panOnDrag={!readonlyFlag}
+        panOnDrag={!readonlyFlag && !drawingTool}
         zoomOnScroll={true}
         zoomOnPinch={true}
         deleteKeyCode={readonlyFlag ? null : ["Delete", "Backspace"]}
         multiSelectionKeyCode={readonlyFlag ? null : "Meta"}
         proOptions={{ hideAttribution: true }}
-        connectionLineStyle={{ stroke: '#000000', strokeWidth: 2 }}
+        connectionLineStyle={{ stroke: "#000000", strokeWidth: 2 }}
         connectionLineType="default"
       >
         <Background
@@ -977,6 +1072,19 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
           zoomable
         />
       </ReactFlow>
+
+      {/* Drawing Overlay */}
+      <DrawingOverlay
+        strokes={drawings}
+        currentTool={drawingTool}
+        color={drawingColor}
+        size={drawingSize}
+        settings={drawingSettings}
+        onStrokeComplete={onDrawingComplete || (() => {})}
+        onStrokeDelete={onDrawingDelete || (() => {})}
+        enabled={!readonlyFlag && drawingTool !== null}
+        className="absolute inset-0 z-30"
+      />
     </div>
   );
 };

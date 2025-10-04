@@ -13,44 +13,55 @@ import {
   ExtendedChallenge,
   challengeManager,
 } from "../../../../lib/config/challenge-config";
-import type { Challenge, DesignData, Connection } from "../../../../shared/contracts";
+import type {
+  Challenge,
+  Connection,
+  DesignData,
+} from "../../../../shared/contracts";
 import { useOptimizedSelector } from "../../../../shared/hooks/useOptimizedSelector";
-import { useCanvasStore } from "../../../../stores/canvasStore";
+import {
+  useCanvasDrawings,
+  useCanvasStore,
+  useDrawingColor,
+  useDrawingSettings,
+  useDrawingSize,
+  useDrawingTool,
+} from "../../../../stores/canvasStore";
 
 import { AssignmentPanel } from "../AssignmentPanel";
 import { StatusBar } from "../layout/StatusBar";
 import { PropertiesPanel } from "../PropertiesPanel";
 
 import { useInitialCanvasSync } from "../../../../shared/hooks/useInitialCanvasSync";
+import { useCanvasKeyboardNavigation } from "./hooks/useCanvasKeyboardNavigation";
 import { useDesignCanvasCallbacks } from "./hooks/useDesignCanvasCallbacks";
 import { useDesignCanvasEffects } from "./hooks/useDesignCanvasEffects";
 import { useDesignCanvasImportExport } from "./hooks/useDesignCanvasImportExport";
 import { useDesignCanvasState } from "./hooks/useDesignCanvasState";
 import { useStatusBarMetrics } from "./hooks/useStatusBarMetrics";
-import { useCanvasKeyboardNavigation } from "./hooks/useCanvasKeyboardNavigation";
 
+import type { Annotation } from "../../../../shared/contracts";
+import {
+  addToRecentlyUsed,
+  applyTemplate,
+  getTemplatesForComponentPair,
+  type ConnectionTemplate,
+} from "../../../canvas/config/connection-templates";
+import { useQuickConnect } from "../../../canvas/hooks/useQuickConnect";
 import { SimpleCanvas } from "../../../canvas/SimpleCanvas";
+import { AnnotationSidebar } from "../canvas/AnnotationSidebar";
+import { AnnotationToolbar } from "../canvas/AnnotationToolbar";
+import { CanvasContextualHelp } from "../canvas/CanvasContextualHelp";
+import { CanvasOnboardingTour } from "../canvas/CanvasOnboardingTour";
+import { CanvasSelfAssessment } from "../canvas/CanvasSelfAssessment";
+import { CanvasToolbar } from "../canvas/CanvasToolbar";
+import { ConnectionTemplatePanel } from "../canvas/ConnectionTemplatePanel";
+import { KeyboardShortcutsReference } from "../canvas/KeyboardShortcutsReference";
+import { QuickConnectOverlay } from "../canvas/QuickConnectOverlay";
+import { QuickValidationPanel } from "../canvas/QuickValidationPanel";
 import { CanvasOverlays } from "./components/CanvasOverlays";
 import { DesignCanvasLayout } from "./components/DesignCanvasLayout";
 import { DesignCanvasHeader } from "./DesignCanvasHeader";
-import { AnnotationToolbar } from "../canvas/AnnotationToolbar";
-import { AnnotationSidebar } from "../canvas/AnnotationSidebar";
-import { CanvasToolbar } from "../canvas/CanvasToolbar";
-import { QuickConnectOverlay } from "../canvas/QuickConnectOverlay";
-import { CanvasOnboardingTour } from "../canvas/CanvasOnboardingTour";
-import { CanvasContextualHelp } from "../canvas/CanvasContextualHelp";
-import { ConnectionTemplatePanel } from "../canvas/ConnectionTemplatePanel";
-import { QuickValidationPanel } from "../canvas/QuickValidationPanel";
-import { CanvasSelfAssessment } from "../canvas/CanvasSelfAssessment";
-import { KeyboardShortcutsReference } from "../canvas/KeyboardShortcutsReference";
-import type { Annotation } from "../../../../shared/contracts";
-import { useQuickConnect } from "../../../canvas/hooks/useQuickConnect";
-import {
-  getTemplatesForComponentPair,
-  applyTemplate,
-  addToRecentlyUsed,
-  type ConnectionTemplate,
-} from "../../../canvas/config/connection-templates";
 
 export interface DesignCanvasProps {
   challenge: Challenge;
@@ -75,14 +86,23 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   >(undefined);
 
   // Annotation state
-  const [annotations, setAnnotations] = useState<Annotation[]>(initialData.annotations ?? []);
-  const [selectedAnnotationTool, setSelectedAnnotationTool] = useState<Annotation['type'] | null>(null);
-  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [annotations, setAnnotations] = useState<Annotation[]>(
+    initialData.annotations ?? [],
+  );
+  const [selectedAnnotationTool, setSelectedAnnotationTool] = useState<
+    Annotation["type"] | null
+  >(null);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<
+    string | null
+  >(null);
   const [showAnnotationSidebar, setShowAnnotationSidebar] = useState(false);
 
   // Connection template state
   const [showTemplatePanel, setShowTemplatePanel] = useState(false);
-  const [pendingConnection, setPendingConnection] = useState<{ from: string; to: string } | null>(null);
+  const [pendingConnection, setPendingConnection] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
 
   // Validation and assessment overlay state
   const [showValidation, setShowValidation] = useState(false);
@@ -90,7 +110,9 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
 
   // Keyboard shortcuts modal state
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
-  const [shortcutsInitialSection, setShortcutsInitialSection] = useState<string | undefined>();
+  const [shortcutsInitialSection, setShortcutsInitialSection] = useState<
+    string | undefined
+  >();
   const [shortcutsHighlight, setShortcutsHighlight] = useState<string[]>([]);
 
   // Quick-connect hook
@@ -106,7 +128,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
       connections: initialData.connections ?? [],
       infoCards: initialData.infoCards ?? [],
     }),
-    [initialData.components, initialData.connections, initialData.infoCards]
+    [initialData.components, initialData.connections, initialData.infoCards],
   );
 
   const { isSynced } = useInitialCanvasSync({
@@ -120,7 +142,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
       getState: useCanvasStore.getState,
       subscribe: useCanvasStore.subscribe,
     }),
-    []
+    [],
   );
 
   const {
@@ -129,18 +151,24 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     infoCards,
     selectedComponentId,
     connectionStart,
-  } =
-    useOptimizedSelector(
-      canvasSource,
-      (state: any) => ({
-        components: state.components,
-        connections: state.connections,
-        infoCards: state.infoCards,
-        selectedComponentId: state.selectedComponent,
-        connectionStart: state.connectionStart,
-      }),
-      { debugLabel: "DesignCanvas.canvasState", equalityFn: shallow }
-    );
+  } = useOptimizedSelector(
+    canvasSource,
+    (state: any) => ({
+      components: state.components,
+      connections: state.connections,
+      infoCards: state.infoCards,
+      selectedComponentId: state.selectedComponent,
+      connectionStart: state.connectionStart,
+    }),
+    { debugLabel: "DesignCanvas.canvasState", equalityFn: shallow },
+  );
+
+  // Drawing state
+  const drawings = useCanvasDrawings();
+  const drawingTool = useDrawingTool();
+  const drawingColor = useDrawingColor();
+  const drawingSize = useDrawingSize();
+  const drawingSettings = useDrawingSettings();
 
   const {
     showHints,
@@ -158,9 +186,19 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
 
   const callbacks = useDesignCanvasCallbacks();
 
+  // Extract drawing callbacks
+  const {
+    handleDrawingComplete,
+    handleDrawingDelete,
+    handleDrawingToolChange,
+    handleDrawingColorChange,
+    handleDrawingSizeChange,
+    handleClearAllDrawings,
+  } = callbacks;
+
   const layers = useMemo(
     () => (Array.isArray(initialData.layers) ? initialData.layers : []),
-    [initialData.layers]
+    [initialData.layers],
   );
 
   const metadata = useMemo(() => {
@@ -178,15 +216,27 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
       connections,
       infoCards,
       annotations,
+      drawings,
       layers,
       metadata,
     }),
-    [components, connections, infoCards, annotations, layers, metadata]
+    [
+      components,
+      connections,
+      infoCards,
+      annotations,
+      drawings,
+      layers,
+      metadata,
+    ],
   );
 
-  const handleAnnotationsImported = useCallback((importedAnnotations: Annotation[]) => {
-    setAnnotations(importedAnnotations);
-  }, []);
+  const handleAnnotationsImported = useCallback(
+    (importedAnnotations: Annotation[]) => {
+      setAnnotations(importedAnnotations);
+    },
+    [],
+  );
 
   const {
     handleImport,
@@ -211,23 +261,23 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
 
   const exportCurrentDesign = useCallback(
     () => handleQuickExport(currentDesignDataRef.current),
-    [handleQuickExport]
+    [handleQuickExport],
   );
   const quickSaveCurrentDesign = useCallback(
     () => handleQuickSave(currentDesignDataRef.current),
-    [handleQuickSave]
+    [handleQuickSave],
   );
   const copyCurrentDesign = useCallback(
     () => handleCopyToClipboard(currentDesignDataRef.current),
-    [handleCopyToClipboard]
+    [handleCopyToClipboard],
   );
   const saveCurrentDesign = useCallback(
     () => handleSave(currentDesignDataRef.current),
-    [handleSave]
+    [handleSave],
   );
   const handleContinue = useCallback(
     () => onComplete(currentDesignData),
-    [onComplete, currentDesignData]
+    [onComplete, currentDesignData],
   );
 
   // Handlers for optional flow
@@ -269,7 +319,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     () =>
       (challengeManager.getChallengeById(challenge.id) as ExtendedChallenge) ??
       challenge,
-    [challenge]
+    [challenge],
   );
 
   const challengeTags = useMemo<string[] | undefined>(() => {
@@ -320,7 +370,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     onSetCanvasMode: (mode) => useCanvasStore.getState().setCanvasMode(mode),
     onHelp: () => {
       setShortcutsInitialSection(undefined);
-      setShortcutsHighlight(['onHelp']);
+      setShortcutsHighlight(["onHelp"]);
       setShowKeyboardShortcuts(true);
     },
   });
@@ -334,50 +384,67 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
       setShowKeyboardShortcuts(true);
     };
 
-    window.addEventListener('open-keyboard-shortcuts', handleOpenShortcuts);
+    window.addEventListener("open-keyboard-shortcuts", handleOpenShortcuts);
     return () => {
-      window.removeEventListener('open-keyboard-shortcuts', handleOpenShortcuts);
+      window.removeEventListener(
+        "open-keyboard-shortcuts",
+        handleOpenShortcuts,
+      );
     };
   }, []);
 
   // Annotation callbacks
-  const handleAnnotationToolSelect = useCallback((tool: Annotation['type'] | null) => {
-    setSelectedAnnotationTool(tool);
-  }, []);
+  const handleAnnotationToolSelect = useCallback(
+    (tool: Annotation["type"] | null) => {
+      setSelectedAnnotationTool(tool);
+    },
+    [],
+  );
 
-  const handleAnnotationCreate = useCallback((x: number, y: number, type: Annotation['type']) => {
-    const newAnnotation: Annotation = {
-      id: `annotation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type,
-      content: '',
-      x,
-      y,
-      width: 200,
-      height: 100,
-      timestamp: Date.now(),
-    };
-    setAnnotations(prev => [...prev, newAnnotation]);
-    setSelectedAnnotationId(newAnnotation.id);
-    setSelectedAnnotationTool(null);
-    markDesignModified();
-  }, [markDesignModified]);
+  const handleAnnotationCreate = useCallback(
+    (x: number, y: number, type: Annotation["type"]) => {
+      const newAnnotation: Annotation = {
+        id: `annotation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type,
+        content: "",
+        x,
+        y,
+        width: 200,
+        height: 100,
+        timestamp: Date.now(),
+      };
+      setAnnotations((prev) => [...prev, newAnnotation]);
+      setSelectedAnnotationId(newAnnotation.id);
+      setSelectedAnnotationTool(null);
+      markDesignModified();
+    },
+    [markDesignModified],
+  );
 
   const handleAnnotationSelect = useCallback((id: string | null) => {
     setSelectedAnnotationId(id);
   }, []);
 
-  const handleAnnotationDelete = useCallback((id: string) => {
-    setAnnotations(prev => prev.filter(a => a.id !== id));
-    if (selectedAnnotationId === id) {
-      setSelectedAnnotationId(null);
-    }
-    markDesignModified();
-  }, [selectedAnnotationId, markDesignModified]);
+  const handleAnnotationDelete = useCallback(
+    (id: string) => {
+      setAnnotations((prev) => prev.filter((a) => a.id !== id));
+      if (selectedAnnotationId === id) {
+        setSelectedAnnotationId(null);
+      }
+      markDesignModified();
+    },
+    [selectedAnnotationId, markDesignModified],
+  );
 
-  const handleAnnotationUpdate = useCallback((id: string, updates: Partial<Annotation>) => {
-    setAnnotations(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
-    markDesignModified();
-  }, [markDesignModified]);
+  const handleAnnotationUpdate = useCallback(
+    (id: string, updates: Partial<Annotation>) => {
+      setAnnotations((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+      );
+      markDesignModified();
+    },
+    [markDesignModified],
+  );
 
   const handleAnnotationFocus = useCallback((id: string) => {
     setSelectedAnnotationId(id);
@@ -385,38 +452,41 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   }, []);
 
   // Connection template handlers
-  const handleTemplateSelect = useCallback((template: ConnectionTemplate) => {
-    if (!pendingConnection) return;
+  const handleTemplateSelect = useCallback(
+    (template: ConnectionTemplate) => {
+      if (!pendingConnection) return;
 
-    // Apply template to create connection with appropriate properties
-    const connectionData = applyTemplate(template, {
-      from: pendingConnection.from,
-      to: pendingConnection.to,
-    });
+      // Apply template to create connection with appropriate properties
+      const connectionData = applyTemplate(template, {
+        from: pendingConnection.from,
+        to: pendingConnection.to,
+      });
 
-    // Add to recently used
-    addToRecentlyUsed(template.id);
+      // Add to recently used
+      addToRecentlyUsed(template.id);
 
-    // Create a new connection with ID
-    const newConnection: Connection = {
-      id: `${pendingConnection.from}-${pendingConnection.to}-${Date.now()}`,
-      from: connectionData.from!,
-      to: connectionData.to!,
-      type: connectionData.type || 'data',
-      label: connectionData.label || '',
-      visualStyle: connectionData.visualStyle,
-      metadata: connectionData.metadata,
-    };
+      // Create a new connection with ID
+      const newConnection: Connection = {
+        id: `${pendingConnection.from}-${pendingConnection.to}-${Date.now()}`,
+        from: connectionData.from!,
+        to: connectionData.to!,
+        type: connectionData.type || "data",
+        label: connectionData.label || "",
+        visualStyle: connectionData.visualStyle,
+        metadata: connectionData.metadata,
+      };
 
-    // Update the store with the new connection
-    useCanvasStore.getState().updateConnections(
-      (connections) => [...connections, newConnection]
-    );
+      // Update the store with the new connection
+      useCanvasStore
+        .getState()
+        .updateConnections((connections) => [...connections, newConnection]);
 
-    // Close template panel
-    setShowTemplatePanel(false);
-    setPendingConnection(null);
-  }, [pendingConnection]);
+      // Close template panel
+      setShowTemplatePanel(false);
+      setPendingConnection(null);
+    },
+    [pendingConnection],
+  );
 
   const handleTemplatePanelCancel = useCallback(() => {
     setShowTemplatePanel(false);
@@ -427,14 +497,18 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   const availableTemplates = useMemo(() => {
     if (!pendingConnection) return [];
 
-    const sourceComponent = components.find(c => c.id === pendingConnection.from);
-    const targetComponent = components.find(c => c.id === pendingConnection.to);
+    const sourceComponent = components.find(
+      (c) => c.id === pendingConnection.from,
+    );
+    const targetComponent = components.find(
+      (c) => c.id === pendingConnection.to,
+    );
 
     if (!sourceComponent || !targetComponent) return [];
 
     return getTemplatesForComponentPair(
       sourceComponent.type,
-      targetComponent.type
+      targetComponent.type,
     );
   }, [pendingConnection, components]);
 
@@ -455,10 +529,14 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             onShowCommandPalette={() => setShowCommandPalette(true)}
             onImport={handleImport}
             showAnnotationSidebar={showAnnotationSidebar}
-            onToggleAnnotationSidebar={() => setShowAnnotationSidebar(prev => !prev)}
+            onToggleAnnotationSidebar={() =>
+              setShowAnnotationSidebar((prev) => !prev)
+            }
             annotationCount={annotations.length}
             onSkipToReview={onSkipToReview ? handleSkipToReview : undefined}
-            onFinishAndExport={onFinishAndExport ? handleFinishAndExport : undefined}
+            onFinishAndExport={
+              onFinishAndExport ? handleFinishAndExport : undefined
+            }
           />
         }
         assignmentPanel={
@@ -471,7 +549,10 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
         canvas={
           <div className="relative w-full h-full">
             {/* Canvas Toolbar */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[var(--z-toolbar)]" data-tour="canvas-toolbar">
+            <div
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-[var(--z-toolbar)]"
+              data-tour="canvas-toolbar"
+            >
               <CanvasToolbar
                 onFitView={() => {
                   // TODO: Implement fit view using React Flow
@@ -494,13 +575,13 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
                   setShortcutsInitialSection(section);
                   // Set highlighted shortcuts based on section
                   const highlights: Record<string, string[]> = {
-                    'Canvas Modes': ['onSetCanvasMode'],
-                    'View': ['onToggleGrid', 'onToggleMinimap'],
-                    'Animation': ['onToggleAnimations'],
-                    'Layout': ['onUndo', 'onRedo', 'onFitView'],
-                    'Validation': [],
-                    'Export': [],
-                    'Settings': [],
+                    "Canvas Modes": ["onSetCanvasMode"],
+                    View: ["onToggleGrid", "onToggleMinimap"],
+                    Animation: ["onToggleAnimations"],
+                    Layout: ["onUndo", "onRedo", "onFitView"],
+                    Validation: [],
+                    Export: [],
+                    Settings: [],
                   };
                   setShortcutsHighlight(highlights[section] || []);
                   setShowKeyboardShortcuts(true);
@@ -521,7 +602,10 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
                       (exportData as any).selfAssessment = assessment;
                     }
                   } catch (error) {
-                    console.warn('Failed to attach self-assessment to export:', error);
+                    console.warn(
+                      "Failed to attach self-assessment to export:",
+                      error,
+                    );
                   }
 
                   handleQuickExport(exportData);
@@ -533,8 +617,15 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
               components={components}
               connections={connections}
               selectedComponent={selectedComponentId ?? null}
-              connectionStart={quickConnect.quickConnectSource ?? connectionStart ?? null}
+              connectionStart={
+                quickConnect.quickConnectSource ?? connectionStart ?? null
+              }
               selectedAnnotationTool={selectedAnnotationTool}
+              drawings={drawings}
+              drawingTool={drawingTool}
+              drawingColor={drawingColor}
+              drawingSize={drawingSize}
+              drawingSettings={drawingSettings}
               onConnectionStart={(id) => {
                 // In quick-connect mode, use the quick-connect hook
                 if (quickConnect.isQuickConnectMode) {
@@ -548,7 +639,10 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
               onComponentDelete={handleDeleteComponent}
               onConnectionCreate={(connection) => {
                 // In quick-connect mode, connections are created via the hook
-                if (quickConnect.isQuickConnectMode && quickConnect.quickConnectSource) {
+                if (
+                  quickConnect.isQuickConnectMode &&
+                  quickConnect.quickConnectSource
+                ) {
                   quickConnect.completeQuickConnect(connection.to);
                 } else {
                   handleCompleteConnection(connection.from, connection.to);
@@ -558,17 +652,20 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
               onComponentDrop={handleComponentDrop}
               onAnnotationCreate={handleAnnotationCreate}
               onQuickConnectPreviewUpdate={quickConnect.updatePreview}
+              onDrawingComplete={handleDrawingComplete}
+              onDrawingDelete={handleDrawingDelete}
             />
 
             {/* Quick Connect Overlay */}
-            {quickConnect.isQuickConnectMode && quickConnect.quickConnectSource && (
-              <QuickConnectOverlay
-                sourceNodeId={quickConnect.quickConnectSource}
-                previewPosition={quickConnect.quickConnectPreview}
-                isValidTarget={true}
-                onCancel={quickConnect.cancelQuickConnect}
-              />
-            )}
+            {quickConnect.isQuickConnectMode &&
+              quickConnect.quickConnectSource && (
+                <QuickConnectOverlay
+                  sourceNodeId={quickConnect.quickConnectSource}
+                  previewPosition={quickConnect.quickConnectPreview}
+                  isValidTarget={true}
+                  onCancel={quickConnect.cancelQuickConnect}
+                />
+              )}
           </div>
         }
         propertiesPanel={
@@ -632,8 +729,14 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             {/* Connection Template Panel */}
             {showTemplatePanel && pendingConnection && (
               <ConnectionTemplatePanel
-                sourceType={components.find(c => c.id === pendingConnection.from)?.type || ''}
-                targetType={components.find(c => c.id === pendingConnection.to)?.type || ''}
+                sourceType={
+                  components.find((c) => c.id === pendingConnection.from)
+                    ?.type || ""
+                }
+                targetType={
+                  components.find((c) => c.id === pendingConnection.to)?.type ||
+                  ""
+                }
                 templates={availableTemplates}
                 onSelectTemplate={handleTemplateSelect}
                 onCancel={handleTemplatePanelCancel}
@@ -666,7 +769,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
                 designData={currentDesignData}
                 onComplete={(assessment) => {
                   // Assessment is saved to localStorage by the component
-                  console.log('Self-assessment completed:', assessment);
+                  console.log("Self-assessment completed:", assessment);
                 }}
               />
             )}
@@ -697,7 +800,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
 
 const designCanvasPropsEqual = (
   prev: DesignCanvasProps,
-  next: DesignCanvasProps
+  next: DesignCanvasProps,
 ): boolean => {
   if (prev.challenge.id !== next.challenge.id) return false;
   if (prev.onComplete !== next.onComplete || prev.onBack !== next.onBack)
@@ -716,7 +819,7 @@ const designCanvasPropsEqual = (
 
 export const DesignCanvas = React.memo(
   DesignCanvasComponent,
-  designCanvasPropsEqual
+  designCanvasPropsEqual,
 );
 
 DesignCanvas.displayName = "DesignCanvas";

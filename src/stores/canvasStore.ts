@@ -1,5 +1,13 @@
 import { InfiniteLoopDetector } from "@/lib/performance/InfiniteLoopDetector";
-import type { Connection, DesignComponent, InfoCard, Annotation } from "@shared/contracts";
+import type {
+  Annotation,
+  Connection,
+  DesignComponent,
+  DrawingSettings,
+  DrawingStroke,
+  DrawingTool,
+  InfoCard,
+} from "@shared/contracts";
 import { temporal } from "zundo";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -12,7 +20,12 @@ const RATE_LIMIT_WINDOW_MS = 100;
 const RATE_LIMIT_COUNT = 10;
 const RATE_LIMIT_COOLDOWN_MS = 250;
 
-export type CanvasMode = "select" | "quick-connect" | "pan" | "annotation";
+export type CanvasMode =
+  | "select"
+  | "quick-connect"
+  | "pan"
+  | "annotation"
+  | "draw";
 export type PathStyle = "straight" | "curved" | "stepped";
 
 interface CanvasStoreState {
@@ -20,11 +33,18 @@ interface CanvasStoreState {
   connections: Connection[];
   infoCards: InfoCard[];
   annotations: Annotation[];
+  drawings: DrawingStroke[];
   selectedComponent: string | null;
   connectionStart: string | null;
   visualTheme: "serious" | "playful";
   lastUpdatedAt: number;
   updateVersion: number;
+
+  // Drawing state
+  drawingTool: DrawingTool;
+  drawingColor: string;
+  drawingSize: number;
+  drawingSettings: DrawingSettings;
 
   // Canvas mode and interaction state
   canvasMode: CanvasMode;
@@ -324,11 +344,25 @@ const initialState: CanvasStoreState = {
   connections: [],
   infoCards: [],
   annotations: [],
+  drawings: [],
   selectedComponent: null,
   connectionStart: null,
   visualTheme: "serious",
   lastUpdatedAt: 0,
   updateVersion: 0,
+
+  // Drawing state
+  drawingTool: null,
+  drawingColor: "#000000",
+  drawingSize: 4,
+  drawingSettings: {
+    color: "#000000",
+    size: 4,
+    tool: null,
+    smoothing: 0.5,
+    thinning: 0.5,
+    streamline: 0.5,
+  },
 
   // Canvas mode defaults
   canvasMode: "select",
@@ -401,6 +435,10 @@ export const useCanvasStore = create<CanvasStoreState>()(
         recentComponents: state.recentComponents,
         favoriteComponents: state.favoriteComponents,
         lastUsedComponent: state.lastUsedComponent,
+        // Persist drawing settings
+        drawingColor: state.drawingColor,
+        drawingSize: state.drawingSize,
+        drawingSettings: state.drawingSettings,
       }),
     },
   ),
@@ -516,7 +554,9 @@ const mutableCanvasActions = {
     applyUpdate(
       "updateAnnotation",
       (draft) => {
-        const index = draft.annotations.findIndex((a) => a.id === annotation.id);
+        const index = draft.annotations.findIndex(
+          (a) => a.id === annotation.id,
+        );
         if (index !== -1) {
           draft.annotations[index] = annotation;
         }
@@ -528,7 +568,9 @@ const mutableCanvasActions = {
     applyUpdate(
       "deleteAnnotation",
       (draft) => {
-        draft.annotations = draft.annotations.filter((a) => a.id !== annotationId);
+        draft.annotations = draft.annotations.filter(
+          (a) => a.id !== annotationId,
+        );
       },
       options,
     );
@@ -538,6 +580,127 @@ const mutableCanvasActions = {
       "clearAnnotations",
       (draft) => {
         draft.annotations = [];
+      },
+      options,
+    );
+  },
+  // Drawing actions
+  setDrawings(drawings: DrawingStroke[], options?: ArrayActionOptions) {
+    const current = useCanvasStore.getState().drawings;
+    if (arraysEqual(current, drawings)) return;
+    applyUpdate(
+      "setDrawings",
+      (draft) => {
+        draft.drawings = drawings;
+      },
+      options,
+    );
+  },
+  addDrawing(drawing: DrawingStroke, options?: ArrayActionOptions) {
+    applyUpdate(
+      "addDrawing",
+      (draft) => {
+        draft.drawings.push(drawing);
+      },
+      options,
+    );
+  },
+  updateDrawing(drawing: DrawingStroke, options?: ArrayActionOptions) {
+    applyUpdate(
+      "updateDrawing",
+      (draft) => {
+        const index = draft.drawings.findIndex((d) => d.id === drawing.id);
+        if (index !== -1) {
+          draft.drawings[index] = drawing;
+        }
+      },
+      options,
+    );
+  },
+  deleteDrawing(drawingId: string, options?: ArrayActionOptions) {
+    applyUpdate(
+      "deleteDrawing",
+      (draft) => {
+        draft.drawings = draft.drawings.filter((d) => d.id !== drawingId);
+      },
+      options,
+    );
+  },
+  clearDrawings(options?: ArrayActionOptions) {
+    applyUpdate(
+      "clearDrawings",
+      (draft) => {
+        draft.drawings = [];
+      },
+      options,
+    );
+  },
+  setDrawingTool(tool: DrawingTool, options?: ConditionalSetOptions) {
+    const current = useCanvasStore.getState().drawingTool;
+    if (current === tool) return;
+    applyUpdate(
+      "setDrawingTool",
+      (draft) => {
+        draft.drawingTool = tool;
+        draft.drawingSettings.tool = tool;
+        // Update canvas mode when drawing tool is selected
+        if (tool !== null && draft.canvasMode !== "draw") {
+          draft.canvasMode = "draw";
+        } else if (tool === null && draft.canvasMode === "draw") {
+          draft.canvasMode = "select";
+        }
+      },
+      options,
+    );
+  },
+  setDrawingColor(color: string, options?: ConditionalSetOptions) {
+    const current = useCanvasStore.getState().drawingColor;
+    if (current === color) return;
+    applyUpdate(
+      "setDrawingColor",
+      (draft) => {
+        draft.drawingColor = color;
+        draft.drawingSettings.color = color;
+      },
+      options,
+    );
+  },
+  setDrawingSize(size: number, options?: ConditionalSetOptions) {
+    const clampedSize = Math.max(1, Math.min(20, size));
+    const current = useCanvasStore.getState().drawingSize;
+    if (current === clampedSize) return;
+    applyUpdate(
+      "setDrawingSize",
+      (draft) => {
+        draft.drawingSize = clampedSize;
+        draft.drawingSettings.size = clampedSize;
+      },
+      options,
+    );
+  },
+  updateDrawingSettings(
+    settings: Partial<DrawingSettings>,
+    options?: BaseActionOptions,
+  ) {
+    applyUpdate(
+      "updateDrawingSettings",
+      (draft) => {
+        Object.assign(draft.drawingSettings, settings);
+      },
+      options,
+    );
+  },
+  updateDrawings(
+    updater: (drawings: DrawingStroke[]) => DrawingStroke[],
+    options?: ArrayActionOptions,
+  ) {
+    const current = useCanvasStore.getState().drawings;
+    const next = updater(current);
+    if (arraysEqual(current, next)) return;
+    applyUpdate(
+      "updateDrawings",
+      (draft) => {
+        draft.drawings = next;
       },
       options,
     );
@@ -685,7 +848,10 @@ const mutableCanvasActions = {
   },
   updateCanvasData(
     data: Partial<
-      Pick<CanvasStoreState, "components" | "connections" | "infoCards" | "annotations">
+      Pick<
+        CanvasStoreState,
+        "components" | "connections" | "infoCards" | "annotations" | "drawings"
+      >
     >,
     options?: UpdateCanvasDataOptions,
   ) {
@@ -724,8 +890,17 @@ const mutableCanvasActions = {
         if (data.infoCards && !arraysEqual(draft.infoCards, data.infoCards)) {
           draft.infoCards = data.infoCards;
         }
-        if (data.annotations && !arraysEqual(draft.annotations, data.annotations)) {
+        if (
+          data.annotations &&
+          !arraysEqual(draft.annotations, data.annotations)
+        ) {
           draft.annotations = data.annotations;
+        }
+        if (
+          data.drawings !== undefined &&
+          !arraysEqual(draft.drawings, data.drawings)
+        ) {
+          draft.drawings = data.drawings;
         }
       },
       options,
@@ -746,8 +921,10 @@ const mutableCanvasActions = {
       draft.connections = [];
       draft.infoCards = [];
       draft.annotations = [];
+      draft.drawings = [];
       draft.selectedComponent = null;
       draft.connectionStart = null;
+      draft.drawingTool = null;
       draft.lastUpdatedAt = Date.now();
       draft.updateVersion += 1;
     });
@@ -988,6 +1165,16 @@ export const useCanvasInfoCards = () =>
   useCanvasStore((state) => state.infoCards, shallow);
 export const useCanvasAnnotations = () =>
   useCanvasStore((state) => state.annotations, shallow);
+export const useCanvasDrawings = () =>
+  useCanvasStore((state) => state.drawings, shallow);
+export const useDrawingTool = () =>
+  useCanvasStore((state) => state.drawingTool);
+export const useDrawingColor = () =>
+  useCanvasStore((state) => state.drawingColor);
+export const useDrawingSize = () =>
+  useCanvasStore((state) => state.drawingSize);
+export const useDrawingSettings = () =>
+  useCanvasStore((state) => state.drawingSettings, shallow);
 export const useCanvasSelectedComponent = () =>
   useCanvasStore((state) => state.selectedComponent ?? null);
 export const useCanvasConnectionStart = () =>
@@ -1050,6 +1237,7 @@ export const useNormalizedCanvasData = () =>
     connections: state.connections,
     infoCards: state.infoCards,
     annotations: state.annotations,
+    drawings: state.drawings,
   }));
 
 export const useComponentsByType = (type: string) =>

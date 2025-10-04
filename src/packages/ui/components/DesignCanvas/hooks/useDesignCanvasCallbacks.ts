@@ -8,7 +8,13 @@ import { useEffect, useRef } from "react";
 import { applyPreset, presetsRegistry } from "@/lib/canvas/component-presets";
 import { RenderLoopDiagnostics } from "@/lib/debug/RenderLoopDiagnostics";
 import { componentTypes } from "@/packages/ui/components/panels/ComponentPalette";
-import type { Connection, DesignComponent, InfoCard } from "@/shared/contracts";
+import type {
+  Connection,
+  DesignComponent,
+  DrawingStroke,
+  DrawingTool,
+  InfoCard,
+} from "@/shared/contracts";
 import {
   useCanvasActions,
   useCanvasComponents,
@@ -1271,6 +1277,161 @@ export function useDesignCanvasCallbacks() {
     };
   }, [reactFlowInstance]);
 
+  // Drawing callbacks
+  const handleDrawingComplete = useStableCallback(
+    (stroke: DrawingStroke) => {
+      const callbackId = "handleDrawingComplete";
+      const startTime = performance.now();
+
+      try {
+        actionsRef.current.addDrawing(stroke, {
+          source: "DesignCanvas",
+          context: { strokeId: stroke.id },
+        });
+
+        emitToast({
+          title: "Drawing added",
+          variant: "success",
+        });
+      } catch (error) {
+        console.error("[handleDrawingComplete] Failed to add drawing:", error);
+        emitToast({
+          title: "Failed to add drawing",
+          description: String(error),
+          variant: "destructive",
+        });
+      } finally {
+        updateCallbackMetrics(callbackId, startTime);
+      }
+    },
+    [actionsRef],
+  );
+
+  const handleDrawingDelete = useStableCallback(
+    (strokeId: string) => {
+      const callbackId = "handleDrawingDelete";
+      const startTime = performance.now();
+
+      try {
+        actionsRef.current.deleteDrawing(strokeId, {
+          source: "DesignCanvas",
+          context: { strokeId },
+        });
+
+        emitToast({
+          title: "Drawing deleted",
+          variant: "success",
+        });
+      } catch (error) {
+        console.error("[handleDrawingDelete] Failed to delete drawing:", error);
+        emitToast({
+          title: "Failed to delete drawing",
+          description: String(error),
+          variant: "destructive",
+        });
+      } finally {
+        updateCallbackMetrics(callbackId, startTime);
+      }
+    },
+    [actionsRef],
+  );
+
+  const handleDrawingToolChange = useStableCallback(
+    (tool: DrawingTool) => {
+      const callbackId = "handleDrawingToolChange";
+      const startTime = performance.now();
+
+      try {
+        actionsRef.current.setDrawingTool(tool, {
+          source: "DesignCanvas",
+          context: { tool },
+        });
+      } catch (error) {
+        console.error(
+          "[handleDrawingToolChange] Failed to change tool:",
+          error,
+        );
+      } finally {
+        updateCallbackMetrics(callbackId, startTime);
+      }
+    },
+    [actionsRef],
+  );
+
+  const handleDrawingColorChange = useStableCallback(
+    (color: string) => {
+      const callbackId = "handleDrawingColorChange";
+      const startTime = performance.now();
+
+      try {
+        actionsRef.current.setDrawingColor(color, {
+          source: "DesignCanvas",
+          context: { color },
+        });
+      } catch (error) {
+        console.error(
+          "[handleDrawingColorChange] Failed to change color:",
+          error,
+        );
+      } finally {
+        updateCallbackMetrics(callbackId, startTime);
+      }
+    },
+    [actionsRef],
+  );
+
+  const handleDrawingSizeChange = useStableCallback(
+    (size: number) => {
+      const callbackId = "handleDrawingSizeChange";
+      const startTime = performance.now();
+
+      try {
+        const clampedSize = Math.max(1, Math.min(20, size));
+        actionsRef.current.setDrawingSize(clampedSize, {
+          source: "DesignCanvas",
+          context: { size: clampedSize },
+        });
+      } catch (error) {
+        console.error(
+          "[handleDrawingSizeChange] Failed to change size:",
+          error,
+        );
+      } finally {
+        updateCallbackMetrics(callbackId, startTime);
+      }
+    },
+    [actionsRef],
+  );
+
+  const handleClearAllDrawings = useStableCallback(() => {
+    const callbackId = "handleClearAllDrawings";
+    const startTime = performance.now();
+
+    try {
+      actionsRef.current.clearDrawings({
+        source: "DesignCanvas",
+        context: { action: "clearAll" },
+      });
+
+      emitToast({
+        title: "All drawings cleared",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error(
+        "[handleClearAllDrawings] Failed to clear drawings:",
+        error,
+      );
+      emitToast({
+        title: "Failed to clear drawings",
+        description: String(error),
+        variant: "destructive",
+      });
+    } finally {
+      updateCallbackMetrics(callbackId, startTime);
+    }
+  }, [actionsRef]);
+
   const callbacks = {
     handleComponentDrop,
     handleComponentMove,
@@ -1293,6 +1454,12 @@ export function useDesignCanvasCallbacks() {
     handleInfoCardColorChange,
     handleStartConnection,
     handleCompleteConnection,
+    handleDrawingComplete,
+    handleDrawingDelete,
+    handleDrawingToolChange,
+    handleDrawingColorChange,
+    handleDrawingSizeChange,
+    handleClearAllDrawings,
   };
 
   // Add debug methods in development
