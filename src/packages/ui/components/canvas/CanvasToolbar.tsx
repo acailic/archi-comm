@@ -359,6 +359,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
             animationsEnabled ? "Disable animations" : "Enable animations"
           }
         />
+        <SectionHelpButton section="Animation" onShowHelp={onShowHelp} />
       </div>
 
       <SectionDivider />
@@ -404,6 +405,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
               onClick={onSelfAssessment}
               tooltip="Open self-assessment overlay"
             />
+            <SectionHelpButton section="Validation" onShowHelp={onShowHelp} />
           </div>
 
           <SectionDivider />
@@ -432,6 +434,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
               onClick={onExportWithNotes}
               tooltip="Export design with annotations"
             />
+            <SectionHelpButton section="Export" onShowHelp={onShowHelp} />
           </div>
 
           <SectionDivider />
@@ -469,13 +472,14 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       )}
 
       {/* Settings */}
-      <div className="flex items-center gap-1">
+      <div className={cx("flex items-center gap-1 px-2 py-1 rounded-md", toolbarSectionBg.settings)}>
         <ToolbarButton
           icon={Settings}
           label="Settings"
           onClick={onToggleSettings}
           tooltip="Canvas settings"
         />
+        <SectionHelpButton section="Settings" onShowHelp={onShowHelp} />
       </div>
 
       {/* Shortcuts hint */}

@@ -152,6 +152,7 @@ export const toolbarSectionBg = {
   layout: 'bg-green-50/30',
   validation: 'bg-amber-50/30',
   export: 'bg-indigo-50/30',
+  settings: 'bg-gray-50/30',
 } as const;
 
 export const primaryAction = {

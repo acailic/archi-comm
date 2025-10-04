@@ -91,6 +91,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   // Keyboard shortcuts modal state
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [shortcutsInitialSection, setShortcutsInitialSection] = useState<string | undefined>();
+  const [shortcutsHighlight, setShortcutsHighlight] = useState<string[]>([]);
 
   // Quick-connect hook
   const quickConnect = useQuickConnect((connection) => {
@@ -319,6 +320,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     onSetCanvasMode: (mode) => useCanvasStore.getState().setCanvasMode(mode),
     onHelp: () => {
       setShortcutsInitialSection(undefined);
+      setShortcutsHighlight(['onHelp']);
       setShowKeyboardShortcuts(true);
     },
   });
@@ -328,6 +330,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     const handleOpenShortcuts = (event: Event) => {
       const customEvent = event as CustomEvent<{ section?: string }>;
       setShortcutsInitialSection(customEvent.detail?.section);
+      setShortcutsHighlight([]);
       setShowKeyboardShortcuts(true);
     };
 
@@ -489,6 +492,17 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
                 }}
                 onShowHelp={(section) => {
                   setShortcutsInitialSection(section);
+                  // Set highlighted shortcuts based on section
+                  const highlights: Record<string, string[]> = {
+                    'Canvas Modes': ['onSetCanvasMode'],
+                    'View': ['onToggleGrid', 'onToggleMinimap'],
+                    'Animation': ['onToggleAnimations'],
+                    'Layout': ['onUndo', 'onRedo', 'onFitView'],
+                    'Validation': [],
+                    'Export': [],
+                    'Settings': [],
+                  };
+                  setShortcutsHighlight(highlights[section] || []);
                   setShowKeyboardShortcuts(true);
                 }}
                 onExportWithNotes={() => {
@@ -609,8 +623,10 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
               onClose={() => {
                 setShowKeyboardShortcuts(false);
                 setShortcutsInitialSection(undefined);
+                setShortcutsHighlight([]);
               }}
               initialSection={shortcutsInitialSection}
+              highlightShortcuts={shortcutsHighlight}
             />
 
             {/* Connection Template Panel */}
