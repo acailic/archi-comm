@@ -286,6 +286,15 @@ export function AppContent() {
     return () => window.removeEventListener("popstate", checkDevRoute);
   }, [setShowDevScenarios]); // Depend on the action
 
+  useEffect(() => {
+    const handleConfigNavigation = (_event: Event) => {
+      handleNavigateToConfig();
+    };
+
+    window.addEventListener("navigate:config", handleConfigNavigation);
+    return () => window.removeEventListener("navigate:config", handleConfigNavigation);
+  }, [handleNavigateToConfig]);
+
   const handleComplete = useCallback(
     (data: DesignData) => {
       setDesignData(data);
