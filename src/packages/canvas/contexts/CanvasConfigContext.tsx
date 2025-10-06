@@ -101,7 +101,7 @@ const defaultCanvasConfig: CanvasConfig = {
   viewport: {
     minZoom: 0.1,
     maxZoom: 4,
-    defaultZoom: 1,
+    defaultZoom: 0.65,
     centerOnLoad: true,
     fitViewOnLoad: false,
     panOnDrag: true,

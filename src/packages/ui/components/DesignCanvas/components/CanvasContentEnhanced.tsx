@@ -80,7 +80,7 @@ export const CanvasContentEnhanced = React.memo<CanvasContentEnhancedProps>(
             <div className="text-xs space-y-1">
               <div className="flex items-center gap-2">
                 <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-mono">
-                  Ctrl+D
+                  Ctrl/Cmd+D
                 </kbd>
                 <span className="text-gray-600">Duplicate</span>
               </div>
@@ -88,7 +88,7 @@ export const CanvasContentEnhanced = React.memo<CanvasContentEnhancedProps>(
                 <>
                   <div className="flex items-center gap-2">
                     <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-mono">
-                      Ctrl+G
+                      Ctrl/Cmd+G
                     </kbd>
                     <span className="text-gray-600">Group</span>
                   </div>
@@ -102,7 +102,7 @@ export const CanvasContentEnhanced = React.memo<CanvasContentEnhancedProps>(
               )}
               <div className="flex items-center gap-2">
                 <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-mono">
-                  Ctrl+L
+                  Ctrl/Cmd+Alt+L
                 </kbd>
                 <span className="text-gray-600">Lock</span>
               </div>

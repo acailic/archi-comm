@@ -469,7 +469,7 @@ const VirtualCanvasInternal: React.FC<VirtualCanvasProps> = ({
         snapToGrid={snapToGrid}
         snapGrid={[gridSpacing, gridSpacing]}
         connectionMode='loose'
-        defaultViewport={viewport ?? { x: 0, y: 0, zoom: 1 }}
+        defaultViewport={viewport ?? { x: 0, y: 0, zoom: 0.65 }}
         onMove={onViewportChange ? (_, vp) => onViewportChange(vp) : undefined}
         nodesDraggable={true}
         nodesConnectable={true}

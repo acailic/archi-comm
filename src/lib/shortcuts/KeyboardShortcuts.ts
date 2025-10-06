@@ -394,6 +394,17 @@ export class KeyboardShortcutManager {
       }
     };
 
+    const withCanvasFocus = (
+      handler: ShortcutConfig["action"],
+    ): ShortcutConfig["action"] => {
+      return (event?: KeyboardEvent) => {
+        if (!isCanvasFocused()) {
+          return;
+        }
+        handler(event);
+      };
+    };
+
     // General shortcuts
     this.register({
       key: "n",
@@ -518,6 +529,16 @@ export class KeyboardShortcutManager {
     });
 
     this.register({
+      key: "a",
+      modifiers: ["meta"],
+      description: "Select all",
+      category: "canvas",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:select-all"));
+      },
+    });
+
+    this.register({
       key: "Escape",
       description: "Clear selection",
       category: "canvas",
@@ -588,9 +609,9 @@ export class KeyboardShortcutManager {
       key: "c",
       description: "Add comment",
       category: "canvas",
-      action: () => {
+      action: withCanvasFocus(() => {
         void window.dispatchEvent(new CustomEvent("shortcut:add-comment"));
-      },
+      }),
     });
 
     this.register({
@@ -645,8 +666,28 @@ export class KeyboardShortcutManager {
     });
 
     this.register({
+      key: "d",
+      modifiers: ["meta"],
+      description: "Duplicate selected",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:duplicate"));
+      },
+    });
+
+    this.register({
       key: "g",
       modifiers: ["ctrl"],
+      description: "Group selected",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:group"));
+      },
+    });
+
+    this.register({
+      key: "g",
+      modifiers: ["meta"],
       description: "Group selected",
       category: "components",
       action: () => {
@@ -664,10 +705,20 @@ export class KeyboardShortcutManager {
       },
     });
 
+    this.register({
+      key: "g",
+      modifiers: ["meta", "shift"],
+      description: "Ungroup selected",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:ungroup"));
+      },
+    });
+
     // Locking shortcuts
     this.register({
       key: "l",
-      modifiers: ["ctrl"],
+      modifiers: ["ctrl", "alt"],
       description: "Lock selected components",
       category: "components",
       action: () => {
@@ -677,7 +728,29 @@ export class KeyboardShortcutManager {
 
     this.register({
       key: "l",
-      modifiers: ["ctrl", "shift"],
+      modifiers: ["meta", "alt"],
+      description: "Lock selected components",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:lock-components"));
+      },
+    });
+
+    this.register({
+      key: "l",
+      modifiers: ["ctrl", "alt", "shift"],
+      description: "Unlock selected components",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(
+          new CustomEvent("shortcut:unlock-components"),
+        );
+      },
+    });
+
+    this.register({
+      key: "l",
+      modifiers: ["meta", "alt", "shift"],
       description: "Unlock selected components",
       category: "components",
       action: () => {
@@ -732,6 +805,18 @@ export class KeyboardShortcutManager {
     this.register({
       key: "2",
       modifiers: ["ctrl"],
+      description: "Zoom to fit selected components",
+      category: "navigation",
+      action: () => {
+        void window.dispatchEvent(
+          new CustomEvent("shortcut:zoom-to-selection"),
+        );
+      },
+    });
+
+    this.register({
+      key: "2",
+      modifiers: ["meta"],
       description: "Zoom to fit selected components",
       category: "navigation",
       action: () => {
@@ -930,9 +1015,9 @@ export class KeyboardShortcutManager {
       key: "v",
       description: "Select tool",
       category: "tools",
-      action: () => {
+      action: withCanvasFocus(() => {
         void window.dispatchEvent(new CustomEvent("shortcut:tool-select"));
-      },
+      }),
     });
 
     this.register({
@@ -959,18 +1044,18 @@ export class KeyboardShortcutManager {
       key: "z",
       description: "Zoom tool",
       category: "tools",
-      action: () => {
+      action: withCanvasFocus(() => {
         void window.dispatchEvent(new CustomEvent("shortcut:tool-zoom"));
-      },
+      }),
     });
 
     this.register({
       key: "a",
       description: "Annotate tool",
       category: "tools",
-      action: () => {
+      action: withCanvasFocus(() => {
         void window.dispatchEvent(new CustomEvent("shortcut:tool-annotate"));
-      },
+      }),
     });
 
     // Drawing shortcuts

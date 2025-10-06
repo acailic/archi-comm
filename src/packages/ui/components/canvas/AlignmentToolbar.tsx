@@ -16,15 +16,17 @@ import {
   AlignVerticalTop,
 } from "lucide-react";
 import { memo, useCallback } from "react";
+import type { CSSProperties } from "react";
 
 import { cx } from "@/lib/design/design-system";
 import { useSelectedComponentIds, useCanvasActions } from "@/stores/canvasStore";
 
 interface AlignmentToolbarProps {
   className?: string;
+  style?: CSSProperties;
 }
 
-export const AlignmentToolbar = memo<AlignmentToolbarProps>(({ className }) => {
+export const AlignmentToolbar = memo<AlignmentToolbarProps>(({ className, style }) => {
   const selectedIds = useSelectedComponentIds();
   const actions = useCanvasActions();
   const hasSelection = selectedIds.length >= 2;
@@ -56,6 +58,7 @@ export const AlignmentToolbar = memo<AlignmentToolbarProps>(({ className }) => {
         "flex items-center gap-1 px-2 py-1 bg-white border-2 border-gray-900 rounded-lg shadow-lg",
         className,
       )}
+      style={style}
     >
       <span className="text-xs font-medium text-gray-600 mr-2">Align:</span>
 

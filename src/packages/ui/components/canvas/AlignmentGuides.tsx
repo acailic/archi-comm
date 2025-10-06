@@ -2,12 +2,17 @@
  * src/packages/ui/components/canvas/AlignmentGuides.tsx
  * Smart alignment guides that appear when dragging components
  * Shows blue guide lines with fade animation when components align
+ *
+ * COORDINATE SYSTEM: Guide positions are stored in world coordinates in the store.
+ * This component transforms them to screen coordinates using viewport zoom/pan for rendering.
+ * The transformation formula: screenPos = worldPos * zoom + viewportOffset
+ *
  * RELEVANT FILES: src/stores/canvasStore.ts, src/shared/contracts/index.ts
  */
 
 import { memo, useMemo } from "react";
 
-import { cx } from "@/lib/design/design-system";
+import { cx, overlayZIndex } from "@/lib/design/design-system";
 import type { AlignmentGuide } from "@/shared/contracts";
 import { useCanvasStore } from "@/stores/canvasStore";
 
@@ -30,7 +35,10 @@ export const AlignmentGuides = memo<AlignmentGuidesProps>(({ viewport }) => {
   if (!showGuides || visibleGuides.length === 0) return null;
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-[60]">
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{ zIndex: overlayZIndex.guides }}
+    >
       {visibleGuides.map((guide) => (
         <Guide key={guide.id} guide={guide} viewport={viewport} />
       ))}
@@ -76,10 +84,10 @@ const Guide = memo<GuideProps>(({ guide, viewport }) => {
         className={cx(
           "absolute px-1.5 py-0.5 rounded text-[10px] font-medium",
           "bg-blue-500 text-white whitespace-nowrap",
-          isHorizontal ? "left-2 -top-4" : "top-2 -left-12",
+          isHorizontal ? "left-2 -top-4" : "top-2 -left-16",
         )}
       >
-        Aligned
+        {isHorizontal ? "Horizontally aligned" : "Vertically aligned"}
       </div>
     </div>
   );

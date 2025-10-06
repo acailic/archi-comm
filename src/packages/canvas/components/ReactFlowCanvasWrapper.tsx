@@ -5,6 +5,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
 } from "@xyflow/react";
 import type { Viewport } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -55,9 +56,8 @@ export interface ReactFlowCanvasWrapperProps {
   onInfoCardSelect?: (infoCardId: string) => void;
 }
 
-const ReactFlowCanvasWrapperComponent: React.FC<
-  ReactFlowCanvasWrapperProps
-> = ({
+// Inner component that uses the ReactFlow instance
+const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
   components,
   connections,
   infoCards = [],
@@ -89,6 +89,7 @@ const ReactFlowCanvasWrapperComponent: React.FC<
   const announce = useAnnouncer();
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const hasAnnouncedInitialRef = useRef(false);
+  const reactFlowInstance = useReactFlow();
 
   const canvasLabel = useMemo(() => {
     const componentCount = components.length;
@@ -167,85 +168,126 @@ const ReactFlowCanvasWrapperComponent: React.FC<
     [components, onComponentDeselect, onComponentSelect, selectedComponentId]
   );
 
+  // Listen for canvas:fit-bounds event to zoom to selection
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleFitBounds = (event: Event) => {
+      const detail = (event as CustomEvent<{ x: number; y: number; width: number; height: number; padding: number }>).detail;
+
+      if (!detail || !reactFlowInstance) {
+        return;
+      }
+
+      // Create DOMRect from the bounding box and fit view to it
+      const bounds = new DOMRect(detail.x, detail.y, detail.width, detail.height);
+      reactFlowInstance.fitBounds(bounds, { padding: detail.padding || 0.2 });
+    };
+
+    window.addEventListener("canvas:fit-bounds", handleFitBounds);
+
+    return () => {
+      window.removeEventListener("canvas:fit-bounds", handleFitBounds);
+    };
+  }, [reactFlowInstance]);
+
   return (
-    <ReactFlowProvider>
-      <CanvasController
+    <CanvasController
+      components={components}
+      connections={connections}
+      infoCards={infoCards}
+      selectedComponentId={selectedComponentId}
+      selectedConnectionId={selectedConnectionId}
+      selectedInfoCardId={selectedInfoCardId}
+      enableAutoLayout={enableAutoLayout}
+      virtualizationEnabled={virtualizationEnabled}
+      onComponentSelect={onComponentSelect}
+      onComponentDeselect={onComponentDeselect}
+      onComponentDrop={onComponentDrop}
+      onComponentPositionChange={onComponentPositionChange}
+      onComponentDelete={onComponentDelete}
+      onConnectionCreate={onConnectionCreate}
+      onConnectionDelete={onConnectionDelete}
+      onConnectionSelect={onConnectionSelect}
+      onInfoCardCreate={onInfoCardCreate}
+      onInfoCardUpdate={onInfoCardUpdate}
+      onInfoCardDelete={onInfoCardDelete}
+      onInfoCardSelect={onInfoCardSelect}
+    >
+      <EnhancedErrorBoundary boundaryId="canvas-node-layer">
+        <NodeLayer components={components} infoCards={infoCards}>
+          <EnhancedErrorBoundary boundaryId="canvas-edge-layer">
+            <EdgeLayer connections={connections}>
+              <EnhancedErrorBoundary boundaryId="canvas-interaction-layer">
+                <CanvasInteractionLayer
+                  enableDragDrop={enableDragDrop}
+                  enableContextMenu={enableContextMenu}
+                  enableKeyboardShortcuts={enableKeyboardShortcuts}
+                >
+                  <div
+                    ref={canvasContainerRef}
+                    role="application"
+                    aria-label={canvasLabel}
+                    tabIndex={0}
+                    className="react-flow-accessible-container focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-background"
+                    onKeyDown={handleKeyboardNavigation}
+                  >
+                    <ReactFlow
+                      fitView
+                      attributionPosition="bottom-left"
+                      className="react-flow-canvas"
+                      onMove={
+                        onViewportChange
+                          ? (_event, viewportParams) =>
+                              onViewportChange(viewportParams)
+                          : undefined
+                      }
+                    >
+                      {showBackground && (
+                        <Background
+                          color="#e5e7eb"
+                          gap={20}
+                          size={1}
+                          variant={BackgroundVariant.Dots}
+                          style={{ backgroundColor: '#ffffff' }}
+                        />
+                      )}
+                      {showControls && (
+                        <Controls
+                          showZoom={true}
+                          showFitView={true}
+                          showInteractive={true}
+                          position="top-right"
+                        />
+                      )}
+                      {showMiniMap && <MiniMap />}
+                    </ReactFlow>
+                  </div>
+                </CanvasInteractionLayer>
+              </EnhancedErrorBoundary>
+            </EdgeLayer>
+          </EnhancedErrorBoundary>
+        </NodeLayer>
+      </EnhancedErrorBoundary>
+
+      <LayoutEngine
         components={components}
         connections={connections}
-        infoCards={infoCards}
-        selectedComponentId={selectedComponentId}
-        selectedConnectionId={selectedConnectionId}
-        selectedInfoCardId={selectedInfoCardId}
         enableAutoLayout={enableAutoLayout}
-        virtualizationEnabled={virtualizationEnabled}
-        onComponentSelect={onComponentSelect}
-        onComponentDeselect={onComponentDeselect}
-        onComponentDrop={onComponentDrop}
-        onComponentPositionChange={onComponentPositionChange}
-        onComponentDelete={onComponentDelete}
-        onConnectionCreate={onConnectionCreate}
-        onConnectionDelete={onConnectionDelete}
-        onConnectionSelect={onConnectionSelect}
-        onInfoCardCreate={onInfoCardCreate}
-        onInfoCardUpdate={onInfoCardUpdate}
-        onInfoCardDelete={onInfoCardDelete}
-        onInfoCardSelect={onInfoCardSelect}
-      >
-        <EnhancedErrorBoundary boundaryId="canvas-node-layer">
-          <NodeLayer components={components} infoCards={infoCards}>
-            <EnhancedErrorBoundary boundaryId="canvas-edge-layer">
-              <EdgeLayer connections={connections}>
-                <EnhancedErrorBoundary boundaryId="canvas-interaction-layer">
-                  <CanvasInteractionLayer
-                    enableDragDrop={enableDragDrop}
-                    enableContextMenu={enableContextMenu}
-                    enableKeyboardShortcuts={enableKeyboardShortcuts}
-                  >
-                    <div
-                      ref={canvasContainerRef}
-                      role="application"
-                      aria-label={canvasLabel}
-                      tabIndex={0}
-                      className="react-flow-accessible-container focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-background"
-                      onKeyDown={handleKeyboardNavigation}
-                    >
-                      <ReactFlow
-                        fitView
-                        attributionPosition="bottom-left"
-                        className="react-flow-canvas"
-                        onMove={
-                          onViewportChange
-                            ? (_event, viewportParams) =>
-                                onViewportChange(viewportParams)
-                            : undefined
-                        }
-                      >
-                        {showBackground && (
-                          <Background
-                            color="#e5e7eb"
-                            gap={20}
-                            size={1}
-                            variant={BackgroundVariant.Dots}
-                            style={{ backgroundColor: '#ffffff' }}
-                          />
-                        )}
-                        {showControls && <Controls />}
-                        {showMiniMap && <MiniMap />}
-                      </ReactFlow>
-                    </div>
-                  </CanvasInteractionLayer>
-                </EnhancedErrorBoundary>
-              </EdgeLayer>
-            </EnhancedErrorBoundary>
-          </NodeLayer>
-        </EnhancedErrorBoundary>
+      />
+    </CanvasController>
+  );
+};
 
-        <LayoutEngine
-          components={components}
-          connections={connections}
-          enableAutoLayout={enableAutoLayout}
-        />
-      </CanvasController>
+// Outer wrapper component that provides ReactFlow context
+const ReactFlowCanvasWrapperComponent: React.FC<
+  ReactFlowCanvasWrapperProps
+> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <ReactFlowCanvasInner {...props} />
     </ReactFlowProvider>
   );
 };

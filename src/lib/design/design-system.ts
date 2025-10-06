@@ -81,6 +81,14 @@ export const animations = {
   tap: "active:scale-[0.98]",
 } as const;
 
+export const overlayZIndex = {
+  groups: 50,
+  guides: 60,
+  toolbar: 80,
+  selection: 100,
+  contextMenu: 120,
+} as const;
+
 // Semantic roles used across component types
 export const colorRoles = {
   primary: "from-blue-500 to-blue-600",

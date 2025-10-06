@@ -11,7 +11,7 @@ import {
   RenderGuardPresets,
   useRenderGuard,
 } from "@/lib/performance/RenderGuard";
-import { canvasActions } from "@/stores/canvasStore";
+import { canvasActions, useCanvasStore } from "@/stores/canvasStore";
 
 import type { DesignComponent } from "../../../types";
 import { useCanvasContext } from "../contexts/CanvasContext";
@@ -230,44 +230,52 @@ const CanvasInteractionLayerComponent: React.FC<
       const target = event.target as HTMLElement;
       if (target.closest("[data-component-id]") || isDraggingSelection) return;
 
+      if (!reactFlowInstance) return;
+
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
+      const clientX = event.clientX - rect.left;
+      const clientY = event.clientY - rect.top;
+
+      // Transform client coords to world coords
+      const worldPos = reactFlowInstance.project({ x: clientX, y: clientY });
 
       setIsDraggingSelection(true);
-      setSelectionStart({ x, y });
+      setSelectionStart({ x: worldPos.x, y: worldPos.y });
 
-      // Dispatch custom event for selection box handling
+      // Dispatch custom event with world coordinates
       window.dispatchEvent(
         new CustomEvent("canvas:selection-drag-start", {
-          detail: { x, y },
+          detail: { x: worldPos.x, y: worldPos.y },
         }),
       );
     },
-    [isDraggingSelection],
+    [isDraggingSelection, reactFlowInstance],
   );
 
   const handleSelectionDragMove = useCallback(
     (event: React.MouseEvent) => {
-      if (!isDraggingSelection || !selectionStart) return;
+      if (!isDraggingSelection || !selectionStart || !reactFlowInstance) return;
 
       const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-      const currentX = event.clientX - rect.left;
-      const currentY = event.clientY - rect.top;
+      const clientX = event.clientX - rect.left;
+      const clientY = event.clientY - rect.top;
 
-      const x = Math.min(selectionStart.x, currentX);
-      const y = Math.min(selectionStart.y, currentY);
-      const width = Math.abs(currentX - selectionStart.x);
-      const height = Math.abs(currentY - selectionStart.y);
+      // Transform client coords to world coords
+      const worldPos = reactFlowInstance.project({ x: clientX, y: clientY });
 
-      // Dispatch custom event for selection box update
+      const x = Math.min(selectionStart.x, worldPos.x);
+      const y = Math.min(selectionStart.y, worldPos.y);
+      const width = Math.abs(worldPos.x - selectionStart.x);
+      const height = Math.abs(worldPos.y - selectionStart.y);
+
+      // Dispatch custom event with world coordinates
       window.dispatchEvent(
         new CustomEvent("canvas:selection-drag-move", {
           detail: { x, y, width, height },
         }),
       );
     },
-    [isDraggingSelection, selectionStart],
+    [isDraggingSelection, selectionStart, reactFlowInstance],
   );
 
   const handleSelectionDragEnd = useCallback(() => {
@@ -282,6 +290,7 @@ const CanvasInteractionLayerComponent: React.FC<
 
   const handleComponentClick = useCallback(
     (componentId: string, event: React.MouseEvent) => {
+      // Multi-select and single-select handling
       const isShiftPressed = event.shiftKey;
       const isCtrlPressed = event.ctrlKey || event.metaKey;
 
@@ -314,9 +323,8 @@ const CanvasInteractionLayerComponent: React.FC<
       Escape: () => {
         componentCallbacks.onComponentDeselect();
         hideContextMenu();
-        // Also clear selection and exit drawing mode
+        // Clear selection
         window.dispatchEvent(new CustomEvent("canvas:clear-selection"));
-        window.dispatchEvent(new CustomEvent("canvas:exit-drawing-mode"));
       },
       KeyA: (event) => {
         if (event.ctrlKey || event.metaKey) {

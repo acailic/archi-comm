@@ -56,10 +56,10 @@ export function toReactFlowNodes(components: DesignComponent[]): ArchiCommNode[]
       properties: component.properties,
       layerId: component.layerId,
     },
-    // React Flow specific properties
-    draggable: true,
+    // React Flow specific properties - respect locked state
+    draggable: !component.locked,
     selectable: true,
-    deletable: true,
+    deletable: !component.locked,
   }));
 }
 

@@ -20,7 +20,7 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
 
 **Phase 1: Essential Operations** (Implemented)
 
-- Component duplication (Ctrl+D)
+- Component duplication (Ctrl/Cmd+D)
 - Multi-select with bulk operations
 - Alignment tools (align left/right/top/bottom/center, distribute)
 - Component search/filter in palette
@@ -29,7 +29,7 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
 
 - Component grouping/ungrouping
 - Smart alignment guides (visual snap feedback)
-- Zoom to selection/fit selected
+- Zoom to selection/fit selected (shortcut in place; viewport fit pending)
 - Enhanced context menu with quick actions
 - Component locking/unlocking
 
@@ -48,7 +48,7 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
 #### Component Duplication
 
 - **Purpose**: Clone components quickly with keyboard shortcut
-- **Usage**: Select components and press Ctrl+D
+- **Usage**: Select components and press Ctrl/Cmd+D
 - **Features**:
   - Maintains all properties (type, size, connections)
   - Applies smart offset (20px right and down)
@@ -61,7 +61,7 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
 - **Usage**:
   - Drag selection box around components
   - Shift+Click to toggle individual components
-  - Ctrl+A to select all components
+  - Ctrl/Cmd+A to select all components
 - **Features**:
   - Visual selection box with dashed border
   - Selected components highlighted
@@ -74,8 +74,8 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
   - Move (drag any selected component)
   - Delete (Del key removes all selected)
   - Alignment (see alignment tools)
-  - Grouping (Ctrl+G creates group)
-  - Locking (Ctrl+L locks all selected)
+  - Grouping (Ctrl/Cmd+G creates group)
+  - Locking (Ctrl/Cmd+Alt+L locks all selected)
 
 #### Alignment Tools
 
@@ -108,8 +108,8 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
 
 - **Purpose**: Organize related components together
 - **Usage**:
-  - Select components and press Ctrl+G to group
-  - Press Ctrl+Shift+G to ungroup
+  - Select components and press Ctrl/Cmd+G to group
+  - Press Ctrl/Cmd+Shift+G to ungroup
 - **Features**:
   - Visual boundary around grouped components
   - Group name and component count display
@@ -126,33 +126,41 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
   - Automatically hides after 1 second
   - Works with zoom/pan transformations
   - Can be toggled on/off
+  - Visibility managed centrally in the canvas store for consistent behavior
 
 #### Zoom to Selection
 
 - **Purpose**: Focus view on selected components
-- **Usage**: Press Ctrl+2 with components selected
+- **Usage**: Press Ctrl/Cmd+2 with components selected
 - **Features**:
-  - Fits all selected components in viewport
-  - Smooth zoom animation
-  - Maintains aspect ratio
+  - Dispatches zoom-to-selection shortcut event
+  - Viewport fit handler wiring is in progress; falls back to current zoom until completed
+  - Maintains project selection context for future fit implementation
 
 #### Enhanced Context Menu
 
 - **Purpose**: Quick access to common actions
 - **Usage**: Right-click on components
+- **Implementation Status**: Completed with keyboard navigation, focus management, and accessibility features
 - **Actions**:
-  - Duplicate (Ctrl+D)
-  - Lock/Unlock (Ctrl+L)
-  - Group (Ctrl+G) - when multiple selected
+  - Duplicate (Ctrl/Cmd+D)
+  - Lock/Unlock (Ctrl/Cmd+Alt+L)
+  - Group (Ctrl/Cmd+G) - when multiple selected
+  - Alignment options (left, right, top, bottom) - when 2+ selected
   - Delete (Del)
-  - Copy/Paste operations
+- **Features**:
+  - Keyboard navigation (arrow keys, Enter, Escape)
+  - Focus trap and restoration
+  - ARIA semantics for screen readers
+  - Disabled state for unavailable actions
+  - Multi-select awareness
 
 #### Component Locking
 
 - **Purpose**: Prevent accidental moves/edits
 - **Usage**:
-  - Select components and press Ctrl+L to lock
-  - Press Ctrl+Shift+L to unlock
+  - Select components and press Ctrl/Cmd+Alt+L to lock
+  - Press Ctrl/Cmd+Alt+Shift+L to unlock
 - **Features**:
   - Locked components cannot be moved
   - Visual indication (different border color)
@@ -228,12 +236,14 @@ The ArchiComm canvas system is feature-rich but was missing several key usabilit
 - [x] Canvas content integration
 - [x] Component exports
 - [x] Comprehensive test suite
+- [x] Context menu with keyboard navigation and accessibility
+- [x] Focus management and restoration
+- [x] Locked component filtering in interactions
 
 ### 🚧 In Progress Features
 
-- [ ] Context menu implementation
-- [ ] Zoom to selection ReactFlow integration
-- [ ] Alignment guide detection logic
+- [ ] Zoom to selection ReactFlow viewport integration (event handler in place, fitBounds wiring pending)
+- [ ] Alignment guide detection optimization (currently O(n), spatial indexing planned)
 
 ### 📋 Planned Features
 

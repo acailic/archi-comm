@@ -19,6 +19,7 @@ import type {
   InfoCard,
 } from "@/shared/contracts";
 import { componentLibrary } from "@/shared/data/componentLibrary";
+import { newComponentId, newGroupId } from "@/lib/utils/id";
 
 const RATE_LIMIT_WINDOW_MS = 100;
 const RATE_LIMIT_COUNT = 10;
@@ -473,6 +474,28 @@ const initialState: CanvasStoreState = {
   draggedComponentId: null,
 };
 
+/**
+ * Canvas Store Persistence Strategy
+ *
+ * PERSISTED STATE (User Preferences & Settings):
+ * - Visual preferences (theme, animations, grid settings)
+ * - Drawing tool settings (color, size, tool type)
+ * - Connection preferences (routing, bundling, path style)
+ * - User personalization (recent/favorite components, dismissed tips)
+ *
+ * NON-PERSISTED STATE (Session/Transient Data):
+ * - componentGroups: Groups are UI helpers, not saved to project
+ * - selectedComponentIds: Selection is session-specific
+ * - selectionBox: Visual feedback only
+ * - componentSearchQuery/componentFilterCategory: Search state resets per session
+ * - component.locked: Lock state is temporary workflow aid
+ * - alignmentGuides: Runtime visual feedback
+ *
+ * RATIONALE:
+ * User preferences persist across sessions for better UX.
+ * Canvas content (components/connections) is saved/loaded via project files.
+ * Transient UI state (selections, groups, locks) is intentionally ephemeral to avoid stale state.
+ */
 export const useCanvasStore = create<CanvasStoreState>()(
   persist(
     temporal(
@@ -1244,9 +1267,7 @@ const mutableCanvasActions = {
       const component = state.components.find((c) => c.id === id);
       if (!component) return;
 
-      const newId =
-        crypto.randomUUID?.() ||
-        `component-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const newId = newComponentId();
       idMap[id] = newId;
 
       newComponents.push({
@@ -1278,9 +1299,17 @@ const mutableCanvasActions = {
     options?: BaseActionOptions,
   ) {
     const state = useCanvasStore.getState();
+
+    // Filter out locked components
     const components = state.components.filter((c) =>
-      componentIds.includes(c.id),
+      componentIds.includes(c.id) && !c.locked
     );
+
+    const lockedCount = componentIds.length - components.length;
+    if (lockedCount > 0) {
+      console.warn(`[Canvas] Skipped ${lockedCount} locked component(s) during alignment`);
+    }
+
     if (components.length < 2) return;
 
     const updates: Array<{ id: string; x?: number; y?: number }> = [];
@@ -1330,6 +1359,15 @@ const mutableCanvasActions = {
       },
       options,
     );
+
+    // Recompute bounds for any groups containing the aligned components
+    const affectedGroups = new Set<string>();
+    components.forEach(c => {
+      if (c.groupId) affectedGroups.add(c.groupId);
+    });
+    affectedGroups.forEach(groupId => {
+      this.recomputeGroupBounds(groupId, { silent: true });
+    });
   },
 
   distributeComponents(
@@ -1338,9 +1376,17 @@ const mutableCanvasActions = {
     options?: BaseActionOptions,
   ) {
     const state = useCanvasStore.getState();
+
+    // Filter out locked components
     const components = state.components.filter((c) =>
-      componentIds.includes(c.id),
+      componentIds.includes(c.id) && !c.locked
     );
+
+    const lockedCount = componentIds.length - components.length;
+    if (lockedCount > 0) {
+      console.warn(`[Canvas] Skipped ${lockedCount} locked component(s) during distribution`);
+    }
+
     if (components.length < 3) return;
 
     const sorted =
@@ -1392,6 +1438,15 @@ const mutableCanvasActions = {
       },
       options,
     );
+
+    // Recompute bounds for any groups containing the distributed components
+    const affectedGroups = new Set<string>();
+    components.forEach(c => {
+      if (c.groupId) affectedGroups.add(c.groupId);
+    });
+    affectedGroups.forEach(groupId => {
+      this.recomputeGroupBounds(groupId, { silent: true });
+    });
   },
 
   // Grouping actions
@@ -1411,7 +1466,7 @@ const mutableCanvasActions = {
     const maxX = Math.max(...components.map((c) => c.x + (c.width || 220)));
     const maxY = Math.max(...components.map((c) => c.y + (c.height || 140)));
 
-    const groupId = crypto.randomUUID?.() || `group-${Date.now()}`;
+    const groupId = newGroupId();
     const group: ComponentGroup = {
       id: groupId,
       name: name || `Group ${state.componentGroups.length + 1}`,
@@ -1457,6 +1512,40 @@ const mutableCanvasActions = {
     );
   },
 
+  /**
+   * Recomputes group bounds based on current component positions.
+   * Call this after moving, aligning, or distributing grouped components.
+   */
+  recomputeGroupBounds(groupId: string, options?: BaseActionOptions) {
+    const state = useCanvasStore.getState();
+    const group = state.componentGroups.find((g) => g.id === groupId);
+    if (!group) return;
+
+    const components = state.components.filter((c) =>
+      group.componentIds.includes(c.id),
+    );
+    if (components.length === 0) return;
+
+    const minX = Math.min(...components.map((c) => c.x));
+    const minY = Math.min(...components.map((c) => c.y));
+    const maxX = Math.max(...components.map((c) => c.x + (c.width || 220)));
+    const maxY = Math.max(...components.map((c) => c.y + (c.height || 140)));
+
+    applyUpdate(
+      "recomputeGroupBounds",
+      (draft) => {
+        const groupToUpdate = draft.componentGroups.find((g) => g.id === groupId);
+        if (groupToUpdate) {
+          groupToUpdate.x = minX - 10;
+          groupToUpdate.y = minY - 10;
+          groupToUpdate.width = maxX - minX + 20;
+          groupToUpdate.height = maxY - minY + 20;
+        }
+      },
+      options,
+    );
+  },
+
   // Locking actions
   lockComponents(componentIds: string[], options?: BaseActionOptions) {
     applyUpdate(
@@ -1497,7 +1586,13 @@ const mutableCanvasActions = {
     resetAlignmentGuides();
   },
 
-  // Alignment guide detection (called during component drag)
+  /**
+   * Alignment guide detection (called during component drag)
+   *
+   * IMPORTANT: newX and newY MUST be in world coordinates (canvas coordinates),
+   * not screen/pixel coordinates. These values should be obtained from ReactFlow's
+   * unproject() method or directly from the node's position in world space.
+   */
   updateAlignmentGuides(movingComponentId: string, newX: number, newY: number) {
     const state = useCanvasStore.getState();
     if (!state.showAlignmentGuides) {
@@ -1509,7 +1604,7 @@ const mutableCanvasActions = {
     if (!movingComp) return;
 
     const guides: AlignmentGuide[] = [];
-    const threshold = 5; // pixels
+    const threshold = 5; // pixels in world space
 
     // Check alignment with other components
     state.components.forEach((comp) => {

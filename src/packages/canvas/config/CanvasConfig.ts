@@ -445,7 +445,7 @@ const buildBaseConfig = (): CanvasConfig => ({
   viewport: {
     minZoom: 0.1,
     maxZoom: 4,
-    defaultZoom: 1,
+    defaultZoom: 0.65, // Lower default zoom to show more components at once
     centerOnLoad: true,
     fitViewOnLoad: false,
     panOnDrag: true,

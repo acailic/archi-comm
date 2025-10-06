@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   canvasActions,
@@ -115,6 +115,26 @@ describe("canvasStore usability actions", () => {
     expect(afterB?.x).toBe(70);
   });
 
+  it("distributes components vertically with even spacing", () => {
+    const a = createComponent("v-a", { x: 10, y: 10, height: 40 });
+    const b = createComponent("v-b", { x: 50, y: 160, height: 40 });
+    const c = createComponent("v-c", { x: 80, y: 310, height: 40 });
+
+    canvasActions.updateComponents(() => [a, b, c]);
+    canvasActions.distributeComponents(["v-a", "v-b", "v-c"], "vertical");
+
+    const { components } = useCanvasStore.getState();
+    const distributed = components.filter((component) =>
+      ["v-a", "v-b", "v-c"].includes(component.id),
+    );
+
+    const positions = distributed
+      .map((component) => component.y)
+      .sort((left, right) => left - right);
+
+    expect(positions[1] - positions[0]).toBe(positions[2] - positions[1]);
+  });
+
   it("creates and dissolves component groups", () => {
     const components = [
       createComponent("g-1", { x: 0, y: 0 }),
@@ -187,5 +207,52 @@ describe("canvasStore usability actions", () => {
         return matchesCategory && query;
       }),
     ).toBe(true);
+  });
+
+  it("locks and unlocks components", () => {
+    const component = createComponent("lock-test", { locked: false });
+    canvasActions.updateComponents(() => [component]);
+
+    canvasActions.lockComponents(["lock-test"]);
+    expect(
+      useCanvasStore.getState().components.find((item) => item.id === "lock-test")
+        ?.locked,
+    ).toBe(true);
+
+    canvasActions.unlockComponents(["lock-test"]);
+    expect(
+      useCanvasStore.getState().components.find((item) => item.id === "lock-test")
+        ?.locked,
+    ).toBe(false);
+  });
+
+  it("updates alignment guides and clears them after timeout", () => {
+    vi.useFakeTimers();
+
+    try {
+      const moving = createComponent("guide-moving", {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      });
+      const stationary = createComponent("guide-static", {
+        x: 200,
+        y: 0,
+        width: 100,
+        height: 100,
+      });
+      canvasActions.updateComponents(() => [moving, stationary]);
+      useCanvasStore.setState({ showAlignmentGuides: true }, false);
+
+      canvasActions.updateAlignmentGuides("guide-moving", 200, 0);
+
+      expect(useCanvasStore.getState().alignmentGuides.length).toBeGreaterThan(0);
+
+      vi.advanceTimersByTime(1000);
+      expect(useCanvasStore.getState().alignmentGuides).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

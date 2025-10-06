@@ -8,7 +8,7 @@
 import { Lock, Ungroup, Unlock } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
 
-import { cx } from "@/lib/design/design-system";
+import { cx, overlayZIndex } from "@/lib/design/design-system";
 import type { ComponentGroup } from "@/shared/contracts";
 import { useComponentGroups, useCanvasActions } from "@/stores/canvasStore";
 
@@ -27,7 +27,7 @@ export const ComponentGroupOverlay = memo<ComponentGroupOverlayProps>(
     if (groups.length === 0) return null;
 
     return (
-      <div className="absolute inset-0 pointer-events-none z-[50]">
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: overlayZIndex.groups }}>
         {groups.map((group) => (
           <GroupBoundary key={group.id} group={group} viewport={viewport} />
         ))}

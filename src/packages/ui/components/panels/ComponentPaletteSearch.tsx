@@ -7,7 +7,7 @@
 
 import * as Popover from "@radix-ui/react-popover";
 import { Filter, Search, X } from "lucide-react";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cx } from "@/lib/design/design-system";
 import {
@@ -15,6 +15,39 @@ import {
   useComponentSearchQuery,
   useCanvasActions,
 } from "@/stores/canvasStore";
+
+/**
+ * Debounce helper for search input
+ */
+function useDebouncedCallback<T extends (...args: any[]) => void>(
+  callback: T,
+  delay: number
+): T {
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  const debouncedCallback = useCallback(
+    (...args: Parameters<T>) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        callback(...args);
+      }, delay);
+    },
+    [callback, delay]
+  ) as T;
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return debouncedCallback;
+}
 
 interface ComponentPaletteSearchProps {
   categories: Array<{ id: string; name: string; count: number }>;
@@ -27,15 +60,27 @@ export const ComponentPaletteSearch = memo<ComponentPaletteSearchProps>(
     const filterCategory = useComponentFilterCategory();
     const actions = useCanvasActions();
     const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [localQuery, setLocalQuery] = useState(searchQuery);
+
+    // Debounced search update to store (200ms delay)
+    const debouncedUpdateSearch = useDebouncedCallback(
+      (value: string) => {
+        actions.setComponentSearchQuery(value);
+      },
+      200
+    );
 
     const handleSearchChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
-        actions.setComponentSearchQuery(e.target.value);
+        const value = e.target.value;
+        setLocalQuery(value); // Update local state immediately for responsive UI
+        debouncedUpdateSearch(value); // Update store with debounce
       },
-      [actions],
+      [debouncedUpdateSearch],
     );
 
     const handleClearSearch = useCallback(() => {
+      setLocalQuery("");
       actions.setComponentSearchQuery("");
     }, [actions]);
 
@@ -56,7 +101,7 @@ export const ComponentPaletteSearch = memo<ComponentPaletteSearchProps>(
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            value={searchQuery}
+            value={localQuery}
             onChange={handleSearchChange}
             placeholder="Search components..."
             className={cx(
@@ -67,7 +112,7 @@ export const ComponentPaletteSearch = memo<ComponentPaletteSearchProps>(
               "transition-colors",
             )}
           />
-          {searchQuery ? (
+          {localQuery ? (
             <button
               onClick={handleClearSearch}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
