@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -46,6 +46,77 @@ import { defaultSettings, loadSettings, saveSettings } from '@/modules/settings'
 
 type SettingsState = typeof defaultSettings;
 type TabKey = 'overview' | 'audio' | 'appearance' | 'performance' | 'privacy' | 'shortcuts' | 'grid';
+
+const SEARCH_SECTIONS = [
+  {
+    id: 'config-overview-system',
+    tab: 'overview' as TabKey,
+    keywords: [
+      'overview',
+      'system',
+      'virtualization',
+      'rendering',
+      'performance',
+      'autosave',
+      'snapshot',
+    ],
+  },
+  {
+    id: 'config-overview-stats',
+    tab: 'overview' as TabKey,
+    keywords: ['stats', 'summary', 'theme', 'telemetry', 'last saved', 'canvas'],
+  },
+  {
+    id: 'config-audio',
+    tab: 'audio' as TabKey,
+    keywords: [
+      'audio',
+      'microphone',
+      'recording',
+      'transcription',
+      'whisper',
+      'quality',
+      'sound',
+      'voice',
+    ],
+  },
+  {
+    id: 'config-appearance',
+    tab: 'appearance' as TabKey,
+    keywords: [
+      'appearance',
+      'theme',
+      'connection',
+      'style',
+      'canvas look',
+      'visuals',
+      'curved',
+      'stepped',
+    ],
+  },
+  {
+    id: 'config-performance',
+    tab: 'performance' as TabKey,
+    keywords: ['performance', 'optimization', 'metrics', 'guardrails', 'speed', 'render'],
+  },
+  {
+    id: 'config-privacy',
+    tab: 'privacy' as TabKey,
+    keywords: ['privacy', 'telemetry', 'analytics', 'diagnostics', 'error reports', 'data'],
+  },
+  {
+    id: 'config-shortcuts',
+    tab: 'shortcuts' as TabKey,
+    keywords: ['shortcuts', 'keyboard', 'hotkeys', 'figma', 'vscode', 'commands', 'hints'],
+  },
+  {
+    id: 'config-grid',
+    tab: 'grid' as TabKey,
+    keywords: ['grid', 'snap', 'spacing', 'alignment', 'layout', 'guides'],
+  },
+] as const;
+
+type SectionKey = typeof SEARCH_SECTIONS[number]['id'];
 
 const STORAGE_KEY = 'archicomm_settings';
 
@@ -144,6 +215,33 @@ export function ConfigPage({
   const [localConnectionStyle, setLocalConnectionStyle] = useState(connectionStyle);
   const [localVirtualization, setLocalVirtualization] = useState(virtualizationEnabled);
   const [searchQuery, setSearchQuery] = useState('');
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const { ids: matchedSectionIds, firstTab: matchedTab } = useMemo(() => {
+    if (!normalizedQuery) {
+      return { ids: new Set<SectionKey>(), firstTab: null as TabKey | null };
+    }
+
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+    const ids = new Set<SectionKey>();
+    let firstTab: TabKey | null = null;
+
+    SEARCH_SECTIONS.forEach(section => {
+      const haystack = section.keywords;
+      const matches = tokens.every(token =>
+        haystack.some(keyword => keyword.includes(token))
+      );
+
+      if (matches) {
+        ids.add(section.id);
+        if (!firstTab) {
+          firstTab = section.tab;
+        }
+      }
+    });
+
+    return { ids, firstTab };
+  }, [normalizedQuery]);
 
   useEffect(() => {
     setLocalConnectionStyle(connectionStyle);
@@ -160,6 +258,21 @@ export function ConfigPage({
     }
     return undefined;
   }, [saveStatus]);
+
+  useEffect(() => {
+    if (!normalizedQuery || !matchedTab) {
+      return;
+    }
+
+    if (activeTab !== matchedTab) {
+      setActiveTab(matchedTab);
+    }
+  }, [normalizedQuery, matchedTab, activeTab]);
+
+  const getCardClassName = (id: SectionKey, base?: string) =>
+    ['transition-shadow', base, matchedSectionIds.has(id) ? 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background shadow-sm' : null]
+      .filter(Boolean)
+      .join(' ');
 
   const persist = (next: SettingsState) => {
     setSaveStatus('saving');
@@ -452,16 +565,22 @@ export function ConfigPage({
             <Input
               type='text'
               placeholder='Search settings...'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className='pl-10'
-            />
-          </div>
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className='pl-10'
+        />
+      </div>
+      {normalizedQuery && matchedSectionIds.size === 0 && (
+        <Alert variant='outline' className='border-dashed border-primary/40 text-muted-foreground'>
+          <AlertTitle>No matches found</AlertTitle>
+          <AlertDescription>Try a different keyword like “audio”, “grid”, or “privacy”.</AlertDescription>
+        </Alert>
+      )}
 
-          <Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)} className='w-full'>
-            <TabsList className='flex h-auto flex-wrap items-center justify-start gap-1 rounded-xl border bg-background/60 p-1'>
-              <TabsTrigger value='overview' className='gap-2'>
-                <Activity className='h-4 w-4' />
+      <Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)} className='w-full'>
+        <TabsList className='flex h-auto flex-wrap items-center justify-start gap-1 rounded-xl border bg-background/60 p-1'>
+          <TabsTrigger value='overview' className='gap-2'>
+            <Activity className='h-4 w-4' />
                 Overview
               </TabsTrigger>
               <TabsTrigger value='audio' className='gap-2'>
@@ -491,7 +610,10 @@ export function ConfigPage({
             </TabsList>
 
             <TabsContent value='overview' className='mt-6 space-y-6'>
-              <Card>
+              <Card
+                id='config-overview-system'
+                className={getCardClassName('config-overview-system')}
+              >
                 <CardHeader className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                   <div>
                     <CardTitle>System snapshot</CardTitle>
@@ -568,7 +690,10 @@ export function ConfigPage({
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card
+                id='config-overview-stats'
+                className={getCardClassName('config-overview-stats')}
+              >
                 <CardHeader>
                   <CardTitle>Quick stats</CardTitle>
                   <CardDescription>Current configuration snapshot</CardDescription>
@@ -616,7 +741,10 @@ export function ConfigPage({
             </TabsContent>
 
             <TabsContent value='audio' className='mt-6 space-y-6'>
-              <Card>
+              <Card
+                id='config-audio'
+                className={getCardClassName('config-audio')}
+              >
                 <CardHeader>
                   <CardTitle>Audio ingest</CardTitle>
                   <CardDescription>
@@ -720,7 +848,10 @@ export function ConfigPage({
             </TabsContent>
 
             <TabsContent value='appearance' className='mt-6 space-y-6'>
-              <Card>
+              <Card
+                id='config-appearance'
+                className={getCardClassName('config-appearance')}
+              >
                 <CardHeader>
                   <CardTitle>Theme</CardTitle>
                   <CardDescription>Switch between calm focus and playful exploration aesthetics.</CardDescription>
@@ -773,7 +904,10 @@ export function ConfigPage({
             </TabsContent>
 
             <TabsContent value='performance' className='mt-6 space-y-6'>
-              <Card>
+              <Card
+                id='config-performance'
+                className={getCardClassName('config-performance')}
+              >
                 <CardHeader>
                   <CardTitle>Performance guardrails</CardTitle>
                   <CardDescription>Keep sprawling workspaces responsive as teams scale their systems.</CardDescription>
@@ -816,7 +950,10 @@ export function ConfigPage({
             </TabsContent>
 
             <TabsContent value='privacy' className='mt-6 space-y-6'>
-              <Card>
+              <Card
+                id='config-privacy'
+                className={getCardClassName('config-privacy')}
+              >
                 <CardHeader>
                   <CardTitle>Telemetry & privacy</CardTitle>
                   <CardDescription>Choose what anonymous diagnostics flow back to the team.</CardDescription>
@@ -857,7 +994,10 @@ export function ConfigPage({
             </TabsContent>
 
             <TabsContent value='shortcuts' className='mt-6 space-y-6'>
-              <Card>
+              <Card
+                id='config-shortcuts'
+                className={getCardClassName('config-shortcuts')}
+              >
                 <CardHeader>
                   <CardTitle>Keyboard shortcuts</CardTitle>
                   <CardDescription>View and customize keyboard shortcuts for faster workflow.</CardDescription>
@@ -932,7 +1072,10 @@ export function ConfigPage({
             </TabsContent>
 
             <TabsContent value='grid' className='mt-6 space-y-6'>
-              <Card>
+              <Card
+                id='config-grid'
+                className={getCardClassName('config-grid')}
+              >
                 <CardHeader>
                   <CardTitle>Grid configuration</CardTitle>
                   <CardDescription>Control the canvas grid appearance and snapping behavior.</CardDescription>

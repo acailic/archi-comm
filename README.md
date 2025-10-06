@@ -62,29 +62,42 @@ See also: [src/docs/SystemDesignPractice.md](src/docs/SystemDesignPractice.md)
 
 ## Installation
 
-### Direct Download (All Platforms)
-
-Download the latest signed release for your platform from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
-
-### macOS
-
-Using Homebrew (recommended):
+### Quick Install (macOS via Homebrew)
 
 ```bash
-# Binary installation
-brew install --cask archi-comm
-
-# Or, for source installation
-brew install archi-comm
+brew tap acailic/tap
+brew install --cask archicomm
 ```
 
-### Windows
+This installs the notarized desktop bundle to `/Applications/ArchiComm.app`. Launch it from Spotlight or run:
 
-Download and run the signed installer from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
+```bash
+open /Applications/ArchiComm.app
+```
 
-### Linux
+Upgrade anytime with `brew upgrade archicomm`. Prefer to build from source? Replace the cask command with `brew install acailic/tap/archicomm`.
 
-Download the AppImage or .deb package from [GitHub Releases](https://github.com/acailic/archi-comm/releases).
+### Download from GitHub Releases
+
+Every tagged build ships to [GitHub Releases](https://github.com/acailic/archi-comm/releases) with SHA256 checksums.
+
+| Platform | Artifact | How to install |
+| --- | --- | --- |
+| macOS (Intel/Apple Silicon) | `ArchiComm-macOS.dmg` | Double-click the DMG and drag ArchiComm to Applications. |
+| Windows 10/11 | `ArchiComm-Setup-x64.exe` | Run the signed installer and follow the wizard. |
+| Linux (AppImage) | `ArchiComm-x86_64.AppImage` | `chmod +x ArchiComm-x86_64.AppImage && ./ArchiComm-x86_64.AppImage` |
+| Linux (Debian/Ubuntu) | `archicomm_x.y.z_amd64.deb` | `sudo dpkg -i archicomm_x.y.z_amd64.deb` |
+
+Download from the latest release manually or via curl:
+
+```bash
+# macOS DMG example
+curl -L \
+  https://github.com/acailic/archi-comm/releases/latest/download/ArchiComm-macOS.dmg \
+  -o ArchiComm-macOS.dmg
+```
+
+Verify the downloaded file with the checksum listed on the release page (`shasum -a 256 <file>` on macOS/Linux or `Get-FileHash` on Windows).
 
 ### Development Setup
 
