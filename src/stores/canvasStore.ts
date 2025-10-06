@@ -1,24 +1,50 @@
+/// <reference types="vite/client" />
+
+import { temporal } from "zundo";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+
 import { InfiniteLoopDetector } from "@/lib/performance/InfiniteLoopDetector";
+import { deepEqual as coreDeepEqual } from "@/packages/core/utils";
 import type {
+  AlignmentGuide,
   Annotation,
+  ComponentGroup,
   Connection,
   DesignComponent,
   DrawingSettings,
   DrawingStroke,
   DrawingTool,
   InfoCard,
-} from "@shared/contracts";
-import { temporal } from "zundo";
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { immer } from "zustand/middleware/immer";
-import { shallow } from "zustand/shallow";
-
-import { deepEqual as coreDeepEqual } from "@/packages/core/utils";
+} from "@/shared/contracts";
+import { componentLibrary } from "@/shared/data/componentLibrary";
 
 const RATE_LIMIT_WINDOW_MS = 100;
 const RATE_LIMIT_COUNT = 10;
 const RATE_LIMIT_COOLDOWN_MS = 250;
+
+let alignmentGuideTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+const clearAlignmentGuideTimeout = () => {
+  if (alignmentGuideTimeoutId !== null) {
+    clearTimeout(alignmentGuideTimeoutId);
+    alignmentGuideTimeoutId = null;
+  }
+};
+
+const resetAlignmentGuides = () => {
+  clearAlignmentGuideTimeout();
+  useCanvasStore.setState({ alignmentGuides: [] }, false);
+};
+
+const typeToCategory = componentLibrary.reduce<Record<string, string>>(
+  (accumulator, component) => {
+    accumulator[component.type.toLowerCase()] = component.category.toLowerCase();
+    return accumulator;
+  },
+  {},
+);
 
 export type CanvasMode =
   | "select"
@@ -39,6 +65,25 @@ interface CanvasStoreState {
   visualTheme: "serious" | "playful";
   lastUpdatedAt: number;
   updateVersion: number;
+
+  // Multi-select state
+  selectedComponentIds: string[];
+  selectionBox: { x: number; y: number; width: number; height: number } | null;
+  lastSelectedId: string | null;
+
+  // Component groups
+  componentGroups: ComponentGroup[];
+
+  // Alignment guides
+  alignmentGuides: AlignmentGuide[];
+  showAlignmentGuides: boolean;
+
+  // Component locking
+  lockedComponentIds: Set<string>;
+
+  // Search/filter
+  componentSearchQuery: string;
+  componentFilterCategory: string | null;
 
   // Drawing state
   drawingTool: DrawingTool;
@@ -144,11 +189,11 @@ class UpdateRateLimiter {
             rateLimiterActive: now < this.blockedUntil,
           },
         });
-      } catch (error) {
+      } catch (_error) {
         // Silently fail if detector throws
         console.warn(
           "[CanvasStore] Failed to record with InfiniteLoopDetector:",
-          error,
+          _error,
         );
       }
     }
@@ -198,14 +243,13 @@ class UpdateRateLimiter {
 
     if (import.meta.env.DEV) {
       try {
-        const detectorReport =
-          InfiniteLoopDetector.getLatestReport("CanvasStore");
+        const detector = InfiniteLoopDetector.getInstance();
+        const detectorReport = detector.getLatestReport("CanvasStore");
         if (detectorReport) {
-          detectorFlagged =
-            InfiniteLoopDetector.isComponentFlagged("CanvasStore");
+          detectorFlagged = detector.isComponentFlagged("CanvasStore");
           detectorSeverity = detectorReport.severity;
         }
-      } catch (error) {
+      } catch {
         // Silently fail
       }
     }
@@ -261,12 +305,13 @@ class UpdateRateLimiter {
     // Also inform the global detector about the drop
     if (import.meta.env.DEV && reason) {
       try {
-        InfiniteLoopDetector.markCircuitBreakerOpen(
+        const detector = InfiniteLoopDetector.getInstance();
+        detector.markCircuitBreakerOpen(
           "CanvasStore",
           Date.now() + RATE_LIMIT_COOLDOWN_MS,
           reason,
         );
-      } catch (error) {
+      } catch {
         // Silently fail
       }
     }
@@ -350,6 +395,25 @@ const initialState: CanvasStoreState = {
   visualTheme: "serious",
   lastUpdatedAt: 0,
   updateVersion: 0,
+
+  // Multi-select state
+  selectedComponentIds: [],
+  selectionBox: null,
+  lastSelectedId: null,
+
+  // Component groups
+  componentGroups: [],
+
+  // Alignment guides
+  alignmentGuides: [],
+  showAlignmentGuides: true,
+
+  // Component locking
+  lockedComponentIds: new Set(),
+
+  // Search/filter
+  componentSearchQuery: "",
+  componentFilterCategory: null,
 
   // Drawing state
   drawingTool: null,
@@ -499,7 +563,7 @@ const mutableCanvasActions = {
     );
 
     // Track usage for each newly added component type
-    newlyAddedTypes.forEach((type) => {
+    newlyAddedTypes.forEach((type: string) => {
       try {
         // call action; safe to reference mutableCanvasActions at runtime
         (mutableCanvasActions as any).trackComponentUsage(type);
@@ -793,7 +857,7 @@ const mutableCanvasActions = {
     );
 
     // Track usage for newly added component types
-    newlyAddedTypes.forEach((type) => {
+    newlyAddedTypes.forEach((type: string) => {
       try {
         (mutableCanvasActions as any).trackComponentUsage(type);
       } catch {
@@ -907,7 +971,7 @@ const mutableCanvasActions = {
     );
 
     // Track usage for newly added component types if any
-    newlyAddedTypes.forEach((type) => {
+    newlyAddedTypes.forEach((type: string) => {
       try {
         (mutableCanvasActions as any).trackComponentUsage(type);
       } catch {
@@ -1136,6 +1200,359 @@ const mutableCanvasActions = {
     }
   },
 
+  // Multi-select actions
+  setSelectedComponents(ids: string[], options?: BaseActionOptions) {
+    applyUpdate(
+      "setSelectedComponents",
+      (draft) => {
+        draft.selectedComponentIds = ids;
+        draft.lastSelectedId = ids[ids.length - 1] || null;
+      },
+      options,
+    );
+  },
+
+  toggleComponentSelection(id: string, options?: BaseActionOptions) {
+    const current = useCanvasStore.getState().selectedComponentIds;
+    const newSelection = current.includes(id)
+      ? current.filter((cid) => cid !== id)
+      : [...current, id];
+    this.setSelectedComponents(newSelection, options);
+  },
+
+  clearSelection(options?: BaseActionOptions) {
+    this.setSelectedComponents([], options);
+  },
+
+  setSelectionBox(
+    box: { x: number; y: number; width: number; height: number } | null,
+  ) {
+    useCanvasStore.setState({ selectionBox: box }, false);
+  },
+
+  // Duplication action
+  duplicateComponents(
+    componentIds: string[],
+    offset = { x: 20, y: 20 },
+    options?: BaseActionOptions,
+  ) {
+    const state = useCanvasStore.getState();
+    const newComponents: DesignComponent[] = [];
+    const idMap: Record<string, string> = {};
+
+    componentIds.forEach((id: string) => {
+      const component = state.components.find((c) => c.id === id);
+      if (!component) return;
+
+      const newId =
+        crypto.randomUUID?.() ||
+        `component-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      idMap[id] = newId;
+
+      newComponents.push({
+        ...component,
+        id: newId,
+        x: component.x + offset.x,
+        y: component.y + offset.y,
+        label: `${component.label} (Copy)`,
+        groupId: undefined,
+        locked: false,
+      });
+    });
+
+    applyUpdate(
+      "duplicateComponents",
+      (draft) => {
+        draft.components.push(...newComponents);
+      },
+      options,
+    );
+
+    return { newComponents, idMap };
+  },
+
+  // Alignment actions
+  alignComponents(
+    componentIds: string[],
+    alignment: "left" | "right" | "top" | "bottom" | "center-h" | "center-v",
+    options?: BaseActionOptions,
+  ) {
+    const state = useCanvasStore.getState();
+    const components = state.components.filter((c) =>
+      componentIds.includes(c.id),
+    );
+    if (components.length < 2) return;
+
+    const updates: Array<{ id: string; x?: number; y?: number }> = [];
+
+    if (alignment === "left") {
+      const minX = Math.min(...components.map((c) => c.x));
+      components.forEach((c: DesignComponent) => updates.push({ id: c.id, x: minX }));
+    } else if (alignment === "right") {
+      const maxX = Math.max(...components.map((c) => c.x + (c.width || 220)));
+      components.forEach((c: DesignComponent) =>
+        updates.push({ id: c.id, x: maxX - (c.width || 220) }),
+      );
+    } else if (alignment === "top") {
+      const minY = Math.min(...components.map((c) => c.y));
+      components.forEach((c: DesignComponent) => updates.push({ id: c.id, y: minY }));
+    } else if (alignment === "bottom") {
+      const maxY = Math.max(...components.map((c) => c.y + (c.height || 140)));
+      components.forEach((c: DesignComponent) =>
+        updates.push({ id: c.id, y: maxY - (c.height || 140) }),
+      );
+    } else if (alignment === "center-h") {
+      const avgX =
+        components.reduce((sum, c) => sum + c.x + (c.width || 220) / 2, 0) /
+        components.length;
+      components.forEach((c: DesignComponent) =>
+        updates.push({ id: c.id, x: avgX - (c.width || 220) / 2 }),
+      );
+    } else if (alignment === "center-v") {
+      const avgY =
+        components.reduce((sum, c) => sum + c.y + (c.height || 140) / 2, 0) /
+        components.length;
+      components.forEach((c: DesignComponent) =>
+        updates.push({ id: c.id, y: avgY - (c.height || 140) / 2 }),
+      );
+    }
+
+    applyUpdate(
+      "alignComponents",
+      (draft) => {
+        updates.forEach(({ id, x, y }) => {
+          const component = draft.components.find((c) => c.id === id);
+          if (component) {
+            if (x !== undefined) component.x = x;
+            if (y !== undefined) component.y = y;
+          }
+        });
+      },
+      options,
+    );
+  },
+
+  distributeComponents(
+    componentIds: string[],
+    direction: "horizontal" | "vertical",
+    options?: BaseActionOptions,
+  ) {
+    const state = useCanvasStore.getState();
+    const components = state.components.filter((c) =>
+      componentIds.includes(c.id),
+    );
+    if (components.length < 3) return;
+
+    const sorted =
+      direction === "horizontal"
+        ? [...components].sort((a, b) => a.x - b.x)
+        : [...components].sort((a, b) => a.y - b.y);
+
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const totalSpace =
+      direction === "horizontal"
+        ? last.x + (last.width || 220) - first.x
+        : last.y + (last.height || 140) - first.y;
+    const totalComponentSize = sorted.reduce(
+      (sum, c) =>
+        sum + (direction === "horizontal" ? c.width || 220 : c.height || 140),
+      0,
+    );
+    const spacing = (totalSpace - totalComponentSize) / (sorted.length - 1);
+
+    let currentPos = direction === "horizontal" ? first.x : first.y;
+    const updates: Array<{ id: string; x?: number; y?: number }> = [];
+
+    sorted.forEach((c: DesignComponent, i: number) => {
+      if (i === 0 || i === sorted.length - 1) {
+        currentPos +=
+          direction === "horizontal" ? c.width || 220 : c.height || 140;
+        return;
+      }
+      if (direction === "horizontal") {
+        updates.push({ id: c.id, x: currentPos });
+        currentPos += (c.width || 220) + spacing;
+      } else {
+        updates.push({ id: c.id, y: currentPos });
+        currentPos += (c.height || 140) + spacing;
+      }
+    });
+
+    applyUpdate(
+      "distributeComponents",
+      (draft) => {
+        updates.forEach(({ id, x, y }) => {
+          const component = draft.components.find((c) => c.id === id);
+          if (component) {
+            if (x !== undefined) component.x = x;
+            if (y !== undefined) component.y = y;
+          }
+        });
+      },
+      options,
+    );
+  },
+
+  // Grouping actions
+  groupComponents(
+    componentIds: string[],
+    name?: string,
+    options?: BaseActionOptions,
+  ) {
+    const state = useCanvasStore.getState();
+    const components = state.components.filter((c) =>
+      componentIds.includes(c.id),
+    );
+    if (components.length < 2) return null;
+
+    const minX = Math.min(...components.map((c) => c.x));
+    const minY = Math.min(...components.map((c) => c.y));
+    const maxX = Math.max(...components.map((c) => c.x + (c.width || 220)));
+    const maxY = Math.max(...components.map((c) => c.y + (c.height || 140)));
+
+    const groupId = crypto.randomUUID?.() || `group-${Date.now()}`;
+    const group: ComponentGroup = {
+      id: groupId,
+      name: name || `Group ${state.componentGroups.length + 1}`,
+      componentIds,
+      x: minX - 10,
+      y: minY - 10,
+      width: maxX - minX + 20,
+      height: maxY - minY + 20,
+    };
+
+    applyUpdate(
+      "groupComponents",
+      (draft) => {
+        draft.componentGroups.push(group);
+        componentIds.forEach((id: string) => {
+          const component = draft.components.find((c) => c.id === id);
+          if (component) component.groupId = groupId;
+        });
+      },
+      options,
+    );
+
+    return group;
+  },
+
+  ungroupComponents(groupId: string, options?: BaseActionOptions) {
+    applyUpdate(
+      "ungroupComponents",
+      (draft) => {
+        const group = draft.componentGroups.find((g) => g.id === groupId);
+        if (!group) return;
+
+        group.componentIds.forEach((id: string) => {
+          const component = draft.components.find((c) => c.id === id);
+          if (component) delete component.groupId;
+        });
+
+        draft.componentGroups = draft.componentGroups.filter(
+          (g) => g.id !== groupId,
+        );
+      },
+      options,
+    );
+  },
+
+  // Locking actions
+  lockComponents(componentIds: string[], options?: BaseActionOptions) {
+    applyUpdate(
+      "lockComponents",
+      (draft) => {
+        componentIds.forEach((id: string) => {
+          const component = draft.components.find((c) => c.id === id);
+          if (component) component.locked = true;
+        });
+      },
+      options,
+    );
+  },
+
+  unlockComponents(componentIds: string[], options?: BaseActionOptions) {
+    applyUpdate(
+      "unlockComponents",
+      (draft) => {
+        componentIds.forEach((id: string) => {
+          const component = draft.components.find((c) => c.id === id);
+          if (component) component.locked = false;
+        });
+      },
+      options,
+    );
+  },
+
+  // Search/Filter actions
+  setComponentSearchQuery(query: string) {
+    useCanvasStore.setState({ componentSearchQuery: query }, false);
+  },
+
+  setComponentFilterCategory(category: string | null) {
+    useCanvasStore.setState({ componentFilterCategory: category }, false);
+  },
+
+  clearAlignmentGuides() {
+    resetAlignmentGuides();
+  },
+
+  // Alignment guide detection (called during component drag)
+  updateAlignmentGuides(movingComponentId: string, newX: number, newY: number) {
+    const state = useCanvasStore.getState();
+    if (!state.showAlignmentGuides) {
+      resetAlignmentGuides();
+      return;
+    }
+
+    const movingComp = state.components.find((c) => c.id === movingComponentId);
+    if (!movingComp) return;
+
+    const guides: AlignmentGuide[] = [];
+    const threshold = 5; // pixels
+
+    // Check alignment with other components
+    state.components.forEach((comp) => {
+      if (comp.id === movingComponentId) return;
+
+      const compCenterX = comp.x + (comp.width || 220) / 2;
+      const compCenterY = comp.y + (comp.height || 140) / 2;
+      const movingCenterX = newX + (movingComp.width || 220) / 2;
+      const movingCenterY = newY + (movingComp.height || 140) / 2;
+
+      // Vertical center alignment
+      if (Math.abs(movingCenterX - compCenterX) < threshold) {
+        guides.push({
+          id: `v-${comp.id}`,
+          type: "vertical",
+          position: compCenterX,
+          componentIds: [movingComponentId, comp.id],
+          visible: true,
+        });
+      }
+
+      // Horizontal center alignment
+      if (Math.abs(movingCenterY - compCenterY) < threshold) {
+        guides.push({
+          id: `h-${comp.id}`,
+          type: "horizontal",
+          position: compCenterY,
+          componentIds: [movingComponentId, comp.id],
+          visible: true,
+        });
+      }
+    });
+
+    clearAlignmentGuideTimeout();
+    useCanvasStore.setState({ alignmentGuides: guides }, false);
+
+    if (guides.length > 0) {
+      alignmentGuideTimeoutId = setTimeout(() => {
+        resetAlignmentGuides();
+      }, 1000);
+    }
+  },
+
   getDebugInfo() {
     const state = useCanvasStore.getState();
     const limiter = updateLimiter.getSnapshot();
@@ -1151,22 +1568,25 @@ const mutableCanvasActions = {
       lastUsedComponent: state.lastUsedComponent,
     };
   },
-} as const;
+};
 
 Object.freeze(mutableCanvasActions);
 
 export type CanvasActions = typeof mutableCanvasActions;
 
+// Export canvasActions for direct imports
+export const canvasActions = mutableCanvasActions;
+
 export const useCanvasComponents = (): DesignComponent[] =>
-  useCanvasStore((state) => state.components, shallow);
+  useCanvasStore((state) => state.components);
 export const useCanvasConnections = () =>
-  useCanvasStore((state) => state.connections, shallow);
+  useCanvasStore((state) => state.connections);
 export const useCanvasInfoCards = () =>
-  useCanvasStore((state) => state.infoCards, shallow);
+  useCanvasStore((state) => state.infoCards);
 export const useCanvasAnnotations = () =>
-  useCanvasStore((state) => state.annotations, shallow);
+  useCanvasStore((state) => state.annotations);
 export const useCanvasDrawings = () =>
-  useCanvasStore((state) => state.drawings, shallow);
+  useCanvasStore((state) => state.drawings);
 export const useDrawingTool = () =>
   useCanvasStore((state) => state.drawingTool);
 export const useDrawingColor = () =>
@@ -1174,7 +1594,7 @@ export const useDrawingColor = () =>
 export const useDrawingSize = () =>
   useCanvasStore((state) => state.drawingSize);
 export const useDrawingSettings = () =>
-  useCanvasStore((state) => state.drawingSettings, shallow);
+  useCanvasStore((state) => state.drawingSettings);
 export const useCanvasSelectedComponent = () =>
   useCanvasStore((state) => state.selectedComponent ?? null);
 export const useCanvasConnectionStart = () =>
@@ -1214,11 +1634,74 @@ export const useDismissedTips = () =>
 
 // New selectors for usage & personalization
 export const useRecentComponents = () =>
-  useCanvasStore((state) => state.recentComponents, shallow);
+  useCanvasStore((state) => state.recentComponents);
 export const useFavoriteComponents = () =>
-  useCanvasStore((state) => state.favoriteComponents, shallow);
+  useCanvasStore((state) => state.favoriteComponents);
 export const useLastUsedComponent = () =>
   useCanvasStore((state) => state.lastUsedComponent);
+
+// Multi-select selectors
+export const useSelectedComponentIds = () =>
+  useCanvasStore((state) => state.selectedComponentIds);
+
+export const useSelectionBox = () =>
+  useCanvasStore((state) => state.selectionBox);
+
+export const useIsComponentSelected = (id: string) =>
+  useCanvasStore((state) => state.selectedComponentIds.includes(id));
+
+// Group selectors
+export const useComponentGroups = () =>
+  useCanvasStore((state) => state.componentGroups);
+
+export const useComponentGroup = (groupId: string) =>
+  useCanvasStore((state) =>
+    state.componentGroups.find((g) => g.id === groupId),
+  );
+
+// Lock selectors
+export const useIsComponentLocked = (id: string) =>
+  useCanvasStore((state) => {
+    const component = state.components.find((c) => c.id === id);
+    return component?.locked || false;
+  });
+
+// Search/Filter selectors
+export const useComponentSearchQuery = () =>
+  useCanvasStore((state) => state.componentSearchQuery);
+
+export const useComponentFilterCategory = () =>
+  useCanvasStore((state) => state.componentFilterCategory);
+
+export const useFilteredComponents = () =>
+  useCanvasStore((state) => {
+    const query = state.componentSearchQuery.trim().toLowerCase();
+    const category = state.componentFilterCategory?.toLowerCase() || null;
+
+    let filtered = componentLibrary;
+
+    if (category && category !== "all") {
+      filtered = filtered.filter((component) => {
+        const resolvedCategory =
+          typeToCategory[component.type.toLowerCase()] ??
+          component.category.toLowerCase();
+        return resolvedCategory === category;
+      });
+    }
+
+    if (query) {
+      filtered = filtered.filter((component) => {
+        const labelMatch = component.label.toLowerCase().includes(query);
+        const typeMatch = component.type.toLowerCase().includes(query);
+        const descriptionMatch = component.description
+          .toLowerCase()
+          .includes(query);
+        return labelMatch || typeMatch || descriptionMatch;
+      });
+    }
+
+    return filtered;
+  });
 
 export const useCanvasActions = () => mutableCanvasActions;
 

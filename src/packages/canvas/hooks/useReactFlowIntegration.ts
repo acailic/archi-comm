@@ -114,10 +114,10 @@ export function useReactFlowIntegration({
   // Handle React Flow node changes
   const onNodesChange: OnNodesChange = useCallback((changes: NodeChange[]) => {
     // Filter out selection and dimension changes as they don't affect domain data
-    const significantChanges = changes.filter(change => 
-      change.type === 'position' || 
-      change.type === 'add' || 
-      change.type === 'remove' || 
+    const significantChanges = changes.filter(change =>
+      change.type === 'position' ||
+      change.type === 'add' ||
+      change.type === 'remove' ||
       change.type === 'replace'
     );
 
@@ -125,18 +125,78 @@ export function useReactFlowIntegration({
       return;
     }
 
+    const lockedComponentIds = new Set(
+      components.filter(component => component.locked).map(component => component.id)
+    );
+    const lockedPositionChangeIds = new Set<string>();
+
+    // Filter out changes to locked components
+    const allowedChanges = significantChanges.filter(change => {
+      if (change.type === 'position') {
+        if (lockedComponentIds.has(change.id)) {
+          lockedPositionChangeIds.add(change.id);
+          console.warn(`[Canvas] Blocked movement of locked component: ${change.id}`);
+          return false; // Prevent position changes to locked components
+        }
+      }
+      return true;
+    });
+
+    if (allowedChanges.length === 0) {
+      if (lockedPositionChangeIds.size > 0 && reactFlowInstance.current) {
+        const originalPositions = new Map<string, { x: number; y: number }>();
+        components.forEach(component => {
+          if (lockedPositionChangeIds.has(component.id)) {
+            originalPositions.set(component.id, { x: component.x, y: component.y });
+          }
+        });
+
+        if (originalPositions.size > 0) {
+          reactFlowInstance.current.setNodes(nodes => {
+            let hasUpdates = false;
+            const nextNodes = nodes.map(node => {
+              const original = originalPositions.get(node.id);
+              if (!original) {
+                return node;
+              }
+
+              if (
+                node.position?.x === original.x &&
+                node.position?.y === original.y
+              ) {
+                return node;
+              }
+
+              hasUpdates = true;
+              return {
+                ...node,
+                position: { x: original.x, y: original.y },
+                positionAbsolute: node.positionAbsolute
+                  ? { x: original.x, y: original.y }
+                  : node.positionAbsolute,
+                dragging: false,
+              };
+            });
+
+            return hasUpdates ? nextNodes : nodes;
+          });
+        }
+      }
+      return;
+    }
+
     // Convert React Flow changes back to domain objects
-    const updatedComponents = fromNodeChanges(changes, components);
-    
+    const updatedComponents = fromNodeChanges(allowedChanges, components);
+
     // Handle specific change types
-    for (const change of significantChanges) {
+    for (const change of allowedChanges) {
       switch (change.type) {
         case 'position':
           if (change.position && onComponentMove) {
             onComponentMove(change.id, change.position.x, change.position.y);
           }
           break;
-          
+
         case 'remove':
           if (onComponentDelete) {
             onComponentDelete(change.id);
@@ -168,7 +228,7 @@ export function useReactFlowIntegration({
     }
 
     // Convert React Flow changes back to domain objects
-    const updatedConnections = fromEdgeChanges(changes, connections);
+    const updatedConnections = fromEdgeChanges(significantChanges, connections);
     
     // Handle specific change types
     for (const change of significantChanges) {

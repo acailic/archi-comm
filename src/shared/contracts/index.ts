@@ -104,6 +104,51 @@ export type ComponentProperties =
   | (LoadBalancerProperties & BaseComponentProperties)
   | (Record<string, unknown> & BaseComponentProperties);
 
+export interface ComponentGroup {
+  id: string;
+  name: string;
+  componentIds: string[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  collapsed?: boolean;
+  color?: string;
+  locked?: boolean;
+  description?: string;
+}
+
+export interface SelectionState {
+  selectedComponentIds: string[];
+  selectionBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  lastSelectedId?: string;
+}
+
+export interface AlignmentGuide {
+  id: string;
+  type: "vertical" | "horizontal";
+  position: number;
+  componentIds: string[];
+  visible: boolean;
+}
+
+export interface ComponentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tags: string[];
+  icon: string;
+  component: Omit<DesignComponent, "id" | "x" | "y">;
+  popularity?: number;
+  lastUsed?: number;
+}
+
 export interface DesignComponent {
   id: string;
   type: ComponentType | string;
@@ -114,6 +159,12 @@ export interface DesignComponent {
   properties?: ComponentProperties;
   layerId?: string;
   typeSpecificProperties?: Record<string, any>;
+  groupId?: string; // Reference to parent group
+  locked?: boolean; // Prevent accidental moves
+  notes?: string; // Inline documentation
+  tags?: string[]; // For search/filter
+  width?: number; // Component width for alignment/distribution
+  height?: number; // Component height for alignment/distribution
 }
 
 export interface GridConfig {

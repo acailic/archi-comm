@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { Node, useNodesState } from '@xyflow/react';
+import { canvasActions, useCanvasStore } from '@/stores/canvasStore';
 import { DesignComponent, InfoCard } from '../../../types';
 import { useRenderGuard, RenderGuardPresets } from '../../../lib/performance/RenderGuard';
 import { InfiniteLoopDetector } from '../../../lib/performance/InfiniteLoopDetector';
@@ -109,6 +110,14 @@ export const NodeLayer: React.FC<NodeLayerProps> = ({ components, infoCards, chi
     renderGuard.renderCount,
   ]);
 
+  const handleNodeDrag = React.useCallback((event: any, node: Node) => {
+    canvasActions.updateAlignmentGuides(
+      node.id,
+      node.position.x,
+      node.position.y
+    );
+  }, []);
+
   const handleNodeDragStop = React.useCallback((event: any, node: Node) => {
     const isComponent = components.some(comp => comp.id === node.id);
     const isInfoCard = infoCards.some(card => card.id === node.id);
@@ -130,6 +139,9 @@ export const NodeLayer: React.FC<NodeLayerProps> = ({ components, infoCards, chi
       ...layoutPositions,
       [node.id]: node.position,
     });
+
+    // Clear alignment guides on drag end
+    canvasActions.clearAlignmentGuides();
   }, [
     components,
     infoCards,
@@ -173,9 +185,10 @@ export const NodeLayer: React.FC<NodeLayerProps> = ({ components, infoCards, chi
   const nodeEventHandlers = useMemo(() => ({
     onNodeClick: handleNodeClick,
     onNodeDoubleClick: handleNodeDoubleClick,
+    onNodeDrag: handleNodeDrag,
     onNodeDragStop: handleNodeDragStop,
     onNodesChange: enhancedOnNodesChange,
-  }), [handleNodeClick, handleNodeDoubleClick, handleNodeDragStop, enhancedOnNodesChange]);
+  }), [handleNodeClick, handleNodeDoubleClick, handleNodeDrag, handleNodeDragStop, enhancedOnNodesChange]);
 
   if (renderGuard.shouldPause) {
     return (

@@ -5,19 +5,23 @@ import React, {
   useMemo,
   useRef,
   useState,
-} from 'react';
+} from "react";
+
 import {
   RenderGuardPresets,
   useRenderGuard,
-} from '@/lib/performance/RenderGuard';
-import type { DesignComponent } from '../../../types';
-import { useCanvasContext } from '../contexts/CanvasContext';
+} from "@/lib/performance/RenderGuard";
+import { canvasActions } from "@/stores/canvasStore";
+
+import type { DesignComponent } from "../../../types";
+import { useCanvasContext } from "../contexts/CanvasContext";
+
 import {
   ContextMenu,
   ContextMenuAPI,
   ContextMenuCallbacks,
   ContextMenuState,
-} from './ContextMenu';
+} from "./ContextMenu";
 
 export interface CanvasInteractionLayerProps {
   enableDragDrop?: boolean;
@@ -30,7 +34,9 @@ interface KeyboardShortcuts {
   [key: string]: (event: KeyboardEvent) => void;
 }
 
-const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = ({
+const CanvasInteractionLayerComponent: React.FC<
+  CanvasInteractionLayerProps
+> = ({
   enableDragDrop = true,
   enableContextMenu = true,
   enableKeyboardShortcuts = true,
@@ -38,7 +44,8 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
 }) => {
   const { state, callbacks } = useCanvasContext();
   const { selectedItems, reactFlowInstance } = state;
-  const { component: componentCallbacks, connection: connectionCallbacks } = callbacks;
+  const { component: componentCallbacks, connection: connectionCallbacks } =
+    callbacks;
 
   const contextMenuRef = useRef<ContextMenuAPI | null>(null);
   const contextMenuStateRef = useRef<ContextMenuState>({
@@ -47,9 +54,15 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
     y: 0,
   });
 
-  const [draggedComponent, setDraggedComponent] = useState<DesignComponent | null>(null);
+  const [draggedComponent, setDraggedComponent] =
+    useState<DesignComponent | null>(null);
+  const [isDraggingSelection, setIsDraggingSelection] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
-  const renderGuardHandle = useRenderGuard('ReactFlowCanvas.Interactions', {
+  const renderGuardHandle = useRenderGuard("ReactFlowCanvas.Interactions", {
     ...RenderGuardPresets.canvasLayers.InteractionLayer,
     context: () => ({
       enableDragDrop,
@@ -73,7 +86,7 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
       return;
     }
 
-    console.warn('[CanvasInteractionLayer] Render guard pause engaged', {
+    console.warn("[CanvasInteractionLayer] Render guard pause engaged", {
       renderCount,
       circuitBreakerActive,
       error: lastSyntheticError?.message,
@@ -87,13 +100,51 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
       onComponentDeselect: componentCallbacks.onComponentDeselect,
       onConnectionSelect: connectionCallbacks.onConnectionSelect,
       onConnectionDelete: connectionCallbacks.onConnectionDelete,
+      onComponentDuplicate: (componentIds: string[]) => {
+        try {
+          canvasActions.duplicateComponents(componentIds);
+        } catch (error) {
+          console.error('Failed to duplicate components', error);
+        }
+      },
+      onComponentLock: (componentIds: string[]) => {
+        try {
+          canvasActions.lockComponents(componentIds);
+        } catch (error) {
+          console.error('Failed to lock components', error);
+        }
+      },
+      onComponentUnlock: (componentIds: string[]) => {
+        try {
+          canvasActions.unlockComponents(componentIds);
+        } catch (error) {
+          console.error('Failed to unlock components', error);
+        }
+      },
+      onComponentGroup: (componentIds: string[]) => {
+        try {
+          canvasActions.groupComponents(componentIds);
+        } catch (error) {
+          console.error('Failed to group components', error);
+        }
+      },
+      onComponentAlign: (componentIds: string[], alignment: 'left' | 'right' | 'top' | 'bottom') => {
+        try {
+          canvasActions.alignComponents(componentIds, alignment);
+        } catch (error) {
+          console.error('Failed to align components', error);
+        }
+      },
     }),
-    [componentCallbacks, connectionCallbacks]
+    [componentCallbacks, connectionCallbacks],
   );
 
-  const handleContextMenuStateChange = useCallback((nextState: ContextMenuState) => {
-    contextMenuStateRef.current = nextState;
-  }, []);
+  const handleContextMenuStateChange = useCallback(
+    (nextState: ContextMenuState) => {
+      contextMenuStateRef.current = nextState;
+    },
+    [],
+  );
 
   const hideContextMenu = useCallback(() => {
     contextMenuRef.current?.hide();
@@ -104,7 +155,7 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
       if (!enableContextMenu) return;
       contextMenuRef.current?.show(event, nodeId, edgeId);
     },
-    [enableContextMenu]
+    [enableContextMenu],
   );
 
   const resolveDraggedComponent = useCallback(
@@ -113,7 +164,7 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
         return draggedComponent;
       }
 
-      const payload = event.dataTransfer.getData('application/json');
+      const payload = event.dataTransfer.getData("application/json");
       if (!payload) {
         return null;
       }
@@ -124,7 +175,7 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
         return null;
       }
     },
-    [draggedComponent]
+    [draggedComponent],
   );
 
   const handleComponentDrop = useCallback(
@@ -150,16 +201,16 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
       enableDragDrop,
       reactFlowInstance,
       resolveDraggedComponent,
-    ]
+    ],
   );
 
   const handleDragOver = useCallback(
     (event: React.DragEvent) => {
       if (!enableDragDrop) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
+      event.dataTransfer.dropEffect = "move";
     },
-    [enableDragDrop]
+    [enableDragDrop],
   );
 
   const handlePaneClick = useCallback(
@@ -170,14 +221,90 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
         componentCallbacks.onComponentDeselect();
       }
     },
-    [componentCallbacks, hideContextMenu]
+    [componentCallbacks, hideContextMenu],
+  );
+
+  const handleSelectionDragStart = useCallback(
+    (event: React.MouseEvent) => {
+      // Only start selection drag if no component is being clicked and we're not already dragging
+      const target = event.target as HTMLElement;
+      if (target.closest("[data-component-id]") || isDraggingSelection) return;
+
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      setIsDraggingSelection(true);
+      setSelectionStart({ x, y });
+
+      // Dispatch custom event for selection box handling
+      window.dispatchEvent(
+        new CustomEvent("canvas:selection-drag-start", {
+          detail: { x, y },
+        }),
+      );
+    },
+    [isDraggingSelection],
+  );
+
+  const handleSelectionDragMove = useCallback(
+    (event: React.MouseEvent) => {
+      if (!isDraggingSelection || !selectionStart) return;
+
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      const currentX = event.clientX - rect.left;
+      const currentY = event.clientY - rect.top;
+
+      const x = Math.min(selectionStart.x, currentX);
+      const y = Math.min(selectionStart.y, currentY);
+      const width = Math.abs(currentX - selectionStart.x);
+      const height = Math.abs(currentY - selectionStart.y);
+
+      // Dispatch custom event for selection box update
+      window.dispatchEvent(
+        new CustomEvent("canvas:selection-drag-move", {
+          detail: { x, y, width, height },
+        }),
+      );
+    },
+    [isDraggingSelection, selectionStart],
+  );
+
+  const handleSelectionDragEnd = useCallback(() => {
+    if (!isDraggingSelection) return;
+
+    setIsDraggingSelection(false);
+    setSelectionStart(null);
+
+    // Dispatch custom event for selection completion
+    window.dispatchEvent(new CustomEvent("canvas:selection-drag-end"));
+  }, [isDraggingSelection]);
+
+  const handleComponentClick = useCallback(
+    (componentId: string, event: React.MouseEvent) => {
+      const isShiftPressed = event.shiftKey;
+      const isCtrlPressed = event.ctrlKey || event.metaKey;
+
+      if (isShiftPressed || isCtrlPressed) {
+        // Dispatch multi-select toggle event
+        window.dispatchEvent(
+          new CustomEvent("canvas:toggle-component-selection", {
+            detail: { componentId },
+          }),
+        );
+      } else {
+        // Regular single select
+        componentCallbacks.onComponentSelect(componentId);
+      }
+    },
+    [componentCallbacks],
   );
 
   const keyboardShortcuts = useMemo<KeyboardShortcuts>(
     () => ({
       Delete: () => {
         selectedItems.forEach((itemId) => {
-          if (itemId.includes('-')) {
+          if (itemId.includes("-")) {
             connectionCallbacks.onConnectionDelete(itemId);
           } else {
             componentCallbacks.onComponentDelete(itemId);
@@ -187,28 +314,35 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
       Escape: () => {
         componentCallbacks.onComponentDeselect();
         hideContextMenu();
+        // Also clear selection and exit drawing mode
+        window.dispatchEvent(new CustomEvent("canvas:clear-selection"));
+        window.dispatchEvent(new CustomEvent("canvas:exit-drawing-mode"));
       },
       KeyA: (event) => {
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
+          // Select all components
+          window.dispatchEvent(new CustomEvent("canvas:select-all"));
         }
       },
+      // Note: Duplicate, Group, Ungroup, Lock, and Unlock are now handled centrally
+      // via KeyboardShortcuts.ts emitting shortcut:* events and CanvasContent.tsx listening
     }),
-    [componentCallbacks, connectionCallbacks, hideContextMenu, selectedItems]
+    [componentCallbacks, connectionCallbacks, hideContextMenu, selectedItems],
   );
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (!enableKeyboardShortcuts) return;
 
-      const key = event.code === 'Delete' ? 'Delete' : event.code;
+      const key = event.code === "Delete" ? "Delete" : event.code;
       const shortcut = keyboardShortcuts[key];
 
       if (shortcut) {
         shortcut(event);
       }
     },
-    [enableKeyboardShortcuts, keyboardShortcuts]
+    [enableKeyboardShortcuts, keyboardShortcuts],
   );
 
   const keyDownHandlerRef = useRef(handleKeyDown);
@@ -221,9 +355,10 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
       return;
     }
 
-    const keyHandler = (event: KeyboardEvent) => keyDownHandlerRef.current(event);
-    document.addEventListener('keydown', keyHandler);
-    return () => document.removeEventListener('keydown', keyHandler);
+    const keyHandler = (event: KeyboardEvent) =>
+      keyDownHandlerRef.current(event);
+    document.addEventListener("keydown", keyHandler);
+    return () => document.removeEventListener("keydown", keyHandler);
   }, [enableKeyboardShortcuts]);
 
   const enhancedChildren = useMemo(() => {
@@ -240,13 +375,19 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
         onPaneClick: handlePaneClick,
         onDrop: handleComponentDrop,
         onDragOver: handleDragOver,
-        onPaneContextMenu: (event: React.MouseEvent) => handleContextMenu(event),
+        onPaneContextMenu: (event: React.MouseEvent) =>
+          handleContextMenu(event),
         onNodeContextMenu: (event: React.MouseEvent, node: any) =>
           handleContextMenu(event, node.id),
         onEdgeContextMenu: (event: React.MouseEvent, edge: any) =>
           handleContextMenu(event, undefined, edge.id),
+        onMouseDown: handleSelectionDragStart,
+        onMouseMove: handleSelectionDragMove,
+        onMouseUp: handleSelectionDragEnd,
+        onNodeClick: (event: React.MouseEvent, node: any) =>
+          handleComponentClick(node.id, event),
         onDragStart: (event: React.DragEvent) => {
-          const payload = event.dataTransfer.getData('application/json');
+          const payload = event.dataTransfer.getData("application/json");
           if (payload) {
             try {
               setDraggedComponent(JSON.parse(payload) as DesignComponent);
@@ -277,10 +418,10 @@ const CanvasInteractionLayerComponent: React.FC<CanvasInteractionLayerProps> = (
     }
 
     if (circuitBreakerActive) {
-      return 'Interaction layer cooling down after rapid updates.';
+      return "Interaction layer cooling down after rapid updates.";
     }
 
-    return 'Interaction layer paused to prevent a render loop.';
+    return "Interaction layer paused to prevent a render loop.";
   }, [shouldPause, lastSyntheticError, circuitBreakerActive]);
 
   if (shouldPause) {

@@ -91,6 +91,8 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
   const reactFlowInstance = useReactFlow();
   const svgRef = useRef<SVGSVGElement>(null);
 
+  const { thinning, smoothing, streamline } = settings;
+
   const [currentPoints, setCurrentPoints] = useState<StrokePoint[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hoveredStrokeId, setHoveredStrokeId] = useState<string | null>(null);
@@ -185,7 +187,7 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       pendingPointsRef.current = [];
 
       const [flowX, flowY] = pointerEventToFlowPosition(
-        event,
+        event.nativeEvent,
         reactFlowInstance,
       );
       const pressure = event.pressure || DEFAULT_PRESSURE;
@@ -207,7 +209,7 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       }
 
       const [flowX, flowY] = pointerEventToFlowPosition(
-        event,
+        event.nativeEvent,
         reactFlowInstance,
       );
       const pressure = event.pressure || DEFAULT_PRESSURE;
@@ -329,9 +331,9 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
     return strokes.map((stroke) => {
       const outline = getStrokeOutline(stroke.points, {
         size: stroke.size,
-        thinning: settings.thinning,
-        smoothing: settings.smoothing,
-        streamline: settings.streamline,
+        thinning,
+        smoothing,
+        streamline,
       });
       const pathData = getSvgPathFromStroke(outline);
       const visuals = getStrokeVisualAttributes(stroke);
@@ -342,7 +344,7 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
         fillOpacity: visuals.opacity,
       };
     });
-  }, [strokes, settings]);
+  }, [strokes, thinning, smoothing, streamline]);
 
   // Current stroke preview
   const currentStrokePath = useMemo(() => {
@@ -352,9 +354,9 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
 
     const outline = getStrokeOutline(currentPoints as StrokePoint[], {
       size,
-      thinning: settings.thinning,
-      smoothing: settings.smoothing,
-      streamline: settings.streamline,
+      thinning,
+      smoothing,
+      streamline,
     });
     const pathData = getSvgPathFromStroke(outline);
     const baseColor = stripAlphaFromColor(color);
@@ -362,7 +364,7 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       currentTool === "highlighter" ? HIGHLIGHTER_OPACITY : 1;
 
     return { pathData, color: baseColor, opacity: previewOpacity };
-  }, [isDrawing, currentPoints, size, settings, currentTool, color]);
+  }, [isDrawing, currentPoints, size, thinning, smoothing, streamline, currentTool, color]);
 
   // Handle escape key to cancel drawing
   useEffect(() => {
@@ -423,7 +425,7 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       ))}
 
       {/* Render current stroke preview */}
-      {currentStrokePath && (
+      {currentStrokePath ? (
         <path
           d={currentStrokePath.pathData}
           fill={currentStrokePath.color}
@@ -431,7 +433,7 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
           className="opacity-80"
           style={{ pointerEvents: "none" }}
         />
-      )}
+      ) : null}
     </svg>
   );
 };

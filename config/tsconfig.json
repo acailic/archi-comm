@@ -7,6 +7,7 @@
       "DOM.Iterable",
       "WebWorker"
     ],
+    "types": ["vite/client"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",

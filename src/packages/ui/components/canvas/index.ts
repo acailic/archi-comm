@@ -5,23 +5,36 @@
  * RELEVANT FILES: DesignCanvas.tsx, AnnotationToolbar.tsx, AnnotationSidebar.tsx, CanvasToolbar.tsx
  */
 
-export { AnnotationToolbar } from './AnnotationToolbar';
-export type { AnnotationToolbarProps, AnnotationTool } from './AnnotationToolbar';
+export { AnnotationToolbar } from "./AnnotationToolbar";
+export type {
+  AnnotationTool,
+  AnnotationToolbarProps,
+} from "./AnnotationToolbar";
 
-export { AnnotationSidebar } from './AnnotationSidebar';
-export type { AnnotationSidebarProps, Annotation, AnnotationType } from './AnnotationSidebar';
+export { AnnotationSidebar } from "./AnnotationSidebar";
+export type {
+  Annotation,
+  AnnotationSidebarProps,
+  AnnotationType,
+} from "./AnnotationSidebar";
 
-export { KeyboardShortcutsReference } from './KeyboardShortcutsReference';
-export type { KeyboardShortcutsReferenceProps } from './KeyboardShortcutsReference';
+export { KeyboardShortcutsReference } from "./KeyboardShortcutsReference";
+export type { KeyboardShortcutsReferenceProps } from "./KeyboardShortcutsReference";
 
-export { CanvasToolbar } from './CanvasToolbar';
+export { CanvasToolbar } from "./CanvasToolbar";
 
-export { QuickConnectOverlay } from './QuickConnectOverlay';
+export { QuickConnectOverlay } from "./QuickConnectOverlay";
 
-export { CanvasOnboardingTour } from './CanvasOnboardingTour';
+export { CanvasOnboardingTour } from "./CanvasOnboardingTour";
 
-export { CanvasContextualHelp } from './CanvasContextualHelp';
+export { CanvasContextualHelp } from "./CanvasContextualHelp";
 
-export { ConnectionTemplatePanel } from './ConnectionTemplatePanel';
+export { ConnectionTemplatePanel } from "./ConnectionTemplatePanel";
 
-export { OverlayPortal } from './OverlayPortal';
+export { OverlayPortal } from "./OverlayPortal";
+
+// Canvas Usability Components
+export { AlignmentGuides } from "./AlignmentGuides";
+export { AlignmentToolbar } from "./AlignmentToolbar";
+export { ComponentGroupOverlay } from "./ComponentGroupOverlay";
+export { SelectionBox } from "./SelectionBox";

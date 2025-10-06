@@ -49,7 +49,7 @@ export const KeyboardShortcutsReference: React.FC<
   const quickComponentShortcuts = useMemo(
     () => [
       { description: "Quick add component (opens overlay)", keys: "/" },
-      { description: "Add last used component", keys: "A" },
+      { description: "Add last used component", keys: "Alt+A" },
       { description: "Add favorite component (if configured)", keys: "1-5" },
       {
         description: "Add via command palette",

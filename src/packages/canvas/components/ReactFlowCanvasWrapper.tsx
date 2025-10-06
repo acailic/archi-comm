@@ -6,6 +6,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
 } from "@xyflow/react";
+import type { Viewport } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAnnouncer } from "../../../shared/hooks/useAccessibility";
@@ -33,6 +34,7 @@ export interface ReactFlowCanvasWrapperProps {
   showBackground?: boolean;
   showControls?: boolean;
   showMiniMap?: boolean;
+  onViewportChange?: (viewport: Viewport) => void;
   onComponentSelect: (componentId: string) => void;
   onComponentDeselect: () => void;
   onComponentDrop: (
@@ -70,6 +72,7 @@ const ReactFlowCanvasWrapperComponent: React.FC<
   showBackground = true,
   showControls = true,
   showMiniMap = true,
+  onViewportChange,
   onComponentSelect,
   onComponentDeselect,
   onComponentDrop,
@@ -210,6 +213,12 @@ const ReactFlowCanvasWrapperComponent: React.FC<
                         fitView
                         attributionPosition="bottom-left"
                         className="react-flow-canvas"
+                        onMove={
+                          onViewportChange
+                            ? (_event, viewportParams) =>
+                                onViewportChange(viewportParams)
+                            : undefined
+                        }
                       >
                         {showBackground && (
                           <Background
@@ -291,7 +300,8 @@ const reactFlowCanvasPropsEqual = (
     prev.onInfoCardCreate !== next.onInfoCardCreate ||
     prev.onInfoCardUpdate !== next.onInfoCardUpdate ||
     prev.onInfoCardDelete !== next.onInfoCardDelete ||
-    prev.onInfoCardSelect !== next.onInfoCardSelect
+    prev.onInfoCardSelect !== next.onInfoCardSelect ||
+    prev.onViewportChange !== next.onViewportChange
   ) {
     return false;
   }

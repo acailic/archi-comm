@@ -548,10 +548,11 @@ export class KeyboardShortcutManager {
       // keep as canvas-level (not global) so it respects modal/command palette state
     });
 
-    // Add Last Component: 'a' (no modifiers) - only when canvas is focused
+    // Add Last Component: Alt+A - only when canvas is focused
     // Note: This intentionally registers a context-sensitive shortcut. The action will no-op if canvas is not focused.
     this.register({
       key: "a",
+      modifiers: ["alt"],
       description: "Add last used component",
       category: "canvas",
       action: () => {
@@ -654,12 +655,89 @@ export class KeyboardShortcutManager {
     });
 
     this.register({
-      key: "u",
-      modifiers: ["ctrl"],
+      key: "g",
+      modifiers: ["ctrl", "shift"],
       description: "Ungroup selected",
       category: "components",
       action: () => {
         void window.dispatchEvent(new CustomEvent("shortcut:ungroup"));
+      },
+    });
+
+    // Locking shortcuts
+    this.register({
+      key: "l",
+      modifiers: ["ctrl"],
+      description: "Lock selected components",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:lock-components"));
+      },
+    });
+
+    this.register({
+      key: "l",
+      modifiers: ["ctrl", "shift"],
+      description: "Unlock selected components",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(
+          new CustomEvent("shortcut:unlock-components"),
+        );
+      },
+    });
+
+    // Alignment shortcuts
+    this.register({
+      key: "ArrowLeft",
+      modifiers: ["ctrl", "shift"],
+      description: "Align selected components to the left",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:align-left"));
+      },
+    });
+
+    this.register({
+      key: "ArrowRight",
+      modifiers: ["ctrl", "shift"],
+      description: "Align selected components to the right",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:align-right"));
+      },
+    });
+
+    this.register({
+      key: "ArrowUp",
+      modifiers: ["ctrl", "shift"],
+      description: "Align selected components to the top",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:align-top"));
+      },
+    });
+
+    this.register({
+      key: "ArrowDown",
+      modifiers: ["ctrl", "shift"],
+      description: "Align selected components to the bottom",
+      category: "components",
+      action: () => {
+        void window.dispatchEvent(new CustomEvent("shortcut:align-bottom"));
+      },
+    });
+
+    // Zoom to selection
+    this.register({
+      key: "2",
+      modifiers: ["ctrl"],
+      description: "Zoom to fit selected components",
+      category: "navigation",
+      action: () => {
+        void window.dispatchEvent(
+          new CustomEvent("shortcut:zoom-to-selection"),
+        );
       },
     });
 
@@ -738,7 +816,7 @@ export class KeyboardShortcutManager {
     });
 
     this.register({
-      key: "2",
+      key: "3",
       modifiers: ["ctrl"],
       description: "Switch to Component palette",
       category: "navigation",
@@ -748,7 +826,7 @@ export class KeyboardShortcutManager {
     });
 
     this.register({
-      key: "3",
+      key: "4",
       modifiers: ["ctrl"],
       description: "Switch to Project view",
       category: "navigation",
@@ -999,21 +1077,6 @@ export class KeyboardShortcutManager {
     });
 
     // Escape to exit drawing mode
-    this.register({
-      key: "Escape",
-      description: "Exit drawing mode",
-      category: "drawing",
-      preventDefault: false,
-      action: () => {
-        if (!isCanvasFocused()) return;
-        const state = useCanvasStore.getState();
-        if (state.canvasMode === "draw") {
-          canvasActions.setDrawingTool(null);
-          canvasActions.setCanvasMode("select");
-        }
-      },
-    });
-
     // Context menu shortcuts
     this.register({
       key: "F2",

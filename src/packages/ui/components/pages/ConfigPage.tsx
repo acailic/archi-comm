@@ -16,6 +16,7 @@ import {
 import { Switch } from '@ui/components/ui/switch';
 import { Button } from '@ui/components/ui/button';
 import { Badge } from '@ui/components/ui/badge';
+import { Input } from '@ui/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs';
 import { Progress } from '@ui/components/ui/progress';
 import { Slider } from '@ui/components/ui/slider';
@@ -25,21 +26,26 @@ import {
   Activity,
   ArrowLeft,
   Clock,
+  Download,
+  Grid3x3,
+  Keyboard,
   Loader2,
   Mic,
   Paintbrush,
   RefreshCcw,
   Save,
+  Search,
   Settings,
   Shield,
   Sparkles,
+  Upload,
   Zap,
 } from 'lucide-react';
 
 import { defaultSettings, loadSettings, saveSettings } from '@/modules/settings';
 
 type SettingsState = typeof defaultSettings;
-type TabKey = 'overview' | 'audio' | 'appearance' | 'performance' | 'privacy';
+type TabKey = 'overview' | 'audio' | 'appearance' | 'performance' | 'privacy' | 'shortcuts' | 'grid';
 
 const STORAGE_KEY = 'archicomm_settings';
 
@@ -113,6 +119,12 @@ interface ConfigPageProps {
     visibleComponents: number;
     totalComponents: number;
   };
+  gridConfig?: {
+    visible: boolean;
+    spacing: number;
+    snapToGrid: boolean;
+  };
+  onGridConfigChange?: (config: { visible: boolean; spacing: number; snapToGrid: boolean }) => void;
 }
 
 export function ConfigPage({
@@ -122,6 +134,8 @@ export function ConfigPage({
   virtualizationEnabled = false,
   onVirtualizationToggle,
   virtualizationStats,
+  gridConfig,
+  onGridConfigChange,
 }: ConfigPageProps) {
   const [settings, setSettings] = useState<SettingsState>(() => getInitialSettings());
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(() => getStoredTimestamp());
@@ -129,6 +143,7 @@ export function ConfigPage({
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [localConnectionStyle, setLocalConnectionStyle] = useState(connectionStyle);
   const [localVirtualization, setLocalVirtualization] = useState(virtualizationEnabled);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     setLocalConnectionStyle(connectionStyle);
@@ -235,6 +250,39 @@ export function ConfigPage({
     });
   };
 
+  const handleExportSettings = () => {
+    const dataStr = JSON.stringify(settings, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `archicomm-settings-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportSettings = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result as string);
+        const merged = cloneSettings(imported);
+        setSettings(merged);
+        persist(merged);
+        setSaveStatus('saved');
+      } catch (error) {
+        console.error('Failed to import settings:', error);
+        setSaveStatus('error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const focusModePreset = (prev: SettingsState): SettingsState =>
     ({
       ...prev,
@@ -339,6 +387,26 @@ export function ConfigPage({
             <Badge variant={saveStatus === 'error' ? 'destructive' : 'secondary'} className='uppercase tracking-wide'>
               {saveStatusLabel}
             </Badge>
+            <Button variant='ghost' size='sm' onClick={handleExportSettings} className='gap-2'>
+              <Download className='h-4 w-4' />
+              Export
+            </Button>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={() => document.getElementById('import-settings')?.click()}
+              className='gap-2'
+            >
+              <Upload className='h-4 w-4' />
+              Import
+            </Button>
+            <input
+              id='import-settings'
+              type='file'
+              accept='.json'
+              onChange={handleImportSettings}
+              className='hidden'
+            />
             <Button variant='outline' size='sm' onClick={handleResetToDefaults} className='gap-2'>
               <RefreshCcw className='h-4 w-4' />
               Reset defaults
@@ -379,6 +447,17 @@ export function ConfigPage({
             </CardContent>
           </Card>
 
+          <div className='relative'>
+            <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+            <Input
+              type='text'
+              placeholder='Search settings...'
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className='pl-10'
+            />
+          </div>
+
           <Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)} className='w-full'>
             <TabsList className='flex h-auto flex-wrap items-center justify-start gap-1 rounded-xl border bg-background/60 p-1'>
               <TabsTrigger value='overview' className='gap-2'>
@@ -400,6 +479,14 @@ export function ConfigPage({
               <TabsTrigger value='privacy' className='gap-2'>
                 <Shield className='h-4 w-4' />
                 Privacy
+              </TabsTrigger>
+              <TabsTrigger value='shortcuts' className='gap-2'>
+                <Keyboard className='h-4 w-4' />
+                Shortcuts
+              </TabsTrigger>
+              <TabsTrigger value='grid' className='gap-2'>
+                <Grid3x3 className='h-4 w-4' />
+                Grid
               </TabsTrigger>
             </TabsList>
 
@@ -476,6 +563,45 @@ export function ConfigPage({
                             : 'Turn auto-save back on to control the interval.'}
                         </p>
                       </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick stats</CardTitle>
+                  <CardDescription>Current configuration snapshot</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+                    <div className='rounded-lg border bg-muted/40 p-4'>
+                      <p className='text-xs font-medium text-muted-foreground'>Canvas theme</p>
+                      <p className='mt-1 text-lg font-semibold capitalize'>{settings.appearance.canvasTheme}</p>
+                    </div>
+                    <div className='rounded-lg border bg-muted/40 p-4'>
+                      <p className='text-xs font-medium text-muted-foreground'>Audio quality</p>
+                      <p className='mt-1 text-lg font-semibold capitalize'>{settings.audio.quality}</p>
+                    </div>
+                    <div className='rounded-lg border bg-muted/40 p-4'>
+                      <p className='text-xs font-medium text-muted-foreground'>Telemetry</p>
+                      <p className='mt-1 text-lg font-semibold'>{settings.telemetry.enabled ? 'Enabled' : 'Disabled'}</p>
+                    </div>
+                    <div className='rounded-lg border bg-muted/40 p-4'>
+                      <p className='text-xs font-medium text-muted-foreground'>Auto-save</p>
+                      <p className='mt-1 text-lg font-semibold'>
+                        {settings.workflow.autoSave ? `${autoSaveSeconds}s` : 'Off'}
+                      </p>
+                    </div>
+                    <div className='rounded-lg border bg-muted/40 p-4'>
+                      <p className='text-xs font-medium text-muted-foreground'>Shortcut hints</p>
+                      <p className='mt-1 text-lg font-semibold'>
+                        {settings.shortcuts.showShortcutHints ? 'Shown' : 'Hidden'}
+                      </p>
+                    </div>
+                    <div className='rounded-lg border bg-muted/40 p-4'>
+                      <p className='text-xs font-medium text-muted-foreground'>Last saved</p>
+                      <p className='mt-1 text-lg font-semibold'>{formatRelativeTime(lastSavedAt)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -726,6 +852,164 @@ export function ConfigPage({
                       onCheckedChange={checked => updateSetting('workflow', 'trackUsageAnalytics', checked)}
                     />
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value='shortcuts' className='mt-6 space-y-6'>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Keyboard shortcuts</CardTitle>
+                  <CardDescription>View and customize keyboard shortcuts for faster workflow.</CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-4'>
+                  <div className='flex flex-wrap items-start justify-between gap-4 rounded-lg border bg-muted/40 p-4'>
+                    <div>
+                      <p className='text-sm font-semibold'>Show shortcut hints</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Display keyboard shortcut tooltips when hovering over toolbar buttons.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.shortcuts.showShortcutHints}
+                      onCheckedChange={checked => updateSetting('shortcuts', 'showShortcutHints', checked)}
+                    />
+                  </div>
+
+                  <div className='space-y-3'>
+                    <label className='text-sm font-medium'>Shortcut scheme</label>
+                    <Select
+                      value={settings.shortcuts.shortcutScheme}
+                      onValueChange={value =>
+                        updateSetting('shortcuts', 'shortcutScheme', value as 'default' | 'vscode' | 'figma')
+                      }
+                    >
+                      <SelectTrigger className='w-full'>
+                        <SelectValue placeholder='Select shortcut scheme' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='default'>ArchiComm default</SelectItem>
+                        <SelectItem value='vscode'>VS Code style</SelectItem>
+                        <SelectItem value='figma'>Figma style</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className='text-xs text-muted-foreground'>
+                      Choose a shortcut scheme that matches your muscle memory from other tools.
+                    </p>
+                  </div>
+
+                  <div className='rounded-lg border bg-muted/20 p-4'>
+                    <h3 className='mb-3 text-sm font-semibold'>Common shortcuts</h3>
+                    <div className='space-y-2 text-sm'>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-muted-foreground'>Select tool</span>
+                        <kbd className='rounded border bg-background px-2 py-1 text-xs font-mono'>V</kbd>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-muted-foreground'>Pan tool</span>
+                        <kbd className='rounded border bg-background px-2 py-1 text-xs font-mono'>H</kbd>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-muted-foreground'>Draw tool</span>
+                        <kbd className='rounded border bg-background px-2 py-1 text-xs font-mono'>P</kbd>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-muted-foreground'>Zoom in</span>
+                        <kbd className='rounded border bg-background px-2 py-1 text-xs font-mono'>Cmd/Ctrl + +</kbd>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-muted-foreground'>Zoom out</span>
+                        <kbd className='rounded border bg-background px-2 py-1 text-xs font-mono'>Cmd/Ctrl + -</kbd>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <span className='text-muted-foreground'>Save</span>
+                        <kbd className='rounded border bg-background px-2 py-1 text-xs font-mono'>Cmd/Ctrl + S</kbd>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value='grid' className='mt-6 space-y-6'>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Grid configuration</CardTitle>
+                  <CardDescription>Control the canvas grid appearance and snapping behavior.</CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-6'>
+                  <div className='flex flex-wrap items-start justify-between gap-4 rounded-lg border bg-muted/40 p-4'>
+                    <div>
+                      <p className='text-sm font-semibold'>Show grid</p>
+                      <p className='text-xs text-muted-foreground'>Display grid lines on the canvas for alignment.</p>
+                    </div>
+                    <Switch
+                      checked={gridConfig?.visible ?? true}
+                      onCheckedChange={checked =>
+                        onGridConfigChange?.({
+                          visible: checked,
+                          spacing: gridConfig?.spacing ?? 20,
+                          snapToGrid: gridConfig?.snapToGrid ?? false,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className='flex flex-wrap items-start justify-between gap-4 rounded-lg border bg-muted/40 p-4'>
+                    <div>
+                      <p className='text-sm font-semibold'>Snap to grid</p>
+                      <p className='text-xs text-muted-foreground'>
+                        Automatically align components to grid when moving or creating them.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={gridConfig?.snapToGrid ?? false}
+                      onCheckedChange={checked =>
+                        onGridConfigChange?.({
+                          visible: gridConfig?.visible ?? true,
+                          spacing: gridConfig?.spacing ?? 20,
+                          snapToGrid: checked,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className='space-y-4 rounded-lg border bg-muted/40 p-4'>
+                    <div>
+                      <p className='text-sm font-semibold'>Grid spacing</p>
+                      <p className='text-xs text-muted-foreground'>Distance between grid lines in pixels.</p>
+                    </div>
+                    <div className='space-y-2'>
+                      <div className='flex items-center justify-between text-sm'>
+                        <span className='text-muted-foreground'>Spacing</span>
+                        <span className='font-medium'>{gridConfig?.spacing ?? 20}px</span>
+                      </div>
+                      <Slider
+                        value={[gridConfig?.spacing ?? 20]}
+                        min={10}
+                        max={100}
+                        step={10}
+                        onValueChange={([value]) =>
+                          onGridConfigChange?.({
+                            visible: gridConfig?.visible ?? true,
+                            spacing: value,
+                            snapToGrid: gridConfig?.snapToGrid ?? false,
+                          })
+                        }
+                      />
+                      <p className='text-xs text-muted-foreground'>
+                        Larger spacing works better for high-level architecture diagrams.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Alert>
+                    <AlertTitle>Grid tips</AlertTitle>
+                    <AlertDescription>
+                      Hold Shift while dragging to temporarily disable grid snapping. Use Cmd/Ctrl + ' to quickly toggle grid
+                      visibility.
+                    </AlertDescription>
+                  </Alert>
                 </CardContent>
               </Card>
             </TabsContent>
