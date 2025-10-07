@@ -1,27 +1,42 @@
-/**
- * src/packages/ui/components/canvas/AnnotationSidebar.tsx
- * Sidebar for viewing and managing all canvas annotations
- * Provides search, filter, and navigation features for annotations
- * RELEVANT FILES: CanvasAnnotations.ts, AnnotationToolbar.tsx, DesignCanvas.tsx
- */
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  FixedSizeList as List,
+  type FixedSizeList,
+  type ListChildComponentProps,
+} from 'react-window';
+import {
+  CheckSquare,
+  Copy,
+  Filter,
+  MoreHorizontal,
+  Search,
+  Target,
+  Trash2,
+} from 'lucide-react';
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { Search, Filter, MessageSquare, FileText, Tag, ArrowRight, Highlighter, X, ChevronRight } from 'lucide-react';
 import { cn } from '@core/utils';
+import { Button } from '@ui/components/ui/button';
+import { Checkbox } from '@ui/components/ui/checkbox';
+import { Input } from '@ui/components/ui/input';
+import { Badge } from '@ui/components/ui/badge';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@ui/components/ui/context-menu';
+import { ScrollArea } from '@ui/components/ui/scroll-area';
+import { sanitizeHtmlContent } from '@/lib/canvas/CanvasAnnotations';
+import type { Annotation } from '@/shared/contracts';
 
-export type AnnotationType = 'comment' | 'note' | 'label' | 'arrow' | 'highlight';
-
-export interface Annotation {
-  id: string;
-  type: AnnotationType;
-  content: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  timestamp: number;
-  author?: string;
-}
+export type AnnotationType = Annotation['type'];
 
 export interface AnnotationSidebarProps {
   annotations: Annotation[];
@@ -29,23 +44,184 @@ export interface AnnotationSidebarProps {
   onAnnotationSelect: (annotationId: string) => void;
   onAnnotationDelete: (annotationId: string) => void;
   onAnnotationFocus: (annotationId: string) => void;
+  onAnnotationUpdate?: (annotation: Annotation) => void;
+  onAnnotationDuplicate?: (annotation: Annotation) => void;
   className?: string;
 }
 
-const annotationIcons: Record<AnnotationType, React.ComponentType<{ size?: number; className?: string }>> = {
-  comment: MessageSquare,
-  note: FileText,
-  label: Tag,
-  arrow: ArrowRight,
-  highlight: Highlighter,
+const ITEM_HEIGHT = 112;
+
+const typeStyles: Record<AnnotationType, { border: string; accent: string; text: string }> = {
+  comment: {
+    border: 'border-blue-200',
+    accent: 'bg-blue-50/70',
+    text: 'text-blue-900',
+  },
+  note: {
+    border: 'border-amber-200',
+    accent: 'bg-amber-50/70',
+    text: 'text-amber-900',
+  },
+  label: {
+    border: 'border-emerald-200',
+    accent: 'bg-emerald-50/70',
+    text: 'text-emerald-900',
+  },
+  arrow: {
+    border: 'border-slate-200',
+    accent: 'bg-slate-50/70',
+    text: 'text-slate-900',
+  },
+  highlight: {
+    border: 'border-yellow-200',
+    accent: 'bg-yellow-50/70',
+    text: 'text-yellow-900',
+  },
 };
 
-const annotationColors: Record<AnnotationType, { bg: string; text: string; border: string }> = {
-  comment: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-  note: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-  label: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
-  arrow: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' },
-  highlight: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' },
+interface SidebarItemData {
+  annotations: Annotation[];
+  selectedAnnotationId: string | null;
+  selectedIds: Set<string>;
+  onSelect: (annotationId: string, focus?: boolean) => void;
+  onToggleSelection: (annotationId: string) => void;
+  onDelete: (annotationId: string) => void;
+  onDuplicate?: (annotation: Annotation) => void;
+  onResolve?: (annotation: Annotation, resolved: boolean) => void;
+}
+
+const formatTimestamp = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleString();
+};
+
+const previewContent = (content: string): string => {
+  const sanitized = sanitizeHtmlContent(content ?? '');
+  const stripped = sanitized
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped.length > 140 ? `${stripped.slice(0, 140)}…` : stripped;
+};
+
+const AnnotationRow: React.FC<ListChildComponentProps<SidebarItemData>> = ({
+  index,
+  style,
+  data,
+}) => {
+  const annotation = data.annotations[index];
+  const isActive = data.selectedAnnotationId === annotation.id;
+  const isMultiSelected = data.selectedIds.has(annotation.id);
+  const tokens = typeStyles[annotation.type];
+
+  const handleSelect = () => data.onSelect(annotation.id, true);
+  const handleToggle = (event: React.MouseEvent | React.KeyboardEvent) => {
+    event.stopPropagation();
+    data.onToggleSelection(annotation.id);
+  };
+
+  const handleDuplicate = () => {
+    data.onDuplicate?.(annotation);
+  };
+
+  const handleToggleResolved = () => {
+    if (!data.onResolve) return;
+    data.onResolve(annotation, !(annotation.resolved ?? false));
+  };
+
+  return (
+    <div style={style} className='px-2 py-2'>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            role='row'
+            tabIndex={-1}
+            onClick={() => data.onSelect(annotation.id)}
+            className={cn(
+              'group flex h-full w-full cursor-pointer items-start gap-3 rounded-xl border bg-background/95 p-3 shadow-sm transition-all',
+              tokens.border,
+              isActive
+                ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                : 'hover:shadow-md',
+            )}
+          >
+            <Checkbox
+              checked={isMultiSelected}
+              onCheckedChange={() => data.onToggleSelection(annotation.id)}
+              onClick={handleToggle}
+              aria-label={`Select annotation ${annotation.id}`}
+              className='mt-1'
+            />
+            <div className='min-w-0 flex-1 space-y-2'>
+              <div className='flex items-start justify-between gap-2'>
+                <div className='flex items-center gap-2'>
+                  <Badge variant='outline' className={cn('text-[11px] uppercase', tokens.text)}>
+                    {annotation.type}
+                  </Badge>
+                  {annotation.resolved && (
+                    <Badge variant='secondary' className='bg-emerald-100 text-emerald-700'>
+                      Resolved
+                    </Badge>
+                  )}
+                </div>
+                <span className='text-xs text-muted-foreground'>
+                  {formatTimestamp(annotation.timestamp)}
+                </span>
+              </div>
+              <div
+                className={cn(
+                  'rounded-lg border px-3 py-2 text-sm leading-relaxed shadow-inner',
+                  tokens.accent,
+                )}
+              >
+                <p className={cn('line-clamp-3', tokens.text)}>{previewContent(annotation.content)}</p>
+              </div>
+              <div className='flex items-center justify-between text-xs text-muted-foreground'>
+                <span>{annotation.author ?? 'Unknown author'}</span>
+                <button
+                  type='button'
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    data.onSelect(annotation.id, true);
+                  }}
+                  className='inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-primary opacity-0 transition-opacity group-hover:opacity-100'
+                >
+                  <Target className='h-3 w-3' /> Focus
+                </button>
+              </div>
+            </div>
+            <button
+              type='button'
+              aria-label='More actions'
+              onClick={(event) => event.stopPropagation()}
+              className='mt-1 text-muted-foreground transition-colors hover:text-foreground'
+            >
+              <MoreHorizontal className='h-4 w-4' />
+            </button>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className='w-48'>
+          <ContextMenuItem onClick={() => data.onSelect(annotation.id, true)}>
+            Focus
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleSelect}>Edit…</ContextMenuItem>
+          <ContextMenuItem onClick={handleDuplicate} disabled={!data.onDuplicate}>
+            Duplicate
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleToggleResolved}>
+            {annotation.resolved ? 'Mark unresolved' : 'Mark resolved'}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            onClick={() => data.onDelete(annotation.id)}
+            className='text-destructive focus:text-destructive'
+          >
+            Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
+  );
 };
 
 export const AnnotationSidebar: React.FC<AnnotationSidebarProps> = ({
@@ -54,287 +230,396 @@ export const AnnotationSidebar: React.FC<AnnotationSidebarProps> = ({
   onAnnotationSelect,
   onAnnotationDelete,
   onAnnotationFocus,
+  onAnnotationUpdate,
+  onAnnotationDuplicate,
   className,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<AnnotationType | 'all'>('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'type'>('newest');
+  const [selectedTypes, setSelectedTypes] = useState<Set<AnnotationType>>(new Set());
+  const [selectedAuthors, setSelectedAuthors] = useState<Set<string>>(new Set());
+  const [resolvedFilter, setResolvedFilter] = useState<'all' | 'resolved' | 'unresolved'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<FixedSizeList<SidebarItemData>>(null);
+  const [listHeight, setListHeight] = useState(320);
 
-  // Filter and sort annotations
-  const filteredAnnotations = useMemo(() => {
-    let filtered = annotations;
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const element = listContainerRef.current;
+    if (!element) return undefined;
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(ann =>
-        ann.content.toLowerCase().includes(query) ||
-        ann.author?.toLowerCase().includes(query)
-      );
-    }
-
-    // Apply type filter
-    if (filterType !== 'all') {
-      filtered = filtered.filter(ann => ann.type === filterType);
-    }
-
-    // Apply sorting
-    const sorted = [...filtered];
-    if (sortBy === 'newest') {
-      sorted.sort((a, b) => b.timestamp - a.timestamp);
-    } else if (sortBy === 'oldest') {
-      sorted.sort((a, b) => a.timestamp - b.timestamp);
-    } else if (sortBy === 'type') {
-      sorted.sort((a, b) => a.type.localeCompare(b.type));
-    }
-
-    return sorted;
-  }, [annotations, searchQuery, filterType, sortBy]);
-
-  // Get annotation counts by type
-  const annotationCounts = useMemo(() => {
-    const counts: Record<AnnotationType, number> = {
-      comment: 0,
-      note: 0,
-      label: 0,
-      arrow: 0,
-      highlight: 0,
+    const updateHeight = () => {
+      const bounds = element.getBoundingClientRect();
+      setListHeight(bounds.height);
     };
-    annotations.forEach(ann => {
-      counts[ann.type]++;
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const authors = useMemo(() => {
+    const unique = new Set<string>();
+    annotations.forEach((annotation) => {
+      if (annotation.author) {
+        unique.add(annotation.author);
+      }
     });
-    return counts;
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
   }, [annotations]);
 
-  const handleAnnotationClick = useCallback((annotationId: string) => {
-    onAnnotationSelect(annotationId);
-    onAnnotationFocus(annotationId);
-  }, [onAnnotationSelect, onAnnotationFocus]);
+  const filteredAnnotations = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return annotations
+      .filter((annotation) => {
+        if (selectedTypes.size > 0 && !selectedTypes.has(annotation.type)) {
+          return false;
+        }
+        if (selectedAuthors.size > 0 && (!annotation.author || !selectedAuthors.has(annotation.author))) {
+          return false;
+        }
+        if (resolvedFilter !== 'all') {
+          const isResolved = annotation.resolved ?? false;
+          if (resolvedFilter === 'resolved' && !isResolved) return false;
+          if (resolvedFilter === 'unresolved' && isResolved) return false;
+        }
+        if (!query) return true;
+        return (
+          annotation.content.toLowerCase().includes(query) ||
+          annotation.author?.toLowerCase().includes(query) ||
+          annotation.id.toLowerCase().includes(query)
+        );
+      })
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [annotations, resolvedFilter, searchQuery, selectedAuthors, selectedTypes]);
 
-  const formatTimestamp = (timestamp: number): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
+  useEffect(() => {
+    setHighlightIndex((current) => {
+      if (filteredAnnotations.length === 0) return 0;
+      return Math.max(0, Math.min(current, filteredAnnotations.length - 1));
+    });
+  }, [filteredAnnotations.length]);
 
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'just now';
-  };
+  useEffect(() => {
+    if (!listRef.current) return;
+    listRef.current.scrollToItem(highlightIndex);
+  }, [highlightIndex]);
 
-  const truncateContent = (content: string, maxLength: number = 80): string => {
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
-  };
+  const toggleType = useCallback((type: AnnotationType) => {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleAuthor = useCallback((author: string) => {
+    setSelectedAuthors((prev) => {
+      const next = new Set(prev);
+      if (next.has(author)) {
+        next.delete(author);
+      } else {
+        next.add(author);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setSelectedTypes(new Set());
+    setSelectedAuthors(new Set());
+    setResolvedFilter('all');
+  }, []);
+
+  const toggleSelection = useCallback((annotationId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(annotationId)) {
+        next.delete(annotationId);
+      } else {
+        next.add(annotationId);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectAllFiltered = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === filteredAnnotations.length) {
+        return new Set();
+      }
+      return new Set(filteredAnnotations.map((annotation) => annotation.id));
+    });
+  }, [filteredAnnotations]);
+
+  const handleSelect = useCallback(
+    (annotationId: string, focus = false) => {
+      onAnnotationSelect(annotationId);
+      if (focus) {
+        onAnnotationFocus(annotationId);
+      }
+    },
+    [onAnnotationFocus, onAnnotationSelect],
+  );
+
+  const handleBulkDelete = useCallback(() => {
+    selectedIds.forEach((id) => onAnnotationDelete(id));
+    setSelectedIds(new Set());
+  }, [onAnnotationDelete, selectedIds]);
+
+  const handleBulkResolve = useCallback(
+    (resolved: boolean) => {
+      if (!onAnnotationUpdate) return;
+      const lookup = new Map(annotations.map((annotation) => [annotation.id, annotation]));
+      selectedIds.forEach((id) => {
+        const annotation = lookup.get(id);
+        if (!annotation) return;
+        onAnnotationUpdate({ ...annotation, resolved });
+      });
+      setSelectedIds(new Set());
+    },
+    [annotations, onAnnotationUpdate, selectedIds],
+  );
+
+  const handleBulkDuplicate = useCallback(() => {
+    if (!onAnnotationDuplicate) return;
+    const lookup = new Map(annotations.map((annotation) => [annotation.id, annotation]));
+    selectedIds.forEach((id) => {
+      const annotation = lookup.get(id);
+      if (!annotation) return;
+      onAnnotationDuplicate(annotation);
+    });
+    setSelectedIds(new Set());
+  }, [annotations, onAnnotationDuplicate, selectedIds]);
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (filteredAnnotations.length === 0) return;
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setHighlightIndex((current) => {
+          const next = Math.min(current + 1, filteredAnnotations.length - 1);
+          return next;
+        });
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setHighlightIndex((current) => Math.max(0, current - 1));
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const annotation = filteredAnnotations[highlightIndex];
+        if (annotation) {
+          handleSelect(annotation.id, true);
+        }
+      }
+      if (event.key === ' ') {
+        event.preventDefault();
+        const annotation = filteredAnnotations[highlightIndex];
+        if (annotation) {
+          toggleSelection(annotation.id);
+        }
+      }
+    },
+    [filteredAnnotations, handleSelect, highlightIndex, toggleSelection],
+  );
+
+  const itemData = useMemo<SidebarItemData>(
+    () => ({
+      annotations: filteredAnnotations,
+      selectedAnnotationId: selectedAnnotation,
+      selectedIds,
+      onSelect: handleSelect,
+      onToggleSelection: toggleSelection,
+      onDelete: onAnnotationDelete,
+      onDuplicate: onAnnotationDuplicate,
+      onResolve: onAnnotationUpdate
+        ? (annotation, resolved) => onAnnotationUpdate({ ...annotation, resolved })
+        : undefined,
+    }),
+    [
+      filteredAnnotations,
+      handleSelect,
+      onAnnotationDelete,
+      onAnnotationDuplicate,
+      onAnnotationUpdate,
+      selectedAnnotation,
+      selectedIds,
+      toggleSelection,
+    ],
+  );
+
+  const listHeightValue = Math.max(ITEM_HEIGHT, listHeight);
 
   return (
     <div
       className={cn(
-        'annotation-sidebar flex flex-col h-full bg-white border-l border-gray-200',
-        className
+        'flex h-full w-full flex-col gap-3 border-l border-border bg-background/95 p-4',
+        className,
       )}
-      role="complementary"
-      aria-label="Annotations panel"
+      role='complementary'
+      aria-label='Annotations panel'
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
     >
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">
-          Annotations ({annotations.length})
-        </h2>
-
-        {/* Search bar */}
-        <div className="relative mb-3">
-          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search annotations..."
+      <header className='space-y-3'>
+        <div className='flex items-center justify-between gap-2'>
+          <h2 className='text-sm font-semibold uppercase tracking-wide text-muted-foreground'>
+            Annotations
+          </h2>
+          <Button variant='ghost' size='sm' onClick={clearFilters} className='h-7 px-2 text-[11px]'>
+            Clear filters
+          </Button>
+        </div>
+        <div className='relative'>
+          <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+          <Input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={cn(
-              'w-full pl-9 pr-3 py-2',
-              'border border-gray-300 rounded-md',
-              'text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-            )}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder='Search annotations'
+            className='pl-9'
           />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label="Clear search"
-            >
-              <X size={14} />
-            </button>
-          )}
         </div>
-
-        {/* Filter buttons */}
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => setFilterType('all')}
-            className={cn(
-              'px-2 py-1 text-xs rounded-md transition-colors',
-              filterType === 'all'
-                ? 'bg-blue-100 text-blue-700 font-medium'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            )}
-          >
-            All ({annotations.length})
-          </button>
-          {(Object.keys(annotationIcons) as AnnotationType[]).map(type => {
-            const Icon = annotationIcons[type];
-            const count = annotationCounts[type];
-            return (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={cn(
-                  'px-2 py-1 text-xs rounded-md transition-colors flex items-center gap-1',
-                  filterType === type
-                    ? `${annotationColors[type].bg} ${annotationColors[type].text} font-medium`
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                )}
-              >
-                <Icon size={12} />
-                {count}
-              </button>
-            );
-          })}
+        <div className='flex flex-wrap items-center gap-2 text-xs text-muted-foreground'>
+          <Filter className='h-3 w-3' />
+          <span>Filters</span>
         </div>
-
-        {/* Sort options */}
-        <div className="mt-3">
-          <label className="text-xs text-gray-600 mb-1 block">Sort by:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'type')}
-            className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="type">By type</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Annotation list */}
-      <div className="flex-1 overflow-y-auto">
-        {filteredAnnotations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-            <MessageSquare size={48} className="text-gray-300 mb-3" />
-            <h3 className="text-sm font-medium text-gray-600 mb-1">
-              {searchQuery || filterType !== 'all' ? 'No annotations found' : 'No annotations yet'}
-            </h3>
-            <p className="text-xs text-gray-500">
-              {searchQuery || filterType !== 'all'
-                ? 'Try adjusting your search or filter'
-                : 'Use the annotation tools to add comments, notes, or labels'
-              }
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {filteredAnnotations.map(annotation => {
-              const Icon = annotationIcons[annotation.type];
-              const colors = annotationColors[annotation.type];
-              const isSelected = selectedAnnotation === annotation.id;
-
+        <ScrollArea className='h-16 rounded-md border border-dashed border-border/60 p-2'>
+          <div className='flex flex-wrap gap-2'>
+            {(Object.keys(typeStyles) as AnnotationType[]).map((type) => {
+              const isSelected = selectedTypes.has(type);
               return (
-                <div
-                  key={annotation.id}
-                  onClick={() => handleAnnotationClick(annotation.id)}
-                  className={cn(
-                    'p-3 cursor-pointer transition-colors',
-                    'hover:bg-gray-50',
-                    isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                  )}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${annotation.type} annotation`}
+                <Badge
+                  key={type}
+                  variant={isSelected ? 'default' : 'outline'}
+                  onClick={() => toggleType(type)}
+                  className={cn('cursor-pointer select-none capitalize', isSelected ? 'bg-primary text-primary-foreground' : undefined)}
                 >
-                  <div className="flex items-start gap-2">
-                    {/* Icon */}
-                    <div className={cn('p-1.5 rounded', colors.bg)}>
-                      <Icon size={14} className={colors.text} />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-gray-900 capitalize">
-                          {annotation.type}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {formatTimestamp(annotation.timestamp)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 mb-1 leading-tight">
-                        {truncateContent(annotation.content)}
-                      </p>
-                      {annotation.author && (
-                        <span className="text-xs text-gray-500">
-                          by {annotation.author}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAnnotationFocus(annotation.id);
-                        }}
-                        className="p-1 rounded hover:bg-gray-200 transition-colors"
-                        title="Focus on canvas"
-                        aria-label="Focus annotation on canvas"
-                      >
-                        <ChevronRight size={14} className="text-gray-600" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAnnotationDelete(annotation.id);
-                        }}
-                        className="p-1 rounded hover:bg-red-100 transition-colors"
-                        title="Delete annotation"
-                        aria-label="Delete annotation"
-                      >
-                        <X size={14} className="text-red-600" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  {type}
+                </Badge>
               );
             })}
+            {authors.map((author) => {
+              const isSelected = selectedAuthors.has(author);
+              return (
+                <Badge
+                  key={author}
+                  variant={isSelected ? 'default' : 'outline'}
+                  onClick={() => toggleAuthor(author)}
+                  className={cn('cursor-pointer select-none', isSelected ? 'bg-secondary text-secondary-foreground' : undefined)}
+                >
+                  {author}
+                </Badge>
+              );
+            })}
+            <Badge
+              variant={resolvedFilter === 'resolved' ? 'default' : 'outline'}
+              onClick={() => setResolvedFilter(resolvedFilter === 'resolved' ? 'all' : 'resolved')}
+              className='cursor-pointer select-none'
+            >
+              Resolved
+            </Badge>
+            <Badge
+              variant={resolvedFilter === 'unresolved' ? 'default' : 'outline'}
+              onClick={() => setResolvedFilter(resolvedFilter === 'unresolved' ? 'all' : 'unresolved')}
+              className='cursor-pointer select-none'
+            >
+              Unresolved
+            </Badge>
           </div>
-        )}
+        </ScrollArea>
+      </header>
+
+      <div className='flex items-center justify-between gap-2 border-y border-border/60 py-2 text-xs'>
+        <div className='flex items-center gap-2'>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={selectAllFiltered}
+            disabled={filteredAnnotations.length === 0}
+            className='h-7 px-2'
+          >
+            <CheckSquare className='mr-2 h-3 w-3' />
+            {selectedIds.size === filteredAnnotations.length && selectedIds.size > 0
+              ? 'Deselect all'
+              : 'Select all'}
+          </Button>
+          <span className='text-muted-foreground'>
+            {selectedIds.size} selected
+          </span>
+        </div>
+        <div className='flex items-center gap-1'>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            disabled={selectedIds.size === 0}
+            onClick={() => handleBulkResolve(true)}
+            className='h-7 px-2'
+          >
+            Resolve
+          </Button>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            disabled={selectedIds.size === 0}
+            onClick={() => handleBulkResolve(false)}
+            className='h-7 px-2'
+          >
+            Reopen
+          </Button>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            disabled={selectedIds.size === 0 || !onAnnotationDuplicate}
+            onClick={handleBulkDuplicate}
+            className='h-7 px-2'
+          >
+            <Copy className='mr-1 h-3 w-3' /> Duplicate
+          </Button>
+          <Button
+            type='button'
+            variant='destructive'
+            size='sm'
+            disabled={selectedIds.size === 0}
+            onClick={handleBulkDelete}
+            className='h-7 px-2'
+          >
+            <Trash2 className='mr-1 h-3 w-3' /> Delete
+          </Button>
+        </div>
       </div>
 
-      {/* Footer with stats */}
-      {annotations.length > 0 && (
-        <div className="p-3 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <span>
-              {filteredAnnotations.length} of {annotations.length} shown
-            </span>
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setFilterType('all');
-              }}
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Clear filters
-            </button>
+      <div ref={listContainerRef} className='flex-1 overflow-hidden rounded-xl border border-border/60 bg-muted/40'>
+        {filteredAnnotations.length === 0 ? (
+          <div className='flex h-full items-center justify-center text-sm text-muted-foreground'>
+            No annotations match the current filters.
           </div>
-        </div>
-      )}
+        ) : (
+          <List
+            ref={listRef}
+            height={listHeightValue}
+            width='100%'
+            itemCount={filteredAnnotations.length}
+            itemSize={ITEM_HEIGHT}
+            itemData={itemData}
+            initialScrollOffset={highlightIndex * ITEM_HEIGHT}
+          >
+            {AnnotationRow}
+          </List>
+        )}
+      </div>
     </div>
   );
 };
 
-export default AnnotationSidebar;
+AnnotationSidebar.displayName = 'AnnotationSidebar';

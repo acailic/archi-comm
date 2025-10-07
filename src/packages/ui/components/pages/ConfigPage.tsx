@@ -196,6 +196,8 @@ interface ConfigPageProps {
     snapToGrid: boolean;
   };
   onGridConfigChange?: (config: { visible: boolean; spacing: number; snapToGrid: boolean }) => void;
+  animationsEnabled?: boolean;
+  onAnimationsToggle?: (enabled: boolean) => void;
 }
 
 export function ConfigPage({
@@ -207,6 +209,8 @@ export function ConfigPage({
   virtualizationStats,
   gridConfig,
   onGridConfigChange,
+  animationsEnabled,
+  onAnimationsToggle,
 }: ConfigPageProps) {
   const [settings, setSettings] = useState<SettingsState>(() => getInitialSettings());
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(() => getStoredTimestamp());
@@ -214,6 +218,9 @@ export function ConfigPage({
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [localConnectionStyle, setLocalConnectionStyle] = useState(connectionStyle);
   const [localVirtualization, setLocalVirtualization] = useState(virtualizationEnabled);
+  const [localAnimationsEnabled, setLocalAnimationsEnabled] = useState(
+    animationsEnabled ?? true
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -250,6 +257,12 @@ export function ConfigPage({
   useEffect(() => {
     setLocalVirtualization(virtualizationEnabled);
   }, [virtualizationEnabled]);
+
+  useEffect(() => {
+    if (typeof animationsEnabled === 'boolean') {
+      setLocalAnimationsEnabled(animationsEnabled);
+    }
+  }, [animationsEnabled]);
 
   useEffect(() => {
     if (saveStatus === 'saved') {
@@ -313,6 +326,8 @@ export function ConfigPage({
     persist(defaults);
     setLocalConnectionStyle('curved');
     onConnectionStyleChange?.('curved');
+    setLocalAnimationsEnabled(true);
+    onAnimationsToggle?.(true);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
@@ -328,6 +343,11 @@ export function ConfigPage({
   const handleVirtualizationToggle = (enabled: boolean) => {
     setLocalVirtualization(enabled);
     onVirtualizationToggle?.(enabled);
+  };
+
+  const handleAnimationsToggle = (enabled: boolean) => {
+    setLocalAnimationsEnabled(enabled);
+    onAnimationsToggle?.(enabled);
   };
 
   const handleConnectionStyleChange = (style: 'straight' | 'curved' | 'stepped') => {
@@ -898,6 +918,22 @@ export function ConfigPage({
 
                   <div className='lg:col-span-2'>
                     <ConnectionPreview style={localConnectionStyle} />
+                  </div>
+
+                  <div className='lg:col-span-2'>
+                    <div className='flex items-start justify-between gap-4 rounded-lg border bg-muted/40 p-4'>
+                      <div>
+                        <p className='text-sm font-semibold'>Canvas animations</p>
+                        <p className='text-xs text-muted-foreground'>
+                          Keep motion feedback active for hover, selection, and auto-layout changes.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={localAnimationsEnabled}
+                        onCheckedChange={handleAnimationsToggle}
+                        aria-label='Toggle canvas animations'
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

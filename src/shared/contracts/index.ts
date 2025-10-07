@@ -211,6 +211,26 @@ export interface InfoCard {
   isEditing?: boolean;
 }
 
+export interface AnnotationReply {
+  id: string;
+  author: string;
+  content: string;
+  timestamp: number;
+}
+
+export interface AnnotationStyle {
+  backgroundColor?: string;
+  borderColor?: string;
+  textColor?: string;
+  fontSize?: number;
+  fontWeight?: "normal" | "bold";
+  opacity?: number;
+  borderRadius?: number;
+  borderWidth?: number;
+  borderStyle?: "solid" | "dashed" | "dotted";
+  shadow?: string;
+}
+
 export interface Annotation {
   id: string;
   type: "comment" | "note" | "label" | "arrow" | "highlight";
@@ -222,7 +242,8 @@ export interface Annotation {
   timestamp: number;
   author?: string;
   resolved?: boolean;
-  style?: Record<string, any>;
+  replies?: AnnotationReply[];
+  style?: AnnotationStyle;
   visible?: boolean; // Whether annotation is visible on canvas (default: true)
   zIndex?: number; // Stacking order for overlapping annotations
   color?: string; // Override color from preset

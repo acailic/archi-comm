@@ -96,7 +96,16 @@ export function useDesignCanvasEffects({
 
   const flushPendingDesign = useCallback(
     (reason: string, options: { immediate?: boolean } = {}) => {
-      if (flushInFlightRef.current) {
+      // Prevent concurrent flushes and check if component is still mounted
+      if (flushInFlightRef.current || !mountedRef.current) {
+        return;
+      }
+
+      // Debounce rapid consecutive flushes (except for immediate ones)
+      if (!options.immediate && lastFlushReasonRef.current === reason) {
+        if (import.meta.env.DEV) {
+          console.debug('[useDesignCanvasEffects] flushPendingDesign: Debouncing duplicate flush', { reason });
+        }
         return;
       }
 
@@ -126,8 +135,11 @@ export function useDesignCanvasEffects({
             });
           }
 
-          actions.setDesignData(pending);
-          void storage.setItem('archicomm-design', JSON.stringify(pending));
+          // Only flush to app store if component is still mounted and data actually changed
+          if (mountedRef.current) {
+            actions.setDesignData(pending);
+            void storage.setItem('archicomm-design', JSON.stringify(pending));
+          }
           RenderLoopDiagnostics.getInstance().recordDesignFlush({
             reason,
             pendingNodes: currentComponents.length,
@@ -141,6 +153,9 @@ export function useDesignCanvasEffects({
               result: 'success',
             });
           }
+
+          // Clear the last flush reason after successful completion
+          lastFlushReasonRef.current = null;
         } catch (error) {
           console.error('Failed to flush design data', { error, reason });
         } finally {
@@ -169,10 +184,10 @@ export function useDesignCanvasEffects({
           if (flushTimerRef.current != null) {
             clearTimeout(flushTimerRef.current);
           }
-          flushTimerRef.current = window.setTimeout(() => {
+          flushTimerRef.current = (window as any).setTimeout(() => {
             executeFlush();
             flushTimerRef.current = null;
-          }, 300);
+          }, 300) as number;
         }
       };
 

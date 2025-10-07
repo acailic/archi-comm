@@ -205,6 +205,7 @@ export default defineConfig(({ command, mode }) => {
         'react-dnd',
         'react-dnd-html5-backend',
         'framer-motion',
+        'react-window',
         '@radix-ui/react-dialog',
         '@radix-ui/react-dropdown-menu',
         '@radix-ui/react-popover',

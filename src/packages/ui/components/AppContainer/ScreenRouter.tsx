@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { ScenarioViewer } from "../../../../dev";
 import { isDevelopment } from "../../../../lib/config/environment";
 import { isOnboardingFlowCompleted } from "../../../../modules/settings";
@@ -14,6 +14,9 @@ import { WelcomeOverlay } from "../overlays/WelcomeOverlay";
 import { ConfigPage } from "../pages/ConfigPage";
 import { ReviewScreen } from "../pages/ReviewScreen";
 import { InfiniteLoopErrorBoundary } from "./InfiniteLoopErrorBoundary";
+import { useCanvasActions, useCanvasStore } from "../../../../stores/canvasStore";
+
+
 
 interface ScreenRouterProps {
   showDevScenarios: boolean;
@@ -72,6 +75,51 @@ export function ScreenRouter({
   onFinishSession,
   onBackToCanvas,
 }: ScreenRouterProps) {
+  // ⚠️ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  // This ensures consistent hook order and prevents "Rendered more hooks" errors
+  
+  const connectionStyle = useCanvasStore(
+    (state: any) => state.defaultPathStyle,
+  );
+
+  const animationsEnabled = useCanvasStore(
+    (state: any) => state.animationsEnabled,
+  );
+  const componentsCount = useCanvasStore((state: any) => state.components.length);
+  const canvasActions = useCanvasActions();
+
+  // Memoize design data to prevent unnecessary re-renders
+  const memoizedDesignData = useMemo(() => {
+    return (
+      designData || {
+        schemaVersion: 1,
+        components: [],
+        connections: [],
+        infoCards: [],
+        layers: [],
+        metadata: { version: "1.0" },
+      }
+    );
+  }, [designData]);
+
+  const handleConnectionStyleChange = useCallback(
+    (style: "straight" | "curved" | "stepped") => {
+      canvasActions.setDefaultPathStyle(style);
+    },
+    [canvasActions],
+  );
+
+
+
+  const handleAnimationsToggle = useCallback(
+    (enabled: boolean) => {
+      if (animationsEnabled !== enabled) {
+        canvasActions.toggleAnimations();
+      }
+    },
+    [animationsEnabled, canvasActions],
+  );
+
   // Development-only scenario viewer
   if (isDevelopment() && showDevScenarios) {
     return <ScenarioViewer />;
@@ -125,23 +173,19 @@ export function ScreenRouter({
 
   // Show config page if requested
   if (currentScreen === "config") {
-    return <ConfigPage onBack={onConfigBack} />;
+    return (
+      <ConfigPage
+        onBack={onConfigBack}
+        connectionStyle={connectionStyle}
+        onConnectionStyleChange={handleConnectionStyleChange}
+
+        animationsEnabled={animationsEnabled}
+        onAnimationsToggle={handleAnimationsToggle}
+      />
+    );
   }
 
-  // Default to design canvas with memoized initialData
-  const memoizedDesignData = useMemo(() => {
-    return (
-      designData || {
-        schemaVersion: 1,
-        components: [],
-        connections: [],
-        infoCards: [],
-        layers: [],
-        metadata: { version: "1.0" },
-      }
-    );
-  }, [designData]);
-
+  // Default to design canvas with memoized initialData (already defined at top)
   return (
     <InfiniteLoopErrorBoundary
       onReset={onInfiniteLoopReset}

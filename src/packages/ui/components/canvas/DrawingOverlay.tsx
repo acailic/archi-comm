@@ -90,21 +90,35 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
 }) => {
   const reactFlowInstance = useReactFlow();
   const svgRef = useRef<SVGSVGElement>(null);
-
+  const containerRef = useRef<HTMLDivElement>(null);
+  
   const { thinning, smoothing, streamline } = settings;
-
+  
   const [currentPoints, setCurrentPoints] = useState<StrokePoint[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hoveredStrokeId, setHoveredStrokeId] = useState<string | null>(null);
-
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isStraightLineMode, setIsStraightLineMode] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  
   const currentPointsRef = useRef<StrokePoint[]>([]);
   const pendingPointsRef = useRef<StrokePoint[]>([]);
   const rafIdRef = useRef<number | null>(null);
+  const previousStrokeCountRef = useRef(strokes.length);
 
   const appendPoints = useCallback((pointsToAdd: StrokePoint[]) => {
     if (!pointsToAdd.length) return;
     currentPointsRef.current.push(...pointsToAdd);
     setCurrentPoints((prev) => [...prev, ...pointsToAdd]);
+  }, []);
+
+  const isPalmContact = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
+    return (
+      event.pointerType === 'touch' &&
+      event.width > 40 &&
+      event.height > 40 &&
+      event.pressure === 0
+    );
   }, []);
 
   const cancelScheduledFlush = useCallback(() => {
@@ -166,13 +180,38 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
     if (!enabled || !currentTool) {
       resetStrokeState();
       setHoveredStrokeId(null);
+      setCursorPosition(null);
+      setIsStraightLineMode(false);
     }
   }, [enabled, currentTool, resetStrokeState]);
+
+  useEffect(() => {
+    if (!currentTool) return;
+    const label = currentTool === 'highlighter' ? 'highlighter' : currentTool;
+    setAnnouncement(`Drawing tool set to ${label}`);
+  }, [currentTool]);
+
+  useEffect(() => {
+    if (strokes.length !== previousStrokeCountRef.current) {
+      if (strokes.length > previousStrokeCountRef.current) {
+        setAnnouncement(`Stroke added. Total strokes ${strokes.length}`);
+      }
+      previousStrokeCountRef.current = strokes.length;
+    }
+  }, [strokes.length]);
 
   // Pointer down handler - start drawing
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<SVGSVGElement>) => {
       if (!enabled || !currentTool || currentTool === "eraser") {
+        return;
+      }
+
+      if (event.pointerType === "touch" && !event.isPrimary) {
+        return;
+      }
+
+      if (isPalmContact(event)) {
         return;
       }
 
@@ -186,6 +225,14 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       cancelScheduledFlush();
       pendingPointsRef.current = [];
 
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setCursorPosition({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+      }
+
       const [flowX, flowY] = pointerEventToFlowPosition(
         event.nativeEvent,
         reactFlowInstance,
@@ -197,8 +244,15 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       setCurrentPoints([initialPoint]);
       setIsDrawing(true);
       setHoveredStrokeId(null);
+      setIsStraightLineMode(event.shiftKey);
     },
-    [enabled, currentTool, reactFlowInstance, cancelScheduledFlush],
+    [
+      enabled,
+      currentTool,
+      reactFlowInstance,
+      cancelScheduledFlush,
+      isPalmContact,
+    ],
   );
 
   // Pointer move handler - add points to current stroke
@@ -208,13 +262,39 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
         return;
       }
 
-      const [flowX, flowY] = pointerEventToFlowPosition(
+      if (isPalmContact(event)) {
+        return;
+      }
+
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setCursorPosition({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+      }
+
+      let [flowX, flowY] = pointerEventToFlowPosition(
         event.nativeEvent,
         reactFlowInstance,
       );
       const pressure = event.pressure || DEFAULT_PRESSURE;
 
       if (isDrawing && currentTool && currentTool !== "eraser") {
+        if (event.shiftKey && currentPointsRef.current.length > 0) {
+          const [anchorX, anchorY] = currentPointsRef.current[0];
+          if (Math.abs(flowX - anchorX) > Math.abs(flowY - anchorY)) {
+            flowY = anchorY;
+          } else {
+            flowX = anchorX;
+          }
+          if (!isStraightLineMode) {
+            setIsStraightLineMode(true);
+          }
+        } else if (isStraightLineMode) {
+          setIsStraightLineMode(false);
+        }
+
         schedulePointAppend([flowX, flowY, pressure]);
       } else if (currentTool === "eraser") {
         let hoveredStroke: DrawingStroke | undefined;
@@ -244,6 +324,8 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
         }
 
         setHoveredStrokeId(hoveredStroke?.id ?? null);
+      } else {
+        setIsStraightLineMode(false);
       }
     },
     [
@@ -256,6 +338,8 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       strokeMap,
       strokes,
       size,
+      isPalmContact,
+      isStraightLineMode,
     ],
   );
 
@@ -269,6 +353,9 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
       if (svgRef.current) {
         svgRef.current.releasePointerCapture(event.pointerId);
       }
+
+      setCursorPosition(null);
+      setIsStraightLineMode(false);
 
       flushPendingPoints();
 
@@ -313,6 +400,11 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
     resetStrokeState();
     setHoveredStrokeId(null);
   }, [resetStrokeState]);
+
+  const handlePointerLeave = useCallback(() => {
+    setCursorPosition(null);
+    setIsStraightLineMode(false);
+  }, []);
 
   // Handle click on stroke for eraser
   const handleStrokeClick = useCallback(
@@ -389,52 +481,74 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
     return null;
   }
 
-  return (
-    <svg
-      ref={svgRef}
-      className={cx(
-        "absolute inset-0 w-full h-full pointer-events-auto",
-        currentTool === "eraser" ? "cursor-crosshair" : "cursor-crosshair",
-        className,
-      )}
-      style={{ zIndex: 10 }} // Above React Flow but below UI controls
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
-      aria-label="Drawing overlay"
-    >
-      {/* Render saved strokes */}
-      {strokePaths.map((stroke) => (
-        <path
-          key={stroke.id}
-          d={stroke.pathData}
-          fill={stroke.fillColor}
-          fillOpacity={stroke.fillOpacity}
-          className={cx(
-            "transition-opacity duration-200",
-            hoveredStrokeId === stroke.id && currentTool === "eraser"
-              ? "opacity-50"
-              : "opacity-100",
-          )}
-          style={{
-            pointerEvents: currentTool === "eraser" ? "auto" : "none",
-          }}
-          onClick={(event) => handleStrokeClick(stroke.id, event)}
-        />
-      ))}
+  const cursorDiameter = currentTool === "eraser" ? size * 1.4 : size;
 
-      {/* Render current stroke preview */}
-      {currentStrokePath ? (
-        <path
-          d={currentStrokePath.pathData}
-          fill={currentStrokePath.color}
-          fillOpacity={currentStrokePath.opacity}
-          className="opacity-80"
-          style={{ pointerEvents: "none" }}
-        />
-      ) : null}
-    </svg>
+  return (
+    <>
+      <span className="sr-only" aria-live="polite">
+        {announcement}
+      </span>
+      <div ref={containerRef} className={cx("relative h-full w-full", className)}>
+        <svg
+          ref={svgRef}
+          className="absolute inset-0 h-full w-full"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onPointerLeave={handlePointerLeave}
+          aria-label="Drawing overlay"
+        >
+          {strokePaths.map((stroke) => (
+            <path
+              key={stroke.id}
+              d={stroke.pathData}
+              fill={stroke.fillColor}
+              fillOpacity={stroke.fillOpacity}
+              className={cx(
+                "transition-opacity duration-200",
+                hoveredStrokeId === stroke.id && currentTool === "eraser"
+                  ? "opacity-50"
+                  : "opacity-100",
+              )}
+              style={{
+                pointerEvents: currentTool === "eraser" ? "auto" : "none",
+              }}
+              onClick={(event) => handleStrokeClick(stroke.id, event)}
+            />
+          ))}
+
+          {currentStrokePath ? (
+            <path
+              d={currentStrokePath.pathData}
+              fill={currentStrokePath.color}
+              fillOpacity={currentStrokePath.opacity}
+              className={cx(
+                "opacity-85",
+                isStraightLineMode ? "shadow-[0_0_0_2px_rgba(59,130,246,0.35)]" : undefined,
+              )}
+              style={{ pointerEvents: "none" }}
+            />
+          ) : null}
+        </svg>
+
+        {cursorPosition && currentTool && (
+          <div
+            className={cx(
+              "pointer-events-none absolute rounded-full border border-primary/40 transition-transform duration-75",
+              isStraightLineMode
+                ? "shadow-[0_0_0_2px_rgba(59,130,246,0.35)]"
+                : "shadow-[0_0_0_1px_rgba(59,130,246,0.25)]",
+            )}
+            style={{
+              width: cursorDiameter,
+              height: cursorDiameter,
+              transform: `translate(${cursorPosition.x - cursorDiameter / 2}px, ${cursorPosition.y - cursorDiameter / 2}px)`,
+            }}
+          />
+        )}
+      </div>
+    </>
   );
 };
 

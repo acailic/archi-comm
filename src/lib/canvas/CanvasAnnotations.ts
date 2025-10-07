@@ -39,6 +39,8 @@ export interface AnnotationStyle {
   opacity: number;
   borderRadius: number;
   borderWidth: number;
+  borderStyle?: 'solid' | 'dashed' | 'dotted';
+  shadow?: string;
 }
 
 export class CanvasAnnotationManager {

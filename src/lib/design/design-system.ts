@@ -82,6 +82,9 @@ export const animations = {
 } as const;
 
 export const overlayZIndex = {
+  annotationLayer: 12,
+  annotationOverlay: 12,
+  drawingOverlay: 15,
   groups: 50,
   guides: 60,
   toolbar: 80,

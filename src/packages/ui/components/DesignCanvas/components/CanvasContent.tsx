@@ -9,16 +9,36 @@ import {
 import QuickAddOverlayBase from "../../canvas/QuickAddOverlay";
 import { EmptyCanvasState } from "@/lib/animations/canvas-empty-states";
 import { overlayZIndex } from "@/lib/design/design-system";
-import { useCanvasStore, useCanvasMode, useCanvasAnnotations, useCanvasActions } from "@/stores/canvasStore";
+import {
+  useCanvasStore,
+  useCanvasMode,
+  useCanvasAnnotations,
+  useCanvasActions,
+  useCanvasDrawings,
+  useDrawingTool,
+  useDrawingColor,
+  useDrawingSize,
+  useDrawingSettings,
+  useLayerVisibility,
+  useLayerOpacity,
+} from "@/stores/canvasStore";
 import { CanvasAnnotationOverlay } from "@ui/components/overlays/CanvasAnnotationOverlay";
-import { AnnotationToolbar, type AnnotationTool } from "@ui/components/canvas/AnnotationToolbar";
+import { UnifiedToolbar, type AnnotationTool } from "@ui/components/canvas/UnifiedToolbar";
 import { AnnotationSidebar } from "@ui/components/canvas/AnnotationSidebar";
 import { AnnotationEditDialog } from "@ui/components/modals/AnnotationEditDialog";
 import { AlignmentToolbar } from "@ui/components/canvas/AlignmentToolbar";
 import { SelectionBox } from "@ui/components/canvas/SelectionBox";
 import { AlignmentGuides } from "@ui/components/canvas/AlignmentGuides";
 import { ComponentGroupOverlay } from "@ui/components/canvas/ComponentGroupOverlay";
-import type { Annotation } from "@shared/contracts";
+import { LayerPanel } from "@ui/components/canvas/LayerPanel";
+import { DrawingOverlay } from "@ui/components/canvas/DrawingOverlay";
+import { AnnotationLayer } from "@canvas/components/AnnotationLayer";
+import {
+  canvasAnnotationToContract,
+  AnnotationWithReplies,
+} from "@/lib/canvas/annotation-utils";
+import type { CanvasAnnotation } from "@/lib/canvas/CanvasAnnotations";
+import type { Annotation, DrawingStroke } from "@shared/contracts";
 
 interface CanvasContentProps {
   canvasProps: ReactFlowCanvasWrapperProps;
@@ -77,15 +97,38 @@ export const CanvasContent = React.memo(
     // Annotation state
     const canvasMode = useCanvasMode();
     const annotations = useCanvasAnnotations();
+    const drawings = useCanvasDrawings();
+    const drawingTool = useDrawingTool();
+    const drawingColor = useDrawingColor();
+    const drawingSize = useDrawingSize();
+    const drawingSettings = useDrawingSettings();
+    const drawingsVisible = useLayerVisibility("drawings");
+    const annotationsVisible = useLayerVisibility("annotations");
+    const componentsVisible = useLayerVisibility("components");
+    const connectionsVisible = useLayerVisibility("connections");
+    const infoCardsVisible = useLayerVisibility("infoCards");
+    const drawingsOpacity = useLayerOpacity("drawings");
+    const annotationsOpacity = useLayerOpacity("annotations");
+    const componentsOpacity = useLayerOpacity("components");
+    const connectionsOpacity = useLayerOpacity("connections");
+    const infoCardsOpacity = useLayerOpacity("infoCards");
     const canvasActions = useCanvasActions();
     const [selectedAnnotationTool, setSelectedAnnotationTool] = useState<AnnotationTool>(null);
     const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
-    const [annotationToEdit, setAnnotationToEdit] = useState<Annotation | null>(null);
+    const [annotationToEdit, setAnnotationToEdit] =
+      useState<AnnotationWithReplies | null>(null);
     const [showAnnotationSidebar, setShowAnnotationSidebar] = useState(false);
+    const [showLayerPanel, setShowLayerPanel] = useState(false);
     const annotationOverlayRef = useRef<any>(null);
 
     // Annotation mode is active when canvas mode is 'annotation'
     const isAnnotationMode = canvasMode === "annotation";
+
+    useEffect(() => {
+      if (!isAnnotationMode && selectedAnnotationTool !== null) {
+        setSelectedAnnotationTool(null);
+      }
+    }, [isAnnotationMode, selectedAnnotationTool]);
 
     const handleCloseQuickAdd = useCallback(() => {
       setQuickAddActive(false);
@@ -204,12 +247,14 @@ export const CanvasContent = React.memo(
     }, []);
 
     // Annotation handlers
-    const handleAnnotationCreate = useCallback((annotation: Annotation) => {
-      canvasActions.addAnnotation(annotation);
+    const handleAnnotationCreate = useCallback((annotation: CanvasAnnotation) => {
+      const normalized = canvasAnnotationToContract(annotation);
+      canvasActions.addAnnotation(normalized);
     }, [canvasActions]);
 
-    const handleAnnotationUpdate = useCallback((annotation: Annotation) => {
-      canvasActions.updateAnnotation(annotation);
+    const handleAnnotationUpdate = useCallback((annotation: CanvasAnnotation) => {
+      const normalized = canvasAnnotationToContract(annotation);
+      canvasActions.updateAnnotation(normalized);
     }, [canvasActions]);
 
     const handleAnnotationDelete = useCallback((annotationId: string) => {
@@ -224,7 +269,10 @@ export const CanvasContent = React.memo(
       setSelectedAnnotationId(annotationId);
       const annotation = annotations.find(a => a.id === annotationId);
       if (annotation) {
-        setAnnotationToEdit(annotation);
+        setAnnotationToEdit({
+          ...annotation,
+          replies: annotation.replies ?? [],
+        });
       }
     }, [annotations]);
 
@@ -243,6 +291,57 @@ export const CanvasContent = React.memo(
       setAnnotationToEdit(null);
     }, [canvasActions]);
 
+    const handleAnnotationMove = useCallback(
+      (annotationId: string, position: { x: number; y: number }) => {
+        const existing = annotations.find((item) => item.id === annotationId);
+        if (!existing) return;
+        canvasActions.updateAnnotation({
+          ...existing,
+          ...position,
+        });
+      },
+      [annotations, canvasActions],
+    );
+
+    const handleAnnotationSidebarUpdate = useCallback(
+      (annotation: Annotation) => {
+        canvasActions.updateAnnotation(annotation);
+      },
+      [canvasActions],
+    );
+
+    const handleAnnotationDuplicate = useCallback(
+      (annotation: Annotation) => {
+        const uniqueId =
+          typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        canvasActions.addAnnotation({
+          ...annotation,
+          id: uniqueId,
+          x: annotation.x + 32,
+          y: annotation.y + 32,
+          timestamp: Date.now(),
+          resolved: false,
+        });
+      },
+      [canvasActions],
+    );
+
+    const handleStrokeComplete = useCallback(
+      (stroke: DrawingStroke) => {
+        canvasActions.addDrawing(stroke);
+      },
+      [canvasActions],
+    );
+
+    const handleStrokeDelete = useCallback(
+      (strokeId: string) => {
+        canvasActions.deleteDrawing(strokeId);
+      },
+      [canvasActions],
+    );
+
     // Toggle annotation sidebar when annotation mode is active
     useEffect(() => {
       if (isAnnotationMode && annotations.length > 0) {
@@ -251,6 +350,45 @@ export const CanvasContent = React.memo(
         setShowAnnotationSidebar(false);
       }
     }, [isAnnotationMode, annotations.length]);
+
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+
+      const updateLayerElements = (
+        selector: string,
+        visible: boolean,
+        opacityValue: number,
+      ) => {
+        const elements = document.querySelectorAll<HTMLElement>(selector);
+        elements.forEach((element) => {
+          element.style.opacity = visible ? opacityValue.toString() : "0";
+          element.style.pointerEvents = visible ? "auto" : "none";
+        });
+      };
+
+      updateLayerElements(
+        ".react-flow__edges",
+        connectionsVisible,
+        connectionsOpacity,
+      );
+      updateLayerElements(
+        ".react-flow__nodes",
+        componentsVisible,
+        componentsOpacity,
+      );
+      updateLayerElements(
+        "[data-layer=info-card]",
+        infoCardsVisible,
+        infoCardsOpacity,
+      );
+    }, [
+      componentsOpacity,
+      componentsVisible,
+      connectionsOpacity,
+      connectionsVisible,
+      infoCardsOpacity,
+      infoCardsVisible,
+    ]);
 
     // Event-to-store bridge for selection drag
     useEffect(() => {
@@ -522,47 +660,132 @@ export const CanvasContent = React.memo(
           style={{ zIndex: overlayZIndex.toolbar }}
         />
 
-        {/* Annotation Overlay - renders on top of canvas */}
-        {isAnnotationMode && (
-          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 15 }}>
-            <CanvasAnnotationOverlay
-              ref={annotationOverlayRef}
-              width={canvasProps.width || 800}
-              height={canvasProps.height || 600}
-              selectedTool={selectedAnnotationTool || undefined}
-              isActive={isAnnotationMode}
-              onAnnotationCreate={handleAnnotationCreate}
-              onAnnotationUpdate={handleAnnotationUpdate}
-              onAnnotationDelete={handleAnnotationDelete}
-              onAnnotationSelect={(annotation) => {
-                if (annotation) {
-                  handleAnnotationSelect(annotation.id);
-                }
-              }}
-            />
-          </div>
-        )}
+        {/* Annotation render layer */}
+        <AnnotationLayer
+          annotations={annotations}
+          selectedAnnotationId={selectedAnnotationId}
+          viewport={viewport}
+          visible={annotationsVisible}
+          opacity={annotationsOpacity}
+          className="absolute inset-0"
+          onSelect={(annotation) => {
+            setSelectedAnnotationId(annotation.id);
+            setAnnotationToEdit({
+              ...annotation,
+              replies: annotation.replies ?? [],
+            });
+          }}
+          onDoubleClick={(annotation) => {
+            setAnnotationToEdit({
+              ...annotation,
+              replies: annotation.replies ?? [],
+            });
+          }}
+          onMove={handleAnnotationMove}
+          style={{
+            zIndex: overlayZIndex.annotationLayer,
+            pointerEvents: annotationsVisible ? "auto" : "none",
+          }}
+        />
 
-        {/* Annotation Toolbar */}
-        {isAnnotationMode && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2" style={{ zIndex: 20 }}>
-            <AnnotationToolbar
-              selectedTool={selectedAnnotationTool}
-              onToolSelect={setSelectedAnnotationTool}
-              annotationCount={annotations.length}
-            />
+        {/* Drawing overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            zIndex: overlayZIndex.drawingOverlay,
+            opacity: drawingsOpacity,
+            pointerEvents: drawingsVisible || canvasMode === "draw" ? "auto" : "none",
+          }}
+        >
+          <DrawingOverlay
+            strokes={drawings}
+            currentTool={drawingTool}
+            color={drawingColor}
+            size={drawingSize}
+            settings={drawingSettings}
+            onStrokeComplete={handleStrokeComplete}
+            onStrokeDelete={handleStrokeDelete}
+            enabled={canvasMode === "draw"}
+          />
+        </div>
+
+        {/* Annotation creation overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            zIndex: overlayZIndex.annotationOverlay,
+            pointerEvents: isAnnotationMode ? "auto" : "none",
+            opacity: annotationsOpacity,
+          }}
+        >
+          <CanvasAnnotationOverlay
+            ref={annotationOverlayRef}
+            width={canvasProps.width || 800}
+            height={canvasProps.height || 600}
+            selectedTool={selectedAnnotationTool || undefined}
+            isActive={isAnnotationMode}
+            onAnnotationCreate={handleAnnotationCreate}
+            onAnnotationUpdate={handleAnnotationUpdate}
+            onAnnotationDelete={handleAnnotationDelete}
+            onAnnotationSelect={(annotation) => {
+              if (annotation) {
+                const normalized = canvasAnnotationToContract(annotation);
+                setSelectedAnnotationId(annotation.id);
+                setAnnotationToEdit(normalized);
+              } else {
+                setSelectedAnnotationId(null);
+                setAnnotationToEdit(null);
+              }
+            }}
+          />
+        </div>
+
+        <div
+          className="absolute top-4 left-1/2 w-full max-w-5xl -translate-x-1/2 px-4"
+          style={{ zIndex: overlayZIndex.toolbar }}
+        >
+          <UnifiedToolbar
+            annotationTool={selectedAnnotationTool}
+            onAnnotationToolChange={(tool) => {
+              setSelectedAnnotationTool(tool);
+              if (tool) {
+                canvasActions.setCanvasMode("annotation");
+              } else if (canvasMode === "annotation") {
+                canvasActions.setCanvasMode("select");
+              }
+            }}
+            isLayerPanelOpen={showLayerPanel}
+            onToggleLayerPanel={() => setShowLayerPanel((value) => !value)}
+            annotationSidebarVisible={showAnnotationSidebar}
+            onToggleAnnotationSidebar={() =>
+              setShowAnnotationSidebar((value) => !value)
+            }
+          />
+        </div>
+
+        {showLayerPanel && (
+          <div
+            className="absolute top-[120px] right-5"
+            style={{ zIndex: overlayZIndex.toolbar }}
+          >
+            <LayerPanel />
           </div>
         )}
 
         {/* Annotation Sidebar */}
         {showAnnotationSidebar && (
-          <div className="absolute top-0 right-0 h-full w-80" style={{ zIndex: 20 }}>
+          <div
+            className="absolute top-0 right-0 h-full w-80"
+            style={{ zIndex: overlayZIndex.toolbar }}
+          >
             <AnnotationSidebar
               annotations={annotations}
               selectedAnnotation={selectedAnnotationId}
               onAnnotationSelect={handleAnnotationSelect}
               onAnnotationDelete={handleAnnotationDelete}
               onAnnotationFocus={handleAnnotationFocus}
+              onAnnotationUpdate={handleAnnotationSidebarUpdate}
+              onAnnotationDuplicate={handleAnnotationDuplicate}
             />
           </div>
         )}
