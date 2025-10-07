@@ -1,7 +1,15 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+import {
+  baseUseOptions,
+  createProject,
+  createWebServerEnv,
+  devicePresets,
+  visualExpectOptions,
+} from './playwright.shared';
 
 // ES module workaround for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -27,20 +35,7 @@ export default defineConfig({
   timeout: MULTI_SESSION_TESTS ? 360_000 : 180_000,
   expect: {
     timeout: 10_000,
-    // Visual testing configuration
-    toHaveScreenshot: {
-      // Enable visual comparisons with appropriate thresholds
-      maxDiffPixelsRatio: process.env.CI ? 0.1 : 0.2,
-      threshold: 0.3,
-      // Animation handling for consistent screenshots
-      animations: 'disabled',
-      // Reduced motion for visual stability
-      mode: 'css',
-    },
-    toMatchScreenshot: {
-      maxDiffPixelsRatio: process.env.CI ? 0.1 : 0.2,
-      threshold: 0.3,
-    },
+    ...visualExpectOptions(),
   },
   retries: process.env.CI ? 2 : 0,
   // Enhanced reporting for visual testing and multi-session tests
@@ -62,21 +57,14 @@ export default defineConfig({
   ],
   // Global setup for session state management
   globalSetup: resolveFromRoot('e2e/utils/global-setup.ts'),
-  use: {
-    baseURL: 'http://localhost:5173',
-    trace: 'on-first-retry',
-    video: 'retain-on-failure',
-    // Screenshot configuration for visual tests
-    screenshot: 'only-on-failure',
-  },
+  use: { ...baseUseOptions },
   projects: [
     // Curated demo videos recorder (sequential, high-quality video ON)
-    {
-      name: 'demo-videos',
+    createProject('demo-videos', {
       testDir: resolveFromRoot('e2e'),
       testMatch: ['**/demo-video-recording.spec.ts'],
       use: {
-        ...devices['Desktop Chrome'],
+        ...devicePresets['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
         deviceScaleFactor: 1,
         hasTouch: false,
@@ -85,7 +73,7 @@ export default defineConfig({
         forcedColors: 'none',
         video: {
           mode: 'on',
-          size: { width: 1920, height: 1080 }
+          size: { width: 1920, height: 1080 },
         },
         trace: 'on',
         screenshot: 'on',
@@ -94,87 +82,100 @@ export default defineConfig({
       },
       timeout: 900_000,
       retries: 0,
-    },
+    }),
+    // Dedicated project for marketing screenshot capture
+    createProject('demo-screenshots', {
+      testDir: resolveFromRoot('e2e'),
+      testMatch: ['**/demo-screenshot-capture.spec.ts'],
+      use: {
+        ...devicePresets['Desktop Chrome'],
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+        hasTouch: false,
+        colorScheme: 'light',
+        reducedMotion: 'reduce',
+        forcedColors: 'none',
+        video: 'off',
+        trace: 'on',
+        screenshot: 'on',
+        actionTimeout: 30_000,
+        navigationTimeout: 90_000,
+      },
+      timeout: 300_000,
+      retries: 0,
+    }),
     // Standard functional testing
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
+    createProject('chromium', {
+      use: { ...devicePresets['Desktop Chrome'] },
+    }),
 
     // Cross-browser testing for consistency validation
-    {
-      name: 'firefox',
+    createProject('firefox', {
       testMatch: ['**/cross-platform-consistency.spec.ts'],
-      use: { ...devices['Desktop Firefox'] },
-    },
+      use: { ...devicePresets['Desktop Firefox'] },
+    }),
 
-    {
-      name: 'webkit',
+    createProject('webkit', {
       testMatch: ['**/cross-platform-consistency.spec.ts'],
-      use: { ...devices['Desktop Safari'] },
-    },
+      use: { ...devicePresets['Desktop Safari'] },
+    }),
 
     // Mobile browser testing
-    {
-      name: 'mobile-chrome',
+    createProject('mobile-chrome', {
       testMatch: ['**/cross-platform-consistency.spec.ts'],
-      use: { ...devices['Pixel 5'] },
-    },
+      use: { ...devicePresets['Pixel 5'] },
+    }),
 
-    {
-      name: 'mobile-safari',
+    createProject('mobile-safari', {
       testMatch: ['**/cross-platform-consistency.spec.ts'],
-      use: { ...devices['iPhone 12'] },
-    },
+      use: { ...devicePresets['iPhone 12'] },
+    }),
 
     // Multi-session testing project (requires sequential execution)
-    {
-      name: 'multi-session',
+    createProject('multi-session', {
       testMatch: ['**/multi-day-session.spec.ts'],
       use: {
-        ...devices['Desktop Chrome'],
+        ...devicePresets['Desktop Chrome'],
         storageState: undefined, // Reset for each test
       },
       timeout: 180_000, // 3 minutes for multi-session tests
       retries: 1, // Fewer retries for sequential tests
-    },
+    }),
 
     // Collaboration testing project (requires multiple contexts) - enabled only when ENABLE_COLLAB=true
     ...(
       ENABLE_COLLAB
-        ? [{
-            name: 'collaboration',
-            testMatch: ['**/collaboration-conflict.spec.ts'],
-            use: {
-              ...devices['Desktop Chrome'],
-              storageState: undefined,
-            },
-            timeout: 120_000,
-            retries: 2,
-          }]
+        ? [
+            createProject('collaboration', {
+              testMatch: ['**/collaboration-conflict.spec.ts'],
+              use: {
+                ...devicePresets['Desktop Chrome'],
+                storageState: undefined,
+              },
+              timeout: 120_000,
+              retries: 2,
+            }),
+          ]
         : []
     ),
 
     // Error recovery testing project
-    {
-      name: 'error-recovery',
+    createProject('error-recovery', {
       testMatch: ['**/error-recovery.spec.ts'],
       use: {
-        ...devices['Desktop Chrome'],
+        ...devicePresets['Desktop Chrome'],
         storageState: undefined,
       },
       timeout: 90_000,
       retries: 2,
-    },
+    }),
 
     // Visual testing project with scenario integration
-    {
-      name: 'scenario-visual',
+    createProject('scenario-visual', {
       testDir: resolveFromRoot('e2e'),
       testMatch: ['**/visual-regression.spec.ts', '**/responsive-design.spec.ts'],
       use: {
-        ...devices['Desktop Chrome'],
-        // Enhanced settings for visual consistency
+        ...devicePresets['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
         deviceScaleFactor: 1,
         hasTouch: false,
@@ -182,18 +183,16 @@ export default defineConfig({
         reducedMotion: 'reduce',
         forcedColors: 'none',
       },
-      // Visual testing specific configuration
-      timeout: 90_000, // Longer timeout for visual operations
-      retries: process.env.CI ? 3 : 1, // More retries for visual tests
-    },
+      timeout: 90_000,
+      retries: process.env.CI ? 3 : 1,
+    }),
 
     // Responsive visual testing - Mobile
-    {
-      name: 'mobile-visual',
+    createProject('mobile-visual', {
       testDir: resolveFromRoot('e2e'),
       testMatch: ['**/responsive-design.spec.ts'],
       use: {
-        ...devices['iPhone 13'],
+        ...devicePresets['iPhone 13'],
         viewport: { width: 375, height: 667 },
         deviceScaleFactor: 2,
         hasTouch: true,
@@ -202,15 +201,14 @@ export default defineConfig({
       },
       timeout: 90_000,
       retries: process.env.CI ? 3 : 1,
-    },
+    }),
 
     // Responsive visual testing - Tablet
-    {
-      name: 'tablet-visual',
+    createProject('tablet-visual', {
       testDir: resolveFromRoot('e2e'),
       testMatch: ['**/responsive-design.spec.ts'],
       use: {
-        ...devices['iPad Pro'],
+        ...devicePresets['iPad Pro'],
         viewport: { width: 768, height: 1024 },
         deviceScaleFactor: 1,
         hasTouch: true,
@@ -219,47 +217,44 @@ export default defineConfig({
       },
       timeout: 90_000,
       retries: process.env.CI ? 3 : 1,
-    },
+    }),
 
     // Firefox cross-browser visual testing
-    {
-      name: 'firefox-visual',
+    createProject('firefox-visual', {
       testDir: resolveFromRoot('e2e'),
       testMatch: ['**/visual-regression.spec.ts'],
       use: {
-        ...devices['Desktop Firefox'],
+        ...devicePresets['Desktop Firefox'],
         viewport: { width: 1920, height: 1080 },
         colorScheme: 'light',
         reducedMotion: 'reduce',
       },
       timeout: 90_000,
       retries: process.env.CI ? 3 : 1,
-    },
+    }),
 
     // Dark theme visual testing
-    {
-      name: 'dark-theme-visual',
+    createProject('dark-theme-visual', {
       testDir: resolveFromRoot('e2e'),
       testMatch: ['**/visual-regression.spec.ts'],
       use: {
-        ...devices['Desktop Chrome'],
+        ...devicePresets['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
         colorScheme: 'dark',
         reducedMotion: 'reduce',
       },
       timeout: 90_000,
       retries: process.env.CI ? 3 : 1,
-    },
+    }),
 
     // Note: Removed legacy demo-videos* projects.
 
     // Demo Scenarios - Desktop HD
-  {
-      name: 'Demo - Desktop HD',
+    createProject('Demo - Desktop HD', {
       testDir: resolveFromRoot('e2e/demo-scenarios'),
       testMatch: ['**/*.spec.ts'],
       use: {
-        ...devices['Desktop Chrome'],
+        ...devicePresets['Desktop Chrome'],
         viewport: { width: 1920, height: 1080 },
         deviceScaleFactor: 1,
         hasTouch: false,
@@ -267,7 +262,7 @@ export default defineConfig({
         reducedMotion: 'no-preference', // Allow animations for demos
         video: {
           mode: 'on',
-          size: { width: 1920, height: 1080 }
+          size: { width: 1920, height: 1080 },
         },
         trace: 'on',
         screenshot: 'on',
@@ -275,16 +270,15 @@ export default defineConfig({
         navigationTimeout: 90_000,
       },
       timeout: 900_000,
-      retries: 0, // No retries for demo recording
-    },
+      retries: 0,
+    }),
 
     // Demo Scenarios - Mobile
-    {
-      name: 'Demo - Mobile',
+    createProject('Demo - Mobile', {
       testDir: resolveFromRoot('e2e/demo-scenarios'),
       testMatch: ['**/mobile-interactions/**/*.spec.ts'],
       use: {
-        ...devices['iPhone 12 Pro'],
+        ...devicePresets['iPhone 12 Pro'],
         viewport: { width: 390, height: 844 },
         deviceScaleFactor: 3,
         hasTouch: true,
@@ -292,7 +286,7 @@ export default defineConfig({
         reducedMotion: 'no-preference',
         video: {
           mode: 'on',
-          size: { width: 390, height: 844 }
+          size: { width: 390, height: 844 },
         },
         trace: 'on',
         screenshot: 'on',
@@ -301,15 +295,14 @@ export default defineConfig({
       },
       timeout: 900_000,
       retries: 0,
-    },
+    }),
 
     // Demo Scenarios - Tablet
-    {
-      name: 'Demo - Tablet',
+    createProject('Demo - Tablet', {
       testDir: resolveFromRoot('e2e/demo-scenarios'),
       testMatch: ['**/mobile-interactions/**/*.spec.ts'],
       use: {
-        ...devices['iPad Pro'],
+        ...devicePresets['iPad Pro'],
         viewport: { width: 1024, height: 1366 },
         deviceScaleFactor: 2,
         hasTouch: true,
@@ -317,7 +310,7 @@ export default defineConfig({
         reducedMotion: 'no-preference',
         video: {
           mode: 'on',
-          size: { width: 1024, height: 1366 }
+          size: { width: 1024, height: 1366 },
         },
         trace: 'on',
         screenshot: 'on',
@@ -326,15 +319,14 @@ export default defineConfig({
       },
       timeout: 900_000,
       retries: 0,
-    },
+    }),
 
     // Demo Scenarios - 4K Ultra HD
-    {
-      name: 'Demo - 4K',
+    createProject('Demo - 4K', {
       testDir: resolveFromRoot('e2e/demo-scenarios'),
       testMatch: ['**/architecture-workflows/**/*.spec.ts', '**/performance-showcases/**/*.spec.ts'],
       use: {
-        ...devices['Desktop Chrome'],
+        ...devicePresets['Desktop Chrome'],
         viewport: { width: 3840, height: 2160 },
         deviceScaleFactor: 1,
         hasTouch: false,
@@ -342,16 +334,16 @@ export default defineConfig({
         reducedMotion: 'no-preference',
         video: {
           mode: 'on',
-          size: { width: 3840, height: 2160 }
+          size: { width: 3840, height: 2160 },
         },
         trace: 'on',
         screenshot: 'on',
-        actionTimeout: 45_000, // Longer for 4K rendering
+        actionTimeout: 45_000,
         navigationTimeout: 45_000,
       },
-      timeout: 600_000, // 10 minutes for 4K demos
+      timeout: 600_000,
       retries: 0,
-    },
+    }),
   ],
 
   webServer: {
@@ -360,12 +352,7 @@ export default defineConfig({
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
     // Enhanced environment for visual testing
-    env: {
-      ...process.env,
-      NODE_ENV: process.env.NODE_ENV || 'test',
-      // Re-enable animations when DEMO_MODE is set for demo recordings
-      DISABLE_ANIMATION: process.env.DEMO_MODE ? 'false' : 'true',
-    },
+    env: createWebServerEnv(),
   },
 
   // Output directory for test artifacts (must not contain the HTML report folder)

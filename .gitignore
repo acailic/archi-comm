@@ -20,9 +20,21 @@ vite.config.ts.timestamp-*
 # macOS artifacts
 .DS_Store
 .DS_Store?
+.AppleDouble
+.LSOverride
 ._*
 .Spotlight-V100
 .Trashes
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 
 # Windows artifacts
 ehthumbs.db
@@ -102,8 +114,6 @@ tmp/
 temp/
 
 # Editor directories and files
-.vscode/
-!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
@@ -155,13 +165,6 @@ pnpm-lock.yaml
 .yarn/install-state.gz
 
 # IDE and editors
-.vscode/settings.json
-.vscode/launch.json
-.vscode/extensions.json
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
 .history/
 *.code-workspace
 
@@ -234,46 +237,6 @@ src-tauri/gen/
 auto-save-list
 tramp
 .\#*
-
-# macOS specific
-.AppleDouble
-.LSOverride
-Icon
-._*
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
-
-# Windows specific
-[Tt]humbs.db
-[Tt]humbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-*.stackdump
-[Dd]esktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-*.lnk
-
-# Linux specific
-*~
-.fuse_hidden*
-.directory
-.Trash-*
-.nfs*
 
 # Security
 .env.*.local
@@ -421,3 +384,13 @@ IMPLEMENTATION_SUMMARY.md1
 *_SUMMARY.md
 docs/**/*.md
 !docs/README.md
+
+# Demo screenshots (generated)
+demo-screenshots/runs/
+demo-screenshots/latest/
+demo-screenshots/**/thumbnails/
+demo-screenshots/**/*.png
+demo-screenshots/**/*.jpg
+demo-screenshots/metadata/*.json
+demo-screenshots/index.html
+!demo-screenshots/.gitkeep

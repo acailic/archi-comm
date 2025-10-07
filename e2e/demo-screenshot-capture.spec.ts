@@ -4,13 +4,20 @@
 // RELEVANT FILES: e2e/utils/screenshot-helpers.ts, e2e/utils/video-helpers.ts, e2e/utils/test-helpers.ts, tools/scripts/generate-demo-screenshots.js
 
 import { expect, test } from '@playwright/test';
+import type { ConsoleMessage, TestInfo } from '@playwright/test';
 
 import { createHelpers } from './utils/test-helpers';
 import { createScreenshotHelpers, ScreenshotSequenceStep } from './utils/screenshot-helpers';
 import { createVideoHelpers } from './utils/video-helpers';
 import { demoScenarios } from './utils/demo-scenarios';
+import { isScreenshotMode } from './utils/env';
 
-const SCREENSHOT_MODE = process.env.SCREENSHOT_MODE !== 'false';
+const SCREENSHOT_MODE = isScreenshotMode();
+
+const annotateScreenshotTest = (testInfo: TestInfo, category: string) => {
+  testInfo.annotations.push({ type: 'tag', description: '@screenshots' });
+  testInfo.annotations.push({ type: 'tag', description: `@screenshots:${category}` });
+};
 
 async function prepareCanvas(page: Parameters<typeof test>[0]['page']) {
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -34,7 +41,8 @@ test.describe('Demo Screenshot Capture', () => {
     await prepareCanvas(page);
   });
 
-  test('Feature showcase marketing captures', async ({ page, context }) => {
+  test('Feature showcase marketing captures', async ({ page, context }, testInfo) => {
+    annotateScreenshotTest(testInfo, 'feature-showcase');
     const helpers = createHelpers(page);
     const screenshotHelpers = createScreenshotHelpers(page, context);
     const videoHelpers = createVideoHelpers(page, context);
@@ -92,7 +100,8 @@ test.describe('Demo Screenshot Capture', () => {
     }
   });
 
-  test('Architecture portfolio gallery', async ({ page, context }) => {
+  test('Architecture portfolio gallery', async ({ page, context }, testInfo) => {
+    annotateScreenshotTest(testInfo, 'architecture-examples');
     const helpers = createHelpers(page);
     const screenshotHelpers = createScreenshotHelpers(page, context);
     const videoHelpers = createVideoHelpers(page, context);
@@ -149,7 +158,8 @@ test.describe('Demo Screenshot Capture', () => {
     }
   });
 
-  test('Workflow stage milestones', async ({ page, context }) => {
+  test('Workflow stage milestones', async ({ page, context }, testInfo) => {
+    annotateScreenshotTest(testInfo, 'workflow-stages');
     const helpers = createHelpers(page);
     const screenshotHelpers = createScreenshotHelpers(page, context);
 
@@ -205,7 +215,8 @@ test.describe('Demo Screenshot Capture', () => {
     });
   });
 
-  test('Responsive layout gallery', async ({ page, context }) => {
+  test('Responsive layout gallery', async ({ page, context }, testInfo) => {
+    annotateScreenshotTest(testInfo, 'responsive-views');
     const helpers = createHelpers(page);
     const screenshotHelpers = createScreenshotHelpers(page, context);
 
@@ -248,7 +259,8 @@ test.describe('Demo Screenshot Capture', () => {
     });
   });
 
-  test('Interactive moments gallery', async ({ page, context }) => {
+  test('Interactive moments gallery', async ({ page, context }, testInfo) => {
+    annotateScreenshotTest(testInfo, 'ui-states');
     const helpers = createHelpers(page);
     const screenshotHelpers = createScreenshotHelpers(page, context);
     const videoHelpers = createVideoHelpers(page, context);
@@ -299,5 +311,35 @@ test.describe('Demo Screenshot Capture', () => {
       step: 'ai-overlay',
       metadata: { description: 'AI assistant recommendations surfaced' }
     });
+  });
+
+  test('Masks skip missing locators gracefully', async ({ page, context }, testInfo) => {
+    annotateScreenshotTest(testInfo, 'utilities');
+
+    const warnings: string[] = [];
+    const handleConsole = (message: ConsoleMessage) => {
+      if (message.type() === 'warning') {
+        warnings.push(message.text());
+      }
+    };
+    page.on('console', handleConsole);
+
+    const helpers = createHelpers(page);
+    const screenshotHelpers = createScreenshotHelpers(page, context);
+
+    await helpers.canvas.navigateToCanvas();
+    await helpers.canvas.clearCanvas();
+
+    const capture = await screenshotHelpers.captureScreenshot('mask-sanity-check', {
+      category: 'utilities',
+      scenario: 'mask-verification',
+      step: 'missing-targets',
+      mask: ['[data-testid="does-not-exist"]', page.locator('[data-testid="canvas-container"]')],
+    });
+
+    expect(capture.relativePath.startsWith('runs/')).toBe(true);
+    expect(warnings.some((text) => text.includes('Skipping mask; no matches'))).toBe(true);
+
+    page.off('console', handleConsole);
   });
 });

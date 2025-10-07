@@ -1,0 +1,42 @@
+name: demo-screenshots
+
+on:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+jobs:
+  demo-screenshots:
+    name: Generate Demo Screenshots
+    runs-on: ubuntu-latest
+    env:
+      CI: 'true'
+      DEMO_MODE: 'true'
+      SCREENSHOT_MODE: 'true'
+      PWTEST_WORKERS: '1'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare demo environment
+        run: npm run demo:prepare
+
+      - name: Generate screenshots
+        run: npm run demo:screenshots
+
+      - name: Upload screenshot artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-screenshots
+          path: demo-screenshots

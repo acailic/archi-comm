@@ -98,6 +98,7 @@ export default [
       // Basic rules
       'no-console': ['warn', { 'allow': ['warn', 'error'] }],
       'no-debugger': 'error',
+      'eol-last': ['error', 'always'],
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'warn',

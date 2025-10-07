@@ -423,6 +423,7 @@ Press `?` in the app for the full list.
 - UI: React + TypeScript, Radix UI, Tailwind
 - Bundler/Dev: Vite
 - Testing: Vitest (unit/integration) + Playwright (E2E)
+- Demo assets: Automated marketing screenshots via Playwright (`npm run demo:prepare && npm run demo:screenshots`, see `e2e/README-DEMO-SCREENSHOTS.md`)
 - Canvas and interactions: custom canvas engine, Motion/Framer animations
 
 ## Developer Tools
@@ -434,6 +435,7 @@ ArchiComm uses modern development tools to ensure code quality and consistency:
 - **Dependabot** — Automated dependency updates via GitHub
 - **EditorConfig** — Consistent editor settings across IDEs
 - **VS Code Integration** — Recommended extensions, debug configurations, and tasks
+- **Playwright CLI** — Install browsers with `npm run demo:prepare` (wraps `npx playwright install`) before running screenshot suites
 
 **Commit Format:** All commits must follow conventional commit format:
 

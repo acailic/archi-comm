@@ -4,6 +4,10 @@
 // RELEVANT FILES: e2e/utils/demo-scenarios.ts, e2e/utils/test-helpers.ts, src/features/ai/, e2e/utils/video-helpers.ts
 
 import { test, expect } from '@playwright/test';
+import { createScreenshotHelpers } from '../../utils/screenshot-helpers';
+import { isScreenshotMode } from '../../utils/env';
+
+const SCREENSHOT_MODE = isScreenshotMode();
 
 test.describe('AI and Automation Feature Demonstrations', () => {
   // Configure extended timeouts for AI feature demonstrations
@@ -26,9 +30,30 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('AI-powered architecture recommendations', async ({ page }) => {
+  test('AI-powered architecture recommendations', async ({ page, context }) => {
     // Show AI assistance in design process
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureAI = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await page.locator('.react-flow__node').count();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'architecture-examples',
+        scenario: 'AI Recommendations',
+        step,
+        metadata: {
+          feature: 'ai-assistant',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Add AI demo annotation
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -45,6 +70,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.keyboard.type('I need to design a high-traffic e-commerce platform that handles 100k concurrent users with real-time inventory management');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
+
+    await captureAI('ai-requirements', 'requirements', {
+      description: 'AI assistant intake form with detailed architecture requirements'
+    });
 
     // Show AI thinking indicator
     await expect(page.locator('[data-testid="ai-thinking-indicator"]')).toBeVisible();
@@ -186,6 +215,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
 
+    await captureAI('ai-pattern-application', 'pattern-suggestions', {
+      description: 'AI pattern suggestions applied to architecture canvas'
+    });
+
     // Add data layer based on AI recommendations
     await page.locator('[data-testid="ai-suggest-data-layer"]').click();
     await page.waitForTimeout(2000);
@@ -215,6 +248,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.keyboard.type('AI Recommendations: Circuit breaker, rate limiting, monitoring');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
+
+    await captureAI('ai-best-practices', 'best-practices', {
+      description: 'AI-generated best practices overlaying architecture'
+    });
 
     // Add monitoring and resilience components
     await page.locator('[data-testid="component-palette-monitoring"]').click();
@@ -249,6 +286,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
 
+    await captureAI('ai-final-architecture', 'final-architecture', {
+      description: 'AI-generated architecture with confidence scores and documentation'
+    });
+
     // Verify AI-generated architecture
     await expect(page.locator('[data-testid="component-load-balancer"]')).toBeVisible();
     await expect(page.locator('[data-testid="component-api-gateway"]')).toBeVisible();
@@ -257,9 +298,30 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await expect(page.locator('[data-testid="component-event-bus"]')).toBeVisible();
   });
 
-  test('intelligent auto-layout and organization', async ({ page }) => {
+  test('intelligent auto-layout and organization', async ({ page, context }) => {
     // Demonstrate automatic design organization
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureLayout = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await page.locator('.react-flow__node').count();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'workflow-stages',
+        scenario: 'AI Auto Layout',
+        step,
+        metadata: {
+          feature: 'auto-layout',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Add demo annotation
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -291,6 +353,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
       await page.waitForTimeout(400);
     }
 
+    await captureLayout('ai-layout-chaotic', 'chaotic-state', {
+      description: 'Chaotic component arrangement before AI auto-layout'
+    });
+
     // Add some random connections
     await page.hover('[data-testid="component-frontend"]');
     await page.locator('[data-testid="connection-handle-frontend-out"]').hover();
@@ -315,6 +381,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     // Show AI auto-layout algorithm organizing components
     await page.locator('[data-testid="ai-auto-layout"]').click();
     await page.waitForTimeout(1000);
+
+    await captureLayout('ai-layout-organized', 'auto-layout', {
+      description: 'AI auto-layout reorganized architecture for clarity'
+    });
 
     // Show AI analysis of current layout
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -492,15 +562,40 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
 
+    await captureLayout('ai-layout-final', 'final-layout', {
+      description: 'Final organized layout after AI optimization and grouping'
+    });
+
     // Verify layout optimization
     await expect(page.locator('[data-testid="component-load-balancer"]')).toBeVisible();
     await expect(page.locator('[data-testid="component-frontend"]')).toBeVisible();
     await expect(page.locator('[data-testid="component-api-gateway"]')).toBeVisible();
   });
 
-  test('AI-powered connection recommendations', async ({ page }) => {
+  test('AI-powered connection recommendations', async ({ page, context }) => {
     // Show intelligent connection assistance
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureConnections = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await page.locator('.react-flow__node').count();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'architecture-examples',
+        scenario: 'AI Connection Intelligence',
+        step,
+        metadata: {
+          feature: 'ai-connections',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Add demo annotation
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -530,6 +625,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
       await page.waitForTimeout(600);
     }
 
+    await captureConnections('ai-connections-initial', 'pre-connections', {
+      description: 'Canvas populated with unconnected components before AI suggestions'
+    });
+
     await page.locator('[data-testid="annotation-tool"]').click();
     await page.locator('[data-testid="canvas-container"]').click({ position: { x: 50, y: 150 } });
     await page.keyboard.type('Unconnected components - AI will suggest logical connections');
@@ -546,6 +645,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.keyboard.type('AI: Analyzing component types and relationships...');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
+
+    await captureConnections('ai-connections-analysis', 'analysis', {
+      description: 'AI analyzing component relationships prior to suggesting connections'
+    });
 
     // Show connection suggestions with confidence scores
     const connectionSuggestions = [
@@ -733,6 +836,10 @@ test.describe('AI and Automation Feature Demonstrations', () => {
     await page.keyboard.type('AI Connection Analysis Complete: Optimized for security, performance, and maintainability');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
+
+    await captureConnections('ai-connections-final', 'final-connections', {
+      description: 'AI-optimized connections with security and performance enhancements'
+    });
 
     // Show AI learning from user feedback
     await page.locator('[data-testid="ai-feedback-panel"]').click();

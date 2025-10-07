@@ -4,6 +4,10 @@
 // RELEVANT FILES: e2e/utils/demo-scenarios.ts, e2e/utils/test-helpers.ts, src/features/onboarding/, e2e/utils/video-helpers.ts
 
 import { test, expect } from '@playwright/test';
+import { createScreenshotHelpers } from '../../utils/screenshot-helpers';
+import { isScreenshotMode } from '../../utils/env';
+
+const SCREENSHOT_MODE = isScreenshotMode();
 
 test.describe('Complete User Journey Demonstrations', () => {
   // Configure extended timeouts for complete user workflows
@@ -24,9 +28,30 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('first-time user complete onboarding experience', async ({ page }) => {
+  test('first-time user complete onboarding experience', async ({ page, context }) => {
     // Show complete new user flow
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureJourney = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await page.locator('.react-flow__node').count();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'workflow-stages',
+        scenario: 'First-time Onboarding',
+        step,
+        metadata: {
+          persona: 'first-time-user',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Start with application landing and welcome screen
     await page.locator('[data-testid="welcome-modal"]').waitFor();
@@ -34,6 +59,10 @@ test.describe('Complete User Journey Demonstrations', () => {
 
     await page.locator('[data-testid="welcome-title"]').waitFor();
     await expect(page.locator('[data-testid="welcome-title"]')).toContainText('Welcome to ArchiComm');
+
+    await captureJourney('journey-onboarding-welcome', 'welcome', {
+      description: 'Welcome modal presenting the guided onboarding experience'
+    });
 
     await page.locator('[data-testid="start-tutorial-button"]').click();
     await page.waitForTimeout(2000);
@@ -64,6 +93,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
 
+    await captureJourney('journey-first-component', 'first-component', {
+      description: 'First web app component placed via tutorial guidance'
+    });
+
     // Tutorial celebrates first component
     await page.locator('[data-testid="tutorial-celebration"]').waitFor();
     await expect(page.locator('[data-testid="tutorial-celebration"]')).toContainText('Great! You\'ve added your first component');
@@ -80,6 +113,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.keyboard.type('App Database');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
+
+    await captureJourney('journey-data-layer', 'database-added', {
+      description: 'Database component added to support application data'
+    });
 
     // Tutorial teaches connection creation
     await page.locator('[data-testid="tutorial-step-4"]').waitFor();
@@ -130,6 +167,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.locator('[data-testid="color-blue"]').click();
     await page.waitForTimeout(1500);
 
+    await captureJourney('journey-styling', 'styling', {
+      description: 'Component styling with color picker during onboarding tour'
+    });
+
     await page.locator('[data-testid="feature-tour-next"]').click();
     await page.waitForTimeout(1000);
 
@@ -141,6 +182,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.waitForTimeout(500);
     await page.locator('[data-testid="export-png"]').click();
     await page.waitForTimeout(2000);
+
+    await captureJourney('journey-export', 'export', {
+      description: 'First export action completed via tutorial prompts'
+    });
 
     // Demonstrate help system and documentation access
     await page.locator('[data-testid="help-button"]').click();
@@ -172,15 +217,40 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.locator('[data-testid="onboarding-complete"]').waitFor();
     await expect(page.locator('[data-testid="onboarding-complete"]')).toContainText('Welcome to ArchiComm! Your journey begins here.');
 
+    await captureJourney('journey-complete', 'completion', {
+      description: 'Onboarding flow complete with progress panel and saved project'
+    });
+
     // Verify onboarding completion
     await expect(page.locator('[data-testid="component-my-first-web-app"]')).toBeVisible();
     await expect(page.locator('[data-testid="component-app-database"]')).toBeVisible();
     await expect(page.locator('[data-testid="progress-panel"]')).toContainText('Beginner');
   });
 
-  test('enterprise architect daily workflow', async ({ page }) => {
+  test('enterprise architect daily workflow', async ({ page, context }) => {
     // Show realistic professional usage
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureEnterprise = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await page.locator('.react-flow__node').count();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'workflow-stages',
+        scenario: 'Enterprise Architect Workflow',
+        step,
+        metadata: {
+          persona: 'enterprise-architect',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Start with user login and profile setup
     await page.locator('[data-testid="login-button"]').click();
@@ -194,6 +264,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     // Start with project dashboard and recent designs
     await page.locator('[data-testid="dashboard"]').waitFor();
     await expect(page.locator('[data-testid="welcome-message"]')).toContainText('Welcome back, Sarah');
+
+    await captureEnterprise('enterprise-dashboard', 'dashboard', {
+      description: 'Enterprise dashboard highlighting returning architect overview'
+    });
 
     await page.locator('[data-testid="recent-projects"]').waitFor();
     await expect(page.locator('[data-testid="recent-project-1"]')).toContainText('E-commerce Platform V2');
@@ -213,12 +287,20 @@ test.describe('Complete User Journey Demonstrations', () => {
     await expect(page.locator('[data-testid="component-api-gateway"]')).toBeVisible();
     await expect(page.locator('[data-testid="component-user-service"]')).toBeVisible();
 
+    await captureEnterprise('enterprise-architecture-review', 'architecture-review', {
+      description: 'Loaded enterprise architecture for morning review'
+    });
+
     // Add morning review annotation
     await page.locator('[data-testid="annotation-tool"]').click();
     await page.locator('[data-testid="canvas-container"]').click({ position: { x: 50, y: 100 } });
     await page.keyboard.type('Daily Review: Checking architecture for client presentation');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
+
+    await captureEnterprise('enterprise-review-annotation', 'review-annotation', {
+      description: 'Architect notes added during daily review'
+    });
 
     // Show client meeting preparation and presentation mode
     await page.locator('[data-testid="presentation-mode"]').click();
@@ -235,6 +317,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.locator('[data-testid="next-slide"]').click();
     await page.waitForTimeout(1000);
     await expect(page.locator('[data-testid="slide-3-title"]')).toContainText('Service Architecture');
+
+    await captureEnterprise('enterprise-presentation', 'presentation-mode', {
+      description: 'Presentation mode showcasing service architecture slide'
+    });
 
     await page.locator('[data-testid="next-slide"]').click();
     await page.waitForTimeout(1000);
@@ -291,6 +377,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.waitForTimeout(3000);
     await expect(page.locator('[data-testid="feedback-comment"]')).toBeVisible();
 
+    await captureEnterprise('enterprise-feedback', 'stakeholder-feedback', {
+      description: 'Stakeholder feedback pinned on architecture canvas'
+    });
+
     // Demonstrate design iteration and approval workflow
     await page.locator('[data-testid="annotation-tool"]').click();
     await page.locator('[data-testid="canvas-container"]').click({ position: { x: 50, y: 200 } });
@@ -310,6 +400,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.keyboard.type('DR Site');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1000);
+
+    await captureEnterprise('enterprise-dr-plan', 'dr-planning', {
+      description: 'Disaster recovery components added in response to feedback'
+    });
 
     // Connect DR components
     await page.hover('[data-testid="component-user-service"]');
@@ -354,6 +448,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
 
+    await captureEnterprise('enterprise-summary', 'day-summary', {
+      description: 'End-of-day summary documenting architecture updates'
+    });
+
     // Save final state
     await page.locator('[data-testid="save-project"]').click();
     await page.waitForTimeout(1500);
@@ -364,9 +462,30 @@ test.describe('Complete User Journey Demonstrations', () => {
     await expect(page.locator('[data-testid="feedback-comment"]')).toBeVisible();
   });
 
-  test('startup CTO planning technical architecture', async ({ page }) => {
+  test('startup CTO planning technical architecture', async ({ page, context }) => {
     // Entrepreneurial workflow
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureStartup = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await page.locator('.react-flow__node').count();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'workflow-stages',
+        scenario: 'Startup CTO Planning',
+        step,
+        metadata: {
+          persona: 'startup-cto',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Start with business requirements and constraints
     await page.locator('[data-testid="new-project-button"]').click();
@@ -382,6 +501,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.locator('[data-testid="user-scale-input"]').fill('10k users year 1');
     await page.locator('[data-testid="continue-requirements"]').click();
     await page.waitForTimeout(2000);
+
+    await captureStartup('startup-requirements', 'requirements', {
+      description: 'Startup requirements captured before architecture planning'
+    });
 
     // Show MVP architecture planning and design
     await page.locator('[data-testid="canvas-container"]').waitFor();
@@ -441,6 +564,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.mouse.up();
     await page.waitForTimeout(600);
 
+    await captureStartup('startup-mvp-architecture', 'mvp', {
+      description: 'Initial MVP architecture connected across web, mobile, API, and database'
+    });
+
     // Demonstrate scalability planning and future considerations
     await page.locator('[data-testid="scalability-planner"]').click();
     await page.waitForTimeout(1000);
@@ -466,6 +593,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.keyboard.type('DataDog');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(800);
+
+    await captureStartup('startup-growth-plan', 'growth-plan', {
+      description: 'Year 1 growth plan adding caching and monitoring capabilities'
+    });
 
     // Connect caching
     await page.hover('[data-testid="component-nodejs-api"]');
@@ -545,6 +676,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await expect(page.locator('[data-testid="slide-scaling"]')).toBeVisible();
     await expect(page.locator('[data-testid="slide-costs"]')).toBeVisible();
 
+    await captureStartup('startup-investor-pitch', 'presentation', {
+      description: 'Investor presentation highlighting MVP, scaling, and cost slides'
+    });
+
     // Show team communication and alignment
     await page.locator('[data-testid="team-sharing"]').click();
     await page.waitForTimeout(1000);
@@ -576,6 +711,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
 
+    await captureStartup('startup-summary', 'final-summary', {
+      description: 'Startup CTO architecture roadmap summarised for team alignment'
+    });
+
     // Save startup architecture plan
     await page.locator('[data-testid="save-project"]').click();
     await page.locator('[data-testid="project-name"]').fill('FinTech Startup Architecture Plan');
@@ -591,9 +730,30 @@ test.describe('Complete User Journey Demonstrations', () => {
     await expect(page.locator('[data-testid="cost-breakdown"]')).toBeVisible();
   });
 
-  test('computer science student learning system design', async ({ page }) => {
+  test('computer science student learning system design', async ({ page, context }) => {
     // Educational workflow demonstration
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureStudent = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await page.locator('.react-flow__node').count();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'workflow-stages',
+        scenario: 'Student Learning Journey',
+        step,
+        metadata: {
+          persona: 'student',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Start with student login
     await page.locator('[data-testid="student-mode"]').click();
@@ -618,6 +778,10 @@ test.describe('Complete User Journey Demonstrations', () => {
 
     await page.locator('[data-testid="start-assignment"]').click();
     await page.waitForTimeout(2000);
+
+    await captureStudent('student-assignment-brief', 'assignment-brief', {
+      description: 'Assignment brief outlining system design requirements'
+    });
 
     // Show research and planning phase
     await page.locator('[data-testid="canvas-container"]').waitFor();
@@ -685,6 +849,10 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(800);
 
+    await captureStudent('student-backend-phase', 'backend-phase', {
+      description: 'Backend services modeled for social media platform assignment'
+    });
+
     // Include instructor feedback and revision cycles
     await page.locator('[data-testid="request-feedback"]').click();
     await page.waitForTimeout(2000);
@@ -713,6 +881,10 @@ test.describe('Complete User Journey Demonstrations', () => {
 
     await page.waitForTimeout(2000);
     await expect(page.locator('[data-testid="instructor-feedback"]')).toBeVisible();
+
+    await captureStudent('student-instructor-feedback', 'instructor-feedback', {
+      description: 'Instructor feedback overlay guiding next iteration'
+    });
 
     // Phase 3: Implement feedback
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -859,6 +1031,10 @@ Trade-offs:
     await page.locator('[data-testid="submission-confirmation"]').waitFor();
     await expect(page.locator('[data-testid="submission-confirmation"]')).toContainText('Assignment submitted successfully!');
 
+    await captureStudent('student-submission', 'submission', {
+      description: 'Assignment submission confirmation with progress panel'
+    });
+
     // Show grade and feedback (simulated)
     await page.evaluate(() => {
       setTimeout(() => {
@@ -883,6 +1059,10 @@ Trade-offs:
 
     await page.waitForTimeout(4000);
     await expect(page.locator('[data-testid="grade-notification"]')).toBeVisible();
+
+    await captureStudent('student-grade', 'grade-feedback', {
+      description: 'Final grade and instructor feedback visible to student'
+    });
 
     // Verify student learning workflow
     await expect(page.locator('[data-testid="component-web-frontend"]')).toBeVisible();

@@ -4,8 +4,17 @@
 // RELEVANT FILES: e2e/utils/test-helpers.ts, e2e/utils/video-helpers.ts, tools/scripts/generate-demo-screenshots.js
 
 import { BrowserContext, Locator, Page } from '@playwright/test';
-import * as fs from 'fs';
+import { promises as fs } from 'fs';
 import * as path from 'path';
+
+const SCREENSHOT_RUN_ID = (() => {
+  if (process.env.SCREENSHOT_RUN_ID) {
+    return process.env.SCREENSHOT_RUN_ID;
+  }
+  const generated = new Date().toISOString().replace(/[:.]/g, '-');
+  process.env.SCREENSHOT_RUN_ID = generated;
+  return generated;
+})();
 
 import { createHelpers, CanvasHelpers } from './test-helpers';
 import { DemoScenario, DemoStep } from './video-helpers';
@@ -56,33 +65,51 @@ export interface ScreenshotHelperApi {
 
 class ScreenshotHelpers {
   private readonly baseDir: string;
-  private readonly metadataDir: string;
+  private readonly runId: string;
+  private readonly runDir: string;
+  private readonly metadataBaseDir: string;
   private readonly canvasHelpers: CanvasHelpers;
   private readonly overlayIds = new Set<string>();
   private annotationModeEnabled = false;
   private annotationStyleId = 'demo-screenshot-annotations';
+  private readonly directoryReady: Promise<void>;
 
   constructor(private readonly page: Page, private readonly context?: BrowserContext) {
     const helpers = createHelpers(page);
     this.canvasHelpers = helpers.canvas;
 
     this.baseDir = path.join(process.cwd(), 'demo-screenshots');
-    this.metadataDir = path.join(this.baseDir, 'metadata');
+    this.runId = SCREENSHOT_RUN_ID;
+    this.runDir = path.join(this.baseDir, 'runs', this.runId);
+    this.metadataBaseDir = path.join(this.runDir, 'metadata');
+    this.directoryReady = this.prepareDirectories();
+  }
 
-    this.ensureDirectory(this.baseDir);
-    this.ensureDirectory(this.metadataDir);
+  private async prepareDirectories(): Promise<void> {
+    const directories = [
+      this.baseDir,
+      path.join(this.baseDir, 'runs'),
+      this.runDir,
+      this.metadataBaseDir,
+    ];
+
+    for (const dir of directories) {
+      await this.ensureDirectory(dir);
+    }
   }
 
   async captureScreenshot(name: string, options: ScreenshotCaptureOptions = {}): Promise<ScreenshotCaptureResult> {
+    await this.directoryReady;
+
     const category = this.slugify(options.category ?? 'uncategorized');
     const scenario = this.slugify(options.scenario ?? 'general');
     const safeStep = this.slugify(options.step ?? name);
-    const relativeDir = path.join(category, scenario);
+    const relativeDir = path.join('runs', this.runId, category, scenario);
     const fileName = `${safeStep}.png`;
     const outputDir = path.join(this.baseDir, relativeDir);
     const screenshotPath = path.join(outputDir, fileName);
 
-    this.ensureDirectory(outputDir);
+    await this.ensureDirectory(outputDir);
 
     if (options.viewport) {
       await this.page.setViewportSize(options.viewport);
@@ -92,10 +119,12 @@ class ScreenshotHelpers {
       await this.page.waitForTimeout(options.waitFor);
     }
 
+    await this.waitForIdle();
     await this.waitForCanvasStable();
     await this.waitForAnimationsComplete();
 
-    const mask = options.mask ? await this.resolveLocatorArray(options.mask) : undefined;
+    const maskTargets = options.mask ? await this.resolveMaskTargets(options.mask) : undefined;
+    const mask = maskTargets && maskTargets.length > 0 ? maskTargets : undefined;
     const clip = options.clip;
 
     const screenshotOptions = {
@@ -126,11 +155,10 @@ class ScreenshotHelpers {
       extra: options.metadata
     });
 
-    const metadataFile = path.join(
-      this.metadataDir,
-      `${category}__${scenario}__${safeStep}.json`
-    );
-    fs.writeFileSync(metadataFile, JSON.stringify(metadata, null, 2));
+    const metadataDir = path.join(this.metadataBaseDir, category, scenario);
+    await this.ensureDirectory(metadataDir);
+    const metadataFile = path.join(metadataDir, `${safeStep}.json`);
+    await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2), 'utf8');
 
     return {
       path: screenshotPath,
@@ -270,6 +298,82 @@ class ScreenshotHelpers {
     await this.page.setViewportSize(viewport);
   }
 
+  private async waitForIdle(timeoutMs = 5000): Promise<void> {
+    const pollInterval = 150;
+    const requiredStableIterations = 3;
+    let stableIterations = 0;
+    let previousCounts: { nodes: number; edges: number } | null = null;
+
+    const idleCheck = async () => {
+      while (stableIterations < requiredStableIterations) {
+        const [nodeCount, edgeCount, animationsSettled] = await Promise.all([
+          this.page.locator('.react-flow__node').count(),
+          this.page.locator('.react-flow__edge').count(),
+          this.page.evaluate(() => {
+            if (!('getAnimations' in document)) {
+              return true;
+            }
+            return document
+              .getAnimations()
+              .every((animation: Animation) => animation.playState !== 'running');
+          }),
+        ]);
+
+        if (
+          !previousCounts ||
+          previousCounts.nodes !== nodeCount ||
+          previousCounts.edges !== edgeCount ||
+          !animationsSettled
+        ) {
+          stableIterations = 0;
+          previousCounts = { nodes: nodeCount, edges: edgeCount };
+          await this.page.waitForTimeout(pollInterval);
+          continue;
+        }
+
+        stableIterations += 1;
+        previousCounts = { nodes: nodeCount, edges: edgeCount };
+        await this.page.waitForTimeout(pollInterval);
+      }
+
+      await this.page.evaluate(() => {
+        return new Promise<void>((resolve) => {
+          if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(() => resolve(), { timeout: 100 });
+          } else {
+            setTimeout(() => resolve(), 100);
+          }
+        });
+      });
+
+      try {
+        await this.page.waitForLoadState('networkidle', { timeout: 1000 });
+      } catch {
+        // Ignored; not all demo flows trigger network requests.
+      }
+    };
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      await Promise.race([
+        idleCheck(),
+        new Promise<void>((_, reject) => {
+          timeoutHandle = setTimeout(
+            () => reject(new Error(`Canvas did not reach idle state within ${timeoutMs}ms`)),
+            timeoutMs
+          );
+        }),
+      ]);
+    } catch (error) {
+      console.warn(`[demo-screenshots] waitForIdle timed out: ${(error as Error).message}`);
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    }
+  }
+
   async waitForCanvasStable(timeoutMs = 2000): Promise<void> {
     const viewport = this.page.locator('.react-flow__viewport');
     let previousTransform = await viewport.getAttribute('transform');
@@ -401,6 +505,7 @@ class ScreenshotHelpers {
       relativePath: params.relativePath,
       absolutePath: params.screenshotPath,
       capturedAt: new Date().toISOString(),
+      runId: this.runId,
       viewport,
       componentCount,
       annotationMode: this.annotationModeEnabled,
@@ -432,10 +537,8 @@ class ScreenshotHelpers {
     await this.page.waitForTimeout(400);
   }
 
-  private ensureDirectory(dir: string): void {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+  private async ensureDirectory(dir: string): Promise<void> {
+    await fs.mkdir(dir, { recursive: true });
   }
 
   private slugify(value: string): string {
@@ -453,12 +556,47 @@ class ScreenshotHelpers {
     return target;
   }
 
-  private async resolveLocatorArray(targets: Array<string | Locator>): Promise<Locator[]> {
-    const locators: Locator[] = [];
+  private async resolveMaskTargets(targets: Array<string | Locator>): Promise<Locator[]> {
+    const resolved: Locator[] = [];
+
     for (const target of targets) {
-      locators.push(await this.resolveLocator(target));
+      const locator = await this.resolveLocator(target);
+      const descriptor = this.describeTarget(target);
+
+      try {
+        const count = await locator.count();
+        if (count === 0) {
+          console.warn(`[demo-screenshots] Skipping mask; no matches for ${descriptor}`);
+          continue;
+        }
+
+        const isVisible = await locator.isVisible().catch(() => false);
+        if (!isVisible) {
+          console.warn(`[demo-screenshots] Skipping mask; target not visible: ${descriptor}`);
+          continue;
+        }
+
+        resolved.push(locator);
+      } catch (error) {
+        console.warn(
+          `[demo-screenshots] Skipping mask; failed resolving ${descriptor}: ${(error as Error).message}`
+        );
+      }
     }
-    return locators;
+
+    return resolved;
+  }
+
+  private describeTarget(target: string | Locator): string {
+    if (typeof target === 'string') {
+      return target;
+    }
+
+    try {
+      return target.toString();
+    } catch {
+      return '[locator]';
+    }
   }
 }
 

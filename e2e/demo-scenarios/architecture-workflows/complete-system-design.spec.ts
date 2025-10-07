@@ -5,6 +5,10 @@
 
 import { test, expect } from '@playwright/test';
 import { CanvasHelpers } from '../../utils/test-helpers';
+import { createScreenshotHelpers } from '../../utils/screenshot-helpers';
+import { isScreenshotMode } from '../../utils/env';
+
+const SCREENSHOT_MODE = isScreenshotMode();
 
 test.describe('Complete System Design Workflows', () => {
   // Configure extended timeouts for natural pacing suitable for video
@@ -20,10 +24,31 @@ test.describe('Complete System Design Workflows', () => {
     await page.waitForTimeout(2000); // Allow natural pacing for video
   });
 
-  test('designing scalable e-commerce architecture', async ({ page }) => {
+  test('designing scalable e-commerce architecture', async ({ page, context }) => {
     // Start with blank canvas, progressively build complete e-commerce system
     await page.locator("[data-testid='canvas-root'], .react-flow__pane").first().waitFor();
     const canvasHelpers = new CanvasHelpers(page);
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureStage = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await canvasHelpers.getComponentCount();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'architecture-examples',
+        scenario: 'E-Commerce Platform',
+        step,
+        metadata: {
+          architecture: 'e-commerce',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Begin with user-facing components (web app, mobile app)
     await canvasHelpers.addComponent('web-app', { x: 200, y: 150 });
@@ -32,12 +57,16 @@ test.describe('Complete System Design Workflows', () => {
     await canvasHelpers.addComponent('mobile-app', { x: 400, y: 150 });
     await page.waitForTimeout(1500);
 
+    await captureStage('ecommerce-frontend-layer', 'user-layer');
+
     // Add API gateway and load balancer
     await canvasHelpers.addComponent('api-gateway', { x: 300, y: 300 });
     await page.waitForTimeout(1500);
 
     await canvasHelpers.addComponent('load-balancer', { x: 300, y: 250 });
     await page.waitForTimeout(1500);
+
+    await captureStage('ecommerce-entrypoints', 'edge-services');
 
     // Add microservices layer
     await canvasHelpers.addComponent('microservice', { x: 150, y: 450 });
@@ -60,6 +89,8 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
 
+    await captureStage('ecommerce-microservices', 'service-layer');
+
     // Include databases for each service
     await canvasHelpers.addComponent('database', { x: 150, y: 600 });
     await page.keyboard.type('User DB');
@@ -76,6 +107,8 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.type('Order DB');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
+
+    await captureStage('ecommerce-data-layer', 'data-layer');
 
     // Add caching layer
     await page.locator('[data-testid="component-palette-cache"]').click();
@@ -97,6 +130,8 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
 
+    await captureStage('ecommerce-external-integrations', 'external-services');
+
     // Add monitoring and logging
     await page.locator('[data-testid="component-palette-monitoring"]').click();
     await page.locator('[data-testid="canvas-container"]').click({ position: { x: 100, y: 750 } });
@@ -109,6 +144,8 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.type('Centralized Logging');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
+
+    await captureStage('ecommerce-observability', 'operations');
 
     // Create connections between components with smooth animations
     // Connect web app to load balancer
@@ -211,6 +248,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
 
+    await captureStage('ecommerce-complete-architecture', 'final-architecture', {
+      description: 'Comprehensive e-commerce architecture with observability and integrations'
+    });
+
     // Demonstrate export functionality
     await page.locator('[data-testid="export-menu"]').click();
     await page.waitForTimeout(500);
@@ -232,9 +273,35 @@ test.describe('Complete System Design Workflows', () => {
     await expect(page.locator('[data-testid="component-monitoring"]')).toBeVisible();
   });
 
-  test('monolith to microservices transformation', async ({ page }) => {
+  test('monolith to microservices transformation', async ({ page, context }) => {
     // Start with monolithic architecture, transform to microservices
     await page.locator("[data-testid='canvas-root'], .react-flow__pane").first().waitFor();
+    const canvasHelpers = new CanvasHelpers(page);
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureTransformation = async (
+      name: string,
+      step: string,
+      metadata: Record<string, unknown> = {}
+    ) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await canvasHelpers.getComponentCount();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'architecture-examples',
+        scenario: 'Monolith to Microservices',
+        step,
+        metadata: {
+          architecture: 'monolith-to-microservices',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Begin with single large application component
     await page.locator('[data-testid="component-palette-application"]').click();
@@ -249,6 +316,8 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.type('Monolithic Database');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
+
+    await captureTransformation('transformation-baseline', 'monolith');
 
     // Connect monolith to database
     await page.hover('[data-testid="component-monolithic-app"]');
@@ -289,6 +358,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.mouse.up();
     await page.waitForTimeout(1000);
 
+    await captureTransformation('transformation-user-service', 'user-service', {
+      description: 'User service and dedicated database extracted from monolith'
+    });
+
     // Show communication between monolith and extracted service
     await page.hover('[data-testid="component-monolithic-app"]');
     await page.locator('[data-testid="connection-handle-monolithic-app-service"]').hover();
@@ -321,6 +394,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.mouse.up();
     await page.waitForTimeout(1000);
 
+    await captureTransformation('transformation-product-service', 'product-service', {
+      description: 'Product service migrated with isolated data store'
+    });
+
     // Connect monolith to product service
     await page.hover('[data-testid="component-monolithic-app"]');
     await page.locator('[data-testid="connection-handle-monolithic-app-product"]').hover();
@@ -352,6 +429,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.locator('[data-testid="connection-handle-order-db-in"]').hover();
     await page.mouse.up();
     await page.waitForTimeout(1000);
+
+    await captureTransformation('transformation-order-service', 'order-service', {
+      description: 'Order service and database established'
+    });
 
     // Show service-to-service communication
     await page.hover('[data-testid="component-order-service"]');
@@ -398,6 +479,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.press('Delete');
     await page.waitForTimeout(1000);
 
+    await captureTransformation('transformation-final', 'final-architecture', {
+      description: 'Monolith retired, API gateway fronts modular services'
+    });
+
     // Add final annotation
     await page.locator('[data-testid="annotation-tool"]').click();
     await page.locator('[data-testid="canvas-container"]').click({ position: { x: 50, y: 400 } });
@@ -417,9 +502,31 @@ test.describe('Complete System Design Workflows', () => {
     await expect(page.locator('[data-testid="component-monolithic-app"]')).not.toBeVisible();
   });
 
-  test('building real-time messaging platform', async ({ page }) => {
+  test('building real-time messaging platform', async ({ page, context }) => {
     // Design comprehensive chat system architecture
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const canvasHelpers = new CanvasHelpers(page);
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureRealtime = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await canvasHelpers.getComponentCount();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'architecture-examples',
+        scenario: 'Real-time Messaging Platform',
+        step,
+        metadata: {
+          architecture: 'real-time-messaging',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Start with basic client applications
     await page.locator('[data-testid="component-palette-mobile-app"]').click();
@@ -440,6 +547,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
 
+    await captureRealtime('realtime-clients', 'client-apps', {
+      description: 'Desktop, web, and mobile chat clients connected across platforms'
+    });
+
     // Add WebSocket gateway for real-time communication
     await page.locator('[data-testid="component-palette-websocket"]').click();
     await page.locator('[data-testid="canvas-container"]').click({ position: { x: 350, y: 300 } });
@@ -458,6 +569,10 @@ test.describe('Complete System Design Workflows', () => {
       await page.mouse.up();
       await page.waitForTimeout(800);
     }
+
+    await captureRealtime('realtime-gateway', 'websocket-layer', {
+      description: 'WebSocket gateway routing traffic from all client platforms'
+    });
 
     // Add message queue for reliable delivery
     await page.locator('[data-testid="component-palette-message-queue"]').click();
@@ -496,6 +611,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.locator('[data-testid="connection-handle-presence-service-in"]').hover();
     await page.mouse.up();
     await page.waitForTimeout(800);
+
+    await captureRealtime('realtime-services', 'service-layer', {
+      description: 'Real-time services connected for messaging and presence'
+    });
 
     // Connect chat service to message queue
     await page.hover('[data-testid="component-chat-service"]');
@@ -552,6 +671,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.mouse.up();
     await page.waitForTimeout(800);
 
+    await captureRealtime('realtime-data-layer', 'data-layer', {
+      description: 'Persistent storage backing chat history and presence data'
+    });
+
     // Add external push notification service
     await page.locator('[data-testid="component-palette-external-service"]').click();
     await page.locator("[data-testid='canvas-root']").click({ position: { x: 750, y: 450 } });
@@ -601,6 +724,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.mouse.up();
     await page.waitForTimeout(800);
 
+    await captureRealtime('realtime-scaled', 'scaling-layer', {
+      description: 'Load-balanced real-time messaging stack ready for scale'
+    });
+
     // Add annotations explaining real-time data flow
     await page.locator('[data-testid="annotation-tool"]').click();
     await page.locator('[data-testid="canvas-container"]').click({ position: { x: 50, y: 100 } });
@@ -623,6 +750,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
 
+    await captureRealtime('realtime-final-architecture', 'final-architecture', {
+      description: 'End-to-end messaging platform with annotations and scaling components'
+    });
+
     // Demonstrate message flow animation
     await page.locator('[data-testid="animate-flow-button"]').click();
     await page.waitForTimeout(3000);
@@ -639,9 +770,31 @@ test.describe('Complete System Design Workflows', () => {
     await expect(page.locator('[data-testid="component-load-balancer"]')).toBeVisible();
   });
 
-  test('on-premises to cloud migration planning', async ({ page }) => {
+  test('on-premises to cloud migration planning', async ({ page, context }) => {
     // Show migration planning process from on-premises to cloud
     await page.locator('[data-testid="canvas-container"]').waitFor();
+    const canvasHelpers = new CanvasHelpers(page);
+    const screenshotHelpers = SCREENSHOT_MODE ? createScreenshotHelpers(page, context) : null;
+
+    if (screenshotHelpers) {
+      await screenshotHelpers.enableAnnotationMode();
+    }
+
+    const captureMigration = async (name: string, step: string, metadata: Record<string, unknown> = {}) => {
+      if (!screenshotHelpers) return;
+      const componentCount = await canvasHelpers.getComponentCount();
+      await screenshotHelpers.captureScreenshot(name, {
+        category: 'architecture-examples',
+        scenario: 'On-Prem to Cloud Migration',
+        step,
+        metadata: {
+          architecture: 'migration-plan',
+          stage: step,
+          componentCount,
+          ...metadata
+        }
+      });
+    };
 
     // Start with on-premises architecture layout
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -713,6 +866,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.locator('[data-testid="connection-handle-file-storage-in"]').hover();
     await page.mouse.up();
     await page.waitForTimeout(800);
+
+    await captureMigration('migration-onprem', 'on-premises', {
+      description: 'Current on-premises infrastructure baseline'
+    });
 
     // Add cloud target architecture section
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -792,10 +949,14 @@ test.describe('Complete System Design Workflows', () => {
     await page.hover('[data-testid="component-ec2-auto-scaling-group"]');
     await page.locator('[data-testid="connection-handle-ec2-auto-scaling-group-storage"]').hover();
     await page.mouse.down();
-    await page.hover('[data-testid="component-s3-object-storage"]');
+   await page.hover('[data-testid="component-s3-object-storage"]');
     await page.locator('[data-testid="connection-handle-s3-object-storage-in"]').hover();
     await page.mouse.up();
     await page.waitForTimeout(800);
+
+    await captureMigration('migration-cloud-core', 'cloud-core', {
+      description: 'Cloud target architecture mapped with core services'
+    });
 
     // Add cloud-native enhancements
     await page.locator('[data-testid="component-palette-cloud-service"]').click();
@@ -824,6 +985,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.locator('[data-testid="connection-handle-application-load-balancer-cdn"]').hover();
     await page.mouse.up();
     await page.waitForTimeout(800);
+
+    await captureMigration('migration-enhancements', 'cloud-enhancements', {
+      description: 'Cloud-native enhancements added (CDN, monitoring, backup)'
+    });
 
     // Add phased migration plan
     await page.locator('[data-testid="annotation-tool"]').click();
@@ -857,6 +1022,10 @@ test.describe('Complete System Design Workflows', () => {
     await page.keyboard.type('Benefits: Improved scalability, reliability, and disaster recovery');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(2000);
+
+    await captureMigration('migration-plan', 'final-architecture', {
+      description: 'Complete migration roadmap with phased plan and benefits'
+    });
 
     // Zoom out to show complete migration plan
     await page.keyboard.press('Control+-');
