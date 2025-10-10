@@ -10,7 +10,7 @@ import { useReactFlow, Viewport } from '@xyflow/react';
 import { useDebouncedCallback } from 'use-debounce';
 import { RTree, SpatialItem, BoundingBoxImpl } from '@/lib/spatial/RTree';
 import { CanvasPerformanceManager } from '@/lib/performance/CanvasPerformanceManager';
-import type { DesignComponent, Connection } from '../@shared/contracts';
+import type { DesignComponent, Connection } from '@shared/contracts';
 import type {
   VirtualizationStats,
   LODThreshold,
@@ -441,6 +441,19 @@ export function useLevelOfDetail(
 
 /**
  * Hook for virtualization performance monitoring and optimization
+ *
+ * Returns a flat metrics object with the following shape:
+ * {
+ *   visibleComponents: number,
+ *   visibleConnections: number,
+ *   totalComponents: number,
+ *   totalConnections: number,
+ *   queryTime: number,        // Direct property (not metrics.metrics.queryTime)
+ *   renderTime: number,        // Direct property (not metrics.metrics.renderTime)
+ *   memoryUsage: number,       // Direct property (not metrics.metrics.memoryUsage)
+ *   fps: number,               // Direct property (not metrics.metrics.fps)
+ *   qualityLevel: number
+ * }
  */
 export function useVirtualizationPerformance(
   systemId = 'virtual-canvas'
@@ -534,8 +547,8 @@ export function useVirtualizationPerformance(
       const currentLevel = performanceManager.getCurrentQualityLevel();
       const newLevel = Math.max(0.1, Math.min(1.0, currentLevel + delta));
 
-      // This would need to be implemented in the performance manager
-      // performanceManager.setQualityLevel(newLevel);
+      // Set the new quality level using the performance manager
+      performanceManager.setQualityLevel(newLevel);
     },
     [performanceManager]
   );

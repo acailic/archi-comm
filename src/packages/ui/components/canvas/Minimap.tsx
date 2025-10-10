@@ -17,6 +17,8 @@ interface MinimapProps {
 const MINIMAP_WIDTH = 300;
 const MINIMAP_HEIGHT = 200;
 const VIEWPORT_PADDING = 20;
+const DEFAULT_COMPONENT_WIDTH = 220;
+const DEFAULT_COMPONENT_HEIGHT = 140;
 
 const getComponentColor = (type: string): string => {
   const colorMap: Record<string, string> = {
@@ -162,8 +164,8 @@ export function Minimap({
     return visibleComponents.map(component => {
       const x = component.x * scale + VIEWPORT_PADDING;
       const y = component.y * scale + VIEWPORT_PADDING;
-      const width = Math.max(2, 200 * scale);
-      const height = Math.max(2, 120 * scale);
+      const width = Math.max(2, (component.width ?? DEFAULT_COMPONENT_WIDTH) * scale);
+      const height = Math.max(2, (component.height ?? DEFAULT_COMPONENT_HEIGHT) * scale);
 
       return (
         <rect
@@ -188,10 +190,15 @@ export function Minimap({
 
       if (!fromComponent || !toComponent) return null;
 
-      const fromX = (fromComponent.x + 100) * scale + VIEWPORT_PADDING;
-      const fromY = (fromComponent.y + 60) * scale + VIEWPORT_PADDING;
-      const toX = (toComponent.x + 100) * scale + VIEWPORT_PADDING;
-      const toY = (toComponent.y + 60) * scale + VIEWPORT_PADDING;
+      const fromWidth = fromComponent.width ?? DEFAULT_COMPONENT_WIDTH;
+      const fromHeight = fromComponent.height ?? DEFAULT_COMPONENT_HEIGHT;
+      const toWidth = toComponent.width ?? DEFAULT_COMPONENT_WIDTH;
+      const toHeight = toComponent.height ?? DEFAULT_COMPONENT_HEIGHT;
+
+      const fromX = (fromComponent.x + fromWidth / 2) * scale + VIEWPORT_PADDING;
+      const fromY = (fromComponent.y + fromHeight / 2) * scale + VIEWPORT_PADDING;
+      const toX = (toComponent.x + toWidth / 2) * scale + VIEWPORT_PADDING;
+      const toY = (toComponent.y + toHeight / 2) * scale + VIEWPORT_PADDING;
 
       return (
         <line

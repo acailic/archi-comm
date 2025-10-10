@@ -10,6 +10,7 @@
  */
 
 import { drawingColors } from "@/lib/design/design-system";
+import { shortcutBus } from "@/lib/events/shortcutBus";
 import type { DrawingTool } from "@/shared/contracts";
 import { useCanvasActions, useCanvasStore } from "@/stores/canvasStore";
 
@@ -25,6 +26,23 @@ export type ShortcutCategory =
   | "tools"
   | "drawing";
 
+export type ShortcutScope = "global" | "canvas" | "input-safe";
+
+interface NormalizedShortcutConfig extends ShortcutConfig {
+  scope: ShortcutScope;
+}
+
+type ShortcutBroadcastMessage =
+  | {
+      type: "status";
+      tabId: string;
+      active: boolean;
+    }
+  | {
+      type: "status-request";
+      tabId: string;
+    };
+
 export interface ShortcutConfig {
   key: string;
   description: string;
@@ -32,6 +50,10 @@ export interface ShortcutConfig {
   action: (event?: KeyboardEvent) => void | Promise<void>;
   modifiers?: KeyModifier[];
   preventDefault?: boolean;
+  scope?: ShortcutScope;
+  /**
+   * @deprecated Use `scope` instead.
+   */
   global?: boolean;
 }
 
@@ -46,6 +68,10 @@ export interface ShortcutAction {
 const DEFAULT_DRAWING_TOOL: DrawingTool = "pen";
 const DRAWING_COLOR_VALUES = drawingColors.map((color) => color.value);
 const canvasActions = useCanvasActions();
+
+const emitShortcut = (topic: string, detail?: any): void => {
+  shortcutBus.emit(topic, detail);
+};
 
 const isDrawingModeActive = (): boolean => {
   const state = useCanvasStore.getState();
@@ -62,29 +88,49 @@ const ensureDrawingMode = (tool?: DrawingTool | null): void => {
 
   if (state.canvasMode !== "draw") {
     canvasActions.setCanvasMode("draw");
+    announceModeChange("draw");
   }
 
   canvasActions.setDrawingTool(desiredTool ?? DEFAULT_DRAWING_TOOL);
 };
 
-const toggleDrawingMode = (): void => {
+const announceModeChange = (mode: string): void => {
+  shortcutBus.emit("canvas:mode-changed", { mode, source: "shortcut" });
+};
+
+const enterDrawMode = (): void => {
   const state = useCanvasStore.getState();
-  const hasActiveTool =
-    state.canvasMode === "draw" && state.drawingTool !== null;
-
-  if (hasActiveTool) {
-    canvasActions.setDrawingTool(null);
-    canvasActions.setCanvasMode("select");
-    return;
-  }
-
-  const previousTool =
+  const desiredTool =
     state.drawingTool ??
     (state.drawingSettings ? state.drawingSettings.tool : null) ??
     DEFAULT_DRAWING_TOOL;
 
+  const modeChanged = state.canvasMode !== "draw";
   canvasActions.setCanvasMode("draw");
-  canvasActions.setDrawingTool(previousTool ?? DEFAULT_DRAWING_TOOL);
+  canvasActions.setDrawingTool(desiredTool ?? DEFAULT_DRAWING_TOOL);
+  if (modeChanged) {
+    announceModeChange("draw");
+  }
+};
+
+const enterAnnotationMode = (): void => {
+  const state = useCanvasStore.getState();
+  const modeChanged = state.canvasMode !== "annotation";
+  canvasActions.setDrawingTool(null);
+  canvasActions.setCanvasMode("annotation");
+  if (modeChanged) {
+    announceModeChange("annotation");
+  }
+};
+
+const exitToSelectMode = (): void => {
+  const state = useCanvasStore.getState();
+  const modeChanged = state.canvasMode !== "select";
+  canvasActions.setDrawingTool(null);
+  canvasActions.setCanvasMode("select");
+  if (modeChanged) {
+    announceModeChange("select");
+  }
 };
 
 const adjustDrawingSize = (delta: number): void => {
@@ -133,15 +179,22 @@ const confirmAndClearDrawings = (): void => {
 
 export class KeyboardShortcutManager {
   // Map from normalized shortcut key to a single ShortcutConfig handler (no duplicates)
-  private shortcuts: Map<string, ShortcutConfig> = new Map();
+  private shortcuts: Map<string, NormalizedShortcutConfig> = new Map();
   private isEnabled = true;
   private changeListeners: Set<() => void> = new Set();
   private shortcutsVersion = 0;
   private autoSetup: boolean;
+  private crossTabEnabled = true;
+  private broadcastChannel?: BroadcastChannel;
+  private readonly tabId: string;
+  private isActiveTab = true;
+  private activeTabId?: string;
+  private broadcastHandlersAttached = false;
 
   constructor(options: { autoSetup?: boolean } = { autoSetup: true }) {
     this.autoSetup = options.autoSetup !== false;
     this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.tabId = `shortcut-tab-${Math.random().toString(36).slice(2, 10)}`;
 
     if (
       this.autoSetup &&
@@ -150,6 +203,7 @@ export class KeyboardShortcutManager {
     ) {
       this.initializeDefaultShortcuts();
       this.attachEventListeners();
+      this.setupCrossTabChannel();
     }
   }
 
@@ -162,7 +216,14 @@ export class KeyboardShortcutManager {
     if (this.debugMode && this.shortcuts.has(shortcutKey)) {
       console.warn(`Overwriting existing shortcut for ${shortcutKey}`);
     }
-    this.shortcuts.set(shortcutKey, config);
+    const normalizedScope: ShortcutScope =
+      config.scope ?? (config.global ? "global" : "canvas");
+    const normalizedConfig: NormalizedShortcutConfig = {
+      ...config,
+      scope: normalizedScope,
+    };
+    this.detectModifierOverlap(shortcutKey, normalizedConfig);
+    this.shortcuts.set(shortcutKey, normalizedConfig);
     this.notifyChange();
     // Return unregister function
     return () => this.unregister(config.key, config.modifiers);
@@ -183,6 +244,18 @@ export class KeyboardShortcutManager {
    */
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
+  }
+
+  setCrossTabEnabled(enabled: boolean): void {
+    if (this.crossTabEnabled === enabled) {
+      return;
+    }
+    this.crossTabEnabled = enabled;
+    if (enabled) {
+      this.setupCrossTabChannel();
+    } else {
+      this.teardownCrossTabChannel();
+    }
   }
 
   /**
@@ -282,82 +355,428 @@ export class KeyboardShortcutManager {
    */
   private handleKeyDown(event: KeyboardEvent): void {
     if (!this.isEnabled || this.temporarilyDisabled) return;
+    if (this.crossTabEnabled && !this.isActiveTab) return;
     if (event.isComposing) return; // Prevent shortcut execution during IME composition
 
-    const target = event.target as HTMLElement;
+    const target =
+      (event.target as HTMLElement | null | undefined) ?? document.body;
     const shortcutKey = this.generateShortcutKeyFromEvent(event);
     const shortcut = this.shortcuts.get(shortcutKey);
 
-    // Allow shortcuts marked as global to fire even inside inputs
-    if (
-      this.isInputElement(target) &&
-      !(shortcut && (shortcut as any).global)
-    ) {
+    if (!shortcut) {
       return;
     }
 
-    if (shortcut) {
-      if (this.debugMode) {
-        console.log(
-          `Executing shortcut: ${shortcut.description} (${shortcutKey})`,
-        );
-      }
+    if (!this.scopeAllowsExecution(shortcut.scope, target)) {
+      return;
+    }
 
-      if (shortcut.preventDefault !== false) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+    if (this.debugMode) {
+      console.log(
+        `Executing shortcut: ${shortcut.description} (${shortcutKey})`,
+      );
+    }
 
-      // Execute with performance monitoring
-      try {
-        shortcut.action();
-      } catch (error) {
-        console.error("Shortcut execution error:", error);
-      }
+    if (shortcut.preventDefault !== false) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    // Execute with performance monitoring
+    try {
+      shortcut.action(event);
+    } catch (error) {
+      console.error("Shortcut execution error:", error);
     }
   }
 
   private attachEventListeners(): void {
     document.addEventListener("keydown", this.handleKeyDown, true);
+    this.setupCrossTabChannel();
   }
 
   private detachEventListeners(): void {
     document.removeEventListener("keydown", this.handleKeyDown, true);
   }
 
-  private isInputElement(element: HTMLElement): boolean {
-    // If command palette or modal overlays are open, treat as input-like to block canvas shortcuts
+  private hasGlobalShortcutBlockers(): boolean {
     try {
-      if (typeof document !== "undefined") {
-        const commandPaletteOpen = !!document.querySelector(
-          '[data-command-palette-open="true"], [data-command-palette], .command-palette-open',
-        );
-        const modalOpen = !!document.querySelector(
-          '[data-modal-open="true"], .modal-open, dialog[open]',
-        );
-        if (commandPaletteOpen || modalOpen) {
-          return true;
-        }
+      if (typeof document === "undefined") {
+        return false;
       }
-    } catch (e) {
-      // ignore DOM access issues
+      const commandPaletteOpen = !!document.querySelector(
+        '[data-command-palette-open="true"], [data-command-palette], .command-palette-open',
+      );
+      const modalOpen = !!document.querySelector(
+        '[data-modal-open="true"], .modal-open, dialog[open]',
+      );
+      return commandPaletteOpen || modalOpen;
+    } catch {
+      return false;
     }
+  }
 
-    const tagName = element.tagName.toLowerCase();
+  private isKeyboardIgnoredElement(element: HTMLElement): boolean {
     return (
-      tagName === "input" ||
-      tagName === "textarea" ||
-      tagName === "select" ||
-      element.contentEditable === "true" ||
-      element.isContentEditable ||
       element.hasAttribute("data-keyboard-ignore") ||
       element.closest("[data-keyboard-ignore]") !== null
     );
   }
 
+  private isFormControlElement(element: HTMLElement): boolean {
+    const tagName = element.tagName.toLowerCase();
+    return tagName === "input" || tagName === "textarea" || tagName === "select";
+  }
+
+  private isEditableElement(element: HTMLElement): boolean {
+    return element.contentEditable === "true" || element.isContentEditable;
+  }
+
+  private isTextEntryElement(element: HTMLElement): boolean {
+    if (this.isEditableElement(element)) {
+      return true;
+    }
+
+    if (!this.isFormControlElement(element)) {
+      return false;
+    }
+
+    const tagName = element.tagName.toLowerCase();
+    if (tagName === "textarea") {
+      return true;
+    }
+
+    if (tagName === "input") {
+      const input = element as HTMLInputElement;
+      const inputType = (input.type ?? "text").toLowerCase();
+      const nonTextTypes = new Set([
+        "button",
+        "checkbox",
+        "radio",
+        "range",
+        "color",
+        "file",
+        "reset",
+        "submit",
+        "image",
+        "date",
+        "datetime-local",
+        "month",
+        "time",
+        "week",
+        "number",
+      ]);
+      return !nonTextTypes.has(inputType);
+    }
+
+    return false;
+  }
+
+  private scopeAllowsExecution(
+    scope: ShortcutScope,
+    element: HTMLElement,
+  ): boolean {
+    if (scope === "global") {
+      return true;
+    }
+
+    if (this.hasGlobalShortcutBlockers()) {
+      return false;
+    }
+
+    if (this.isKeyboardIgnoredElement(element)) {
+      return false;
+    }
+
+    if (scope === "canvas") {
+      return !this.isFormControlElement(element) && !this.isEditableElement(element);
+    }
+
+    if (scope === "input-safe") {
+      return !this.isTextEntryElement(element);
+    }
+
+    return true;
+  }
+
+  private isInputElement(element: HTMLElement): boolean {
+    return !this.scopeAllowsExecution("canvas", element);
+  }
+
+  private registerPlatformShortcut(
+    config: ShortcutConfig & { modifiers: KeyModifier[] },
+  ): void {
+    const includesCtrl = config.modifiers.includes("ctrl");
+    const includesMeta = config.modifiers.includes("meta");
+
+    if (!includesCtrl && !includesMeta) {
+      this.register(config);
+      return;
+    }
+
+    const baseModifiers = config.modifiers.filter(
+      (modifier) => modifier !== "ctrl" && modifier !== "meta",
+    );
+
+    const combos: KeyModifier[][] = [];
+
+    if (includesCtrl || !includesMeta) {
+      combos.push([...baseModifiers, "ctrl"]);
+    }
+
+    if (includesMeta || includesCtrl) {
+      combos.push([...baseModifiers, "meta"]);
+    }
+
+    const seen = new Set<string>();
+
+    combos.forEach((combo) => {
+      const normalized = [...combo].sort() as KeyModifier[];
+      const comboKey = this.generateShortcutKey(config.key, normalized);
+      if (seen.has(comboKey)) {
+        return;
+      }
+      seen.add(comboKey);
+      this.register({ ...config, modifiers: normalized });
+    });
+  }
+
+  private setupCrossTabChannel(): void {
+    if (!this.crossTabEnabled) {
+      return;
+    }
+
+    if (this.broadcastChannel) {
+      return;
+    }
+
+    if (
+      typeof window === "undefined" ||
+      typeof document === "undefined" ||
+      typeof BroadcastChannel === "undefined"
+    ) {
+      this.isActiveTab = true;
+      return;
+    }
+
+    this.broadcastChannel = new BroadcastChannel(
+      "archicomm-shortcut-coordination",
+    );
+    this.broadcastChannel.addEventListener(
+      "message",
+      this.handleBroadcastMessage,
+    );
+
+    if (!this.broadcastHandlersAttached) {
+      window.addEventListener("focus", this.handleWindowFocus, true);
+      document.addEventListener(
+        "visibilitychange",
+        this.handleVisibilityChange,
+      );
+      window.addEventListener("pagehide", this.handlePageHide);
+      window.addEventListener("beforeunload", this.handleBeforeUnload);
+      this.broadcastHandlersAttached = true;
+    }
+
+    this.isActiveTab = this.isDocumentVisible();
+    this.activeTabId = this.isActiveTab ? this.tabId : undefined;
+    this.sendStatus(this.isActiveTab);
+    this.requestStatus();
+  }
+
+  private teardownCrossTabChannel(): void {
+    if (this.broadcastChannel) {
+      this.broadcastChannel.removeEventListener(
+        "message",
+        this.handleBroadcastMessage,
+      );
+      this.broadcastChannel.close();
+      this.broadcastChannel = undefined;
+    }
+
+    if (this.broadcastHandlersAttached) {
+      window.removeEventListener("focus", this.handleWindowFocus, true);
+      if (typeof document !== "undefined") {
+        document.removeEventListener(
+          "visibilitychange",
+          this.handleVisibilityChange,
+        );
+      }
+      window.removeEventListener("pagehide", this.handlePageHide);
+      window.removeEventListener("beforeunload", this.handleBeforeUnload);
+      this.broadcastHandlersAttached = false;
+    }
+
+    this.isActiveTab = true;
+    this.activeTabId = undefined;
+  }
+
+  private handleBroadcastMessage = (
+    event: MessageEvent<ShortcutBroadcastMessage>,
+  ) => {
+    if (!this.crossTabEnabled) {
+      return;
+    }
+
+    const message = event.data;
+    if (!message || message.tabId === this.tabId) {
+      return;
+    }
+
+    if (message.type === "status-request") {
+      this.sendStatus(this.isActiveTab);
+      return;
+    }
+
+    if (message.type === "status") {
+      if (message.active) {
+        this.isActiveTab = false;
+        this.activeTabId = message.tabId;
+      } else if (this.activeTabId === message.tabId) {
+        this.activeTabId = undefined;
+        if (this.isDocumentVisible()) {
+          this.claimActiveTab();
+        }
+      }
+    }
+  };
+
+  private handleWindowFocus = () => {
+    if (!this.crossTabEnabled) {
+      return;
+    }
+    this.claimActiveTab();
+  };
+
+  private handleVisibilityChange = () => {
+    if (!this.crossTabEnabled || typeof document === "undefined") {
+      return;
+    }
+    if (document.hidden) {
+      this.surrenderActiveTab();
+    } else {
+      this.claimActiveTab();
+    }
+  };
+
+  private handlePageHide = () => {
+    if (!this.crossTabEnabled) {
+      return;
+    }
+    this.surrenderActiveTab();
+  };
+
+  private handleBeforeUnload = () => {
+    if (!this.crossTabEnabled) {
+      return;
+    }
+    this.surrenderActiveTab();
+  };
+
+  private claimActiveTab(): void {
+    if (!this.crossTabEnabled) {
+      return;
+    }
+    if (!this.isDocumentVisible()) {
+      return;
+    }
+    if (this.isActiveTab) {
+      this.sendStatus(true);
+      return;
+    }
+
+    this.isActiveTab = true;
+    this.activeTabId = this.tabId;
+    this.sendStatus(true);
+  }
+
+  private surrenderActiveTab(): void {
+    if (!this.crossTabEnabled) {
+      return;
+    }
+    if (!this.isActiveTab) {
+      return;
+    }
+
+    this.isActiveTab = false;
+    if (this.activeTabId === this.tabId) {
+      this.activeTabId = undefined;
+    }
+    this.sendStatus(false);
+  }
+
+  private sendStatus(active: boolean): void {
+    if (!this.crossTabEnabled || !this.broadcastChannel) {
+      return;
+    }
+    this.broadcastChannel.postMessage({
+      type: "status",
+      tabId: this.tabId,
+      active,
+    });
+  }
+
+  private requestStatus(): void {
+    if (!this.crossTabEnabled || !this.broadcastChannel) {
+      return;
+    }
+    this.broadcastChannel.postMessage({
+      type: "status-request",
+      tabId: this.tabId,
+    });
+  }
+
+  private isDocumentVisible(): boolean {
+    if (typeof document === "undefined") {
+      return true;
+    }
+    return !document.hidden;
+  }
+
   private generateShortcutKey(key: string, modifiers?: KeyModifier[]): string {
     const mods = modifiers?.sort().join("+") || "";
     return mods ? `${mods}+${key.toLowerCase()}` : key.toLowerCase();
+  }
+
+  private getBaseKey(key: string): string {
+    return key.toLowerCase();
+  }
+
+  private detectModifierOverlap(
+    shortcutKey: string,
+    config: NormalizedShortcutConfig,
+  ): void {
+    const hasModifiers = !!config.modifiers?.length;
+    const baseKey = this.getBaseKey(config.key);
+
+    this.shortcuts.forEach((existingConfig, existingKey) => {
+      if (existingKey === shortcutKey) {
+        return;
+      }
+
+      if (this.getBaseKey(existingConfig.key) !== baseKey) {
+        return;
+      }
+
+      const existingHasModifiers = !!existingConfig.modifiers?.length;
+      const involvesModifierOverlap =
+        hasModifiers !== existingHasModifiers &&
+        (!hasModifiers || !existingHasModifiers);
+
+      if (!involvesModifierOverlap) {
+        return;
+      }
+
+      if (existingConfig.category !== config.category) {
+        return;
+      }
+
+      if (this.debugMode) {
+        console.warn(
+          `[KeyboardShortcuts] Potential modifier overlap detected for key "${config.key}" in category "${config.category}". Consider remapping or scoping shortcuts to avoid conflicts.`,
+        );
+      }
+    });
   }
 
   private generateShortcutKeyFromEvent(event: KeyboardEvent): string {
@@ -394,6 +813,21 @@ export class KeyboardShortcutManager {
       }
     };
 
+    const shouldBlockForActiveInput = (): boolean => {
+      try {
+        if (typeof document === "undefined") {
+          return false;
+        }
+        const activeElement = document.activeElement as HTMLElement | null;
+        if (!activeElement) {
+          return false;
+        }
+        return this.isInputElement(activeElement);
+      } catch (_error) {
+        return false;
+      }
+    };
+
     const withCanvasFocus = (
       handler: ShortcutConfig["action"],
     ): ShortcutConfig["action"] => {
@@ -401,48 +835,55 @@ export class KeyboardShortcutManager {
         if (!isCanvasFocused()) {
           return;
         }
+        if (shouldBlockForActiveInput()) {
+          return;
+        }
         handler(event);
       };
     };
 
     // General shortcuts
-    this.register({
+    this.registerPlatformShortcut({
       key: "n",
       modifiers: ["ctrl"],
       description: "Create new project",
       category: "general",
+      scope: "global",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:new-project"));
+        emitShortcut("shortcut:new-project");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "o",
       modifiers: ["ctrl"],
       description: "Open project",
       category: "general",
+      scope: "global",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:open-project"));
+        emitShortcut("shortcut:open-project");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "s",
       modifiers: ["ctrl"],
       description: "Save project",
       category: "general",
+      scope: "global",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:save-project"));
+        emitShortcut("shortcut:save-project");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: ",",
       modifiers: ["ctrl"],
       description: "AI Settings",
       category: "general",
+      scope: "global",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:ai-settings"));
+        emitShortcut("shortcut:ai-settings");
       },
     });
 
@@ -453,7 +894,7 @@ export class KeyboardShortcutManager {
       description: "Add component",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-component"));
+        emitShortcut("shortcut:add-component");
       },
     });
 
@@ -463,17 +904,17 @@ export class KeyboardShortcutManager {
       description: "Add comment",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-comment"));
+        emitShortcut("shortcut:add-comment");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "z",
       modifiers: ["ctrl"],
       description: "Undo",
       category: "general",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:undo"));
+        emitShortcut("shortcut:undo");
       },
     });
 
@@ -483,17 +924,17 @@ export class KeyboardShortcutManager {
       description: "Redo",
       category: "general",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:redo"));
+        emitShortcut("shortcut:redo");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "z",
       modifiers: ["ctrl", "shift"],
       description: "Redo",
       category: "general",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:redo"));
+        emitShortcut("shortcut:redo");
       },
     });
 
@@ -505,7 +946,7 @@ export class KeyboardShortcutManager {
       description: "Add connection",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-connection"));
+        emitShortcut("shortcut:add-connection");
       },
     });
 
@@ -514,27 +955,17 @@ export class KeyboardShortcutManager {
       description: "Delete selected",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:delete-selected"));
+        emitShortcut("shortcut:delete-selected");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "a",
       modifiers: ["ctrl"],
       description: "Select all",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:select-all"));
-      },
-    });
-
-    this.register({
-      key: "a",
-      modifiers: ["meta"],
-      description: "Select all",
-      category: "canvas",
-      action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:select-all"));
+        emitShortcut("shortcut:select-all");
       },
     });
 
@@ -542,9 +973,11 @@ export class KeyboardShortcutManager {
       key: "Escape",
       description: "Clear selection",
       category: "canvas",
-      action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:clear-selection"));
-      },
+      action: withCanvasFocus((event) => {
+        event?.preventDefault?.();
+        exitToSelectMode();
+        emitShortcut("shortcut:clear-selection");
+      }),
     });
 
     // Quick Add Mode: Slash key opens command palette pre-filled and triggers quick-add overlay
@@ -555,16 +988,12 @@ export class KeyboardShortcutManager {
       action: () => {
         // Open command palette with pre-filled search to surface component commands
         try {
-          window.dispatchEvent(
-            new CustomEvent("command-palette:open", {
-              detail: { query: "add " },
-            }),
-          );
+          emitShortcut("command-palette:open", { query: "add " });
         } catch (e) {
           // ignore
         }
         // Also dispatch the quick-add shortcut event for overlay toggles
-        window.dispatchEvent(new CustomEvent("shortcut:quick-add-component"));
+        emitShortcut("shortcut:quick-add-component");
       },
       // keep as canvas-level (not global) so it respects modal/command palette state
     });
@@ -586,18 +1015,10 @@ export class KeyboardShortcutManager {
           );
           if (!last) {
             // No last used component recorded; optionally notify listeners
-            window.dispatchEvent(
-              new CustomEvent("canvas:add-last-component", {
-                detail: { componentType: null },
-              }),
-            );
+            emitShortcut("canvas:add-last-component", { componentType: null });
             return;
           }
-          window.dispatchEvent(
-            new CustomEvent("canvas:add-last-component", {
-              detail: { componentType: last },
-            }),
-          );
+          emitShortcut("canvas:add-last-component", { componentType: last });
         } catch (e) {
           // ignore errors
         }
@@ -610,7 +1031,7 @@ export class KeyboardShortcutManager {
       description: "Add comment",
       category: "canvas",
       action: withCanvasFocus(() => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-comment"));
+        emitShortcut("shortcut:add-comment");
       }),
     });
 
@@ -620,7 +1041,7 @@ export class KeyboardShortcutManager {
       description: "Add note",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-note"));
+        emitShortcut("shortcut:add-note");
       },
     });
 
@@ -630,7 +1051,7 @@ export class KeyboardShortcutManager {
       description: "Add label",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-label"));
+        emitShortcut("shortcut:add-label");
       },
     });
 
@@ -640,7 +1061,7 @@ export class KeyboardShortcutManager {
       description: "Add arrow",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-arrow"));
+        emitShortcut("shortcut:add-arrow");
       },
     });
 
@@ -650,113 +1071,59 @@ export class KeyboardShortcutManager {
       description: "Add highlight",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:add-highlight"));
+        emitShortcut("shortcut:add-highlight");
       },
     });
 
     // Component shortcuts
-    this.register({
+    this.registerPlatformShortcut({
       key: "d",
       modifiers: ["ctrl"],
       description: "Duplicate selected",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:duplicate"));
+        emitShortcut("shortcut:duplicate");
       },
     });
 
-    this.register({
-      key: "d",
-      modifiers: ["meta"],
-      description: "Duplicate selected",
-      category: "components",
-      action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:duplicate"));
-      },
-    });
-
-    this.register({
+    this.registerPlatformShortcut({
       key: "g",
       modifiers: ["ctrl"],
       description: "Group selected",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:group"));
+        emitShortcut("shortcut:group");
       },
     });
 
-    this.register({
-      key: "g",
-      modifiers: ["meta"],
-      description: "Group selected",
-      category: "components",
-      action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:group"));
-      },
-    });
-
-    this.register({
+    this.registerPlatformShortcut({
       key: "g",
       modifiers: ["ctrl", "shift"],
       description: "Ungroup selected",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:ungroup"));
-      },
-    });
-
-    this.register({
-      key: "g",
-      modifiers: ["meta", "shift"],
-      description: "Ungroup selected",
-      category: "components",
-      action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:ungroup"));
+        emitShortcut("shortcut:ungroup");
       },
     });
 
     // Locking shortcuts
-    this.register({
+    this.registerPlatformShortcut({
       key: "l",
       modifiers: ["ctrl", "alt"],
       description: "Lock selected components",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:lock-components"));
+        emitShortcut("shortcut:lock-components");
       },
     });
 
-    this.register({
-      key: "l",
-      modifiers: ["meta", "alt"],
-      description: "Lock selected components",
-      category: "components",
-      action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:lock-components"));
-      },
-    });
-
-    this.register({
+    this.registerPlatformShortcut({
       key: "l",
       modifiers: ["ctrl", "alt", "shift"],
       description: "Unlock selected components",
       category: "components",
       action: () => {
-        void window.dispatchEvent(
-          new CustomEvent("shortcut:unlock-components"),
-        );
-      },
-    });
-
-    this.register({
-      key: "l",
-      modifiers: ["meta", "alt", "shift"],
-      description: "Unlock selected components",
-      category: "components",
-      action: () => {
-        void window.dispatchEvent(
-          new CustomEvent("shortcut:unlock-components"),
-        );
+        emitShortcut("shortcut:unlock-components");
       },
     });
 
@@ -767,7 +1134,7 @@ export class KeyboardShortcutManager {
       description: "Align selected components to the left",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:align-left"));
+        emitShortcut("shortcut:align-left");
       },
     });
 
@@ -777,7 +1144,7 @@ export class KeyboardShortcutManager {
       description: "Align selected components to the right",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:align-right"));
+        emitShortcut("shortcut:align-right");
       },
     });
 
@@ -787,7 +1154,7 @@ export class KeyboardShortcutManager {
       description: "Align selected components to the top",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:align-top"));
+        emitShortcut("shortcut:align-top");
       },
     });
 
@@ -797,32 +1164,18 @@ export class KeyboardShortcutManager {
       description: "Align selected components to the bottom",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:align-bottom"));
+        emitShortcut("shortcut:align-bottom");
       },
     });
 
     // Zoom to selection
-    this.register({
+    this.registerPlatformShortcut({
       key: "2",
       modifiers: ["ctrl"],
       description: "Zoom to fit selected components",
       category: "navigation",
       action: () => {
-        void window.dispatchEvent(
-          new CustomEvent("shortcut:zoom-to-selection"),
-        );
-      },
-    });
-
-    this.register({
-      key: "2",
-      modifiers: ["meta"],
-      description: "Zoom to fit selected components",
-      category: "navigation",
-      action: () => {
-        void window.dispatchEvent(
-          new CustomEvent("shortcut:zoom-to-selection"),
-        );
+        emitShortcut("shortcut:zoom-to-selection");
       },
     });
 
@@ -848,11 +1201,9 @@ export class KeyboardShortcutManager {
                 action: () => {
                   try {
                     if (!isCanvasFocused()) return;
-                    window.dispatchEvent(
-                      new CustomEvent("canvas:add-component", {
-                        detail: { componentType: favType },
-                      }),
-                    );
+                    emitShortcut("canvas:add-component", {
+                      componentType: favType,
+                    });
                   } catch (e) {
                     // ignore
                   }
@@ -873,9 +1224,7 @@ export class KeyboardShortcutManager {
       description: "Toggle patterns panel",
       category: "navigation",
       action: () => {
-        void window.dispatchEvent(
-          new CustomEvent("shortcut:toggle-patterns-panel"),
-        );
+        emitShortcut("shortcut:toggle-patterns-panel");
       },
     });
 
@@ -886,7 +1235,7 @@ export class KeyboardShortcutManager {
       description: "Find/Search",
       category: "navigation",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:search"));
+        emitShortcut("shortcut:search");
       },
     });
 
@@ -896,58 +1245,58 @@ export class KeyboardShortcutManager {
       description: "Switch to Canvas view",
       category: "navigation",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:view-canvas"));
+        emitShortcut("shortcut:view-canvas");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "3",
       modifiers: ["ctrl"],
       description: "Switch to Component palette",
       category: "navigation",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:view-components"));
+        emitShortcut("shortcut:view-components");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "4",
       modifiers: ["ctrl"],
       description: "Switch to Project view",
       category: "navigation",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:view-project"));
+        emitShortcut("shortcut:view-project");
       },
     });
 
     // Zoom and pan
-    this.register({
+    this.registerPlatformShortcut({
       key: "Equal",
       modifiers: ["ctrl"],
       description: "Zoom in",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:zoom-in"));
+        emitShortcut("shortcut:zoom-in");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "Minus",
       modifiers: ["ctrl"],
       description: "Zoom out",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:zoom-out"));
+        emitShortcut("shortcut:zoom-out");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "0",
       modifiers: ["ctrl"],
       description: "Reset zoom",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:zoom-reset"));
+        emitShortcut("shortcut:zoom-reset");
       },
     });
 
@@ -957,8 +1306,9 @@ export class KeyboardShortcutManager {
       modifiers: ["shift"],
       description: "Show shortcuts help",
       category: "system",
+      scope: "input-safe",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:show-help"));
+        emitShortcut("shortcut:show-help");
       },
     });
 
@@ -966,10 +1316,9 @@ export class KeyboardShortcutManager {
       key: "F11",
       description: "Toggle fullscreen",
       category: "system",
+      scope: "global",
       action: () => {
-        void window.dispatchEvent(
-          new CustomEvent("shortcut:toggle-fullscreen"),
-        );
+        emitShortcut("shortcut:toggle-fullscreen");
       },
     });
 
@@ -979,7 +1328,7 @@ export class KeyboardShortcutManager {
       description: "Move up",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:move-up"));
+        emitShortcut("shortcut:move-up");
       },
     });
 
@@ -988,7 +1337,7 @@ export class KeyboardShortcutManager {
       description: "Move down",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:move-down"));
+        emitShortcut("shortcut:move-down");
       },
     });
 
@@ -997,7 +1346,7 @@ export class KeyboardShortcutManager {
       description: "Move left",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:move-left"));
+        emitShortcut("shortcut:move-left");
       },
     });
 
@@ -1006,7 +1355,7 @@ export class KeyboardShortcutManager {
       description: "Move right",
       category: "canvas",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:move-right"));
+        emitShortcut("shortcut:move-right");
       },
     });
 
@@ -1015,8 +1364,10 @@ export class KeyboardShortcutManager {
       key: "v",
       description: "Select tool",
       category: "tools",
-      action: withCanvasFocus(() => {
-        void window.dispatchEvent(new CustomEvent("shortcut:tool-select"));
+      action: withCanvasFocus((event) => {
+        event?.preventDefault?.();
+        exitToSelectMode();
+        emitShortcut("shortcut:tool-select");
       }),
     });
 
@@ -1036,7 +1387,7 @@ export class KeyboardShortcutManager {
           return;
         }
 
-        void window.dispatchEvent(new CustomEvent("shortcut:tool-pan"));
+        emitShortcut("shortcut:tool-pan");
       },
     });
 
@@ -1045,7 +1396,7 @@ export class KeyboardShortcutManager {
       description: "Zoom tool",
       category: "tools",
       action: withCanvasFocus(() => {
-        void window.dispatchEvent(new CustomEvent("shortcut:tool-zoom"));
+        emitShortcut("shortcut:tool-zoom");
       }),
     });
 
@@ -1053,21 +1404,23 @@ export class KeyboardShortcutManager {
       key: "a",
       description: "Annotate tool",
       category: "tools",
-      action: withCanvasFocus(() => {
-        void window.dispatchEvent(new CustomEvent("shortcut:tool-annotate"));
+      action: withCanvasFocus((event) => {
+        event?.preventDefault?.();
+        enterAnnotationMode();
+        emitShortcut("shortcut:tool-annotate");
       }),
     });
 
     // Drawing shortcuts
     this.register({
       key: "d",
-      description: "Toggle drawing mode",
+      description: "Enter drawing mode",
       category: "drawing",
       preventDefault: false,
-      action: () => {
-        if (!isCanvasFocused()) return;
-        toggleDrawingMode();
-      },
+      action: withCanvasFocus((event) => {
+        event?.preventDefault?.();
+        enterDrawMode();
+      }),
     });
 
     this.register({
@@ -1139,21 +1492,10 @@ export class KeyboardShortcutManager {
       });
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "d",
       modifiers: ["ctrl", "shift"],
       description: "Clear all drawings",
-      category: "drawing",
-      action: () => {
-        if (!isCanvasFocused()) return;
-        confirmAndClearDrawings();
-      },
-    });
-
-    this.register({
-      key: "d",
-      modifiers: ["meta", "shift"],
-      description: "Clear all drawings (Cmd)",
       category: "drawing",
       action: () => {
         if (!isCanvasFocused()) return;
@@ -1168,49 +1510,49 @@ export class KeyboardShortcutManager {
       description: "Edit properties",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:edit-properties"));
+        emitShortcut("shortcut:edit-properties");
       },
     });
 
     // Note: Duplicate shortcut removed - already defined above as "Duplicate selected"
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "c",
       modifiers: ["ctrl"],
       description: "Copy",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:copy"));
+        emitShortcut("shortcut:copy");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "v",
       modifiers: ["ctrl"],
       description: "Paste",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:paste"));
+        emitShortcut("shortcut:paste");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "]",
       modifiers: ["ctrl", "shift"],
       description: "Bring to front",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:bring-to-front"));
+        emitShortcut("shortcut:bring-to-front");
       },
     });
 
-    this.register({
+    this.registerPlatformShortcut({
       key: "[",
       modifiers: ["ctrl", "shift"],
       description: "Send to back",
       category: "components",
       action: () => {
-        void window.dispatchEvent(new CustomEvent("shortcut:send-to-back"));
+        emitShortcut("shortcut:send-to-back");
       },
     });
 
@@ -1220,9 +1562,7 @@ export class KeyboardShortcutManager {
       description: "Show context menu",
       category: "general",
       action: () => {
-        void window.dispatchEvent(
-          new CustomEvent("shortcut:show-context-menu"),
-        );
+        emitShortcut("shortcut:show-context-menu");
       },
     });
   }
@@ -1232,6 +1572,7 @@ export class KeyboardShortcutManager {
    */
   destroy(): void {
     this.detachEventListeners();
+    this.teardownCrossTabChannel();
     this.shortcuts.clear();
     this.changeListeners.clear(); // Clear listeners to prevent memory leaks
   }

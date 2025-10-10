@@ -4,6 +4,7 @@
 // RELEVANT FILES: DesignCanvasCore.tsx, ../@shared/contracts.ts, ../../../lib/utils.ts, useStableCallbacks.ts
 
 import { useEffect, useRef } from "react";
+import type { ReactFlowInstance } from "@xyflow/react";
 
 import { applyPreset, presetsRegistry } from "@/lib/canvas/component-presets";
 import { RenderLoopDiagnostics } from "@/lib/debug/RenderLoopDiagnostics";
@@ -319,8 +320,7 @@ export function useDesignCanvasCallbacks() {
   // Use Zustand store selectors instead of canvas context
   const selectedComponent = useCanvasSelectedComponent();
   const selectedItems = selectedComponent ? [selectedComponent] : [];
-  // TODO: reactFlowInstance should be passed as prop or retrieved differently
-  const reactFlowInstance = null; // Temporary fallback
+  const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
   const components = useCanvasComponents();
   const connections = useCanvasConnections();
 
@@ -443,6 +443,37 @@ export function useDesignCanvasCallbacks() {
         },
         ["updateInfoCards"],
       );
+    },
+  );
+
+  const registerReactFlowInstance = useStableCallback(
+    (instance: ReactFlowInstance | null) => {
+      reactFlowInstanceRef.current = instance;
+    },
+  );
+
+  const focusViewport = useStableCallback(
+    (
+      center: { x: number; y: number },
+      options: { zoom?: number; duration?: number } = {},
+    ) => {
+      const instance = reactFlowInstanceRef.current;
+      if (!instance) {
+        return false;
+      }
+
+      const currentZoom = instance.getViewport().zoom;
+      const targetZoom = options.zoom ?? Math.min(Math.max(currentZoom, 0.8), 1.6);
+      try {
+        instance.setCenter(center.x, center.y, {
+          zoom: targetZoom,
+          duration: options.duration ?? 300,
+        });
+        return true;
+      } catch (error) {
+        console.warn('[DesignCanvasCallbacks] Failed to focus viewport', error);
+        return false;
+      }
     },
   );
 
@@ -1089,6 +1120,7 @@ export function useDesignCanvasCallbacks() {
       })();
 
       const position = (() => {
+        const instance = reactFlowInstanceRef.current;
         if (selectedComponent) {
           return {
             x: selectedComponent.x + SELECTION_OFFSET.x,
@@ -1097,18 +1129,18 @@ export function useDesignCanvasCallbacks() {
         }
 
         if (detail.position) {
-          if (detail.coordinateSpace === "canvas" || !reactFlowInstance) {
+          if (detail.coordinateSpace === "canvas" || !instance) {
             return { x: detail.position.x, y: detail.position.y };
           }
-          return reactFlowInstance.project(detail.position);
+          return instance.project(detail.position);
         }
 
         const viewportCenter = {
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
         };
-        return reactFlowInstance
-          ? reactFlowInstance.project(viewportCenter)
+        return instance
+          ? instance.project(viewportCenter)
           : viewportCenter;
       })();
 
@@ -1143,7 +1175,7 @@ export function useDesignCanvasCallbacks() {
         handleAddComponent as EventListener,
       );
     };
-  }, [handleComponentDrop, reactFlowInstance]);
+  }, [handleComponentDrop]);
 
   // Event listener for architecture preset insertion
   useEffect(() => {
@@ -1167,18 +1199,19 @@ export function useDesignCanvasCallbacks() {
       }
 
       const basePosition = (() => {
+        const instance = reactFlowInstanceRef.current;
         if (detail.position) {
-          if (detail.coordinateSpace === "canvas" || !reactFlowInstance) {
+          if (detail.coordinateSpace === "canvas" || !instance) {
             return { x: detail.position.x, y: detail.position.y };
           }
-          return reactFlowInstance.project(detail.position);
+          return instance.project(detail.position);
         }
         const viewportCenter = {
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
         };
-        return reactFlowInstance
-          ? reactFlowInstance.project(viewportCenter)
+        return instance
+          ? instance.project(viewportCenter)
           : viewportCenter;
       })();
 
@@ -1275,7 +1308,7 @@ export function useDesignCanvasCallbacks() {
         handleAddPreset as EventListener,
       );
     };
-  }, [reactFlowInstance]);
+  }, [handleComponentDrop]);
 
   // Drawing callbacks
   const handleDrawingComplete = useStableCallback(
@@ -1433,6 +1466,8 @@ export function useDesignCanvasCallbacks() {
   }, [actionsRef]);
 
   const callbacks = {
+    registerReactFlowInstance,
+    focusViewport,
     handleComponentDrop,
     handleComponentMove,
     handleComponentSelect,

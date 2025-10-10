@@ -3,6 +3,54 @@ import { useUXOptimizer } from '@/lib/user-experience/UXOptimizer';
 import { getLogger } from '@/lib/logging/logger';
 import { addError, addPerformanceError, errorStore } from '@/lib/logging/errorStore';
 
+type PerformanceLike = Performance & {
+  memory?: {
+    usedJSHeapSize?: number;
+    totalJSHeapSize?: number;
+    jsHeapSizeLimit?: number;
+  };
+};
+
+const safePerformance = (): PerformanceLike | undefined => {
+  if (typeof performance === 'undefined') {
+    return undefined;
+  }
+  return performance as PerformanceLike;
+};
+
+const safeNow = (): number => {
+  const perf = safePerformance();
+  return typeof perf?.now === 'function' ? perf.now() : Date.now();
+};
+
+interface MemorySnapshot {
+  usedJSHeapSize: number;
+  totalJSHeapSize?: number;
+  jsHeapSizeLimit?: number;
+  available: boolean;
+}
+
+const safeMemory = (): MemorySnapshot => {
+  const perf = safePerformance();
+  const memory = perf?.memory;
+  if (memory && typeof memory.usedJSHeapSize === 'number') {
+    return {
+      usedJSHeapSize: memory.usedJSHeapSize,
+      totalJSHeapSize: memory.totalJSHeapSize,
+      jsHeapSizeLimit: memory.jsHeapSizeLimit,
+      available: true,
+    };
+  }
+
+  return {
+    usedJSHeapSize: 0,
+    available: false,
+  };
+};
+
+const safeUserAgent = (): string | undefined =>
+  typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
+
 export interface NavigationData {
   screen: string;
   previousScreen: string;
@@ -51,7 +99,7 @@ export const useUXTracker = () => {
    */
   const trackNavigation = useCallback(
     (screen: string, previousScreen: string) => {
-      const startTime = performance.now();
+      const startTime = safeNow();
 
       try {
         const actionData = {
@@ -73,16 +121,16 @@ export const useUXTracker = () => {
         uxOptimizer.trackAction(actionData);
 
         // Log navigation event with performance timing
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.info('User navigation tracked', {
           screen,
           previousScreen,
           duration: Math.round(duration * 100) / 100,
-          userAgent: navigator.userAgent,
+          userAgent: safeUserAgent(),
           timestamp: new Date().toISOString(),
         });
       } catch (error) {
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.error('Failed to track navigation', error, {
           screen,
           previousScreen,
@@ -108,8 +156,8 @@ export const useUXTracker = () => {
    */
   const trackCanvasAction = useCallback(
     (actionType: string, data: Record<string, any>, success: boolean = true) => {
-      const startTime = performance.now();
-      const memoryBefore = (performance as any).memory?.usedJSHeapSize;
+      const startTime = safeNow();
+      const memoryBefore = safeMemory();
 
       try {
         const actionData = {
@@ -130,9 +178,12 @@ export const useUXTracker = () => {
         uxOptimizer.trackAction(actionData);
 
         // Log canvas action with performance metrics
-        const duration = performance.now() - startTime;
-        const memoryAfter = (performance as any).memory?.usedJSHeapSize;
-        const memoryDelta = memoryAfter && memoryBefore ? memoryAfter - memoryBefore : undefined;
+        const duration = safeNow() - startTime;
+        const memoryAfter = safeMemory();
+        const memoryDelta =
+          memoryBefore.available && memoryAfter.available
+            ? memoryAfter.usedJSHeapSize - memoryBefore.usedJSHeapSize
+            : undefined;
 
         const logLevel = success ? 'info' : 'warn';
         logger[logLevel](`Canvas action: ${actionType}`, {
@@ -157,7 +208,7 @@ export const useUXTracker = () => {
             `Slow canvas action: ${actionType}`,
             {
               renderTime: duration,
-              memoryUsage: memoryAfter,
+              memoryUsage: memoryAfter.available ? memoryAfter.usedJSHeapSize : undefined,
               timestamp: Date.now(),
             },
             {
@@ -167,7 +218,7 @@ export const useUXTracker = () => {
           );
         }
       } catch (error) {
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.error('Failed to track canvas action', error, {
           actionType,
           data,
@@ -193,13 +244,14 @@ export const useUXTracker = () => {
    */
   const trackDialogAction = useCallback(
     (actionType: string, dialogType: string, data: Record<string, any>) => {
-      const startTime = performance.now();
+      const startTime = safeNow();
 
       try {
         const success = actionType !== 'error' && actionType !== 'cancel';
         const actionData = {
-          type: `dialog-${actionType}`,
+          type: 'dialog-action',
           data: {
+            actionType,
             dialogType,
             ...data,
             timestamp: Date.now(),
@@ -216,7 +268,7 @@ export const useUXTracker = () => {
         uxOptimizer.trackAction(actionData);
 
         // Log dialog interaction with timing
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         const logLevel = success ? 'info' : 'warn';
         logger[logLevel](`Dialog action: ${actionType}`, {
           actionType,
@@ -239,7 +291,7 @@ export const useUXTracker = () => {
           });
         }
       } catch (error) {
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.error('Failed to track dialog action', error, {
           actionType,
           dialogType,
@@ -266,7 +318,7 @@ export const useUXTracker = () => {
    */
   const trackKeyboardShortcut = useCallback(
     (shortcut: string, action: string, success: boolean = true) => {
-      const startTime = performance.now();
+      const startTime = safeNow();
 
       try {
         const actionData = {
@@ -288,7 +340,7 @@ export const useUXTracker = () => {
         uxOptimizer.trackAction(actionData);
 
         // Log keyboard shortcut usage for efficiency analysis
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         const logLevel = success ? 'debug' : 'warn';
         logger[logLevel](`Keyboard shortcut used: ${shortcut}`, {
           shortcut,
@@ -310,7 +362,7 @@ export const useUXTracker = () => {
           });
         }
       } catch (error) {
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.error('Failed to track keyboard shortcut', error, {
           shortcut,
           action,
@@ -336,8 +388,8 @@ export const useUXTracker = () => {
    */
   const trackPerformance = useCallback(
     (metric: string, value: number, context?: Record<string, any>) => {
-      const startTime = performance.now();
-      const memoryUsage = (performance as any).memory?.usedJSHeapSize;
+      const startTime = safeNow();
+      const memoryUsageSnapshot = safeMemory();
 
       try {
         const actionData = {
@@ -360,12 +412,14 @@ export const useUXTracker = () => {
         uxOptimizer.trackAction(actionData);
 
         // Log performance metric with detailed context
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.info(`Performance metric: ${metric}`, {
           metric,
           value,
           duration: Math.round(duration * 100) / 100,
-          memoryUsage,
+          memoryUsage: memoryUsageSnapshot.available
+            ? memoryUsageSnapshot.usedJSHeapSize
+            : undefined,
           page: getCurrentPage(),
           context: context || {},
           timestamp: new Date().toISOString(),
@@ -384,7 +438,11 @@ export const useUXTracker = () => {
             `Performance threshold exceeded for ${metric}`,
             {
               renderTime: metric.includes('render') ? value : undefined,
-              memoryUsage: metric.includes('memory') ? value : memoryUsage,
+              memoryUsage: metric.includes('memory')
+                ? value
+                : memoryUsageSnapshot.available
+                    ? memoryUsageSnapshot.usedJSHeapSize
+                    : undefined,
               timestamp: Date.now(),
             },
             {
@@ -402,7 +460,7 @@ export const useUXTracker = () => {
           });
         }
       } catch (error) {
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.error('Failed to track performance metric', error, {
           metric,
           value,
@@ -428,8 +486,8 @@ export const useUXTracker = () => {
    */
   const trackError = useCallback(
     (error: string | Error, context?: Record<string, any>) => {
-      const startTime = performance.now();
-      const memoryUsage = (performance as any).memory?.usedJSHeapSize;
+      const startTime = safeNow();
+      const memoryUsageSnapshot = safeMemory();
 
       try {
         const errorObj = error instanceof Error ? error : new Error(String(error));
@@ -453,10 +511,12 @@ export const useUXTracker = () => {
         uxOptimizer.trackAction(actionData);
 
         // Log error with comprehensive context
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.error('User experience error tracked', errorObj, {
           duration: Math.round(duration * 100) / 100,
-          memoryUsage,
+          memoryUsage: memoryUsageSnapshot.available
+            ? memoryUsageSnapshot.usedJSHeapSize
+            : undefined,
           page: getCurrentPage(),
           userContext: context || {},
           errorDetails: {
@@ -473,7 +533,9 @@ export const useUXTracker = () => {
           additionalData: {
             ...context,
             page: getCurrentPage(),
-            memoryUsage,
+            memoryUsage: memoryUsageSnapshot.available
+              ? memoryUsageSnapshot.usedJSHeapSize
+              : undefined,
             trackingDuration: duration,
           },
         });
@@ -488,7 +550,7 @@ export const useUXTracker = () => {
           });
         }
       } catch (trackingError) {
-        const duration = performance.now() - startTime;
+        const duration = safeNow() - startTime;
         logger.fatal('Critical failure in error tracking', trackingError, {
           originalError: error instanceof Error ? error.message : String(error),
           context,

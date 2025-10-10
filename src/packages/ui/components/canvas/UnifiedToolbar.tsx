@@ -42,6 +42,7 @@ import {
   Highlighter,
   Layers,
   MessageSquare,
+  MousePointer,
   Pencil,
   Redo2,
   StickyNote,
@@ -50,7 +51,7 @@ import {
   Undo2,
   Wand2,
 } from 'lucide-react';
-import { cx } from '@/lib/design/design-system';
+import { cn, cx } from '@/lib/design/design-system';
 
 type UnifiedToolbarMode = 'draw' | 'annotate';
 
@@ -126,6 +127,9 @@ const annotationTools = [
   },
 ];
 
+const DEFAULT_ANNOTATION_TOOL: AnnotationTool = 'comment';
+const LAST_TAB_STORAGE_KEY = 'canvas:lastTab';
+
 export const UnifiedToolbar: React.FC<UnifiedToolbarProps> = ({
   annotationTool,
   onAnnotationToolChange,
@@ -149,29 +153,71 @@ export const UnifiedToolbar: React.FC<UnifiedToolbarProps> = ({
   const annotationOpacity = useLayerOpacity('annotations');
   const canvasActions = useCanvasActions();
   const [confirmTarget, setConfirmTarget] = useState<UnifiedToolbarMode | null>(null);
-  const [mode, setMode] = useState<UnifiedToolbarMode>(
-    canvasMode === 'annotation' ? 'annotate' : 'draw'
-  );
+  const [mode, setMode] = useState<UnifiedToolbarMode>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(LAST_TAB_STORAGE_KEY);
+      if (stored === 'draw' || stored === 'annotate') {
+        return stored;
+      }
+    }
+    return 'draw';
+  });
+  const [modeAnnouncement, setModeAnnouncement] = useState('');
 
   useEffect(() => {
-    setMode(canvasMode === 'annotation' ? 'annotate' : 'draw');
+    const readableMode =
+      canvasMode === 'annotation'
+        ? 'Annotation mode active'
+        : canvasMode === 'draw'
+        ? 'Drawing mode active'
+        : 'Select mode active';
+    setModeAnnouncement(readableMode);
   }, [canvasMode]);
 
   const strokeCount = drawings.length;
   const annotationCount = annotations.length;
+  const isSelectMode = canvasMode === 'select';
+  const isDrawMode = canvasMode === 'draw';
+  const isAnnotationMode = canvasMode === 'annotation';
+
+  const handleModeSwitch = useCallback(
+    (nextMode: 'select' | 'draw' | 'annotation') => {
+      if (nextMode === 'select') {
+        canvasActions.setCanvasMode('select');
+        canvasActions.setDrawingTool(null, { silent: true });
+        onAnnotationToolChange(null);
+        return;
+      }
+
+      if (nextMode === 'draw') {
+        canvasActions.setCanvasMode('draw');
+        canvasActions.setDrawingTool('pen', { silent: true });
+        onAnnotationToolChange(null);
+        return;
+      }
+
+      canvasActions.setCanvasMode('annotation');
+      canvasActions.setDrawingTool(null, { silent: true });
+      if (!annotationTool) {
+        onAnnotationToolChange(DEFAULT_ANNOTATION_TOOL);
+      }
+    },
+    [annotationTool, canvasActions, onAnnotationToolChange]
+  );
 
   const handleModeChange = useCallback(
     (value: UnifiedToolbarMode) => {
       setMode(value);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(LAST_TAB_STORAGE_KEY, value);
+      }
       if (value === 'draw') {
-        canvasActions.setCanvasMode('draw');
-        onAnnotationToolChange(null);
+        handleModeSwitch('draw');
       } else {
-        canvasActions.setCanvasMode('annotation');
-        canvasActions.setDrawingTool(null, { silent: true });
+        handleModeSwitch('annotation');
       }
     },
-    [canvasActions, onAnnotationToolChange]
+    [handleModeSwitch]
   );
 
   const handleDrawingToolSelect = useCallback(
@@ -209,9 +255,9 @@ export const UnifiedToolbar: React.FC<UnifiedToolbarProps> = ({
 
   const handleClearAll = useCallback(() => {
     if (confirmTarget === 'draw') {
-      canvasActions.deleteAllDrawings();
+      canvasActions.clearDrawings();
     } else if (confirmTarget === 'annotate') {
-      canvasActions.deleteAllAnnotations();
+      canvasActions.clearAnnotations();
     }
     setConfirmTarget(null);
   }, [canvasActions, confirmTarget]);
@@ -301,18 +347,61 @@ export const UnifiedToolbar: React.FC<UnifiedToolbarProps> = ({
           'w-[min(640px,calc(100vw-2rem))]',
           className
         )}
-        style={{ zIndex: 20 }}
         role='region'
         aria-label='Canvas tools'
       >
         <Tabs.Root value={mode} onValueChange={handleModeChange} orientation='horizontal'>
-          <div className='flex items-center justify-between gap-4'>
-            <Tabs.List className='flex items-center gap-2 rounded-xl bg-muted/40 p-1'>
-              <Tabs.Trigger
-                value='draw'
-                className='flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm'
-              >
-                Draw
+          <div className='flex w-full flex-wrap items-center justify-between gap-4'>
+            <div className='flex flex-wrap items-center gap-3'>
+              <div className='flex items-center gap-1 rounded-lg bg-muted/40 p-1' role='group' aria-label='Canvas modes'>
+                <button
+                  type='button'
+                  onClick={() => handleModeSwitch('select')}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                    isSelectMode ? 'bg-background shadow-sm text-primary' : 'hover:bg-background/60'
+                  )}
+                  aria-pressed={isSelectMode}
+                  aria-label='Select mode (V)'
+                >
+                  <MousePointer size={16} />
+                  <span className='hidden sm:inline'>Select</span>
+                </button>
+                <button
+                  type='button'
+                  onClick={() => handleModeSwitch('draw')}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                    isDrawMode ? 'bg-background shadow-sm text-primary' : 'hover:bg-background/60'
+                  )}
+                  aria-pressed={isDrawMode}
+                  aria-label='Draw mode (D)'
+                >
+                  <Pencil size={16} />
+                  <span className='hidden sm:inline'>Draw</span>
+                </button>
+                <button
+                  type='button'
+                  onClick={() => handleModeSwitch('annotation')}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                    isAnnotationMode ? 'bg-background shadow-sm text-primary' : 'hover:bg-background/60'
+                  )}
+                  aria-pressed={isAnnotationMode}
+                  aria-label='Annotation mode (A)'
+                >
+                  <MessageSquare size={16} />
+                  <span className='hidden sm:inline'>Annotate</span>
+                </button>
+              </div>
+              <div className='hidden h-8 w-px bg-border/60 sm:block' aria-hidden='true' />
+
+              <Tabs.List className='flex items-center gap-2 rounded-xl bg-muted/40 p-1'>
+                <Tabs.Trigger
+                  value='draw'
+                  className='flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm'
+                >
+                  Draw
                 <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-[11px] font-semibold'>
                   {strokeCount}
                 </Badge>
@@ -325,8 +414,9 @@ export const UnifiedToolbar: React.FC<UnifiedToolbarProps> = ({
                 <Badge variant='secondary' className='ml-1 h-5 px-1.5 text-[11px] font-semibold'>
                   {annotationCount}
                 </Badge>
-              </Tabs.Trigger>
-            </Tabs.List>
+                </Tabs.Trigger>
+              </Tabs.List>
+            </div>
 
             <div className='flex items-center gap-2'>
               <Tooltip>
@@ -578,6 +668,9 @@ export const UnifiedToolbar: React.FC<UnifiedToolbarProps> = ({
             </AnimatePresence>
           </Tabs.Content>
         </Tabs.Root>
+        <span className='sr-only' role='status' aria-live='polite'>
+          {modeAnnouncement}
+        </span>
       </div>
 
       <AlertDialog open={confirmTarget !== null} onOpenChange={(open) => !open && setConfirmTarget(null)}>

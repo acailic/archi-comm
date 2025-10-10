@@ -3,7 +3,7 @@
  * Advanced user experience optimization system for maximum productivity
  */
 
-import { PerformanceMonitor } from '../performance/PerformanceOptimizer';
+import { performanceMonitor } from '@/shared/utils/performanceMonitor';
 
 export interface UXMetrics {
   taskCompletionTime: number;
@@ -59,11 +59,11 @@ export interface WorkflowPattern {
 
 export class UXOptimizer {
   private static instance: UXOptimizer;
-  private performanceMonitor: PerformanceMonitor;
   private userBehavior: UserBehaviorPattern | null = null;
   private metrics: UXMetrics;
   private adaptations: Map<string, UXAdaptation> = new Map();
   private observers: Set<UXObserver> = new Set();
+  private cachedPreferences: Partial<UserPreferences> | null = null;
 
   static getInstance(): UXOptimizer {
     if (!UXOptimizer.instance) {
@@ -73,7 +73,6 @@ export class UXOptimizer {
   }
 
   constructor() {
-    this.performanceMonitor = PerformanceMonitor.getInstance();
     this.metrics = this.initializeMetrics();
     this.setupBehaviorTracking();
     this.loadUserPreferences();
@@ -199,12 +198,14 @@ export class UXOptimizer {
     if (!this.userBehavior) return 0.5;
 
     const recentActions = this.userBehavior.actions.slice(-100);
+    if (recentActions.length === 0) return 0.5;
+
     const successRate = recentActions.filter(a => a.success).length / recentActions.length;
     const avgCompletionTime = this.calculateAverageCompletionTime(recentActions);
     const expectedTime = 5000; // 5 seconds baseline
 
     // Calculate satisfaction based on success rate and efficiency
-    const efficiencyScore = Math.min(expectedTime / avgCompletionTime, 1);
+    const efficiencyScore = avgCompletionTime > 0 ? Math.min(expectedTime / avgCompletionTime, 1) : 1;
     const satisfactionScore = successRate * 0.6 + efficiencyScore * 0.4;
 
     this.metrics.userSatisfactionScore = satisfactionScore;
@@ -294,18 +295,40 @@ export class UXOptimizer {
       skillLevel: 'intermediate',
       workflowPatterns: [],
     };
+
+    if (this.cachedPreferences) {
+      this.userBehavior.preferences = {
+        ...this.userBehavior.preferences,
+        ...this.cachedPreferences,
+      };
+      this.cachedPreferences = null;
+    }
   }
 
   private setupBehaviorTracking(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    const resolvePagePath = () => {
+      try {
+        return window.location?.pathname ?? 'unknown';
+      } catch (error) {
+        console.warn('[UXOptimizer] Unable to resolve page path', error);
+        return 'unknown';
+      }
+    };
+
     // Track page visibility changes
     document.addEventListener('visibilitychange', () => {
+      const page = resolvePagePath();
       if (document.hidden) {
         this.trackAction({
           type: 'session-pause',
           data: { timestamp: Date.now() },
           success: true,
           context: {
-            page: window.location.pathname,
+            page,
             component: 'system',
             userIntent: 'pause',
           },
@@ -316,7 +339,7 @@ export class UXOptimizer {
           data: { timestamp: Date.now() },
           success: true,
           context: {
-            page: window.location.pathname,
+            page,
             component: 'system',
             userIntent: 'resume',
           },
@@ -326,6 +349,7 @@ export class UXOptimizer {
 
     // Track errors
     window.addEventListener('error', event => {
+      const page = resolvePagePath();
       this.trackAction({
         type: 'error',
         data: {
@@ -335,7 +359,7 @@ export class UXOptimizer {
         },
         success: false,
         context: {
-          page: window.location.pathname,
+          page,
           component: 'system',
           userIntent: 'unknown',
         },
@@ -364,9 +388,9 @@ export class UXOptimizer {
     }
   }
 
-  private analyzeAndAdapt(action: UserAction): void {
+  private analyzeAndAdapt(_action: UserAction): void {
     // Detect user skill level based on actions
-    this.detectSkillLevel(action);
+    this.detectSkillLevel();
 
     // Look for workflow patterns
     this.detectWorkflowPatterns();
@@ -377,7 +401,7 @@ export class UXOptimizer {
     }
   }
 
-  private detectSkillLevel(action: UserAction): void {
+  private detectSkillLevel(): void {
     if (!this.userBehavior) return;
 
     const recentActions = this.userBehavior.actions.slice(-20);
@@ -469,10 +493,11 @@ export class UXOptimizer {
   private optimizeAnimations(): UXAdaptation | null {
     if (!this.userBehavior) return null;
 
-    const performanceScore = this.performanceMonitor.getCurrentFPS();
+    const perf = performanceMonitor.getSystemMetrics();
+    const performanceScore = 100 - Math.min(100, perf.slowComponents * 10);
     const userPreference = this.userBehavior.preferences.animations;
 
-    if (performanceScore < 30 && userPreference) {
+    if (performanceScore < 70 && userPreference) {
       return {
         id: 'animation-optimization',
         type: 'performance',
@@ -481,6 +506,21 @@ export class UXOptimizer {
         data: {
           reduceAnimations: true,
           animationDuration: 150,
+          performanceScore,
+        },
+      };
+    }
+
+    if (performanceScore > 85 && !userPreference) {
+      return {
+        id: 'animation-optimization',
+        type: 'performance',
+        priority: 'low',
+        description: 'Enable richer animations when the system performs well',
+        data: {
+          reduceAnimations: false,
+          animationDuration: 250,
+          performanceScore,
         },
       };
     }
@@ -489,10 +529,14 @@ export class UXOptimizer {
   }
 
   private optimizeLayout(): UXAdaptation | null {
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
+    if (typeof window === 'undefined') {
+      return null;
+    }
 
-    if (screenWidth < 1200) {
+    const screenWidth = window.innerWidth || 0;
+    const screenHeight = window.innerHeight || 0;
+
+    if (screenWidth < 1200 || screenHeight < 800) {
       return {
         id: 'layout-optimization',
         type: 'responsive',
@@ -576,9 +620,28 @@ export class UXOptimizer {
   }
 
   private loadUserPreferences(): void {
-    const stored = localStorage.getItem('archicomm-user-preferences');
-    if (stored && this.userBehavior) {
-      this.userBehavior.preferences = { ...this.userBehavior.preferences, ...JSON.parse(stored) };
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem('archicomm-user-preferences');
+      if (!stored) {
+        return;
+      }
+
+      const parsed = JSON.parse(stored) as Partial<UserPreferences>;
+
+      if (this.userBehavior) {
+        this.userBehavior.preferences = {
+          ...this.userBehavior.preferences,
+          ...parsed,
+        };
+      } else {
+        this.cachedPreferences = { ...this.cachedPreferences, ...parsed };
+      }
+    } catch (error) {
+      console.warn('[UXOptimizer] Failed to load user preferences', error);
     }
   }
 
@@ -586,10 +649,25 @@ export class UXOptimizer {
     if (!this.userBehavior) return;
 
     this.userBehavior.preferences = { ...this.userBehavior.preferences, [key]: value };
-    localStorage.setItem(
-      'archicomm-user-preferences',
-      JSON.stringify(this.userBehavior.preferences)
-    );
+
+    if (typeof window === 'undefined') {
+      this.cachedPreferences = {
+        ...this.cachedPreferences,
+        [key]: value,
+      };
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        'archicomm-user-preferences',
+        JSON.stringify(this.userBehavior.preferences)
+      );
+    } catch (error) {
+      console.warn('[UXOptimizer] Failed to persist user preference', error, {
+        key,
+      });
+    }
   }
 
   private getShortcutForAction(action: string): string {

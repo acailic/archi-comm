@@ -485,10 +485,26 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
 
   return (
     <>
-      <span className="sr-only" aria-live="polite">
-        {announcement}
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement || `Drawing mode active. Current tool: ${currentTool || 'none'}. ${strokes.length} strokes on canvas.`}
       </span>
-      <div ref={containerRef} className={cx("relative h-full w-full", className)}>
+      <div 
+        ref={containerRef} 
+        className={cx(
+          "relative h-full w-full",
+          currentTool === "pen" && "cursor-crosshair",
+          currentTool === "eraser" && "cursor-pointer",
+          currentTool === "highlighter" && "cursor-crosshair",
+          className
+        )}
+      >
+        {enabled && currentTool && strokes.length === 0 && !isDrawing && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="px-4 py-2 bg-blue-50 border-2 border-blue-200 rounded-lg text-sm text-blue-700 animate-pulse">
+              Click and drag to start drawing
+            </div>
+          </div>
+        )}
         <svg
           ref={svgRef}
           className="absolute inset-0 h-full w-full"
@@ -535,7 +551,10 @@ const DrawingOverlayComponent: React.FC<DrawingOverlayProps> = ({
         {cursorPosition && currentTool && (
           <div
             className={cx(
-              "pointer-events-none absolute rounded-full border border-primary/40 transition-transform duration-75",
+              "pointer-events-none absolute rounded-full border-2 transition-transform duration-75",
+              currentTool === "pen" && "border-blue-500/60",
+              currentTool === "eraser" && "border-red-500/60 bg-red-100/20",
+              currentTool === "highlighter" && "border-yellow-500/60",
               isStraightLineMode
                 ? "shadow-[0_0_0_2px_rgba(59,130,246,0.35)]"
                 : "shadow-[0_0_0_1px_rgba(59,130,246,0.25)]",

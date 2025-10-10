@@ -47,8 +47,16 @@ import {
   useDrawingTool,
 } from "../../../../stores/canvasStore";
 import { useAppStore } from "../../../../stores/SimpleAppStore";
+import type { DrawingTool } from "../../../../shared/contracts";
 import { DrawingToolbar } from "./DrawingToolbar";
+
 import { openShortcutsModal } from "./KeyboardShortcutsReference";
+import {
+  APP_EVENT,
+  QuickAddOverlayStateDetail,
+  QuickAddShortcutDetail,
+  dispatchAppEvent,
+} from "@/lib/events/appEvents";
 
 /**
  * Quick add toolbar support:
@@ -57,6 +65,7 @@ import { openShortcutsModal } from "./KeyboardShortcutsReference";
  * - surface an onboarding hint until first use
  */
 const QUICK_ADD_STORAGE_KEY = "archicomm_quick_add_used";
+const DEFAULT_DRAW_TOOL: DrawingTool = "pen";
 
 interface CanvasToolbarProps {
   onFitView?: () => void;
@@ -112,6 +121,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
   const drawingColor = useDrawingColor();
   const drawingSize = useDrawingSize();
   const drawingSettings = useDrawingSettings();
+  const drawingSettingsTool = drawingSettings.tool;
   const drawings = useCanvasDrawings();
 
   const [quickAddActive, setQuickAddActive] = useState(false);
@@ -173,10 +183,17 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       return;
     }
 
-    const shortcutListener = (_event: Event) => {
+    const shortcutListener = (event: Event) => {
+      const detail = (event as CustomEvent<QuickAddShortcutDetail | undefined>)
+        .detail;
       setQuickAddActive((prev) => {
-        const next = !prev;
-        if (!prev) {
+        const next =
+          detail && detail.forceOpen
+            ? true
+            : detail && detail.forceClose
+              ? false
+              : !prev;
+        if ((!prev && next) || detail?.source === "quick-add-overlay") {
           markQuickAddUsed();
         }
         return next;
@@ -193,7 +210,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
     };
 
     const stateListener = (event: Event) => {
-      const detail = (event as CustomEvent<{ active?: boolean }>).detail;
+      const detail = (event as CustomEvent<QuickAddOverlayStateDetail>).detail;
       if (detail && typeof detail.active === "boolean") {
         if (detail.active) {
           markQuickAddUsed();
@@ -202,23 +219,29 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
       }
     };
 
-    window.addEventListener("shortcut:quick-add-component", shortcutListener);
-    window.addEventListener("quick-add-overlay:open", openListener);
-    window.addEventListener("quick-add-overlay:opened", openListener);
-    window.addEventListener("quick-add-overlay:close", closeListener);
-    window.addEventListener("quick-add-overlay:closed", closeListener);
-    window.addEventListener("quick-add-overlay:state", stateListener);
+    window.addEventListener(APP_EVENT.SHORTCUT_QUICK_ADD, shortcutListener);
+    window.addEventListener(APP_EVENT.QUICK_ADD_OVERLAY_OPEN, openListener);
+    window.addEventListener(APP_EVENT.QUICK_ADD_OVERLAY_OPENED, openListener);
+    window.addEventListener(APP_EVENT.QUICK_ADD_OVERLAY_CLOSE, closeListener);
+    window.addEventListener(APP_EVENT.QUICK_ADD_OVERLAY_CLOSED, closeListener);
+    window.addEventListener(APP_EVENT.QUICK_ADD_OVERLAY_STATE, stateListener);
 
     return () => {
+      window.removeEventListener(APP_EVENT.SHORTCUT_QUICK_ADD, shortcutListener);
+      window.removeEventListener(APP_EVENT.QUICK_ADD_OVERLAY_OPEN, openListener);
       window.removeEventListener(
-        "shortcut:quick-add-component",
-        shortcutListener,
+        APP_EVENT.QUICK_ADD_OVERLAY_OPENED,
+        openListener,
       );
-      window.removeEventListener("quick-add-overlay:open", openListener);
-      window.removeEventListener("quick-add-overlay:opened", openListener);
-      window.removeEventListener("quick-add-overlay:close", closeListener);
-      window.removeEventListener("quick-add-overlay:closed", closeListener);
-      window.removeEventListener("quick-add-overlay:state", stateListener);
+      window.removeEventListener(
+        APP_EVENT.QUICK_ADD_OVERLAY_CLOSE,
+        closeListener,
+      );
+      window.removeEventListener(
+        APP_EVENT.QUICK_ADD_OVERLAY_CLOSED,
+        closeListener,
+      );
+      window.removeEventListener(APP_EVENT.QUICK_ADD_OVERLAY_STATE, stateListener);
     };
   }, [markQuickAddUsed]);
 
@@ -253,17 +276,37 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
     actions.toggleAnimations();
   }, [actions]);
 
+  const handleToggleDrawMode = useCallback(() => {
+    const isDrawModeActive = canvasMode === "draw" && drawingTool !== null;
+
+    if (isDrawModeActive) {
+      actions.setDrawingTool(null);
+      return;
+    }
+
+    const preferredTool: DrawingTool =
+      drawingTool ?? drawingSettingsTool ?? DEFAULT_DRAW_TOOL;
+
+    if (drawingTool === preferredTool && canvasMode !== "draw") {
+      actions.setDrawingTool(null, {
+        silent: true,
+        source: "canvas-toolbar",
+        context: { reason: "reset-before-reactivate" },
+      });
+    }
+
+    actions.setDrawingTool(preferredTool);
+  }, [actions, canvasMode, drawingTool, drawingSettingsTool]);
+
   const handleQuickAddClick = useCallback(() => {
     if (!isDesignCanvas || typeof window === "undefined") {
       return;
     }
 
     markQuickAddUsed();
-    window.dispatchEvent(
-      new CustomEvent("shortcut:quick-add-component", {
-        detail: { source: "canvas-toolbar" },
-      }),
-    );
+    dispatchAppEvent(APP_EVENT.SHORTCUT_QUICK_ADD, {
+      source: "canvas-toolbar",
+    });
   }, [isDesignCanvas, markQuickAddUsed]);
 
   const handleUndo = useCallback(() => {
@@ -374,13 +417,7 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
               icon={Pencil}
               label="Draw (D)"
               active={canvasMode === "draw" || drawingTool !== null}
-              onClick={() => {
-                if (drawingTool === null) {
-                  actions.setDrawingTool("pen");
-                } else {
-                  actions.setDrawingTool(null);
-                }
-              }}
+              onClick={handleToggleDrawMode}
               tooltip="Drawing mode - Draw on canvas"
             />
           </Popover.Trigger>

@@ -31,8 +31,12 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
   onSelect,
   readonly = true,
 }) => {
-  const width = 220 * zoomLevel;
-  const height = 140 * zoomLevel;
+  const baseWidth = component.width ?? 220;
+  const baseHeight = component.height ?? 140;
+  const width = baseWidth * zoomLevel;
+  const height = baseHeight * zoomLevel;
+  const x = component.x ?? 0;
+  const y = component.y ?? 0;
 
   const borderColor = isSelected
     ? 'var(--primary)'
@@ -43,7 +47,7 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
     : 'hsl(var(--border))';
 
   const handleClick = () => {
-    if (onSelect) onSelect(component.id);
+    if (!readonly && onSelect) onSelect(component.id);
   };
 
   return (
@@ -51,13 +55,16 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
       style={{
         width,
         height,
+        position: 'absolute',
+        left: x,
+        top: y,
         border: `2px solid ${borderColor}`,
         borderRadius: 8,
         background: 'hsl(var(--card))',
         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
         padding: 12 * zoomLevel,
-        pointerEvents: readonly ? 'auto' : 'auto',
-        transform: `translate(${component.x}px, ${component.y}px)`,
+        pointerEvents: readonly ? 'none' : 'auto',
+        cursor: readonly ? 'default' : 'pointer',
       }}
       onClick={handleClick}
       role='button'
@@ -92,4 +99,3 @@ export const CanvasComponent: React.FC<CanvasComponentProps> = ({
 };
 
 export default CanvasComponent;
-

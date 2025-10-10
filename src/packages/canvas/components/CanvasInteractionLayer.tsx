@@ -6,12 +6,14 @@ import React, {
   useRef,
   useState,
 } from "react";
+import type { Viewport } from "@xyflow/react";
 
 import {
   RenderGuardPresets,
   useRenderGuard,
 } from "@/lib/performance/RenderGuard";
 import { canvasActions, useCanvasStore } from "@/stores/canvasStore";
+import { DragTrailOverlay } from "./DragTrailOverlay";
 
 import type { DesignComponent } from "../../../types";
 import { useCanvasContext } from "../contexts/CanvasContext";
@@ -28,6 +30,7 @@ export interface CanvasInteractionLayerProps {
   enableContextMenu?: boolean;
   enableKeyboardShortcuts?: boolean;
   children: React.ReactNode;
+  viewport: Viewport;
 }
 
 interface KeyboardShortcuts {
@@ -40,6 +43,7 @@ const CanvasInteractionLayerComponent: React.FC<
   enableDragDrop = true,
   enableContextMenu = true,
   enableKeyboardShortcuts = true,
+  viewport,
   children,
 }) => {
   const { state, callbacks } = useCanvasContext();
@@ -446,6 +450,8 @@ const CanvasInteractionLayerComponent: React.FC<
   return (
     <div className="canvas-interaction-layer">
       {enhancedChildren}
+
+      <DragTrailOverlay viewport={viewport} />
 
       <ContextMenu
         ref={contextMenuRef}

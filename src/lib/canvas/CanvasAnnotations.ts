@@ -325,6 +325,22 @@ export class CanvasAnnotationManager {
     return this.getAllAnnotations();
   }
 
+  getAnnotationBounds(id: string): AnnotationBounds | null {
+    const annotation = this.annotations.get(id);
+    if (!annotation) {
+      return null;
+    }
+
+    const cached = this.boundingBoxCache.get(id);
+    if (cached) {
+      return { ...cached };
+    }
+
+    const bounds = this.getBoundingBox(annotation);
+    this.boundingBoxCache.set(id, bounds);
+    return { ...bounds };
+  }
+
   /**
    * Get annotations in a specific area
    */
@@ -1383,6 +1399,7 @@ export type AnnotationEventListener = (event: string, data: any) => void;
 // Export alias for compatibility
 export type Annotation = CanvasAnnotation;
 export type AnnotationType = CanvasAnnotation['type'];
+export type AnnotationBounds = { x: number; y: number; width: number; height: number };
 
 // Utility functions
 export const createAnnotationStyle = (

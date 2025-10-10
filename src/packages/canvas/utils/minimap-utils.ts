@@ -3,7 +3,7 @@
 // Provides component coloring, dimension calculations, and configuration helpers
 // RELEVANT FILES: src/components/Minimap.tsx, src/features/canvas/components/EnhancedMiniMap.tsx, src/shared/contracts/index.ts
 
-import type { ComponentType } from '../@shared/contracts';
+import type { ComponentType } from '@shared/contracts';
 
 /**
  * Interface for minimap configuration

@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { toPng } from "html-to-image";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { shallow } from "zustand/shallow";
@@ -59,9 +60,16 @@ import { ConnectionTemplatePanel } from "../canvas/ConnectionTemplatePanel";
 import { KeyboardShortcutsReference } from "../canvas/KeyboardShortcutsReference";
 import { QuickConnectOverlay } from "../canvas/QuickConnectOverlay";
 import { QuickValidationPanel } from "../canvas/QuickValidationPanel";
+import { CanvasSettingsPanel } from "../canvas/CanvasSettingsPanel";
+import { useAnnouncer } from "@/shared/hooks/useAccessibility";
 import { CanvasOverlays } from "./components/CanvasOverlays";
 import { DesignCanvasLayout } from "./components/DesignCanvasLayout";
 import { DesignCanvasHeader } from "./DesignCanvasHeader";
+import {
+  APP_EVENT,
+  type AppEventPayloads,
+  dispatchAppEvent,
+} from "@/lib/events/appEvents";
 
 export interface DesignCanvasProps {
   challenge: Challenge;
@@ -84,6 +92,61 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   const flushDesignDataRef = useRef<
     ((reason: string, options?: { immediate?: boolean }) => void) | undefined
   >(undefined);
+  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
+
+  type CanvasEventName =
+    | typeof APP_EVENT.CANVAS_ZOOM_IN
+    | typeof APP_EVENT.CANVAS_ZOOM_OUT
+    | typeof APP_EVENT.CANVAS_FIT_VIEW
+    | typeof APP_EVENT.CANVAS_FIT_BOUNDS
+    | typeof APP_EVENT.CANVAS_AUTO_LAYOUT;
+
+  const dispatchCanvasEvent = useCallback(
+    <T extends CanvasEventName>(
+      eventName: T,
+      detail: AppEventPayloads[T],
+    ) => {
+      dispatchAppEvent(eventName, detail);
+    },
+    [],
+  );
+
+  const handleExportPng = useCallback(async () => {
+    if (typeof window === "undefined" || !canvasWrapperRef.current) {
+      return;
+    }
+
+    try {
+      const dataUrl = await toPng(canvasWrapperRef.current, {
+        backgroundColor: "#ffffff",
+        pixelRatio: Math.min(2, window.devicePixelRatio || 1),
+      });
+
+      const safeTitle = (challenge.title || "archicomm-canvas")
+        .replace(/\s+/g, "-")
+        .toLowerCase();
+      const link = document.createElement("a");
+      link.download = `${safeTitle}-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error("Failed to export canvas as PNG", error);
+      try {
+        const anyWindow = window as any;
+        const message = "Unable to export PNG. Please try again.";
+        if (typeof anyWindow.__ARCHICOMM_TOAST === "function") {
+          anyWindow.__ARCHICOMM_TOAST("error", message);
+        } else if (anyWindow.toast && typeof anyWindow.toast.error === "function") {
+          anyWindow.toast.error(message);
+        } else if (typeof anyWindow.showToast === "function") {
+          anyWindow.showToast({ type: "error", message });
+        }
+      } catch (_toastError) {
+        // Ignore secondary errors when showing notifications
+      }
+    }
+  }, [challenge.title]);
 
   // Annotation state
   const [annotations, setAnnotations] = useState<Annotation[]>(
@@ -95,6 +158,8 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<
     string | null
   >(null);
+  const [highlightedAnnotationId, setHighlightedAnnotationId] =
+    useState<string | null>(null);
   const [showAnnotationSidebar, setShowAnnotationSidebar] = useState(false);
 
   // Connection template state
@@ -107,6 +172,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   // Validation and assessment overlay state
   const [showValidation, setShowValidation] = useState(false);
   const [showAssessment, setShowAssessment] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Keyboard shortcuts modal state
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
@@ -145,22 +211,36 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     [],
   );
 
-  const {
-    components,
-    connections,
-    infoCards,
-    selectedComponentId,
-    connectionStart,
-  } = useOptimizedSelector(
+  // OPTIMIZED: Use individual selectors to minimize re-renders
+  // Only re-render when specific slices change, not when entire canvas state changes
+  const components = useOptimizedSelector(
     canvasSource,
-    (state: any) => ({
-      components: state.components,
-      connections: state.connections,
-      infoCards: state.infoCards,
-      selectedComponentId: state.selectedComponent,
-      connectionStart: state.connectionStart,
-    }),
-    { debugLabel: "DesignCanvas.canvasState", equalityFn: shallow },
+    (state: any) => state.components,
+    { debugLabel: "DesignCanvas.components", equalityFn: shallow },
+  );
+
+  const connections = useOptimizedSelector(
+    canvasSource,
+    (state: any) => state.connections,
+    { debugLabel: "DesignCanvas.connections", equalityFn: shallow },
+  );
+
+  const infoCards = useOptimizedSelector(
+    canvasSource,
+    (state: any) => state.infoCards,
+    { debugLabel: "DesignCanvas.infoCards", equalityFn: shallow },
+  );
+
+  const selectedComponentId = useOptimizedSelector(
+    canvasSource,
+    (state: any) => state.selectedComponent,
+    { debugLabel: "DesignCanvas.selectedComponent" },
+  );
+
+  const connectionStart = useOptimizedSelector(
+    canvasSource,
+    (state: any) => state.connectionStart,
+    { debugLabel: "DesignCanvas.connectionStart" },
   );
 
   // Drawing state
@@ -185,6 +265,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   } = useDesignCanvasState({ initialData, sessionStartTime });
 
   const callbacks = useDesignCanvasCallbacks();
+  const announce = useAnnouncer();
 
   // Extract drawing callbacks
   const {
@@ -210,26 +291,36 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     } satisfies DesignData["metadata"];
   }, [initialData.metadata]);
 
+  // OPTIMIZED: Split currentDesignData memoization
+  // Components/connections from store - memoized separately
+  const coreCanvasData = useMemo(
+    () => ({ components, connections, infoCards }),
+    [components, connections, infoCards],
+  );
+
+  // Annotations/drawings - local state, change less frequently
+  const annotationData = useMemo(
+    () => ({ annotations, drawings }),
+    [annotations, drawings],
+  );
+
+  // Full design data - now only recomputes when major sections change
   const currentDesignData = useMemo<DesignData>(
     () => ({
-      components,
-      connections,
-      infoCards,
-      annotations,
-      drawings,
+      ...coreCanvasData,
+      ...annotationData,
       layers,
       metadata,
     }),
-    [
-      components,
-      connections,
-      infoCards,
-      annotations,
-      drawings,
-      layers,
-      metadata,
-    ],
+    [coreCanvasData, annotationData, layers, metadata],
   );
+
+  const highlightedAnnotation = useMemo(() => {
+    if (!highlightedAnnotationId) {
+      return null;
+    }
+    return annotations.find(annotation => annotation.id === highlightedAnnotationId) ?? null;
+  }, [annotations, highlightedAnnotationId]);
 
   const handleAnnotationsImported = useCallback(
     (importedAnnotations: Annotation[]) => {
@@ -275,27 +366,38 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     () => handleSave(currentDesignDataRef.current),
     [handleSave],
   );
-  const handleContinue = useCallback(
-    () => onComplete(currentDesignData),
-    [onComplete, currentDesignData],
-  );
+  // OPTIMIZED: Stabilize callbacks with refs
+  // These callbacks should not recreate when design data changes
+  const onCompleteRef = useRef(onComplete);
+  const onSkipToReviewRef = useRef(onSkipToReview);
+  const onFinishAndExportRef = useRef(onFinishAndExport);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+    onSkipToReviewRef.current = onSkipToReview;
+    onFinishAndExportRef.current = onFinishAndExport;
+  });
+
+  const handleContinue = useCallback(() => {
+    onCompleteRef.current(currentDesignDataRef.current);
+  }, []);
 
   // Handlers for optional flow
   const handleSkipToReview = useCallback(() => {
-    if (onSkipToReview) {
+    if (onSkipToReviewRef.current) {
       // Save current design data before skipping
-      onComplete(currentDesignData);
-      onSkipToReview();
+      onCompleteRef.current(currentDesignDataRef.current);
+      onSkipToReviewRef.current();
     }
-  }, [onSkipToReview, onComplete, currentDesignData]);
+  }, []);
 
   const handleFinishAndExport = useCallback(() => {
-    if (onFinishAndExport) {
+    if (onFinishAndExportRef.current) {
       // Save current design data before finishing
-      onComplete(currentDesignData);
-      onFinishAndExport();
+      onCompleteRef.current(currentDesignDataRef.current);
+      onFinishAndExportRef.current();
     }
-  }, [onFinishAndExport, onComplete, currentDesignData]);
+  }, []);
 
   const designCanvasEffects = useDesignCanvasEffects({
     components,
@@ -314,6 +416,15 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
       flushDesignDataRef.current = undefined;
     };
   }, [designCanvasEffects.flushPendingDesign]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const extendedChallenge = useMemo<ExtendedChallenge>(
     () =>
@@ -334,6 +445,8 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   });
 
   const {
+    registerReactFlowInstance,
+    focusViewport,
     handleComponentDrop,
     handleComponentMove,
     handleComponentSelect,
@@ -364,9 +477,12 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     onComponentMove: handleComponentMove,
     onUndo: () => useCanvasStore.temporal.getState().undo(),
     onRedo: () => useCanvasStore.temporal.getState().redo(),
-    onZoomIn: () => {}, // TODO: implement zoom
-    onZoomOut: () => {}, // TODO: implement zoom
-    onFitView: () => {}, // TODO: implement fit view
+    onZoomIn: () =>
+      dispatchCanvasEvent(APP_EVENT.CANVAS_ZOOM_IN, undefined),
+    onZoomOut: () =>
+      dispatchCanvasEvent(APP_EVENT.CANVAS_ZOOM_OUT, undefined),
+    onFitView: () =>
+      dispatchCanvasEvent(APP_EVENT.CANVAS_FIT_VIEW, undefined),
     onSetCanvasMode: (mode) => useCanvasStore.getState().setCanvasMode(mode),
     onHelp: () => {
       setShortcutsInitialSection(undefined);
@@ -378,16 +494,21 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   // Listen for custom event to open keyboard shortcuts modal
   useEffect(() => {
     const handleOpenShortcuts = (event: Event) => {
-      const customEvent = event as CustomEvent<{ section?: string }>;
+      const customEvent = event as CustomEvent<
+        AppEventPayloads[typeof APP_EVENT.KEYBOARD_SHORTCUTS_OPEN]
+      >;
       setShortcutsInitialSection(customEvent.detail?.section);
       setShortcutsHighlight([]);
       setShowKeyboardShortcuts(true);
     };
 
-    window.addEventListener("open-keyboard-shortcuts", handleOpenShortcuts);
+    window.addEventListener(
+      APP_EVENT.KEYBOARD_SHORTCUTS_OPEN,
+      handleOpenShortcuts,
+    );
     return () => {
       window.removeEventListener(
-        "open-keyboard-shortcuts",
+        APP_EVENT.KEYBOARD_SHORTCUTS_OPEN,
         handleOpenShortcuts,
       );
     };
@@ -446,10 +567,51 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     [markDesignModified],
   );
 
-  const handleAnnotationFocus = useCallback((id: string) => {
-    setSelectedAnnotationId(id);
-    // TODO: Implement scroll to annotation using React Flow's fitView
-  }, []);
+  const handleAnnotationFocus = useCallback(
+    (id: string) => {
+      setSelectedAnnotationId(id);
+
+      const annotation = annotations.find(item => item.id === id);
+      if (!annotation) {
+        return;
+      }
+
+      const width = annotation.width ?? 220;
+      const height = annotation.height ?? 120;
+      const centerX = annotation.x + width / 2;
+      const centerY = annotation.y + height / 2;
+
+      const viewportFocused = focusViewport(
+        { x: centerX, y: centerY },
+        { zoom: 1.1, duration: 320 },
+      );
+
+      if (!viewportFocused) {
+        dispatchCanvasEvent(APP_EVENT.CANVAS_FIT_BOUNDS, {
+          x: annotation.x - 48,
+          y: annotation.y - 48,
+          width: width + 96,
+          height: height + 96,
+          padding: 0.2,
+        });
+      }
+
+      setHighlightedAnnotationId(id);
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+      highlightTimeoutRef.current = window.setTimeout(() => {
+        setHighlightedAnnotationId(null);
+        highlightTimeoutRef.current = null;
+      }, 1500);
+
+      const message = annotation.content?.trim()
+        ? `Focused annotation: ${annotation.content}`
+        : `Focused ${annotation.type} annotation`;
+      announce(message, "polite");
+    },
+    [annotations, focusViewport, dispatchCanvasEvent, announce],
+  );
 
   // Connection template handlers
   const handleTemplateSelect = useCallback(
@@ -547,7 +709,10 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
           />
         }
         canvas={
-          <div className="relative w-full h-full">
+          <div
+            ref={canvasWrapperRef}
+            className="relative w-full h-full min-h-[500px]"
+          >
             {/* Canvas Toolbar */}
             <div
               className="absolute top-4 left-1/2 -translate-x-1/2 z-[var(--z-toolbar)]"
@@ -555,21 +720,19 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
             >
               <CanvasToolbar
                 onFitView={() => {
-                  // TODO: Implement fit view using React Flow
+                  dispatchCanvasEvent(APP_EVENT.CANVAS_FIT_VIEW, undefined);
                 }}
                 onAutoLayout={() => {
-                  // TODO: Implement auto layout
+                  dispatchCanvasEvent(APP_EVENT.CANVAS_AUTO_LAYOUT, undefined);
                 }}
-                onToggleSettings={() => {
-                  // TODO: Implement settings panel
-                }}
+                onToggleSettings={() => setShowSettings(true)}
                 onQuickValidate={() => setShowValidation(true)}
                 onSelfAssessment={() => setShowAssessment(true)}
                 onExportJSON={() => {
                   handleQuickExport(currentDesignData);
                 }}
                 onExportPNG={() => {
-                  // TODO: Implement PNG export
+                  void handleExportPng();
                 }}
                 onShowHelp={(section) => {
                   setShortcutsInitialSection(section);
@@ -626,6 +789,8 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
               drawingColor={drawingColor}
               drawingSize={drawingSize}
               drawingSettings={drawingSettings}
+              onReactFlowInit={registerReactFlowInstance}
+              highlightedAnnotation={highlightedAnnotation}
               onConnectionStart={(id) => {
                 // In quick-connect mode, use the quick-connect hook
                 if (quickConnect.isQuickConnectMode) {
@@ -759,6 +924,11 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
                 }}
               />
             )}
+
+            <CanvasSettingsPanel
+              isOpen={showSettings}
+              onClose={() => setShowSettings(false)}
+            />
 
             {/* Self-Assessment Overlay */}
             {showAssessment && (

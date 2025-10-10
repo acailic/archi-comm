@@ -10,7 +10,7 @@ import * as Slider from "@radix-ui/react-slider";
 import { Eraser, Highlighter, Pencil, Trash2 } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 import { cx } from "../../../../lib/design/design-system";
-import type { DrawingTool } from "../../../../shared/contracts";
+import type { DrawingSettings, DrawingTool } from "../../../../shared/contracts";
 
 interface DrawingToolbarProps {
   selectedTool: DrawingTool;
@@ -19,6 +19,8 @@ interface DrawingToolbarProps {
   onColorChange: (color: string) => void;
   size: number;
   onSizeChange: (size: number) => void;
+  settings?: DrawingSettings;
+  onSettingsChange?: (settings: Partial<DrawingSettings>) => void;
   strokeCount?: number;
   onClearAll?: () => void;
   className?: string;
@@ -73,6 +75,8 @@ const DrawingToolbarComponent: React.FC<DrawingToolbarProps> = ({
   onColorChange,
   size,
   onSizeChange,
+  settings,
+  onSettingsChange,
   strokeCount = 0,
   onClearAll,
   className,
@@ -113,10 +117,19 @@ const DrawingToolbarComponent: React.FC<DrawingToolbarProps> = ({
     setShowClearConfirm(false);
   }, [onClearAll]);
 
+  const handleSettingsChange = useCallback(
+    (key: keyof DrawingSettings, value: number[]) => {
+      if (!onSettingsChange) return;
+      onSettingsChange({ [key]: Number(value[0].toFixed(2)) });
+    },
+    [onSettingsChange],
+  );
+
   return (
     <div
       className={cx(
-        "flex items-center gap-3 p-3 bg-white border-2 border-gray-900 rounded-lg shadow-lg",
+        "flex items-center gap-3 p-3 bg-white border-2 border-gray-900 rounded-lg shadow-xl",
+        "backdrop-blur-sm bg-white/95", // Add slight transparency and blur
         className,
       )}
     >
@@ -264,6 +277,86 @@ const DrawingToolbarComponent: React.FC<DrawingToolbarProps> = ({
         </Popover.Content>
       </Popover.Root>
 
+      {/* Advanced Settings */}
+      {onSettingsChange && settings && (
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <button
+              className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-gray-300 rounded-md hover:border-gray-400 transition-colors"
+              title="Brush settings"
+            >
+              <span className="text-sm font-medium">Settings</span>
+            </button>
+          </Popover.Trigger>
+          <Popover.Content
+            className="p-3 bg-white border-2 border-gray-900 rounded-lg shadow-lg z-50 w-56"
+            sideOffset={8}
+          >
+            <div className="space-y-3 text-sm text-gray-700">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-medium uppercase text-gray-500">
+                  <span>Smoothing</span>
+                  <span>{Math.round((settings.smoothing ?? 0) * 100)}%</span>
+                </div>
+                <Slider.Root
+                  className="relative flex items-center select-none touch-none w-full h-5"
+                  value={[settings.smoothing ?? 0]}
+                  max={1}
+                  min={0}
+                  step={0.05}
+                  onValueChange={(value) => handleSettingsChange("smoothing", value)}
+                >
+                  <Slider.Track className="bg-gray-200 relative grow rounded-full h-2">
+                    <Slider.Range className="absolute bg-blue-500 rounded-full h-full" />
+                  </Slider.Track>
+                  <Slider.Thumb className="block w-4 h-4 bg-white border-2 border-blue-500 rounded-full hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50" />
+                </Slider.Root>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-medium uppercase text-gray-500">
+                  <span>Thinning</span>
+                  <span>{Math.round((settings.thinning ?? 0) * 100)}%</span>
+                </div>
+                <Slider.Root
+                  className="relative flex items-center select-none touch-none w-full h-5"
+                  value={[settings.thinning ?? 0]}
+                  max={1}
+                  min={0}
+                  step={0.05}
+                  onValueChange={(value) => handleSettingsChange("thinning", value)}
+                >
+                  <Slider.Track className="bg-gray-200 relative grow rounded-full h-2">
+                    <Slider.Range className="absolute bg-blue-500 rounded-full h-full" />
+                  </Slider.Track>
+                  <Slider.Thumb className="block w-4 h-4 bg-white border-2 border-blue-500 rounded-full hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50" />
+                </Slider.Root>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-medium uppercase text-gray-500">
+                  <span>Streamline</span>
+                  <span>{Math.round((settings.streamline ?? 0) * 100)}%</span>
+                </div>
+                <Slider.Root
+                  className="relative flex items-center select-none touch-none w-full h-5"
+                  value={[settings.streamline ?? 0]}
+                  max={1}
+                  min={0}
+                  step={0.05}
+                  onValueChange={(value) => handleSettingsChange("streamline", value)}
+                >
+                  <Slider.Track className="bg-gray-200 relative grow rounded-full h-2">
+                    <Slider.Range className="absolute bg-blue-500 rounded-full h-full" />
+                  </Slider.Track>
+                  <Slider.Thumb className="block w-4 h-4 bg-white border-2 border-blue-500 rounded-full hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50" />
+                </Slider.Root>
+              </div>
+            </div>
+          </Popover.Content>
+        </Popover.Root>
+      )}
+
       {/* Stroke Count Badge */}
       {strokeCount > 0 && (
         <div className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
@@ -316,6 +409,17 @@ const DrawingToolbarComponent: React.FC<DrawingToolbarProps> = ({
           </div>
         </Popover.Content>
       </Popover.Root>
+
+      {/* Exit drawing mode */}
+      <div className="h-6 w-px bg-gray-300 mx-1" aria-hidden="true" />
+      <button
+        onClick={() => onToolSelect(null)}
+        className="flex items-center justify-center w-9 h-9 rounded-md border-2 bg-white border-gray-300 text-gray-700 hover:bg-red-50 hover:border-red-400 hover:text-red-600 transition-all duration-200"
+        title="Exit drawing mode (Esc)"
+        aria-label="Exit drawing mode"
+      >
+        <span className="text-lg font-bold">×</span>
+      </button>
     </div>
   );
 };

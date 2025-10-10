@@ -7,7 +7,7 @@
 
 import type { Viewport } from '@xyflow/react';
 import { BoundingBoxImpl, RTree, SpatialItem } from '@/lib/spatial/RTree';
-import type { DesignComponent } from '../@shared/contracts';
+import type { DesignComponent } from '@shared/contracts';
 
 // Configuration interfaces
 export interface VirtualizationConfig {

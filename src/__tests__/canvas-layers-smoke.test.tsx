@@ -139,7 +139,12 @@ describe('Canvas layers smoke tests (minimal props)', () => {
   it('CanvasInteractionLayer mounts with features disabled', () => {
     render(
       <CanvasContextProvider initialState={initialCanvasState} callbacks={noopCallbacks as any}>
-        <CanvasInteractionLayer enableContextMenu={false} enableDragDrop={false} enableKeyboardShortcuts={false}>
+        <CanvasInteractionLayer
+          enableContextMenu={false}
+          enableDragDrop={false}
+          enableKeyboardShortcuts={false}
+          viewport={{ x: 0, y: 0, zoom: 1 }}
+        >
           <div data-testid='interaction-root' />
         </CanvasInteractionLayer>
       </CanvasContextProvider>

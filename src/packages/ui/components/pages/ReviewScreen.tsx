@@ -5,7 +5,7 @@
  * RELEVANT FILES: useAIReview.ts, CanvasComponent.tsx, ReviewPreviewCanvas.tsx, VerticalSidebar.tsx
  */
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import {
   ArrowLeft,
   RotateCcw,
@@ -39,8 +39,15 @@ import {
 import { SidebarProvider } from '@ui/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/components/ui/tooltip';
 import { CanvasComponent } from '@ui/components/canvas/CanvasComponent';
+import { Minimap } from '@ui/components/canvas/Minimap';
 import { SolutionValidationCard } from '@ui/components/SolutionValidationCard';
-import type { DesignData, AudioData, TranscriptFeedback, Challenge } from '@/shared/contracts';
+import type {
+  DesignData,
+  AudioData,
+  TranscriptFeedback,
+  Challenge,
+  ViewportInfo,
+} from '@/shared/contracts';
 import type { ExtendedChallenge } from '@/lib/config/challenge-config';
 
 interface ReviewScreenProps {
@@ -55,6 +62,14 @@ interface ReviewScreenProps {
   skipReview?: boolean;
 }
 
+const DEFAULT_COMPONENT_WIDTH = 220;
+const DEFAULT_COMPONENT_HEIGHT = 140;
+const CANVAS_PADDING = 200;
+const DEFAULT_CANVAS_WIDTH = 1600;
+const DEFAULT_CANVAS_HEIGHT = 1200;
+const ZOOM_MIN = 0.3;
+const ZOOM_MAX = 2;
+
 export function ReviewScreen({
   challenge,
   designData,
@@ -68,8 +83,20 @@ export function ReviewScreen({
 }: ReviewScreenProps) {
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [reviewMode, setReviewMode] = useState<'overview' | 'detailed'>('overview');
-  const canvasRef = useRef<HTMLDivElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [showOptionalBanner, setShowOptionalBanner] = useState(true);
+  const [showMinimap, setShowMinimap] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(0.6);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [viewport, setViewport] = useState<ViewportInfo>({
+    x: 0,
+    y: 0,
+    width: DEFAULT_CANVAS_WIDTH,
+    height: DEFAULT_CANVAS_HEIGHT,
+    zoom: 0.6,
+    worldWidth: DEFAULT_CANVAS_WIDTH,
+    worldHeight: DEFAULT_CANVAS_HEIGHT,
+  });
   // Collapse AI Review and detailed panel when skipReview is true
   const [isAIReviewExpanded, setIsAIReviewExpanded] = useState(!skipReview);
   const [isDetailedPanelExpanded, setIsDetailedPanelExpanded] = useState(!skipReview);
@@ -166,6 +193,154 @@ export function ReviewScreen({
   const solutionText = useMemo(() => {
     return `Design Summary\nComponents: ${designData.components.length}\nConnections: ${designData.connections.length}\nTypes: ${designAnalysis.types.join(', ')}\nArchitecture Score: ${designAnalysis.architectureScore}\n`;
   }, [designData, designAnalysis]);
+
+  const worldCanvasBounds = useMemo(() => {
+    if (!designData?.components?.length) {
+      return {
+        width: DEFAULT_CANVAS_WIDTH,
+        height: DEFAULT_CANVAS_HEIGHT,
+      };
+    }
+
+    const aggregate = designData.components.reduce(
+      (acc, component) => {
+        const componentWidth = component.width ?? DEFAULT_COMPONENT_WIDTH;
+        const componentHeight = component.height ?? DEFAULT_COMPONENT_HEIGHT;
+        const componentX = component.x ?? 0;
+        const componentY = component.y ?? 0;
+
+        return {
+          maxX: Math.max(acc.maxX, componentX + componentWidth),
+          maxY: Math.max(acc.maxY, componentY + componentHeight),
+        };
+      },
+      { maxX: DEFAULT_CANVAS_WIDTH, maxY: DEFAULT_CANVAS_HEIGHT }
+    );
+
+    return {
+      width: Math.max(aggregate.maxX + CANVAS_PADDING, DEFAULT_CANVAS_WIDTH),
+      height: Math.max(aggregate.maxY + CANVAS_PADDING, DEFAULT_CANVAS_HEIGHT),
+    };
+  }, [designData.components]);
+
+  const canvasBounds = useMemo(() => {
+    if (!designData?.components?.length) {
+      return { width: DEFAULT_CANVAS_WIDTH, height: DEFAULT_CANVAS_HEIGHT };
+    }
+    const agg = designData.components.reduce(
+      (acc, c) => {
+        const w = (c.width ?? DEFAULT_COMPONENT_WIDTH) * zoomLevel;
+        const h = (c.height ?? DEFAULT_COMPONENT_HEIGHT) * zoomLevel;
+        const x = c.x ?? 0;
+        const y = c.y ?? 0;
+        return {
+          maxX: Math.max(acc.maxX, x + w),
+          maxY: Math.max(acc.maxY, y + h),
+        };
+      },
+      { maxX: DEFAULT_CANVAS_WIDTH, maxY: DEFAULT_CANVAS_HEIGHT }
+    );
+    return {
+      width: Math.max(agg.maxX + CANVAS_PADDING, DEFAULT_CANVAS_WIDTH),
+      height: Math.max(agg.maxY + CANVAS_PADDING, DEFAULT_CANVAS_HEIGHT),
+    };
+  }, [designData.components, zoomLevel]);
+
+  const canvasExtents = useMemo(
+    () => ({ width: worldCanvasBounds.width, height: worldCanvasBounds.height }),
+    [worldCanvasBounds]
+  );
+
+  const componentsById = useMemo(() => {
+    const map = new Map<string, (typeof designData.components)[number]>();
+    for (const component of designData.components) {
+      map.set(component.id, component);
+    }
+    return map;
+  }, [designData.components]);
+
+  useEffect(() => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+
+    const updateViewport = () => {
+      const scrollLeft = container.scrollLeft;
+      const scrollTop = container.scrollTop;
+      const worldX = scrollLeft / zoomLevel;
+      const worldY = scrollTop / zoomLevel;
+      setViewport(prev => ({
+        ...prev,
+        x: worldX,
+        y: worldY,
+        width: container.clientWidth / zoomLevel,
+        height: container.clientHeight / zoomLevel,
+        zoom: zoomLevel,
+        worldWidth: worldCanvasBounds.width,
+        worldHeight: worldCanvasBounds.height,
+      }));
+    };
+
+    updateViewport();
+
+    const handleScroll = () => updateViewport();
+
+    container.addEventListener('scroll', handleScroll);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => updateViewport());
+      resizeObserver.observe(container);
+    }
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [canvasBounds.height, canvasBounds.width, worldCanvasBounds.height, worldCanvasBounds.width, zoomLevel]);
+
+  useEffect(() => {
+    setCanvasReady(false);
+    const frame = window.requestAnimationFrame(() => setCanvasReady(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [designData.components, canvasBounds]);
+
+  const handlePanTo = useCallback(
+    (x: number, y: number) => {
+      const container = canvasContainerRef.current;
+      if (!container) return;
+
+      const screenTargetLeft = x * zoomLevel - container.clientWidth / 2;
+      const screenTargetTop = y * zoomLevel - container.clientHeight / 2;
+
+      const maxLeft = Math.max(0, canvasBounds.width - container.clientWidth);
+      const maxTop = Math.max(0, canvasBounds.height - container.clientHeight);
+
+      const targetLeft = Math.min(Math.max(0, screenTargetLeft), maxLeft);
+      const targetTop = Math.min(Math.max(0, screenTargetTop), maxTop);
+
+      container.scrollTo({ left: targetLeft, top: targetTop, behavior: 'smooth' });
+    },
+    [canvasBounds.height, canvasBounds.width, zoomLevel]
+  );
+
+  const handleZoomTo = useCallback(
+    (nextZoom: number, centerX?: number, centerY?: number) => {
+      const container = canvasContainerRef.current;
+      const clampedZoom = Math.min(Math.max(nextZoom, ZOOM_MIN), ZOOM_MAX);
+
+      setZoomLevel(current => (Math.abs(current - clampedZoom) < 0.001 ? current : clampedZoom));
+
+      if (!container) return;
+
+      const focalX = centerX ?? viewport.x + viewport.width / 2;
+      const focalY = centerY ?? viewport.y + viewport.height / 2;
+
+      window.requestAnimationFrame(() => handlePanTo(focalX, focalY));
+    },
+    [handlePanTo, viewport.height, viewport.width, viewport.x, viewport.y]
+  );
 
   // Render the detailed review panel separately to avoid JSX parsing edge cases
   const renderDetailedPanel = () => {
@@ -677,43 +852,53 @@ export function ReviewScreen({
                   >
                     Detailed
                   </Button>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => setShowMinimap(prev => !prev)}
+                  >
+                    <Target className='w-4 h-4 mr-1' />
+                    {showMinimap ? 'Hide Minimap' : 'Show Minimap'}
+                  </Button>
                 </div>
               </div>
             </div>
             
             
-            <div className='flex-1 relative bg-background overflow-auto'>
-              <div 
-                ref={canvasRef}
-                className='w-full h-full relative'
-                style={{ minWidth: '2400px', minHeight: '1800px' }}
+            <div ref={canvasContainerRef} className='flex-1 relative bg-background overflow-auto'>
+              <div
+                className='relative'
+                style={{ width: `${canvasBounds.width}px`, height: `${canvasBounds.height}px` }}
               >
-                
-                {designData.components.map((component) => (
-                  <div key={component.id} className='absolute'>
-                    <CanvasComponent
-                      component={component}
-                      isSelected={selectedComponent === component.id}
-                      isConnectionStart={false}
-                      zoomLevel={0.6}
-                      health={designAnalysis.architectureScore > 70 ? 'healthy' : 'warning'}
-                      connectionCount={designData.connections.filter(c => 
-                        c.from === component.id || c.to === component.id
-                      ).length}
-                      onSelect={() => setSelectedComponent(component.id)}
-                      onLabelChange={() => {}}
-                      onMove={() => {}}
-                      onStartConnection={() => {}}
-                      onCompleteConnection={() => {}}
-                      readonly={true}
-                    />
+                {!canvasReady && (
+                  <div className='absolute inset-0 z-10 flex items-center justify-center bg-background/80'>
+                    <span className='text-sm text-muted-foreground'>Preparing canvas…</span>
                   </div>
+                )}
+
+                {designData.components.map(component => (
+                  <CanvasComponent
+                    key={component.id}
+                    component={component}
+                    isSelected={selectedComponent === component.id}
+                    isConnectionStart={false}
+                    zoomLevel={zoomLevel}
+                    health={designAnalysis.architectureScore > 70 ? 'healthy' : 'warning'}
+                    connectionCount={designData.connections.filter(
+                      c => c.from === component.id || c.to === component.id
+                    ).length}
+                    onSelect={() => setSelectedComponent(component.id)}
+                    onLabelChange={() => {}}
+                    onMove={() => {}}
+                    onStartConnection={() => {}}
+                    onCompleteConnection={() => {}}
+                    readonly={false}
+                  />
                 ))}
-                
-                
-                <svg 
+
+                <svg
                   className='absolute inset-0 pointer-events-none'
-                  style={{ width: '2400px', height: '1800px' }}
+                  style={{ width: `${canvasBounds.width}px`, height: `${canvasBounds.height}px` }}
                 >
                   <defs>
                     <marker
@@ -728,16 +913,21 @@ export function ReviewScreen({
                     </marker>
                   </defs>
                   
-                  {designData.connections.map((connection) => {
-                    const fromComponent = designData.components.find(c => c.id === connection.from);
-                    const toComponent = designData.components.find(c => c.id === connection.to);
+                  {designData.connections.map(connection => {
+                    const fromComponent = componentsById.get(connection.from);
+                    const toComponent = componentsById.get(connection.to);
                     
                     if (!fromComponent || !toComponent) return null;
                     
-                    const fromX = fromComponent.x + 110; // Component width / 2
-                    const fromY = fromComponent.y + 70;  // Component height / 2
-                    const toX = toComponent.x + 110;
-                    const toY = toComponent.y + 70;
+                    const fromWidth = (fromComponent.width ?? DEFAULT_COMPONENT_WIDTH) * zoomLevel;
+                    const fromHeight = (fromComponent.height ?? DEFAULT_COMPONENT_HEIGHT) * zoomLevel;
+                    const toWidth = (toComponent.width ?? DEFAULT_COMPONENT_WIDTH) * zoomLevel;
+                    const toHeight = (toComponent.height ?? DEFAULT_COMPONENT_HEIGHT) * zoomLevel;
+
+                    const fromX = fromComponent.x + fromWidth / 2;
+                    const fromY = fromComponent.y + fromHeight / 2;
+                    const toX = toComponent.x + toWidth / 2;
+                    const toY = toComponent.y + toHeight / 2;
                     
                     return (
                       <g key={connection.id}>
@@ -787,6 +977,25 @@ export function ReviewScreen({
                   </p>
                 </CardContent>
               </Card>
+              
+              {showMinimap && (
+                <Card>
+                  <CardHeader className='pb-2'>
+                    <CardTitle className='text-sm'>Canvas Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Minimap
+                      components={designData.components}
+                      connections={designData.connections}
+                      layers={designData.layers || []}
+                      viewport={viewport}
+                      canvasExtents={canvasExtents}
+                      onPanTo={handlePanTo}
+                      onZoomTo={handleZoomTo}
+                    />
+                  </CardContent>
+                </Card>
+              )}
               
               
               {selectedComponent && (() => {

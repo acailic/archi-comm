@@ -13,15 +13,14 @@ import { Badge } from '@ui/components/ui/badge';
 import { cx } from '@/lib/design/design-system';
 import { annotationStyleTokens } from '@/lib/canvas/annotation-utils';
 
-export interface AnnotationLayerProps {
+export interface AnnotationLayerProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onSelect'> {
   annotations: Annotation[];
   selectedAnnotationId?: string | null;
   highlightedAnnotationId?: string | null;
   viewport: Viewport;
   visible?: boolean;
   opacity?: number;
-  className?: string;
-  style?: React.CSSProperties;
+  debugMode?: boolean;
   onSelect?: (annotation: Annotation) => void;
   onDoubleClick?: (annotation: Annotation) => void;
   onHover?: (annotation: Annotation | null) => void;
@@ -60,14 +59,33 @@ const AnnotationLayerComponent: React.FC<AnnotationLayerProps> = ({
   viewport,
   visible = true,
   opacity = 1,
+  debugMode = false,
   className,
   style,
   onSelect,
   onDoubleClick,
   onHover,
   onMove,
+  ...rest
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Development mode logging
+  if (import.meta.env.DEV) {
+    React.useEffect(() => {
+      console.log('[AnnotationLayer] Rendering', {
+        annotationCount: annotations.length,
+        visible,
+        opacity,
+        selectedAnnotationId,
+        viewport: {
+          x: viewport.x,
+          y: viewport.y,
+          zoom: viewport.zoom,
+        },
+      });
+    }, [annotations.length, visible, opacity, selectedAnnotationId, viewport.x, viewport.y, viewport.zoom]);
+  }
   const dragStateRef = useRef<{
     id: string;
     pointerId: number;
@@ -107,7 +125,7 @@ const AnnotationLayerComponent: React.FC<AnnotationLayerProps> = ({
         (viewportHeight + VIRTUALIZATION_BUFFER) / viewport.zoom,
     };
 
-    return annotations
+    const filtered = annotations
       .filter((annotation) => annotation.visible !== false)
       .filter((annotation) => {
         const override = overrides[annotation.id];
@@ -124,6 +142,19 @@ const AnnotationLayerComponent: React.FC<AnnotationLayerProps> = ({
         );
       })
       .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+    if (import.meta.env.DEV) {
+      const hiddenByVisibleFlag = annotations.filter(a => a.visible === false).length;
+      const hiddenByViewport = annotations.length - hiddenByVisibleFlag - filtered.length;
+      console.log('[AnnotationLayer] Visibility filtering', {
+        total: annotations.length,
+        visible: filtered.length,
+        hiddenByVisibleFlag,
+        hiddenByViewport,
+      });
+    }
+
+    return filtered;
   }, [annotations, overrides, viewport]);
 
   const handlePointerDown = useCallback(
@@ -236,8 +267,9 @@ const AnnotationLayerComponent: React.FC<AnnotationLayerProps> = ({
               <div
                 className='line-clamp-5 whitespace-pre-wrap text-sm'
                 style={annotation.style}
-                dangerouslySetInnerHTML={{ __html: annotation.content }}
-              />
+              >
+                {annotation.content}
+              </div>
             </div>
           );
         case 'label':
@@ -292,16 +324,27 @@ const AnnotationLayerComponent: React.FC<AnnotationLayerProps> = ({
   );
 
   if (!visible) {
+    if (import.meta.env.DEV) {
+      console.log('[AnnotationLayer] Layer hidden (visible=false)');
+    }
     return null;
   }
 
   return (
     <div
       ref={containerRef}
+      {...rest}
+      data-testid="annotation-layer"
       className={cx('pointer-events-auto absolute inset-0', className)}
       style={{ ...style, opacity }}
       aria-hidden={!visible}
     >
+      {/* Empty state indicator in dev mode */}
+      {import.meta.env.DEV && annotations.length === 0 && (
+        <div className="pointer-events-none absolute top-4 left-4 bg-yellow-100 border border-yellow-400 px-3 py-2 rounded text-xs text-yellow-800">
+          AnnotationLayer: No annotations yet
+        </div>
+      )}
       {visibleAnnotations.map((annotation) => {
         const override = overrides[annotation.id];
         const { width, height } = getAnnotationDimensions(annotation);
@@ -339,11 +382,14 @@ const AnnotationLayerComponent: React.FC<AnnotationLayerProps> = ({
         return (
           <motion.div
             key={annotation.id}
+            data-testid={`annotation-${annotation.id}`}
+            data-annotation-type={annotation.type}
             layout
             className={cx(
               'annotation-layer-item absolute origin-top-left will-change-transform',
               'cursor-pointer rounded-xl transition-shadow duration-150',
-              isHighlighted ? 'ring-2 ring-primary/60' : null
+              isHighlighted ? 'ring-2 ring-primary/60' : null,
+              debugMode ? 'ring-4 ring-yellow-400 ring-offset-2' : null
             )}
             style={style}
             whileHover={{ scale: 1.01 }}
@@ -357,6 +403,11 @@ const AnnotationLayerComponent: React.FC<AnnotationLayerProps> = ({
             onPointerLeave={handlePointerLeave}
           >
             {renderAnnotationContent(annotation, isSelected)}
+            {debugMode && (
+              <div className="absolute bottom-0 left-0 bg-yellow-400 text-black text-[10px] px-1 py-0.5 font-mono pointer-events-none">
+                {annotation.id.slice(0, 8)} | {annotation.type}
+              </div>
+            )}
           </motion.div>
         );
       })}

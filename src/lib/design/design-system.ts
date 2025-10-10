@@ -81,16 +81,49 @@ export const animations = {
   tap: "active:scale-[0.98]",
 } as const;
 
+/**
+ * Z-index values for canvas overlays
+ *
+ * Stacking order (bottom to top):
+ * 1. ReactFlow canvas (base layer)
+ * 2. Annotation layer (rendered annotations)
+ * 3. Drawing overlay (freehand strokes)
+ * 4. Annotation overlay (creation interface)
+ * 5. Selection/alignment overlays
+ * 6. Toolbars and controls
+ * 7. Sidebars and panels
+ * 8. Modals and dialogs
+ * 9. Toast notifications
+ */
 export const overlayZIndex = {
-  annotationLayer: 12,
-  annotationOverlay: 12,
-  drawingOverlay: 15,
-  groups: 50,
-  guides: 60,
-  toolbar: 80,
-  selection: 100,
-  contextMenu: 120,
+  reactFlow: 1,
+  annotationLayer: 5,
+  drawingOverlay: 10,
+  annotationOverlay: 15,
+  selectionBox: 20,
+  alignmentGuides: 25,
+  toolbar: 30,
+  sidebar: 35,
+  modal: 40,
+  toast: 50,
 } as const;
+
+export const getOverlayZIndex = (
+  layer: keyof typeof overlayZIndex,
+): number => overlayZIndex[layer];
+
+if (import.meta.env.DEV) {
+  const values = Object.values(overlayZIndex);
+  const sorted = [...values].sort((a, b) => a - b);
+
+  if (JSON.stringify(values) !== JSON.stringify(sorted)) {
+    // eslint-disable-next-line no-console
+    console.warn("Z-index values are not in ascending order");
+  }
+}
+
+// Pointer-event guidelines: higher z-index overlays should set pointer-events to
+// 'none' when inactive to avoid blocking interactions with lower layers.
 
 // Semantic roles used across component types
 export const colorRoles = {

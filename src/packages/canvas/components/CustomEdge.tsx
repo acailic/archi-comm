@@ -9,6 +9,11 @@ import type { Connection } from "@/shared/contracts";
 import { useStableStyleEx } from "@/shared/hooks/useStableLiterals";
 import { createHotLeafComponent } from "@/shared/utils/hotLeafMemoization";
 import {
+  useFlowingConnectionIds,
+  useCanvasActions,
+  useCanvasStore,
+} from "@/stores/canvasStore";
+import {
   BaseEdge,
   EdgeLabelRenderer,
   EdgeProps,
@@ -16,7 +21,7 @@ import {
   getSmoothStepPath,
   getStraightPath,
 } from "@xyflow/react";
-import React, { useId, useMemo } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { isDevelopment } from "../../../lib/config/environment";
 import { getConnectionColor, getVisualStyleColor } from "@/lib/design/canvas-colors";
 
@@ -54,6 +59,50 @@ function CustomEdgeInner({
     isStartConnection,
     onConnectionSelect,
   } = data;
+
+  const animationsEnabled = useCanvasStore((state) => state.animationsEnabled);
+  const flowingConnectionIds = useFlowingConnectionIds();
+  const canvasActions = useCanvasActions();
+  const hoverTimeoutRef = useRef<number | null>(null);
+  const isFlowing = animationsEnabled && flowingConnectionIds.includes(id);
+
+  const flowSpeedSetting = (connection as any)?.metadata?.flowSpeed;
+  const animationDuration = useMemo(() => {
+    if (flowSpeedSetting === "fast") return "1s";
+    if (flowSpeedSetting === "slow") return "3s";
+    return "2s";
+  }, [flowSpeedSetting]);
+
+  const handleMouseEnter = useCallback(() => {
+    if (!animationsEnabled) {
+      return;
+    }
+    canvasActions.addFlowingConnection(id);
+  }, [animationsEnabled, canvasActions, id]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!animationsEnabled) {
+      return;
+    }
+
+    if (hoverTimeoutRef.current) {
+      window.clearTimeout(hoverTimeoutRef.current);
+    }
+
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      canvasActions.removeFlowingConnection(id);
+      hoverTimeoutRef.current = null;
+    }, 1000);
+  }, [animationsEnabled, canvasActions, id]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+      }
+      canvasActions.removeFlowingConnection(id);
+    };
+  }, [canvasActions, id]);
 
   // Generate the appropriate path based on connection style
   const [edgePath, labelX, labelY] = useMemo(() => {
@@ -185,12 +234,51 @@ function CustomEdgeInner({
         style={edgeStyle}
         markerEnd={`url(#${arrowId})`}
         onClick={handleEdgeClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         className={
           isSelected
             ? "transition-all duration-200"
             : "transition-all duration-200"
         }
       />
+
+      {isFlowing && (
+        <BaseEdge
+          id={`${id}-flow-visual`}
+          path={edgePath}
+          style={{
+            ...style,
+            stroke: color,
+            strokeWidth,
+            strokeDasharray: "10 18",
+            opacity: 0.85,
+            fill: "none",
+            vectorEffect: "non-scaling-stroke",
+            animationDuration,
+          }}
+          className="pointer-events-none animate-data-flow"
+          markerEnd={undefined}
+        />
+      )}
+
+      {isFlowing && (
+        <BaseEdge
+          id={`${id}-flow-dash`}
+          path={edgePath}
+          style={{
+            stroke: color,
+            strokeWidth: Math.max(2, strokeWidth - 1),
+            strokeDasharray: "14 12",
+            opacity: 0.4,
+            fill: "none",
+            vectorEffect: "non-scaling-stroke",
+            animationDuration,
+          }}
+          className="pointer-events-none animate-data-flow"
+          markerEnd={undefined}
+        />
+      )}
 
       {/* Edge label using EdgeLabelRenderer for proper positioning */}
       {connection.label && (

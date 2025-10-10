@@ -22,7 +22,7 @@ import {
 function useDebouncedCallback<T extends (...args: any[]) => void>(
   callback: T,
   delay: number
-): T {
+): [T, () => void] {
   const timeoutRef = useRef<NodeJS.Timeout>();
 
   const debouncedCallback = useCallback(
@@ -37,16 +37,17 @@ function useDebouncedCallback<T extends (...args: any[]) => void>(
     [callback, delay]
   ) as T;
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = undefined;
+    }
   }, []);
 
-  return debouncedCallback;
+  // Cleanup timeout on unmount
+  useEffect(() => cancel, [cancel]);
+
+  return [debouncedCallback, cancel];
 }
 
 interface ComponentPaletteSearchProps {
@@ -63,12 +64,14 @@ export const ComponentPaletteSearch = memo<ComponentPaletteSearchProps>(
     const [localQuery, setLocalQuery] = useState(searchQuery);
 
     // Debounced search update to store (200ms delay)
-    const debouncedUpdateSearch = useDebouncedCallback(
+    const [debouncedUpdateSearch, cancelDebounce] = useDebouncedCallback(
       (value: string) => {
         actions.setComponentSearchQuery(value);
       },
       200
     );
+
+    useEffect(() => cancelDebounce, [cancelDebounce]);
 
     const handleSearchChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {

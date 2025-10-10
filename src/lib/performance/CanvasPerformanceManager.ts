@@ -466,6 +466,25 @@ export class CanvasPerformanceManager {
   }
 
   /**
+   * Set quality level manually (0.0 = lowest quality, 1.0 = highest quality)
+   * This adjusts LOD rendering detail, texture quality, and other performance settings.
+   * @param level Quality level between 0.0 and 1.0
+   */
+  setQualityLevel(level: number): void {
+    const clampedLevel = Math.max(0.0, Math.min(1.0, level));
+    if (this.currentQualityLevel === clampedLevel) return;
+
+    this.currentQualityLevel = clampedLevel;
+    this.applyQualityLevel(clampedLevel);
+
+    if (this.config.debugMode) {
+      console.log(`[CanvasPerformanceManager] Quality level set to ${clampedLevel.toFixed(2)}`);
+    }
+
+    this.notifyListeners('qualityLevelChanged', { level: clampedLevel });
+  }
+
+  /**
    * Get system capabilities
    */
   getSystemCapabilities(): SystemCapabilities {

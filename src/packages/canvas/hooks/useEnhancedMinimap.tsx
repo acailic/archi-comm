@@ -5,7 +5,7 @@
 
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useReactFlow, useOnViewportChange } from '@xyflow/react';
-import type { DesignComponent } from '../@shared/contracts';
+import type { DesignComponent } from '@shared/contracts';
 import { useOptimizedCallback } from '@/lib/performance/PerformanceOptimizer';
 import {
   getComponentColor,

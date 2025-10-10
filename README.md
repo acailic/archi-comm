@@ -132,6 +132,7 @@ ArchiComm includes an automatic update system that securely downloads and instal
 For a deeper dive into the system and developer guidance, see the Architecture Guide.
 
 - Architecture overview, canvas internals, and performance: `docs/ARCHITECTURE.md`
+- Canvas drawing & annotation workflows: `docs/CANVAS_DRAWING_ANNOTATION_GUIDE.md`
 - APIs for components, hooks, and services: `docs/API_REFERENCE.md`
 
 ## Study Flow
@@ -148,6 +149,9 @@ For a deeper dive into the system and developer guidance, see the Architecture G
 ## Community Edition Features
 
 - **Voice Recording**: Record audio explanations of your system designs with manual transcript entry
+- 🎨 **Freehand Drawing**: Draw directly on the canvas with pen, highlighter, and eraser tools, plus keyboard shortcuts (`D`, `P`, `H`, `E`)
+- 💬 **Annotations**: Drop comments, notes, labels, arrows, and highlights with on-canvas guidance and quick placement overlays
+- ⌨️ **Canvas Shortcuts**: One-keystroke mode switching (`V` select, `D` draw, `A` annotate, `Esc` to exit) with in-app reference and toast feedback
 - Scenario templates: classic problems (URL shortener, news feed, chat, ride-hailing, file storage)
 - Patterns library: load balancing, caching, sharding, CQRS, pub/sub, rate limiting
 - Trade-off explorer: consistency levels, replication factors, partitioning schemes, backpressure
@@ -161,6 +165,7 @@ New in this build:
 - Architecture templates pre-seeding (load suggested components and links)
 - Progressive solution hints (manual toggle or contextual prompts)
 - Auto-save of canvas to Tauri backend (diagram + connections)
+- Unified canvas mode switcher with floating drawing toolbar, mode indicator, and refreshed keyboard shortcuts
 
 <details>
 <summary><b>Pro Version Features (Upgrade)</b></summary>
@@ -279,14 +284,39 @@ ArchiComm Community Edition loads "Tasks" (study modules) that define prompts, a
 - Simplified architecture: `DesignCanvas` integrates with `SimpleCanvas` (React Flow-based)
 - Simple state management: Zustand store (`SimpleAppStore`) replaces complex RxJS patterns
 - Component rendering: Single React Flow node type with customizable styling
+- Unified toolbar: Mode switcher toggles select/draw/annotate with contextual toolbars and mode indicator
 - Persistence: Local storage and export/import functionality
 
 ### Keyboard Shortcuts
 
-- V: Select, H: Pan, Z: Zoom, A: Annotate
-- Space + Drag: Pan viewport
-- Ctrl/Cmd+A: Select all; Del/Backspace: Delete
-- Arrow keys: Nudge; Ctrl/Cmd+Arrow: Fine nudge
+- `V`: Select mode / exit active mode
+- `D`: Drawing mode (defaults to the pen tool)
+- `A`: Annotation mode
+- `Esc`: Clear selection or exit the current mode
+- `H`: Pan tool (or highlighter when already drawing)
+- `Z`: Zoom tool
+- `Space` + drag: Pan viewport
+- `Ctrl/Cmd + A`: Select all; `Del`/`Backspace`: Delete
+- Arrow keys: Nudge; `Ctrl/Cmd` + arrow: Fine nudge
+
+### Drawing on Canvas
+
+ArchiComm includes a powerful freehand drawing feature:
+
+1. Press `D` or click **Draw** in the unified toolbar.
+2. Use the floating drawing toolbar (anchored beneath the header) to select tools, colors, and stroke size.
+3. Move the cursor to preview stroke size, then click and drag to draw.
+4. Use undo/redo or the toolbar controls to manage strokes.
+5. Press `Esc` or `V`, or click the mode indicator ✕, to return to select mode.
+
+### Adding Annotations
+
+1. Press `A` or click **Annotate** to enable annotation mode.
+2. Pick an annotation type (comment, note, label, arrow, highlight) from the toolbar.
+3. Hover to view placement feedback, then click once to drop the annotation.
+4. Press `Enter` to edit, `Delete` to remove, and `Esc` or `V` to exit annotation mode.
+
+For an in-depth guide (including troubleshooting and alternatives), see [docs/CANVAS_DRAWING_ANNOTATION_GUIDE.md](docs/CANVAS_DRAWING_ANNOTATION_GUIDE.md).
 
 ### Task Plugins
 
@@ -424,7 +454,7 @@ Press `?` in the app for the full list.
 - Bundler/Dev: Vite
 - Testing: Vitest (unit/integration) + Playwright (E2E)
 - Demo assets: Automated marketing screenshots via Playwright (`npm run demo:prepare && npm run demo:screenshots`, see `e2e/README-DEMO-SCREENSHOTS.md`)
-- Canvas and interactions: custom canvas engine, Motion/Framer animations
+- Canvas and interactions: React Flow canvas engine with custom overlays, `perfect-freehand` drawing, TipTap-powered annotations, Motion/Framer animations
 
 ## Developer Tools
 
@@ -479,7 +509,6 @@ Useful scripts:
 For complete tooling documentation, see `docs/TOOLING.md`.
 
 ---
-
 ## Contributing
 
 We welcome improvements to modules, patterns, checklists, and study flows for the Community Edition.
@@ -507,6 +536,28 @@ Ideas that help learners most:
 ArchiComm Pro unlocks advanced features for professional users, including automatic transcription, advanced AI review, company-specific templates, and more. Upgrade for the full experience.
 
 [Learn more and upgrade](https://archicomm.com/pro)
+
+---
+
+## Troubleshooting
+
+### Drawing Issues
+
+**Can't draw on the canvas?**
+- Press `D` or click **Draw** in the unified toolbar to enter drawing mode.
+- Pick a pen, highlighter, or eraser in the floating toolbar beneath the header.
+- Confirm the mode indicator badge shows *Drawing Mode* and the cursor preview circle is visible.
+- If strokes still do not appear, press `V` then `D` to reset the mode and ensure you are dragging on the canvas (not over other panels).
+
+### Annotation Issues
+
+**Annotations not placing?**
+- Press `A` or click **Annotate**, then choose a comment, note, label, arrow, or highlight tool.
+- Look for the hover halo that appears when the cursor is ready to place an annotation.
+- Ensure no side panels or overlays are covering the canvas—toggle layer visibility if necessary.
+- Press `Esc` or `V`, then re-enter annotation mode with `A` to reset the workflow.
+
+See [docs/CANVAS_DRAWING_ANNOTATION_GUIDE.md](docs/CANVAS_DRAWING_ANNOTATION_GUIDE.md) for detailed troubleshooting, best practices, and library alternatives.
 
 ---
 

@@ -8,7 +8,7 @@ import {
   Lightbulb,
   RotateCcw,
   Target,
-  Zap
+  Zap,
 } from 'lucide-react';
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { ExtendedChallenge, SolutionHint } from '@/lib/config/challenge-config';
@@ -19,6 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@ui/c
 import { ScrollArea } from '@ui/components/ui/scroll-area';
 import { Separator } from '@ui/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs';
+import { DidYouKnowLoader } from '@ui/components/loading/DidYouKnowLoader';
+import { EmptyHintsState } from '@/lib/animations/canvas-empty-states';
 
 // Lazy load heavy animation components (removed unused)
 // const LazyMotionDiv = React.lazy(() =>
@@ -27,30 +29,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui/tabs
 // const LazyAnimatePresence = React.lazy(() =>
 //   import('framer-motion').then(m => ({ default: m.AnimatePresence }))
 // );
-
-// Lightweight loading states
-const HintsLoadingSkeleton = () => (
-  <div className='space-y-3 animate-pulse'>
-    {[...Array(3)].map((_, i) => (
-      <div key={i} className='p-3 bg-muted/30 rounded-lg'>
-        <div className='w-3/4 h-4 bg-muted rounded mb-2' />
-        <div className='w-1/2 h-3 bg-muted/60 rounded' />
-      </div>
-    ))}
-  </div>
-);
-
-const TemplateLoadingSkeleton = () => (
-  <div className='p-4 bg-muted/20 rounded-lg animate-pulse'>
-    <div className='w-2/3 h-4 bg-muted rounded mb-2' />
-    <div className='w-full h-3 bg-muted/60 rounded mb-3' />
-    <div className='flex flex-wrap gap-2 mb-3'>
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className='w-16 h-6 bg-muted rounded' />
-      ))}
-    </div>
-  </div>
-);
 
 interface ComponentData {
   id: string;
@@ -169,6 +147,13 @@ export function SolutionHints({
   const [viewedHints, setViewedHints] = useState<Set<string>>(new Set());
   const [expandedHints, setExpandedHints] = useState<Set<string>>(new Set());
   const [currentTab, setCurrentTab] = useState('hints');
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 200);
+    return () => clearTimeout(timer);
+  }, [challenge.id]);
 
   // Progressive enhancement
   const isReady = useSolutionHintsReady();
@@ -244,6 +229,13 @@ export function SolutionHints({
     [expandedHints, handleHintView]
   );
 
+  const toggleCategory = useCallback((category: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [category]: !(prev[category] ?? true),
+    }));
+  }, []);
+
   const progressMessage = useMemo(() => {
     const { componentsCount, connectionsCount, timeElapsed } = designProgress;
     const minutes = Math.floor(timeElapsed / 60);
@@ -261,7 +253,24 @@ export function SolutionHints({
   }, [designProgress]);
 
   if (!visibleHints.length && !challenge.architectureTemplate) {
-    return null;
+    return (
+      <div className={`h-full bg-card/50 backdrop-blur-sm border-l border-border/30 flex flex-col ${className}`}>
+        <div className='flex items-center justify-between p-3 border-b border-border/30 bg-gradient-to-r from-muted/20 to-card/80 backdrop-blur-sm'>
+          <div className='flex items-center space-x-2'>
+            <div className='p-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-200/30'>
+              <Lightbulb className='w-3.5 h-3.5 text-amber-600' />
+            </div>
+            <div className='min-w-0'>
+              <h3 className='font-medium text-foreground text-sm truncate'>Solution Hints</h3>
+              <p className='text-xs text-muted-foreground truncate'>Hints will appear as you work on your design</p>
+            </div>
+          </div>
+        </div>
+        <div className='flex-1 flex items-center justify-center p-6'>
+          <EmptyHintsState />
+        </div>
+      </div>
+    );
   }
 
   const ContainerComponent = (animationsReady && motion ? motion.div : 'div') as React.ElementType;
@@ -322,6 +331,100 @@ export function SolutionHints({
   );
 
   function SolutionHintsContent() {
+    // Helper function to render individual hint cards
+    const renderHintCard = (hint: SolutionHint) => {
+      const isExpanded = expandedHints.has(hint.id);
+      const isViewed = viewedHints.has(hint.id);
+      const HintIcon = hintTypeIcons[hint.type as keyof typeof hintTypeIcons] || HelpCircle;
+      const hintColor = hintTypeColors[hint.type as keyof typeof hintTypeColors] || 'from-gray-500 to-gray-600';
+
+      const HintCard = ({ children }: { children: React.ReactNode }) => {
+        if (animationsReady && motion) {
+          return (
+            <motion.div key={hint.id} layout className='group'>
+              {children}
+            </motion.div>
+          );
+        }
+        return <div key={hint.id} className='group'>{children}</div>;
+      };
+
+      return (
+        <HintCard key={hint.id}>
+          <Card
+            className={`cursor-pointer transition-all duration-200 hover:shadow-md border-l-4 ${
+              isViewed ? 'border-l-green-500 bg-green-50/50' : 'border-l-gray-300'
+            }`}
+            onClick={() => toggleHintExpansion(hint.id)}
+          >
+            <CardHeader className='pb-1.5 px-3 pt-3'>
+              <div className='flex items-center justify-between'>
+                <div className='flex items-center space-x-2'>
+                  <div className={`p-1 rounded bg-gradient-to-r ${hintColor} bg-opacity-10`}>
+                    <HintIcon className='w-3 h-3' />
+                  </div>
+                  <CardTitle className='text-sm'>{hint.title}</CardTitle>
+                  {!isViewed && (
+                    <div className='w-2 h-2 bg-blue-500 rounded-full' />
+                  )}
+                </div>
+
+                <div className='flex items-center space-x-1'>
+                  <Badge
+                    variant='outline'
+                    className='text-xs'
+                    style={{
+                      color:
+                        hint.difficulty === 'beginner'
+                          ? '#10b981'
+                          : hint.difficulty === 'intermediate'
+                            ? '#f59e0b'
+                            : '#ef4444',
+                    }}
+                  >
+                    {hint.difficulty}
+                  </Badge>
+                  {isExpanded ? (
+                    <ChevronDown className='w-4 h-4' />
+                  ) : (
+                    <ChevronRight className='w-4 h-4' />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+
+            {isExpanded &&
+              (animationsReady && AnimatePresence ? (
+                <Suspense fallback={<div className='p-2'>Loading...</div>}>
+                  <AnimatePresence>
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <CardContent className='pt-0'>
+                        <Separator className='mb-3' />
+                        <CardDescription className='text-sm leading-relaxed'>
+                          {hint.content}
+                        </CardDescription>
+                      </CardContent>
+                    </motion.div>
+                  </AnimatePresence>
+                </Suspense>
+              ) : (
+                <CardContent className='pt-0'>
+                  <Separator className='mb-3' />
+                  <CardDescription className='text-sm leading-relaxed'>
+                    {hint.content}
+                  </CardDescription>
+                </CardContent>
+              ))}
+          </Card>
+        </HintCard>
+      );
+    };
+
     return (
       <Tabs value={currentTab} onValueChange={setCurrentTab} className='p-3 flex-1 flex flex-col'>
         <TabsList className='grid w-full grid-cols-2 mb-3'>
@@ -338,119 +441,69 @@ export function SolutionHints({
         </TabsList>
 
         <TabsContent value='hints' className='mt-4 space-y-3'>
-          {isReady ? (
+          {isLoading ? (
+            <div className='flex justify-center py-6'>
+              <DidYouKnowLoader variant='inline' />
+            </div>
+          ) : (
             <ScrollArea className='flex-1 min-h-0'>
-              {(Object.entries(hintsByType || {})).map(([type, hints]) => {
+              {Object.entries(hintsByType || {}).map(([type, hints]) => {
                 const Icon = hintTypeIcons[type as keyof typeof hintTypeIcons] || HelpCircle;
                 return (
                   <div key={type} className='mb-4'>
-                    <div className='flex items-center space-x-2 mb-2'>
-                      {React.createElement(Icon, {
-                        className: 'w-3 h-3',
-                      })}
-                      <span className='text-xs font-medium capitalize'>{type.replace('-', ' ')}</span>
-                      <Badge variant='outline' className='text-xs'>
-                        {hints.length}
-                      </Badge>
-                    </div>
+                    <button
+                      onClick={() =>
+                        setExpandedCategories((prev) => ({
+                          ...prev,
+                          [type]: !(prev[type] ?? true),
+                        }))
+                      }
+                      className='flex w-full items-center justify-between mb-2 text-left'
+                    >
+                      <div className='flex items-center space-x-2'>
+                        {React.createElement(Icon, {
+                          className: 'w-3 h-3',
+                        })}
+                        <span className='text-xs font-medium capitalize'>{
+                          type.replace('-', ' ')
+                        }</span>
+                        <Badge variant='outline' className='text-xs'>
+                          {hints.length}
+                        </Badge>
+                      </div>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${
+                          expandedCategories[type] ?? true ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
 
-                    <div className='space-y-2'>
-                      {hints.map(hint => {
-                        const isExpanded = expandedHints.has(hint.id);
-                        const isViewed = viewedHints.has(hint.id);
-                        const HintIcon = hintTypeIcons[hint.type as keyof typeof hintTypeIcons] || HelpCircle;
-                        const hintColor = hintTypeColors[hint.type as keyof typeof hintTypeColors] || 'from-gray-500 to-gray-600';
-
-                        const HintCard = ({ children }: { children: React.ReactNode }) => {
-                          if (animationsReady && motion) {
-                            return (
-                              <motion.div key={hint.id} layout className='group'>
-                                {children}
-                              </motion.div>
-                            );
-                          }
-                          return <div className='group'>{children}</div>;
-                        };
-
-                        return (
-                          <HintCard key={hint.id}>
-                            <Card
-                              className={`cursor-pointer transition-all duration-200 hover:shadow-md border-l-4 ${
-                                isViewed ? 'border-l-green-500 bg-green-50/50' : 'border-l-gray-300'
-                              }`}
-                              onClick={() => toggleHintExpansion(hint.id)}
+                    {(expandedCategories[type] ?? true) && (
+                      <div className='space-y-2'>
+                        {(animationsReady && AnimatePresence && motion) ? (
+                          <AnimatePresence initial={false}>
+                            <motion.div
+                              className='space-y-2'
+                              variants={{
+                                hidden: {},
+                                visible: {
+                                  transition: { staggerChildren: 0.05 },
+                                },
+                              }}
+                              initial='hidden'
+                              animate='visible'
+                              exit='hidden'
                             >
-                              <CardHeader className='pb-1.5 px-3 pt-3'>
-                                <div className='flex items-center justify-between'>
-                                  <div className='flex items-center space-x-2'>
-                                    <div
-                                      className={`p-1 rounded bg-gradient-to-r ${hintColor} bg-opacity-10`}
-                                    >
-                                      <HintIcon className='w-3 h-3' />
-                                    </div>
-                                    <CardTitle className='text-sm'>{hint.title}</CardTitle>
-                                    {!isViewed && (
-                                      <div className='w-2 h-2 bg-blue-500 rounded-full' />
-                                    )}
-                                  </div>
-
-                                  <div className='flex items-center space-x-1'>
-                                    <Badge
-                                      variant='outline'
-                                      className='text-xs'
-                                      style={{
-                                        color:
-                                          hint.difficulty === 'beginner'
-                                            ? '#10b981'
-                                            : hint.difficulty === 'intermediate'
-                                              ? '#f59e0b'
-                                              : '#ef4444',
-                                      }}
-                                    >
-                                      {hint.difficulty}
-                                    </Badge>
-                                    {isExpanded ? (
-                                      <ChevronDown className='w-4 h-4' />
-                                    ) : (
-                                      <ChevronRight className='w-4 h-4' />
-                                    )}
-                                  </div>
-                                </div>
-                              </CardHeader>
-
-                              {/* Conditional animation for hint expansion */}
-                              {isExpanded &&
-                                (animationsReady && AnimatePresence ? (
-                                  <Suspense fallback={<div className='p-2'>Loading...</div>}>
-                                    <AnimatePresence>
-                                      <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                      >
-                                        <CardContent className='pt-0'>
-                                          <Separator className='mb-3' />
-                                          <CardDescription className='text-sm leading-relaxed'>
-                                            {hint.content}
-                                          </CardDescription>
-                                        </CardContent>
-                                      </motion.div>
-                                    </AnimatePresence>
-                                  </Suspense>
-                                ) : (
-                                  <CardContent className='pt-0'>
-                                    <Separator className='mb-3' />
-                                    <CardDescription className='text-sm leading-relaxed'>
-                                      {hint.content}
-                                    </CardDescription>
-                                  </CardContent>
-                                ))}
-                            </Card>
-                          </HintCard>
-                        );
-                      })}
-                    </div>
+                              {hints.map((hint) => renderHintCard(hint))}
+                            </motion.div>
+                          </AnimatePresence>
+                        ) : (
+                          <div className='space-y-2'>
+                            {hints.map((hint) => renderHintCard(hint))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -462,8 +515,6 @@ export function SolutionHints({
                 </div>
               )}
             </ScrollArea>
-          ) : (
-            <HintsLoadingSkeleton />
           )}
         </TabsContent>
 
@@ -548,4 +599,26 @@ export function SolutionHints({
       </Tabs>
     );
   }
+}
+
+// Loading skeleton components
+function HintsLoadingSkeleton() {
+  return (
+    <div className='space-y-3 p-4'>
+      <div className='h-4 bg-gray-200 rounded animate-pulse w-3/4' />
+      <div className='h-4 bg-gray-200 rounded animate-pulse w-full' />
+      <div className='h-4 bg-gray-200 rounded animate-pulse w-5/6' />
+    </div>
+  );
+}
+
+function TemplateLoadingSkeleton() {
+  return (
+    <div className='space-y-3 p-4'>
+      <div className='h-6 bg-gray-200 rounded animate-pulse w-1/2' />
+      <div className='h-4 bg-gray-200 rounded animate-pulse w-full' />
+      <div className='h-4 bg-gray-200 rounded animate-pulse w-4/5' />
+      <div className='h-4 bg-gray-200 rounded animate-pulse w-3/4' />
+    </div>
+  );
 }

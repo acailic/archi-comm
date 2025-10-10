@@ -217,13 +217,27 @@ export class ShortcutLearningSystem {
 
     this.shortcutMetrics.set(shortcutId, metrics);
 
-    // Track with UXOptimizer
-    UXOptimizer.getInstance().trackAction('shortcut_usage', {
-      shortcutId,
+    const shortcutManager = getGlobalShortcutManager();
+    const shortcutDetails = shortcutManager?.getShortcut(shortcutId);
+    const optimizer = UXOptimizer.getInstance();
+
+    optimizer.trackAction({
+      type: 'shortcut-used',
+      data: {
+        shortcutId,
+        description: shortcutDetails?.description ?? shortcutId,
+        combination: shortcutDetails ? formatShortcutKey(shortcutDetails.combination) : undefined,
+        timeSaved,
+        adoptionRate: metrics.adoptionRate,
+      },
       success,
-      timeSaved,
-      context,
-      adoptionRate: metrics.adoptionRate,
+      duration: timeSaved,
+      context: {
+        page: 'canvas',
+        component: 'shortcut-learning-system',
+        previousAction: context,
+        userIntent: success ? 'accelerate-workflow' : 'attempt-shortcut',
+      },
     });
 
     // Update learning progress
@@ -267,12 +281,23 @@ export class ShortcutLearningSystem {
     // Track workflow patterns
     this.updateWorkflowPatterns(actionType, executionTime);
 
-    // Track with UXOptimizer
-    UXOptimizer.getInstance().trackAction('manual_action', {
-      actionType,
-      executionTime,
-      hasShortcut: !!availableShortcut,
-      context,
+    const optimizer = UXOptimizer.getInstance();
+    optimizer.trackAction({
+      type: 'manual-action',
+      data: {
+        actionType,
+        executionTime,
+        hadShortcut: !!availableShortcut,
+        availableShortcutId: availableShortcut?.id,
+      },
+      success: true,
+      duration: executionTime,
+      context: {
+        page: 'canvas',
+        component: 'shortcut-learning-system',
+        previousAction: context,
+        userIntent: 'manual-action',
+      },
     });
 
     this.saveData();
@@ -814,18 +839,43 @@ export class ShortcutLearningSystem {
   }
 
   private checkForLearningOpportunity(actionType: string, shortcutId: string): void {
+    const optimizer = UXOptimizer.getInstance();
     const recentActions = this.actionTracking.filter(
       action =>
         action.actionType === actionType && action.timestamp > Date.now() - 24 * 60 * 60 * 1000 // Last 24 hours
     ).length;
 
-    if (recentActions >= 3) {
-      // Trigger learning recommendation through UXOptimizer
-      UXOptimizer.getInstance().notifyObservers('show-help', {
+    const skillLevel = optimizer.getSkillLevel();
+    const thresholds: Record<string, number> = {
+      beginner: 3,
+      intermediate: 5,
+      advanced: 10,
+      expert: Number.POSITIVE_INFINITY,
+    };
+    const threshold = thresholds[skillLevel] ?? 5;
+
+    if (recentActions >= threshold && threshold !== Number.POSITIVE_INFINITY) {
+      optimizer.notifyObservers('show-help', {
         componentId: 'shortcut-learning',
         shortcutId,
         actionType,
         frequency: recentActions,
+        skillLevel,
+      });
+      optimizer.trackAction({
+        type: 'shortcut-recommendation',
+        data: {
+          shortcutId,
+          actionType,
+          frequency: recentActions,
+          skillLevel,
+        },
+        success: true,
+        context: {
+          page: 'canvas',
+          component: 'shortcut-learning-system',
+          userIntent: 'recommend-shortcut',
+        },
       });
     }
   }

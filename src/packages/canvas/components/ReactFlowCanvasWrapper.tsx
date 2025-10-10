@@ -7,9 +7,9 @@ import {
   ReactFlowProvider,
   useReactFlow,
 } from "@xyflow/react";
-import type { Viewport } from "@xyflow/react";
+import type { Viewport, ReactFlowInstance } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnouncer } from "../../../shared/hooks/useAccessibility";
 import { equalityFunctions } from "../../../shared/utils/memoization";
 import { EnhancedErrorBoundary } from "../../ui/components/ErrorBoundary/EnhancedErrorBoundary";
@@ -54,6 +54,7 @@ export interface ReactFlowCanvasWrapperProps {
   onInfoCardUpdate?: (infoCard: InfoCard) => void;
   onInfoCardDelete?: (infoCardId: string) => void;
   onInfoCardSelect?: (infoCardId: string) => void;
+  onReactFlowInit?: (instance: ReactFlowInstance) => void;
 }
 
 // Inner component that uses the ReactFlow instance
@@ -85,11 +86,23 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
   onInfoCardUpdate = () => {},
   onInfoCardDelete = () => {},
   onInfoCardSelect = () => {},
+  onReactFlowInit,
 }) => {
   const announce = useAnnouncer();
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const hasAnnouncedInitialRef = useRef(false);
   const reactFlowInstance = useReactFlow();
+  const [viewportState, setViewportState] = useState<Viewport>({
+    x: 0,
+    y: 0,
+    zoom: 1,
+  });
+
+  useEffect(() => {
+    if (onReactFlowInit && reactFlowInstance) {
+      onReactFlowInit(reactFlowInstance);
+    }
+  }, [onReactFlowInit, reactFlowInstance]);
 
   const canvasLabel = useMemo(() => {
     const componentCount = components.length;
@@ -168,30 +181,15 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
     [components, onComponentDeselect, onComponentSelect, selectedComponentId]
   );
 
-  // Listen for canvas:fit-bounds event to zoom to selection
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const handleFitBounds = (event: Event) => {
-      const detail = (event as CustomEvent<{ x: number; y: number; width: number; height: number; padding: number }>).detail;
-
-      if (!detail || !reactFlowInstance) {
-        return;
+  const handleViewportMove = useCallback(
+    (_event: unknown, viewportParams: Viewport) => {
+      setViewportState(viewportParams);
+      if (onViewportChange) {
+        onViewportChange(viewportParams);
       }
-
-      // Create DOMRect from the bounding box and fit view to it
-      const bounds = new DOMRect(detail.x, detail.y, detail.width, detail.height);
-      reactFlowInstance.fitBounds(bounds, { padding: detail.padding || 0.2 });
-    };
-
-    window.addEventListener("canvas:fit-bounds", handleFitBounds);
-
-    return () => {
-      window.removeEventListener("canvas:fit-bounds", handleFitBounds);
-    };
-  }, [reactFlowInstance]);
+    },
+    [onViewportChange]
+  );
 
   return (
     <CanvasController
@@ -221,11 +219,12 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
           <EnhancedErrorBoundary boundaryId="canvas-edge-layer">
             <EdgeLayer connections={connections}>
               <EnhancedErrorBoundary boundaryId="canvas-interaction-layer">
-                <CanvasInteractionLayer
-                  enableDragDrop={enableDragDrop}
-                  enableContextMenu={enableContextMenu}
-                  enableKeyboardShortcuts={enableKeyboardShortcuts}
-                >
+              <CanvasInteractionLayer
+                enableDragDrop={enableDragDrop}
+                enableContextMenu={enableContextMenu}
+                enableKeyboardShortcuts={enableKeyboardShortcuts}
+                viewport={viewportState}
+              >
                   <div
                     ref={canvasContainerRef}
                     role="application"
@@ -238,12 +237,7 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
                       fitView
                       attributionPosition="bottom-left"
                       className="react-flow-canvas"
-                      onMove={
-                        onViewportChange
-                          ? (_event, viewportParams) =>
-                              onViewportChange(viewportParams)
-                          : undefined
-                      }
+                      onMove={handleViewportMove}
                     >
                       {showBackground && (
                         <Background

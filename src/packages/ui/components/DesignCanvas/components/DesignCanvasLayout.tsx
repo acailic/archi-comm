@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { ResizablePanel } from '@ui/components/ui/ResizablePanel';
+import { ResizablePanel } from '../../ui/ResizablePanel';
 
 interface DesignCanvasLayoutProps {
   header: React.ReactNode;
@@ -16,10 +16,10 @@ interface DesignCanvasLayoutProps {
 export const DesignCanvasLayout: React.FC<DesignCanvasLayoutProps> = React.memo(
   ({ header, assignmentPanel, canvas, propertiesPanel, statusBar, overlays, annotationToolbar, annotationSidebar }) => {
     return (
-      <div className='h-screen flex flex-col'>
+      <div className='h-screen flex flex-col' style={{ height: '100vh' }}>
         {header}
 
-        <div className='flex-1 flex overflow-hidden'>
+        <div className='flex-1 flex overflow-hidden' style={{ minHeight: '600px' }}>
           <ResizablePanel
             side='left'
             defaultWidth={320}
@@ -30,7 +30,7 @@ export const DesignCanvasLayout: React.FC<DesignCanvasLayoutProps> = React.memo(
             {assignmentPanel}
           </ResizablePanel>
 
-          <div className='flex-1 relative overflow-hidden'>
+          <div className='flex-1 relative overflow-hidden' style={{ height: '100%' }}>
             {canvas}
 
             {/* Annotation toolbar floating in top-right corner of canvas */}

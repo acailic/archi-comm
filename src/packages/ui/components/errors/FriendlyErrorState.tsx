@@ -15,11 +15,13 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { Button } from '@/packages/ui/components/ui/button';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { UXOptimizer } from '@/lib/user-experience/UXOptimizer';
 
 interface ErrorAction {
   label: string;
   onClick: () => void;
+  variant?: 'default' | 'outline' | 'ghost';
 }
 
 interface FriendlyErrorStateProps {
@@ -28,6 +30,7 @@ interface FriendlyErrorStateProps {
   suggestions?: string[];
   primaryAction?: ErrorAction;
   secondaryAction?: ErrorAction;
+  extraActions?: ErrorAction[];
   technicalDetails?: string;
   illustration?: React.ReactNode;
 }
@@ -38,10 +41,19 @@ export function FriendlyErrorState({
   suggestions = [],
   primaryAction,
   secondaryAction,
+  extraActions,
   technicalDetails,
   illustration,
 }: FriendlyErrorStateProps) {
   const [showDetails, setShowDetails] = useState(false);
+const actions: ErrorAction[] = [];
+  if (primaryAction) actions.push({ ...primaryAction, variant: 'default' });
+  if (secondaryAction) actions.push({ ...secondaryAction, variant: 'outline' });
+  if (extraActions?.length) {
+    extraActions.forEach((action) =>
+      actions.push({ ...action, variant: action.variant ?? 'ghost' }),
+    );
+  }
 
   return (
     <motion.div
@@ -87,18 +99,20 @@ export function FriendlyErrorState({
       )}
 
       {/* Actions */}
-      <div className="flex gap-3">
-        {primaryAction && (
-          <Button onClick={primaryAction.onClick}>
-            {primaryAction.label}
-          </Button>
-        )}
-        {secondaryAction && (
-          <Button onClick={secondaryAction.onClick} variant="outline">
-            {secondaryAction.label}
-          </Button>
-        )}
-      </div>
+      {actions.length > 0 && (
+        <div className="flex flex-wrap gap-3 justify-center">
+          {actions.map((action) => (
+            <Button
+              key={action.label}
+              onClick={action.onClick}
+              variant={action.variant}
+              size="sm"
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {/* Technical details (collapsible) */}
       {technicalDetails && (
@@ -125,12 +139,55 @@ export function FriendlyErrorState({
   );
 }
 
+const trackErrorInteraction = (action: string, metadata?: Record<string, any>) => {
+  try {
+    const optimizer = UXOptimizer.getInstance();
+    optimizer.trackAction({
+      type: 'error-action',
+      data: { action, ...metadata },
+      success: true,
+      duration: 0,
+      context: {
+        page: 'error-state',
+        component: action,
+      },
+    });
+  } catch (error) {
+    console.warn('Failed to record error interaction', error);
+  }
+};
+
 // Specific error state variants
 export function NetworkErrorState({ onRetry }: { onRetry?: () => void }) {
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+  const handleRetry = () => {
+    trackErrorInteraction('network-retry');
+    onRetry?.();
+  };
+
+  const handleWorkOffline = () => {
+    trackErrorInteraction('network-offline-mode');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('network:work-offline'));
+    }
+  };
+
+  const handleStatusPage = () => {
+    trackErrorInteraction('network-status-page');
+    if (typeof window !== 'undefined') {
+      window.open('https://status.archicomm.app', '_blank', 'noopener');
+    }
+  };
+
   return (
     <FriendlyErrorState
       title="Connection lost"
-      message="We're having trouble connecting to the server"
+      message={
+        isOnline
+          ? "We're having trouble reaching the server."
+          : "You're currently offline."
+      }
       suggestions={[
         'Check your internet connection',
         'Try again in a few moments',
@@ -140,10 +197,22 @@ export function NetworkErrorState({ onRetry }: { onRetry?: () => void }) {
         onRetry
           ? {
               label: 'Try Again',
-              onClick: onRetry,
+              onClick: handleRetry,
             }
           : undefined
       }
+      secondaryAction={{
+        label: 'View Status',
+        onClick: handleStatusPage,
+        variant: 'outline',
+      }}
+      extraActions={[
+        {
+          label: 'Work Offline',
+          onClick: handleWorkOffline,
+          variant: 'ghost',
+        },
+      ]}
       illustration={
         <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center">
           <WifiOff className="w-12 h-12 text-red-500" />
@@ -154,6 +223,25 @@ export function NetworkErrorState({ onRetry }: { onRetry?: () => void }) {
 }
 
 export function FileErrorState({ onRetry, onChooseFile }: { onRetry?: () => void; onChooseFile?: () => void }) {
+  const handleRetry = () => {
+    trackErrorInteraction('file-retry');
+    onRetry?.();
+  };
+
+  const handleChooseFile = () => {
+    trackErrorInteraction('file-choose-different');
+    onChooseFile?.();
+  };
+
+  const handleViewRequirements = () => {
+    trackErrorInteraction('file-view-requirements');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('docs:open', { detail: { topic: 'file-requirements' } }),
+      );
+    }
+  };
+
   return (
     <FriendlyErrorState
       title="File error"
@@ -167,7 +255,7 @@ export function FileErrorState({ onRetry, onChooseFile }: { onRetry?: () => void
         onRetry
           ? {
               label: 'Try Again',
-              onClick: onRetry,
+              onClick: handleRetry,
             }
           : undefined
       }
@@ -175,10 +263,17 @@ export function FileErrorState({ onRetry, onChooseFile }: { onRetry?: () => void
         onChooseFile
           ? {
               label: 'Choose Different File',
-              onClick: onChooseFile,
+              onClick: handleChooseFile,
             }
           : undefined
       }
+      extraActions={[
+        {
+          label: 'View File Requirements',
+          onClick: handleViewRequirements,
+          variant: 'ghost',
+        },
+      ]}
       illustration={
         <div className="w-24 h-24 rounded-full bg-orange-100 flex items-center justify-center">
           <FileX className="w-12 h-12 text-orange-500" />
@@ -189,6 +284,20 @@ export function FileErrorState({ onRetry, onChooseFile }: { onRetry?: () => void
 }
 
 export function ValidationErrorState({ errors, onFix }: { errors?: string[]; onFix?: () => void }) {
+  const handleFix = () => {
+    trackErrorInteraction('validation-auto-fix');
+    onFix?.();
+  };
+
+  const handleShowExamples = () => {
+    trackErrorInteraction('validation-show-examples');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('docs:open', { detail: { topic: 'validation-examples' } }),
+      );
+    }
+  };
+
   return (
     <FriendlyErrorState
       title="Validation failed"
@@ -201,11 +310,18 @@ export function ValidationErrorState({ errors, onFix }: { errors?: string[]; onF
       primaryAction={
         onFix
           ? {
-              label: 'Fix Issues',
-              onClick: onFix,
+              label: 'Fix Automatically',
+              onClick: handleFix,
             }
           : undefined
       }
+      extraActions={[
+        {
+          label: 'Show Examples',
+          onClick: handleShowExamples,
+          variant: 'ghost',
+        },
+      ]}
       illustration={
         <div className="w-24 h-24 rounded-full bg-yellow-100 flex items-center justify-center">
           <AlertCircle className="w-12 h-12 text-yellow-600" />
@@ -216,6 +332,18 @@ export function ValidationErrorState({ errors, onFix }: { errors?: string[]; onF
 }
 
 export function PermissionErrorState({ onRequestAccess }: { onRequestAccess?: () => void }) {
+  const handleRequest = () => {
+    trackErrorInteraction('permission-request');
+    onRequestAccess?.();
+  };
+
+  const handleLearnMore = () => {
+    trackErrorInteraction('permission-learn-more');
+    if (typeof window !== 'undefined') {
+      window.open('https://docs.archicomm.app/permissions', '_blank', 'noopener');
+    }
+  };
+
   return (
     <FriendlyErrorState
       title="Access denied"
@@ -229,10 +357,15 @@ export function PermissionErrorState({ onRequestAccess }: { onRequestAccess?: ()
         onRequestAccess
           ? {
               label: 'Request Access',
-              onClick: onRequestAccess,
+              onClick: handleRequest,
             }
           : undefined
       }
+      secondaryAction={{
+        label: 'Learn More',
+        onClick: handleLearnMore,
+        variant: 'outline',
+      }}
       illustration={
         <div className="w-24 h-24 rounded-full bg-purple-100 flex items-center justify-center">
           <Lock className="w-12 h-12 text-purple-500" />
@@ -274,6 +407,42 @@ export function GenericErrorState({ onReload, onReport, error }: {
   onReport?: () => void;
   error?: Error | string;
 }) {
+  const errorDetails = useMemo(() => {
+    if (typeof error === 'string') return error;
+    if (error) {
+      return `${error.name}: ${error.message}\n\n${error.stack || ''}`;
+    }
+    return undefined;
+  }, [error]);
+
+  const handleReload = () => {
+    trackErrorInteraction('generic-reload');
+    onReload?.();
+  };
+
+  const handleReport = () => {
+    trackErrorInteraction('generic-report');
+    onReport?.();
+  };
+
+  const handleCopyDetails = async () => {
+    trackErrorInteraction('generic-copy-details');
+    try {
+      if (errorDetails) {
+        await navigator.clipboard.writeText(errorDetails);
+      }
+    } catch (err) {
+      console.warn('Failed to copy error details', err);
+    }
+  };
+
+  const handleReset = () => {
+    trackErrorInteraction('generic-reset-last-save');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app:restore-last-save'));
+    }
+  };
+
   return (
     <FriendlyErrorState
       title="Something went wrong"
@@ -287,7 +456,7 @@ export function GenericErrorState({ onReload, onReport, error }: {
         onReload
           ? {
               label: 'Reload',
-              onClick: onReload,
+              onClick: handleReload,
             }
           : undefined
       }
@@ -295,17 +464,23 @@ export function GenericErrorState({ onReload, onReport, error }: {
         onReport
           ? {
               label: 'Report Issue',
-              onClick: onReport,
+              onClick: handleReport,
             }
           : undefined
       }
-      technicalDetails={
-        typeof error === 'string'
-          ? error
-          : error
-          ? `${error.name}: ${error.message}\n\n${error.stack || ''}`
-          : undefined
-      }
+      extraActions={[
+        {
+          label: 'Copy Error Details',
+          onClick: handleCopyDetails,
+          variant: 'ghost',
+        },
+        {
+          label: 'Reset to Last Save',
+          onClick: handleReset,
+          variant: 'ghost',
+        },
+      ]}
+      technicalDetails={errorDetails}
       illustration={
         <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center">
           <AlertCircle className="w-12 h-12 text-red-500" />

@@ -3,106 +3,181 @@
 // Provides visual feedback during drag operations with a subtle trail/shadow effect
 // RELEVANT FILES: src/packages/canvas/hooks/useComponentDrag.ts, src/lib/animations/component-animations.ts, src/stores/canvasStore.ts
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useState } from 'react';
-import { nodeAnimations } from '@/lib/animations/component-animations';
-import { getComponentIcon } from '@/lib/design/component-icons';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
 
-interface TrailPosition {
-  x: number;
-  y: number;
-  timestamp: number;
-}
+import { getComponentIcon } from '@/lib/design/component-icons';
+import { useCanvasStore, useDraggedComponentId } from '@/stores/canvasStore';
 
 interface DragTrailOverlayProps {
-  draggedComponentId: string | null;
-  dragPosition: { x: number; y: number } | null;
-  componentType: string;
+  viewport: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
 }
 
-const TRAIL_LENGTH = 6;
-const TRAIL_SPACING_MS = 30; // Minimum time between trail points
+interface DragEventDetail {
+  componentId: string;
+  positions: Array<{ x: number; y: number }>;
+}
 
-export function DragTrailOverlay({
-  draggedComponentId,
-  dragPosition,
-  componentType,
-}: DragTrailOverlayProps) {
-  const [trailPositions, setTrailPositions] = useState<TrailPosition[]>([]);
+const TRAIL_LIMIT = 5;
 
-  // Update trail positions when drag position changes
+export function DragTrailOverlay({ viewport }: DragTrailOverlayProps) {
+  const draggedComponentId = useDraggedComponentId();
+  const animationsEnabled = useCanvasStore((state) => state.animationsEnabled);
+  const components = useCanvasStore((state) => state.components);
+
+  const [activeComponentId, setActiveComponentId] = useState<string | null>(null);
+  const [trailPositions, setTrailPositions] = useState<
+    Array<{ x: number; y: number }>
+  >([]);
+
+  const componentId = draggedComponentId ?? activeComponentId;
+
+  const draggedComponent = useMemo(() => {
+    if (!componentId) {
+      return null;
+    }
+    return (
+      components.find((component) => component.id === componentId) ?? null
+    );
+  }, [components, componentId]);
+
   useEffect(() => {
-    if (!dragPosition || !draggedComponentId) {
-      setTrailPositions([]);
+    if (typeof window === 'undefined') {
       return;
     }
 
-    const now = Date.now();
-    setTrailPositions((prev) => {
-      // Check if enough time has passed since last position
-      const lastPosition = prev[0];
-      if (lastPosition && now - lastPosition.timestamp < TRAIL_SPACING_MS) {
-        return prev;
+    const handleDragUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<DragEventDetail>).detail;
+      if (!detail) {
+        return;
       }
 
-      // Add new position at the front
-      const newTrail = [
-        { x: dragPosition.x, y: dragPosition.y, timestamp: now },
-        ...prev,
-      ].slice(0, TRAIL_LENGTH);
+      setActiveComponentId(detail.componentId);
+      setTrailPositions(detail.positions.slice(-TRAIL_LIMIT));
+    };
 
-      return newTrail;
-    });
-  }, [dragPosition, draggedComponentId]);
+    window.addEventListener('canvas:component-dragging', handleDragUpdate);
+    return () => {
+      window.removeEventListener('canvas:component-dragging', handleDragUpdate);
+    };
+  }, []);
 
-  // Clear trail when drag ends
   useEffect(() => {
-    if (!draggedComponentId) {
+    if (!draggedComponentId || !animationsEnabled) {
       setTrailPositions([]);
+      if (!draggedComponentId) {
+        setActiveComponentId(null);
+      }
     }
-  }, [draggedComponentId]);
+  }, [draggedComponentId, animationsEnabled]);
 
-  if (!draggedComponentId || trailPositions.length === 0) {
+  const tailSegments = useMemo(() => {
+    if (!trailPositions.length) {
+      return [] as Array<{
+        x: number;
+        y: number;
+        key: string;
+        index: number;
+      }>;
+    }
+
+    const ordered = [...trailPositions].reverse();
+    // Remove the most recent position (the live component)
+    const segments = ordered.slice(1, TRAIL_LIMIT + 1);
+
+    return segments.map((position, index) => ({
+      ...position,
+      key: `${position.x}-${position.y}-${index}`,
+      index,
+    }));
+  }, [trailPositions]);
+
+  const trailSprites = useMemo(() => {
+    return tailSegments.map((segment) => {
+      const screenX = segment.x * viewport.zoom + viewport.x;
+      const screenY = segment.y * viewport.zoom + viewport.y;
+
+      const orderIndex = segment.index + 1; // ensure non-zero divisor
+      const opacity = Math.max(0, 0.6 - orderIndex * 0.1);
+      const scale = Math.max(0.45, 1 - orderIndex * 0.12);
+
+      return {
+        ...segment,
+        screenX,
+        screenY,
+        opacity,
+        scale,
+      };
+    });
+  }, [tailSegments, viewport]);
+
+  const Icon = draggedComponent
+    ? getComponentIcon(draggedComponent.type as string)
+    : null;
+
+  const ghostSize = useMemo(() => {
+    if (!draggedComponent) {
+      return 48;
+    }
+    const base = draggedComponent.width ?? 220;
+    return Math.max(36, Math.min(72, base * 0.25));
+  }, [draggedComponent]);
+
+  if (
+    !animationsEnabled ||
+    !componentId ||
+    !draggedComponent ||
+    trailSprites.length === 0
+  ) {
     return null;
   }
 
-  const Icon = getComponentIcon(componentType);
-
   return (
-    <div className="pointer-events-none absolute inset-0 z-50">
+    <div className="pointer-events-none absolute inset-0 z-[60]">
       <AnimatePresence>
-        {trailPositions.map((position, index) => {
-          // Skip the first position (that's the actual component)
-          if (index === 0) return null;
-
-          const opacity = 1 - index / TRAIL_LENGTH;
-          const scale = 1 - index * 0.05;
-
-          return (
-            <motion.div
-              key={`${position.timestamp}-${index}`}
-              className="absolute"
+        {trailSprites.map((segment) => (
+          <motion.div
+            key={`${componentId}-${segment.key}`}
+            className="absolute"
+            initial={{
+              opacity: 0,
+              scale: segment.scale * 0.9,
+              x: segment.screenX - ghostSize / 2,
+              y: segment.screenY - ghostSize / 2,
+            }}
+            animate={{
+              opacity: segment.opacity,
+              scale: segment.scale,
+              x: segment.screenX - ghostSize / 2,
+              y: segment.screenY - ghostSize / 2,
+            }}
+            exit={{ opacity: 0, scale: segment.scale * 0.8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div
+              className="flex items-center justify-center rounded-xl bg-blue-500/15 backdrop-blur-sm shadow-lg shadow-blue-500/10"
               style={{
-                left: position.x - 20,
-                top: position.y - 20,
+                width: ghostSize,
+                height: ghostSize,
+                opacity: segment.opacity,
               }}
-              initial={{ opacity: opacity * 0.3, scale }}
-              animate={{ opacity: 0, scale: scale * 0.95 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
             >
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20 backdrop-blur-sm"
-                style={{
-                  opacity: opacity * 0.5,
-                  transform: `scale(${scale})`,
-                }}
-              >
-                {Icon && <Icon className="h-5 w-5 text-blue-400" />}
-              </div>
-            </motion.div>
-          );
-        })}
+              {Icon && (
+                <Icon
+                  className="text-blue-400"
+                  style={{
+                    width: ghostSize * 0.45,
+                    height: ghostSize * 0.45,
+                  }}
+                />
+              )}
+            </div>
+          </motion.div>
+        ))}
       </AnimatePresence>
     </div>
   );

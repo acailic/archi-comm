@@ -19,7 +19,7 @@ import type {
   OnConnectEnd,
   ReactFlowInstance
 } from '@xyflow/react';
-import type { DesignComponent, Connection } from '../@shared/contracts';
+import type { DesignComponent, Connection } from '@shared/contracts';
 import { useUndoRedo } from '../../../hooks/useUndoRedo';
 import { generateId } from '@core/utils';
 import {
@@ -30,6 +30,41 @@ import {
   type ArchiCommNode,
   type ArchiCommEdge
 } from '../utils/rf-adapters';
+
+const LOCKED_TOAST_COOLDOWN_MS = 1500;
+let lastLockedToastAt = 0;
+
+function showLockedComponentToast() {
+  const now = Date.now();
+  if (now - lastLockedToastAt < LOCKED_TOAST_COOLDOWN_MS) {
+    return;
+  }
+  lastLockedToastAt = now;
+
+  const message = 'Cannot move locked component. Press Ctrl+Alt+Shift+L to unlock.';
+  try {
+    const anyWindow = typeof window !== 'undefined' ? (window as any) : null;
+    if (!anyWindow) {
+      console.info(message);
+      return;
+    }
+    if (typeof anyWindow.__ARCHICOMM_TOAST === 'function') {
+      anyWindow.__ARCHICOMM_TOAST('info', message);
+      return;
+    }
+    if (anyWindow.toast && typeof anyWindow.toast.info === 'function') {
+      anyWindow.toast.info(message);
+      return;
+    }
+    if (anyWindow.showToast && typeof anyWindow.showToast === 'function') {
+      anyWindow.showToast({ type: 'info', message });
+      return;
+    }
+  } catch {
+    // Fall back to console
+  }
+  console.info(message);
+}
 
 export interface UseReactFlowIntegrationProps {
   components: DesignComponent[];
@@ -113,36 +148,26 @@ export function useReactFlowIntegration({
 
   // Handle React Flow node changes
   const onNodesChange: OnNodesChange = useCallback((changes: NodeChange[]) => {
-    // Filter out selection and dimension changes as they don't affect domain data
-    const significantChanges = changes.filter(change =>
-      change.type === 'position' ||
-      change.type === 'add' ||
-      change.type === 'remove' ||
-      change.type === 'replace'
-    );
-
-    if (significantChanges.length === 0) {
-      return;
-    }
-
-    const lockedComponentIds = new Set(
-      components.filter(component => component.locked).map(component => component.id)
-    );
+    const lockedChangeIds = new Set<string>();
     const lockedPositionChangeIds = new Set<string>();
 
-    // Filter out changes to locked components
-    const allowedChanges = significantChanges.filter(change => {
-      if (change.type === 'position') {
-        if (lockedComponentIds.has(change.id)) {
-          lockedPositionChangeIds.add(change.id);
-          console.warn(`[Canvas] Blocked movement of locked component: ${change.id}`);
-          return false; // Prevent position changes to locked components
+    const allowedChanges = changes.filter(change => {
+      if (change.type === 'position' || change.type === 'dimensions') {
+        const component = components.find(candidate => candidate.id === change.id);
+        if (component?.locked) {
+          lockedChangeIds.add(change.id);
+          if (change.type === 'position') {
+            lockedPositionChangeIds.add(change.id);
+          }
+          return false;
         }
       }
       return true;
     });
 
-    if (allowedChanges.length === 0) {
+    if (lockedChangeIds.size > 0) {
+      showLockedComponentToast();
+
       if (lockedPositionChangeIds.size > 0 && reactFlowInstance.current) {
         const originalPositions = new Map<string, { x: number; y: number }>();
         components.forEach(component => {
@@ -182,21 +207,28 @@ export function useReactFlowIntegration({
           });
         }
       }
+    }
+
+    const significantChanges = allowedChanges.filter(change =>
+      change.type === 'position' ||
+      change.type === 'add' ||
+      change.type === 'remove' ||
+      change.type === 'replace'
+    );
+
+    if (significantChanges.length === 0) {
       return;
     }
 
-    // Convert React Flow changes back to domain objects
-    const updatedComponents = fromNodeChanges(allowedChanges, components);
+    const updatedComponents = fromNodeChanges(significantChanges, components);
 
-    // Handle specific change types
-    for (const change of allowedChanges) {
+    for (const change of significantChanges) {
       switch (change.type) {
         case 'position':
           if (change.position && onComponentMove) {
             onComponentMove(change.id, change.position.x, change.position.y);
           }
           break;
-
         case 'remove':
           if (onComponentDelete) {
             onComponentDelete(change.id);
@@ -205,7 +237,6 @@ export function useReactFlowIntegration({
       }
     }
 
-    // Push state to history for undo/redo
     if (enableUndoRedo) {
       pushState({
         components: updatedComponents,

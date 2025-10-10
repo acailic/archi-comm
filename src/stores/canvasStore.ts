@@ -79,6 +79,10 @@ interface CanvasStoreState {
   alignmentGuides: AlignmentGuide[];
   showAlignmentGuides: boolean;
 
+  // Layer visibility and opacity
+  layerVisibility: Record<string, boolean>;
+  layerOpacity: Record<string, number>;
+
   // Component locking
   lockedComponentIds: Set<string>;
 
@@ -328,6 +332,16 @@ class UpdateRateLimiter {
     const snapshot = this.getSnapshot();
     this.listeners.forEach((listener) => listener(snapshot));
   }
+
+  reset(): void {
+    this.timestamps = [];
+    this.totalUpdates = 0;
+    this.droppedUpdates = 0;
+    this.blockedUntil = 0;
+    this.lastAction = undefined;
+    this.cachedSnapshot = null;
+    this.notify();
+  }
 }
 
 const updateLimiter = new UpdateRateLimiter();
@@ -408,6 +422,22 @@ const initialState: CanvasStoreState = {
   // Alignment guides
   alignmentGuides: [],
   showAlignmentGuides: true,
+
+  // Layer visibility defaults (all visible)
+  layerVisibility: {
+    components: true,
+    connections: true,
+    drawings: true,
+    annotations: true,
+    infoCards: true,
+  },
+  layerOpacity: {
+    components: 1,
+    connections: 1,
+    drawings: 1,
+    annotations: 1,
+    infoCards: 1,
+  },
 
   // Component locking
   lockedComponentIds: new Set(),
@@ -526,6 +556,9 @@ export const useCanvasStore = create<CanvasStoreState>()(
         drawingColor: state.drawingColor,
         drawingSize: state.drawingSize,
         drawingSettings: state.drawingSettings,
+        // Persist layer visibility and opacity preferences
+        layerVisibility: state.layerVisibility,
+        layerOpacity: state.layerOpacity,
       }),
     },
   ),
@@ -1663,6 +1696,107 @@ const mutableCanvasActions = {
       lastUsedComponent: state.lastUsedComponent,
     };
   },
+
+  // Animation actions for drag/drop and flow effects
+  setDraggedComponent(componentId: string | null) {
+    useCanvasStore.setState({ draggedComponentId: componentId }, false);
+  },
+
+  setDroppedComponent(componentId: string | null) {
+    if (componentId === null) {
+      useCanvasStore.setState({ droppedComponentId: null }, false);
+      return;
+    }
+
+    useCanvasStore.setState({ droppedComponentId: componentId }, false);
+    // Auto-clear after 600ms
+    setTimeout(() => {
+      const current = useCanvasStore.getState().droppedComponentId;
+      if (current === componentId) {
+        useCanvasStore.setState({ droppedComponentId: null }, false);
+      }
+    }, 600);
+  },
+
+  setSnappingComponent(componentId: string | null) {
+    if (componentId === null) {
+      useCanvasStore.setState({ snappingComponentId: null }, false);
+      return;
+    }
+
+    useCanvasStore.setState({ snappingComponentId: componentId }, false);
+    // Auto-clear after 300ms
+    setTimeout(() => {
+      const current = useCanvasStore.getState().snappingComponentId;
+      if (current === componentId) {
+        useCanvasStore.setState({ snappingComponentId: null }, false);
+      }
+    }, 300);
+  },
+
+  addFlowingConnection(connectionId: string) {
+    const current = useCanvasStore.getState().flowingConnectionIds;
+    if (!current.includes(connectionId)) {
+      useCanvasStore.setState({
+        flowingConnectionIds: [...current, connectionId]
+      }, false);
+    }
+  },
+
+  removeFlowingConnection(connectionId: string) {
+    const current = useCanvasStore.getState().flowingConnectionIds;
+    useCanvasStore.setState({
+      flowingConnectionIds: current.filter(id => id !== connectionId)
+    }, false);
+  },
+
+  // Layer visibility actions
+  setLayerVisibility(layer: string, visible: boolean, options?: ConditionalSetOptions) {
+    const current = useCanvasStore.getState().layerVisibility[layer];
+    if (current === visible) return;
+    applyUpdate(
+      'setLayerVisibility',
+      (draft) => {
+        draft.layerVisibility[layer] = visible;
+      },
+      options
+    );
+  },
+
+  toggleLayerVisibility(layer: string, options?: ConditionalSetOptions) {
+    const current = useCanvasStore.getState().layerVisibility[layer];
+    this.setLayerVisibility(layer, !current, options);
+  },
+
+  setAllLayersVisibility(visible: boolean, options?: BaseActionOptions) {
+    applyUpdate(
+      'setAllLayersVisibility',
+      (draft) => {
+        Object.keys(draft.layerVisibility).forEach((layer) => {
+          draft.layerVisibility[layer] = visible;
+        });
+      },
+      options
+    );
+  },
+
+  setLayerOpacity(layer: string, opacity: number, options?: ConditionalSetOptions) {
+    const clamped = Math.max(0, Math.min(1, opacity));
+    const current = useCanvasStore.getState().layerOpacity[layer];
+    if (current === clamped) return;
+    applyUpdate(
+      'setLayerOpacity',
+      (draft) => {
+        draft.layerOpacity[layer] = clamped;
+      },
+      options
+    );
+  },
+
+  // Alias for setAllLayersVisibility for backwards compatibility
+  toggleAllLayers(visible: boolean, options?: BaseActionOptions) {
+    this.setAllLayersVisibility(visible, options);
+  },
 };
 
 Object.freeze(mutableCanvasActions);
@@ -1860,5 +1994,35 @@ export const subscribeToCanvasCircuitBreaker =
   updateLimiter.subscribe.bind(updateLimiter);
 export const getCanvasCircuitBreakerSnapshot = () =>
   updateLimiter.getSnapshot();
+export const resetCanvasCircuitBreaker = () => updateLimiter.reset();
+
+// Animation state selectors
+export const useDraggedComponentId = () =>
+  useCanvasStore((state) => state.draggedComponentId);
+
+export const useDroppedComponentId = () =>
+  useCanvasStore((state) => state.droppedComponentId);
+
+export const useSnappingComponentId = () =>
+  useCanvasStore((state) => state.snappingComponentId);
+
+export const useFlowingConnectionIds = () =>
+  useCanvasStore((state) => state.flowingConnectionIds);
+
+// Layer visibility selectors
+export const useLayerVisibility = (layer: string): boolean =>
+  useCanvasStore((state) => state.layerVisibility[layer] ?? true);
+
+export const useAllLayersVisibility = () =>
+  useCanvasStore((state) => state.layerVisibility);
+
+export const useAnnotationsVisible = () =>
+  useCanvasStore((state) => state.layerVisibility['annotations'] ?? true);
+
+export const useLayerOpacity = (layer: string): number =>
+  useCanvasStore((state) => state.layerOpacity[layer] ?? 1);
+
+export const useAllLayersOpacity = () =>
+  useCanvasStore((state) => state.layerOpacity);
 
 export const deepEqual = coreDeepEqual;

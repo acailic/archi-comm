@@ -20,7 +20,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 
 import { CanvasPerformanceManager } from '@/lib/performance/CanvasPerformanceManager';
 import { BoundingBoxImpl } from '@/lib/spatial/RTree';
-import type { Connection, DesignComponent, InfoCard } from '../@shared/contracts';
+import type { Connection, DesignComponent, InfoCard } from '@shared/contracts';
 import { useConnectionEditor } from '../hooks/useConnectionEditor';
 import {
   useLevelOfDetail,
@@ -340,11 +340,20 @@ const VirtualCanvasInternal: React.FC<VirtualCanvasProps> = ({
     visibleEdges.length,
     components.length,
     connections.length,
-    metrics,
+    metrics.queryTime,
+    metrics.renderTime,
+    metrics.fps,
+    metrics.memoryUsage,
     lodResult.qualityMultiplier,
     onVirtualizationStatsChange,
     performanceManager,
   ]);
+
+  // Create component map for efficient lookup during drag operations
+  const componentMap = useMemo(
+    () => new Map(components.map(c => [c.id, c])),
+    [components]
+  );
 
   // Handle node position changes (component movement)
   const handleNodesChange = React.useCallback(
@@ -355,7 +364,7 @@ const VirtualCanvasInternal: React.FC<VirtualCanvasProps> = ({
 
           // Update spatial index with new position
           if (spatialIndex.isReady) {
-            const component = components.find((c: any) => c.id === change.id);
+            const component = componentMap.get(change.id);
             if (component) {
               const newBounds = BoundingBoxImpl.fromComponent({
                 ...component,
@@ -368,7 +377,7 @@ const VirtualCanvasInternal: React.FC<VirtualCanvasProps> = ({
         }
       });
     },
-    [onComponentMove, spatialIndex, components]
+    [onComponentMove, spatialIndex, componentMap]
   );
 
   // Handle connection creation
@@ -509,10 +518,10 @@ const VirtualCanvasInternal: React.FC<VirtualCanvasProps> = ({
             visibleConnections: visibleEdges.length,
             totalComponents: components.length,
             totalConnections: connections.length,
-            queryTime: metrics.metrics.queryTime,
-            renderTime: metrics.metrics.renderTime,
-            memoryUsage: metrics.metrics.memoryUsage,
-            fps: metrics.metrics.fps,
+            queryTime: metrics.queryTime,
+            renderTime: metrics.renderTime,
+            memoryUsage: metrics.memoryUsage,
+            fps: metrics.fps,
             qualityLevel: lodResult.qualityMultiplier,
           }}
           isVisible={config.debugMode}

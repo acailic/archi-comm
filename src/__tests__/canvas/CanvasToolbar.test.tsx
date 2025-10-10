@@ -65,6 +65,49 @@ describe('CanvasToolbar', () => {
     });
   });
 
+  describe('Drawing Mode Toggle', () => {
+    it('re-activates drawing with a single click after switching modes', () => {
+      const store = useCanvasStore.getState();
+      store.setDrawingTool('pen');
+      store.setCanvasMode('select');
+
+      renderWithAppProviders(<CanvasToolbar />);
+
+      fireEvent.click(screen.getByRole('button', { name: /draw/i }));
+
+      const nextState = useCanvasStore.getState();
+      expect(nextState.canvasMode).toBe('draw');
+      expect(nextState.drawingTool).toBe('pen');
+    });
+
+    it('restores the last used drawing tool when re-entering draw mode', () => {
+      const store = useCanvasStore.getState();
+      store.setDrawingTool('highlighter');
+      store.setCanvasMode('select');
+
+      renderWithAppProviders(<CanvasToolbar />);
+
+      fireEvent.click(screen.getByRole('button', { name: /draw/i }));
+
+      const nextState = useCanvasStore.getState();
+      expect(nextState.canvasMode).toBe('draw');
+      expect(nextState.drawingTool).toBe('highlighter');
+    });
+
+    it('exits draw mode when already active', () => {
+      const store = useCanvasStore.getState();
+      store.setDrawingTool('pen');
+
+      renderWithAppProviders(<CanvasToolbar />);
+
+      fireEvent.click(screen.getByRole('button', { name: /draw/i }));
+
+      const nextState = useCanvasStore.getState();
+      expect(nextState.canvasMode).toBe('select');
+      expect(nextState.drawingTool).toBeNull();
+    });
+  });
+
   describe('View Control Interactions', () => {
     const viewControls: Array<{
       name: string;

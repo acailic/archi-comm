@@ -2,7 +2,7 @@
  * src/packages/ui/components/canvas/index.ts
  * Central export file for canvas UI components
  * Makes imports cleaner and easier to manage
- * RELEVANT FILES: DesignCanvas.tsx, AnnotationToolbar.tsx, AnnotationSidebar.tsx, CanvasToolbar.tsx
+ * RELEVANT FILES: DesignCanvas.tsx, AnnotationToolbar.tsx, AnnotationSidebar.tsx, CanvasToolbar.tsx, ModeIndicator.tsx
  */
 
 export { AnnotationToolbar } from "./AnnotationToolbar";
@@ -37,4 +37,10 @@ export { OverlayPortal } from "./OverlayPortal";
 export { AlignmentGuides } from "./AlignmentGuides";
 export { AlignmentToolbar } from "./AlignmentToolbar";
 export { ComponentGroupOverlay } from "./ComponentGroupOverlay";
+
+/**
+ * Visual indicator showing current canvas mode (draw/annotation)
+ * with contextual instructions and optional exit control
+ */
+export { ModeIndicator } from "./ModeIndicator";
 export { SelectionBox } from "./SelectionBox";

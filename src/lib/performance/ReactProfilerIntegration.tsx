@@ -31,6 +31,8 @@ class ReactProfilerIntegration {
   private activeProfilers = new Map<string, ComponentProfileConfig>();
   private measurementHistory = new Map<string, ProfilerMetrics[]>();
   private readonly maxHistorySize = 100;
+  private previousProps = new Map<string, Record<string, unknown>>();
+  private pendingPropChanges = new Map<string, string[]>();
 
   static getInstance(): ReactProfilerIntegration {
     if (!ReactProfilerIntegration.instance) {
@@ -70,7 +72,7 @@ class ReactProfilerIntegration {
         duration: actualDuration,
         timestamp: commitTime,
         commitType: phase as RenderCommitType,
-        propsChanged: [], // TODO: Add prop change detection
+        propsChanged: import.meta.env.DEV ? this.consumePropChanges(id) : [],
       };
 
       // Record with ComponentOptimizer
@@ -78,6 +80,11 @@ class ReactProfilerIntegration {
 
       // Record with performance monitor
       performanceMonitor.recordComponentRender(id, actualDuration);
+
+      if (phase === 'unmount') {
+        this.previousProps.delete(id);
+        this.pendingPropChanges.delete(id);
+      }
 
       // Handle slow renders
       const threshold = config.slowRenderThreshold || 16;
@@ -90,6 +97,38 @@ class ReactProfilerIntegration {
         config.onRender(metrics);
       }
     };
+  }
+
+  private consumePropChanges(componentId: string): string[] {
+    if (!import.meta.env.DEV) {
+      return [];
+    }
+    const changes = this.pendingPropChanges.get(componentId) ?? [];
+    this.pendingPropChanges.delete(componentId);
+    return changes;
+  }
+
+  private recordPropsSnapshot(componentId: string, props: Record<string, unknown>): void {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+
+    const previous = this.previousProps.get(componentId);
+    const next = props;
+    const changedKeys: string[] = [];
+    const keys = new Set([
+      ...(previous ? Object.keys(previous) : []),
+      ...Object.keys(next),
+    ]);
+
+    keys.forEach(key => {
+      if ((previous ?? {})[key] !== next[key]) {
+        changedKeys.push(key);
+      }
+    });
+
+    this.previousProps.set(componentId, next);
+    this.pendingPropChanges.set(componentId, changedKeys);
   }
 
   /**
@@ -107,13 +146,20 @@ class ReactProfilerIntegration {
     };
 
     const onRender = this.createProfilerCallback(profilerConfig);
+    const integration = this;
 
     const Wrapped = React.memo(
-      React.forwardRef<any, React.ComponentProps<T>>((props, ref) => (
-        <React.Profiler id={componentId} onRender={onRender}>
-          {React.createElement(Component as React.ComponentType<any>, { ...(props as any), ref })}
-        </React.Profiler>
-      ))
+      React.forwardRef<any, React.ComponentProps<T>>((props, ref) => {
+        if (import.meta.env.DEV) {
+          integration.recordPropsSnapshot(componentId, props as Record<string, unknown>);
+        }
+
+        return (
+          <React.Profiler id={componentId} onRender={onRender}>
+            {React.createElement(Component as React.ComponentType<any>, { ...(props as any), ref })}
+          </React.Profiler>
+        );
+      })
     );
 
     return Wrapped as unknown as React.ComponentType<React.ComponentProps<T>>;

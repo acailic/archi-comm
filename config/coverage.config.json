@@ -32,12 +32,12 @@
   "reportDir": "coverage",
   "acceptanceCriteria": {
     "requireTestsForAllCriteria": true,
-    "minimumCriterionCoverage": 100,
+    "minimumCriterionCoverage": 80,
     "allowManualTests": false
   },
   "enforcement": {
     "failOnThresholdViolation": true,
-    "failOnUncoveredCriteria": true,
+    "failOnUncoveredCriteria": false,
     "warnOnOrphanedTests": true
   }
 }

@@ -1,4 +1,4 @@
-import { UXOptimizer, UXRecommendation } from './UXOptimizer';
+
 
 export interface WorkflowAction {
   type: string;
@@ -38,6 +38,21 @@ export interface WorkflowOptimization {
   category: WorkflowPattern['category'];
 }
 
+export type WorkflowRecommendationType =
+  | 'workflow_optimization'
+  | 'help_suggestion'
+  | 'workflow_improvement';
+
+export interface WorkflowRecommendation {
+  type: WorkflowRecommendationType;
+  priority: 'low' | 'medium' | 'high';
+  title: string;
+  description: string;
+  actionText?: string;
+  duration: 'persistent' | 'transient';
+  metadata: Record<string, unknown>;
+}
+
 export interface WorkflowEfficiencyMetrics {
   patternId: string;
   averageCompletionTime: number;
@@ -67,15 +82,16 @@ export class WorkflowOptimizer {
   private optimizations: WorkflowOptimization[] = [];
   private efficiencyMetrics: Map<string, WorkflowEfficiencyMetrics> = new Map();
   private userStrugglePoints: Map<string, UserStrugglePoint> = new Map();
+  private intervals: Array<ReturnType<typeof setInterval>> = [];
+  private patternDetectionInterval: ReturnType<typeof setInterval> | null = null;
 
   private readonly maxHistorySize = 5000;
   private readonly patternDetectionWindow = 30 * 24 * 60 * 60 * 1000; // 30 days
   private readonly minPatternFrequency = 3;
-  private readonly struggleThreshold = 2; // Actions attempted more than twice
 
   private sessionId: string = this.generateSessionId();
   private currentSequence: WorkflowAction[] = [];
-  private sequenceTimeout: NodeJS.Timeout | null = null;
+  private sequenceTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private constructor() {
     this.loadStoredData();
@@ -87,6 +103,29 @@ export class WorkflowOptimizer {
       WorkflowOptimizer.instance = new WorkflowOptimizer();
     }
     return WorkflowOptimizer.instance;
+  }
+
+  public static getExistingInstance(): WorkflowOptimizer | null {
+    return WorkflowOptimizer.instance;
+  }
+
+  public dispose(): void {
+    this.intervals.forEach(intervalId => {
+      clearInterval(intervalId);
+    });
+    this.intervals = [];
+
+    if (this.sequenceTimeout) {
+      clearTimeout(this.sequenceTimeout);
+      this.sequenceTimeout = null;
+    }
+
+    this.patternDetectionInterval = null;
+  }
+
+  private registerInterval(intervalId: ReturnType<typeof setInterval>): ReturnType<typeof setInterval> {
+    this.intervals.push(intervalId);
+    return intervalId;
   }
 
   // Action tracking
@@ -175,8 +214,8 @@ export class WorkflowOptimizer {
     });
   }
 
-  public generateRecommendations(): UXRecommendation[] {
-    const recommendations: UXRecommendation[] = [];
+  public generateRecommendations(): WorkflowRecommendation[] {
+    const recommendations: WorkflowRecommendation[] = [];
 
     // Workflow optimization recommendations
     const topOptimizations = this.getOptimizationSuggestions().slice(0, 5);
@@ -308,28 +347,6 @@ export class WorkflowOptimizer {
     };
   }
 
-  // Integration with UXOptimizer
-  public integrateWithUXOptimizer(): void {
-    const uxOptimizer = UXOptimizer.getInstance();
-
-    // Generate and submit recommendations
-    const recommendations = this.generateRecommendations();
-    recommendations.forEach(rec => {
-      uxOptimizer.addRecommendation(rec);
-    });
-
-    // Set up periodic recommendation updates
-    setInterval(
-      () => {
-        const newRecommendations = this.generateRecommendations();
-        newRecommendations.forEach(rec => {
-          uxOptimizer.addRecommendation(rec);
-        });
-      },
-      10 * 60 * 1000
-    ); // Every 10 minutes
-  }
-
   // Private implementation methods
   private processSequence(): void {
     if (this.currentSequence.length < 2) {
@@ -369,10 +386,6 @@ export class WorkflowOptimizer {
     // Save data
     this.saveData();
 
-    // Integrate with UXOptimizer if new patterns or optimizations found
-    if (patterns.length > 0) {
-      this.integrateWithUXOptimizer();
-    }
   }
 
   private extractSequences(actions: WorkflowAction[]): WorkflowAction[][] {
@@ -538,9 +551,23 @@ export class WorkflowOptimizer {
         action.timestamp > Date.now() - this.patternDetectionWindow
     );
 
-    const completions = this.extractSequences([
-      relevantActions.find(a => pattern.actions.includes(a.type))!,
-    ]).filter(seq => seq.length >= pattern.actions.length);
+    if (relevantActions.length === 0) {
+      return {
+        patternId: pattern.id,
+        averageCompletionTime: pattern.averageDuration,
+        successRate: pattern.successRate,
+        abandonmentRate: 1 - pattern.successRate,
+        retryRate: 0,
+        userSatisfactionScore: Math.max(0.1, pattern.successRate - 0.1),
+        bottleneckSteps: [],
+        optimizationOpportunities: 0,
+      };
+    }
+
+    const completions = this.extractSequences(relevantActions).filter(seq => 
+      seq.length >= pattern.actions.length &&
+      pattern.actions.every(action => seq.some(seqAction => seqAction.type === action))
+    );
 
     const averageCompletionTime =
       completions.length > 0
@@ -755,37 +782,45 @@ export class WorkflowOptimizer {
   }
 
   private startPatternDetection(): void {
-    // Analyze patterns every 5 minutes
-    setInterval(
-      () => {
+    if (this.patternDetectionInterval) {
+      return;
+    }
+
+    const intervalId = this.registerInterval(
+      setInterval(() => {
         if (this.actionHistory.length >= 10) {
           const patterns = this.analyzeWorkflow(this.actionHistory);
           patterns.forEach(pattern => this.updateOrCreatePattern(pattern));
         }
-      },
-      5 * 60 * 1000
+      }, 5 * 60 * 1000)
     );
+
+    this.patternDetectionInterval = intervalId;
   }
 
   private loadStoredData(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     try {
-      const storedActions = localStorage.getItem('archicomm_workflow_actions');
+      const storedActions = window.localStorage.getItem('archicomm_workflow_actions');
       if (storedActions) {
         this.actionHistory = JSON.parse(storedActions);
       }
 
-      const storedPatterns = localStorage.getItem('archicomm_workflow_patterns');
+      const storedPatterns = window.localStorage.getItem('archicomm_workflow_patterns');
       if (storedPatterns) {
         const patterns = JSON.parse(storedPatterns);
         this.detectedPatterns = new Map(patterns);
       }
 
-      const storedOptimizations = localStorage.getItem('archicomm_workflow_optimizations');
+      const storedOptimizations = window.localStorage.getItem('archicomm_workflow_optimizations');
       if (storedOptimizations) {
         this.optimizations = JSON.parse(storedOptimizations);
       }
 
-      const storedStruggles = localStorage.getItem('archicomm_workflow_struggles');
+      const storedStruggles = window.localStorage.getItem('archicomm_workflow_struggles');
       if (storedStruggles) {
         const struggles = JSON.parse(storedStruggles);
         this.userStrugglePoints = new Map(struggles);
@@ -796,14 +831,18 @@ export class WorkflowOptimizer {
   }
 
   private saveData(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     try {
-      localStorage.setItem('archicomm_workflow_actions', JSON.stringify(this.actionHistory));
-      localStorage.setItem(
+      window.localStorage.setItem('archicomm_workflow_actions', JSON.stringify(this.actionHistory));
+      window.localStorage.setItem(
         'archicomm_workflow_patterns',
         JSON.stringify(Array.from(this.detectedPatterns.entries()))
       );
-      localStorage.setItem('archicomm_workflow_optimizations', JSON.stringify(this.optimizations));
-      localStorage.setItem(
+      window.localStorage.setItem('archicomm_workflow_optimizations', JSON.stringify(this.optimizations));
+      window.localStorage.setItem(
         'archicomm_workflow_struggles',
         JSON.stringify(Array.from(this.userStrugglePoints.entries()))
       );
@@ -814,3 +853,9 @@ export class WorkflowOptimizer {
 }
 
 export default WorkflowOptimizer;
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    WorkflowOptimizer.getExistingInstance()?.dispose();
+  });
+}

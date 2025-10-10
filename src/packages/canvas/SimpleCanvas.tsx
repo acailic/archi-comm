@@ -17,6 +17,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
 } from "@xyflow/react";
+import type { ReactFlowInstance } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -31,10 +32,11 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useDrop } from "react-dnd";
 
 import type {
+  Annotation,
   Connection as AppConnection,
   DesignComponent,
   DrawingSettings,
@@ -285,6 +287,8 @@ export interface SimpleCanvasProps {
   ) => void;
   onDrawingComplete?: (stroke: DrawingStroke) => void;
   onDrawingDelete?: (strokeId: string) => void;
+  onReactFlowInit?: (instance: ReactFlowInstance | null) => void;
+  highlightedAnnotation?: Annotation | null;
   readonly?: boolean;
   className?: string;
   style?: React.CSSProperties;
@@ -597,6 +601,8 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   onQuickConnectPreviewUpdate,
   onDrawingComplete,
   onDrawingDelete,
+  onReactFlowInit,
+  highlightedAnnotation = null,
   readonly = false,
   className = "",
   style,
@@ -604,6 +610,18 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const lastEdgeClickRef = useRef(0);
   const reactFlowInstanceRef = useRef<any>(null);
+  const renderCountRef = useRef(0);
+  
+  // Track render count to detect potential infinite loops
+  renderCountRef.current += 1;
+  
+  // Reset render count periodically to avoid false positives
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      renderCountRef.current = 0;
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Internal state for quick-connect mode
   const [internalConnectionStart, setInternalConnectionStart] = React.useState<
@@ -714,13 +732,27 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
 
   // Memoize node options with stable callback references
   const nodeOptions = React.useMemo(
-    () => ({
-      selectedComponent,
-      connectionStart: activeConnectionStart,
-      readonly: readonlyFlag,
-      onConnectionStart: handleConnectionStart,
-      onNodeClick: handleNodeClick,
-    }),
+    () => {
+      // Defensive check to prevent infinite loop
+      if (renderCountRef.current > 100) {
+        console.error('[SimpleCanvas] Excessive renders detected, using cached nodeOptions');
+        return {
+          selectedComponent: null,
+          connectionStart: null,
+          readonly: true,
+          onConnectionStart: () => {},
+          onNodeClick: () => {},
+        };
+      }
+      
+      return {
+        selectedComponent,
+        connectionStart: activeConnectionStart,
+        readonly: readonlyFlag,
+        onConnectionStart: handleConnectionStart,
+        onNodeClick: handleNodeClick,
+      };
+    },
     [
       selectedComponent,
       activeConnectionStart,
@@ -730,41 +762,53 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     ],
   );
 
-  // Convert props to React Flow format
-  const initialNodes = useMemo(
-    () => convertComponentsToNodes(components, nodeOptions),
-    [components, nodeOptions],
-  );
-
-  const initialEdges = useMemo(
-    () => convertConnectionsToEdges(connections),
-    [connections],
-  );
-
-  // Convert props to React Flow format - simple and direct
+  // Convert props to React Flow format - memoized to prevent infinite re-renders
   const nodes = React.useMemo(
     () => convertComponentsToNodes(components, nodeOptions),
     [components, nodeOptions],
   );
 
   const edges = React.useMemo(() => {
-    const result = convertConnectionsToEdges(connections);
-    console.log("[SimpleCanvas] Converting connections to edges:", {
-      connections: connections.length,
-      edges: result.length,
-      edgeDetails: result,
-    });
-    return result;
+    return convertConnectionsToEdges(connections);
   }, [connections]);
 
   // Use React Flow's built-in state management
-  const [reactFlowInstance, setReactFlowInstance] = React.useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] =
+    React.useState<ReactFlowInstance | null>(null);
 
-  const onInit = React.useCallback((instance: any) => {
+  const onInit = React.useCallback((instance: ReactFlowInstance) => {
     console.log("[SimpleCanvas] React Flow initialized");
     setReactFlowInstance(instance);
     reactFlowInstanceRef.current = instance;
-  }, []);
+    onReactFlowInit?.(instance);
+  }, [onReactFlowInit]);
+
+  useEffect(() => {
+    return () => {
+      onReactFlowInit?.(null);
+      reactFlowInstanceRef.current = null;
+    };
+  }, [onReactFlowInit]);
+
+  const highlightOverlayStyle = React.useMemo(() => {
+    if (!highlightedAnnotation || !reactFlowInstance) {
+      return null;
+    }
+
+    const viewport = reactFlowInstance.getViewport();
+    const zoom = viewport.zoom;
+    const width = (highlightedAnnotation.width ?? DEFAULT_NODE_WIDTH) * zoom;
+    const height = (highlightedAnnotation.height ?? DEFAULT_NODE_HEIGHT) * zoom;
+    const projectedX = (highlightedAnnotation.x - viewport.x) * zoom;
+    const projectedY = (highlightedAnnotation.y - viewport.y) * zoom;
+
+    return {
+      left: projectedX - 16,
+      top: projectedY - 16,
+      width: width + 32,
+      height: height + 32,
+    } satisfies React.CSSProperties;
+  }, [highlightedAnnotation, reactFlowInstance]);
 
   // Drop functionality for adding components from palette
   const [{ isOver, canDrop }, drop] = useDrop(
@@ -970,17 +1014,16 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
     [drop],
   );
 
-  // Debug log to see what's being rendered
-  console.log("[SimpleCanvas] Rendering with:", {
-    nodesCount: nodes.length,
-    edgesCount: edges.length,
-    nodes: nodes.map((n) => ({ id: n.id, position: n.position })),
-    edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
-  });
+  // Minimize logging to prevent infinite loop detection issues
+  // console.log("[SimpleCanvas] Rendering with:", {
+  //   nodesCount: nodes.length,
+  //   edgesCount: edges.length,
+  // });
 
   return (
     <div
       ref={setRefs}
+      data-testid="simple-canvas"
       className={cn(
         "simple-canvas relative overflow-hidden rounded-lg border-2 border-gray-300 transition-shadow duration-300",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50",
@@ -992,6 +1035,7 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
       style={{
         width: "100%",
         height: "100%",
+        minHeight: "500px", // Explicit minimum height
         backgroundColor: "#ffffff",
         ...style,
       }}
@@ -1072,6 +1116,14 @@ const SimpleCanvasComponent: React.FC<SimpleCanvasProps> = ({
           zoomable
         />
       </ReactFlow>
+
+      {highlightOverlayStyle && (
+        <div
+          className='pointer-events-none absolute z-40 rounded-xl border-2 border-amber-400/80 bg-amber-200/20 shadow-[0_0_0_6px_rgba(251,191,36,0.15)] animate-[pulse_0.9s_ease-in-out_2]'
+          style={highlightOverlayStyle}
+          aria-hidden='true'
+        />
+      )}
 
       {/* Drawing Overlay */}
       <DrawingOverlay

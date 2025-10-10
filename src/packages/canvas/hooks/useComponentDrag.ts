@@ -5,11 +5,12 @@
  * RELEVANT FILES: CanvasComponent.tsx, CanvasArea.tsx, canvas-utils.ts
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import type { XYCoord } from 'react-dnd';
+import type { DragSourceMonitor, XYCoord } from 'react-dnd';
 import type { DesignComponent } from '@/shared/contracts';
 import { snapToGrid } from '@/shared/canvasUtils';
+import { useCanvasActions } from '@/stores/canvasStore';
 
 interface UseComponentDragProps {
   component: DesignComponent;
@@ -51,9 +52,82 @@ export function useComponentDrag({
 }: UseComponentDragProps): UseComponentDragResult {
   const ref = useRef<HTMLDivElement>(null);
   const [isDragPreview, setIsDragPreview] = useState(false);
+  const canvasActions = useCanvasActions();
+  const canvasActionsRef = useRef(canvasActions);
+  useEffect(() => {
+    canvasActionsRef.current = canvasActions;
+  }, [canvasActions]);
   
   // Store initial client offset for proper coordinate calculation
   const initialClientOffset = useRef<XYCoord | null>(null);
+  const initialComponentPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const dragMonitorRef = useRef<DragSourceMonitor<DragItem, unknown> | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const trailPositionsRef = useRef<Array<{ x: number; y: number }>>([]);
+  const lastSnapFeedbackAtRef = useRef<number>(0);
+
+  const stopAnimationLoop = () => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  };
+
+  const emitTrailUpdate = (positions: Array<{ x: number; y: number }>) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('canvas:component-dragging', {
+        detail: {
+          componentId: component.id,
+          positions,
+        },
+      }),
+    );
+  };
+
+  const updateDragTrail = () => {
+    if (!dragMonitorRef.current || !initialClientOffset.current || !initialComponentPositionRef.current) {
+      animationFrameRef.current = requestAnimationFrame(updateDragTrail);
+      return;
+    }
+
+    const clientOffset = dragMonitorRef.current.getClientOffset();
+    if (!clientOffset) {
+      animationFrameRef.current = requestAnimationFrame(updateDragTrail);
+      return;
+    }
+
+    const base = initialComponentPositionRef.current;
+    const newX = base.x + (clientOffset.x - initialClientOffset.current.x);
+    const newY = base.y + (clientOffset.y - initialClientOffset.current.y);
+
+    const last = trailPositionsRef.current[trailPositionsRef.current.length - 1];
+    if (!last || Math.abs(last.x - newX) > 0.5 || Math.abs(last.y - newY) > 0.5) {
+      trailPositionsRef.current = [...trailPositionsRef.current, { x: newX, y: newY }].slice(-5);
+      emitTrailUpdate(trailPositionsRef.current);
+    }
+
+    if (shouldSnapToGrid) {
+      const snapped = snapToGrid(newX, newY, gridSpacing);
+      const distance = Math.hypot(snapped.x - newX, snapped.y - newY);
+      const now = Date.now();
+      if (distance < 1 && now - lastSnapFeedbackAtRef.current > 150) {
+        canvasActionsRef.current.setSnappingComponent(component.id);
+        lastSnapFeedbackAtRef.current = now;
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(updateDragTrail);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopAnimationLoop();
+      emitTrailUpdate([]);
+      dragMonitorRef.current = null;
+      initialComponentPositionRef.current = null;
+    };
+  }, []);
 
   const [{ isDragging }, drag] = useDrag<DragItem, unknown, DragCollectedProps>(() => ({
     type: 'canvas-component',
@@ -65,36 +139,55 @@ export function useComponentDrag({
       setIsDragPreview(true);
       // Store initial client offset for coordinate calculation
       initialClientOffset.current = monitor.getInitialClientOffset();
+      initialComponentPositionRef.current = { x: component.x, y: component.y };
+      trailPositionsRef.current = [{ x: component.x, y: component.y }];
+      dragMonitorRef.current = monitor;
+      lastSnapFeedbackAtRef.current = 0;
+      canvasActionsRef.current.setDraggedComponent(component.id);
+      emitTrailUpdate(trailPositionsRef.current);
+      stopAnimationLoop();
+      animationFrameRef.current = requestAnimationFrame(updateDragTrail);
       return { id: component.id };
     },
     end: (item, monitor) => {
       setIsDragPreview(false);
-      if (!monitor.didDrop() && ref.current && initialClientOffset.current) {
+      stopAnimationLoop();
+      emitTrailUpdate([]);
+      canvasActionsRef.current.setDraggedComponent(null);
+      dragMonitorRef.current = null;
+      if (!monitor.didDrop() && initialClientOffset.current) {
         const currentClientOffset = monitor.getClientOffset();
         if (currentClientOffset) {
-          // Calculate position using canvas coordinate system
-          const canvasRect = ref.current.parentElement?.getBoundingClientRect();
-          if (canvasRect) {
-            // Calculate the difference in client coordinates
-            const deltaX = currentClientOffset.x - initialClientOffset.current.x;
-            const deltaY = currentClientOffset.y - initialClientOffset.current.y;
-            
-            let newX = component.x + deltaX;
-            let newY = component.y + deltaY;
+          const initialPosition = initialComponentPositionRef.current ?? {
+            x: component.x,
+            y: component.y,
+          };
+          const deltaX = currentClientOffset.x - initialClientOffset.current.x;
+          const deltaY = currentClientOffset.y - initialClientOffset.current.y;
 
-            // Apply snap-to-grid if enabled
-            if (shouldSnapToGrid) {
-              const snapped = snapToGrid(newX, newY, gridSpacing);
-              newX = snapped.x;
-              newY = snapped.y;
-            }
+          let newX = initialPosition.x + deltaX;
+          let newY = initialPosition.y + deltaY;
+          let snappedTriggered = false;
 
-            onMove(component.id, newX, newY);
+          if (shouldSnapToGrid) {
+            const snapped = snapToGrid(newX, newY, gridSpacing);
+            snappedTriggered = snapped.x !== newX || snapped.y !== newY;
+            newX = snapped.x;
+            newY = snapped.y;
+          }
+
+          onMove(component.id, newX, newY);
+
+          if (snappedTriggered) {
+            canvasActionsRef.current.setSnappingComponent(component.id);
           }
         }
       }
+      canvasActionsRef.current.setDroppedComponent(component.id);
       // Reset initial offset
       initialClientOffset.current = null;
+      initialComponentPositionRef.current = null;
+      trailPositionsRef.current = [];
     },
   }), [component.id, component.x, component.y, onMove, shouldSnapToGrid, gridSpacing]);
 

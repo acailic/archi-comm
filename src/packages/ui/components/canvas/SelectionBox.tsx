@@ -6,13 +6,16 @@
  */
 
 import { memo, useMemo } from "react";
-import type { Viewport } from "@xyflow/react";
 
 import { cx, overlayZIndex } from "@/lib/design/design-system";
 import { useSelectionBox } from "@/stores/canvasStore";
 
 interface SelectionBoxProps {
-  viewport?: Viewport;
+  viewport: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
 }
 
 export const SelectionBox = memo(({ viewport }: SelectionBoxProps) => {
@@ -25,27 +28,16 @@ export const SelectionBox = memo(({ viewport }: SelectionBoxProps) => {
 
     // Apply viewport transformation if provided
     // Convert world coordinates to screen coordinates
-    if (viewport) {
-      const screenX = x * viewport.zoom + viewport.x;
-      const screenY = y * viewport.zoom + viewport.y;
-      const screenWidth = width * viewport.zoom;
-      const screenHeight = height * viewport.zoom;
+    const screenX = x * viewport.zoom + viewport.x;
+    const screenY = y * viewport.zoom + viewport.y;
+    const screenWidth = width * viewport.zoom;
+    const screenHeight = height * viewport.zoom;
 
-      return {
-        left: `${screenX}px`,
-        top: `${screenY}px`,
-        width: `${screenWidth}px`,
-        height: `${screenHeight}px`,
-        zIndex: overlayZIndex.selection,
-      };
-    }
-
-    // Fallback to world coordinates (no transformation)
     return {
-      left: `${x}px`,
-      top: `${y}px`,
-      width: `${width}px`,
-      height: `${height}px`,
+      left: `${screenX}px`,
+      top: `${screenY}px`,
+      width: `${screenWidth}px`,
+      height: `${screenHeight}px`,
       zIndex: overlayZIndex.selection,
     };
   }, [selectionBox, viewport]);

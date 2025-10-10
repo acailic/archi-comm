@@ -1,0 +1,6 @@
+{
+  "extends": "./config/tsconfig.json",
+  "compilerOptions": { "baseUrl": "." },
+  "include": ["src", "config", "tools", "e2e"],
+  "exclude": ["node_modules", "dist", "src-tauri", "coverage", "test-results"]
+}
