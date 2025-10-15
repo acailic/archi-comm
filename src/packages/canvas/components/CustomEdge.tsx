@@ -25,12 +25,70 @@ import React, { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { isDevelopment } from "../../../lib/config/environment";
 import { getConnectionColor, getVisualStyleColor } from "@/lib/design/canvas-colors";
 
+type SmartPathPoint = { x: number; y: number };
+
+const pathFromPoints = (points: SmartPathPoint[]): string => {
+  if (points.length === 0) {
+    return "";
+  }
+  return points
+    .map((point, index) =>
+      index === 0
+        ? `M ${point.x} ${point.y}`
+        : `L ${point.x} ${point.y}`,
+    )
+    .join(" ");
+};
+
+const polylineMidpoint = (points: SmartPathPoint[]): SmartPathPoint => {
+  if (points.length === 0) {
+    return { x: 0, y: 0 };
+  }
+  if (points.length === 1) {
+    return points[0];
+  }
+
+  const segments = [];
+  let totalLength = 0;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    segments.push({ start, end, length });
+    totalLength += length;
+  }
+
+  if (totalLength === 0) {
+    return points[Math.floor(points.length / 2)];
+  }
+
+  const targetLength = totalLength / 2;
+  let accumulated = 0;
+
+  for (const segment of segments) {
+    if (accumulated + segment.length >= targetLength) {
+      const remaining = targetLength - accumulated;
+      const ratio = segment.length === 0 ? 0 : remaining / segment.length;
+      return {
+        x: segment.start.x + (segment.end.x - segment.start.x) * ratio,
+        y: segment.start.y + (segment.end.y - segment.start.y) * ratio,
+      };
+    }
+    accumulated += segment.length;
+  }
+
+  return points[points.length - 1];
+};
+
 interface CustomEdgeData extends Record<string, unknown> {
   connection: Connection;
   connectionStyle: "straight" | "curved" | "stepped";
   isSelected: boolean;
   isStartConnection: boolean;
   onConnectionSelect: (id: string | null, x?: number, y?: number) => void;
+  smartPath?: SmartPathPoint[];
+  routingAlgorithm?: string;
+  collisions?: number;
 }
 
 export interface CustomEdgeProps extends EdgeProps {
@@ -58,6 +116,7 @@ function CustomEdgeInner({
     isSelected,
     isStartConnection,
     onConnectionSelect,
+    smartPath,
   } = data;
 
   const animationsEnabled = useCanvasStore((state) => state.animationsEnabled);
@@ -106,6 +165,12 @@ function CustomEdgeInner({
 
   // Generate the appropriate path based on connection style
   const [edgePath, labelX, labelY] = useMemo(() => {
+    if (smartPath && smartPath.length >= 2) {
+      const path = pathFromPoints(smartPath);
+      const midPoint = polylineMidpoint(smartPath);
+      return [path, midPoint.x, midPoint.y] as const;
+    }
+
     const pathParams = {
       sourceX,
       sourceY,
@@ -132,6 +197,7 @@ function CustomEdgeInner({
     targetY,
     targetPosition,
     connectionStyle,
+    smartPath,
   ]);
 
   // Edge styling using centralized canvas colors
@@ -331,6 +397,23 @@ const edgePropsEquality = (
   if (prev.data.connection.label !== next.data.connection.label) return false;
   if (prev.data.connection.visualStyle !== next.data.connection.visualStyle)
     return false;
+  const prevSmart = prev.data.smartPath;
+  const nextSmart = next.data.smartPath;
+  if ((prevSmart?.length ?? 0) !== (nextSmart?.length ?? 0)) {
+    return false;
+  }
+  if (prevSmart && nextSmart) {
+    for (let index = 0; index < prevSmart.length; index += 1) {
+      const prevPoint = prevSmart[index];
+      const nextPoint = nextSmart[index];
+      if (
+        prevPoint.x !== nextPoint.x ||
+        prevPoint.y !== nextPoint.y
+      ) {
+        return false;
+      }
+    }
+  }
 
   return true;
 };

@@ -1240,6 +1240,80 @@ export class KeyboardShortcutManager {
     });
 
     this.register({
+      key: "g",
+      modifiers: ["ctrl"],
+      description: "Find next result",
+      category: "navigation",
+      action: () => {
+        emitShortcut("shortcut:search-next");
+      },
+    });
+
+    this.register({
+      key: "g",
+      modifiers: ["ctrl", "shift"],
+      description: "Find previous result",
+      category: "navigation",
+      action: () => {
+        emitShortcut("shortcut:search-prev");
+      },
+    });
+
+    // Frame shortcuts
+    this.register({
+      key: "f",
+      modifiers: ["ctrl", "shift"],
+      description: "Create frame from selection",
+      category: "canvas",
+      action: () => {
+        emitShortcut("shortcut:create-frame");
+      },
+    });
+
+    // AI shortcuts
+    this.register({
+      key: "i",
+      modifiers: ["ctrl", "shift"],
+      description: "Toggle AI assistant",
+      category: "tools",
+      action: () => {
+        emitShortcut("shortcut:toggle-ai-assistant");
+      },
+    });
+
+    this.register({
+      key: "t",
+      modifiers: ["ctrl", "shift"],
+      description: "Text to diagram",
+      category: "tools",
+      action: () => {
+        emitShortcut("shortcut:text-to-diagram");
+      },
+    });
+
+    // Presentation shortcuts
+    this.register({
+      key: "p",
+      modifiers: ["ctrl", "shift"],
+      description: "Presentation mode",
+      category: "navigation",
+      action: () => {
+        emitShortcut("shortcut:presentation-mode");
+      },
+    });
+
+    // Template shortcuts
+    this.register({
+      key: "l",
+      modifiers: ["ctrl", "shift"],
+      description: "Open template library",
+      category: "tools",
+      action: () => {
+        emitShortcut("shortcut:template-library");
+      },
+    });
+
+    this.register({
       key: "1",
       modifiers: ["ctrl"],
       description: "Switch to Canvas view",

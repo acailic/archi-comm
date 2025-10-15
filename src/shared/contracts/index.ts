@@ -3,6 +3,8 @@
  * Replaces scattered any types with strict unions and interfaces.
  */
 
+import type { Viewport } from '@xyflow/react';
+
 // Tooling
 export type ToolType =
   | "select"
@@ -135,6 +137,11 @@ export interface AlignmentGuide {
   position: number;
   componentIds: string[];
   visible: boolean;
+  /**
+   * Optional difference (in pixels) between aligned component centers.
+   * Used to convey snapping strength in the UI.
+   */
+  delta?: number;
 }
 
 export interface ComponentTemplate {
@@ -183,7 +190,28 @@ export interface Connection {
   protocol?: string;
   direction?: ConnectionDirection;
   visualStyle?: VisualStyle;
+  /** @deprecated - use `from` instead */
+  sourceId?: string;
+  /** @deprecated - use `to` instead */
+  targetId?: string;
   properties?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  fromHandleId?: string;
+  toHandleId?: string;
+  fromPortId?: string;
+  toPortId?: string;
+  /**
+   * Precomputed smart routing path in world coordinates, if available.
+   */
+  smartPath?: { x: number; y: number }[];
+  /**
+   * Additional routing metadata (algorithm, timestamps, etc.).
+   */
+  routingMetadata?: {
+    algorithm: "orthogonal" | "manhattan" | "direct" | "bezier";
+    updatedAt: number;
+    collisionsDetected?: number;
+  };
 }
 
 export interface Layer {
@@ -250,19 +278,6 @@ export interface Annotation {
   fontSize?: number; // Text size for note/comment/label types
   borderWidth?: number; // Border thickness
   borderStyle?: "solid" | "dashed" | "dotted"; // Border style
-}
-
-export interface DesignData {
-  schemaVersion?: number;
-  components: DesignComponent[];
-  connections: Connection[];
-  infoCards?: InfoCard[];
-  annotations?: Annotation[];
-  drawings?: DrawingStroke[];
-  layers: Layer[];
-  gridConfig?: GridConfig;
-  activeTool?: ToolType;
-  metadata: DesignMetadata;
 }
 
 // Shared viewport info used by CanvasArea and Minimap
@@ -371,4 +386,213 @@ export interface DesignValidationResult {
   missingComponents: string[];
   extraComponents: string[];
   incorrectConnections: string[];
+}
+
+// ========================================
+//  World-Class Canvas Features Types
+// ========================================
+
+// Canvas Frames for organization (similar to Figma frames)
+export interface CanvasFrame {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color?: string;
+  locked?: boolean;
+  collapsed?: boolean;
+  parentFrameId?: string; // For nested frames
+  zIndex?: number;
+  description?: string;
+  componentIds?: string[]; // Components within this frame
+}
+
+// Canvas Sections for logical grouping
+export interface CanvasSection {
+  id: string;
+  name: string;
+  description?: string;
+  componentIds: string[];
+  frameIds?: string[];
+  color?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+// Navigation history for breadcrumbs
+export interface NavigationHistoryEntry {
+  id: string;
+  type: "frame" | "component" | "search" | "viewport";
+  targetId?: string;
+  viewport: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
+  timestamp: number;
+  label: string;
+}
+
+// Search results for advanced canvas search
+export interface SearchResult {
+  id: string;
+  type: "component" | "connection" | "annotation" | "frame" | "section";
+  label: string;
+  description?: string;
+  score: number; // Relevance score
+  position?: { x: number; y: number };
+  metadata?: Record<string, unknown>;
+}
+
+// Presentation slides for presentation mode
+export interface PresentationSlide {
+  id: string;
+  name: string;
+  frameId?: string; // Reference to frame
+  viewport: Viewport;
+  focusedComponentIds?: string[];
+  duration?: number; // Slide duration in seconds
+  transition?: "fade" | "slide" | "zoom" | "none";
+  notes?: string; // Speaker notes
+  order: number;
+}
+
+// AI-generated diagram metadata
+export interface AIGeneratedMetadata {
+  prompt: string;
+  generatedAt: number;
+  model?: string;
+  confidence?: number;
+  suggestionsApplied: string[];
+  patternsDetected?: string[];
+}
+
+export interface AIAssistantOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface TextToDiagramOptions extends AIAssistantOptions {
+  includeConnections?: boolean;
+  style?: 'auto' | 'flowchart' | 'architecture' | 'sequence';
+  complexity?: 'simple' | 'medium' | 'complex';
+}
+
+export interface AIDiagramSuggestion {
+  components: DesignComponent[];
+  connections: Connection[];
+  explanation: string;
+  confidence: number;
+  metadata: AIGeneratedMetadata;
+}
+
+export interface AIAssistantResponse {
+  success: boolean;
+  message: string;
+  suggestions?: AIDiagramSuggestion[];
+  error?: string;
+}
+
+// Smart routing configuration
+export interface SmartRoutingConfig {
+  algorithm: "orthogonal" | "manhattan" | "bezier" | "a-star";
+  avoidOverlaps: boolean;
+  smartAnchors: boolean;
+  gridSnap: boolean;
+}
+
+// Extended DesignData to include world-class features
+export interface DesignData {
+  schemaVersion?: number;
+  components: DesignComponent[];
+  connections: Connection[];
+  infoCards?: InfoCard[];
+  annotations?: Annotation[];
+  drawings?: DrawingStroke[];
+  layers: Layer[];
+  gridConfig?: GridConfig;
+  activeTool?: ToolType;
+  metadata: DesignMetadata;
+  // New world-class features
+  frames?: CanvasFrame[];
+  sections?: CanvasSection[];
+  presentationSlides?: PresentationSlide[];
+  aiMetadata?: AIGeneratedMetadata;
+  routingConfig?: SmartRoutingConfig;
+}
+
+// Canvas AI command contracts
+export interface CanvasAIInstructionContext {
+  components: DesignComponent[];
+  connections: Connection[];
+  selectedComponentIds?: string[];
+  canvasMetadata?: Record<string, unknown>;
+}
+
+export interface CanvasAIInstructionRequest {
+  prompt: string;
+  context: CanvasAIInstructionContext;
+  provider?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  allowPartial?: boolean;
+  mode?: 'diagram' | 'update' | 'analysis';
+}
+
+export interface CanvasAIComponentDraft extends Partial<Omit<DesignComponent, 'id'>> {
+  id?: string;
+}
+
+export interface CanvasAIConnectionDraft extends Partial<Omit<Connection, 'id'>> {
+  id?: string;
+  from?: string;
+  to?: string;
+}
+
+export type CanvasAIAction =
+  | {
+      type: 'add_component';
+      component: CanvasAIComponentDraft;
+    }
+  | {
+      type: 'update_component';
+      componentId: string;
+      patch: CanvasAIComponentDraft;
+    }
+  | {
+      type: 'remove_component';
+      componentId: string;
+    }
+  | {
+      type: 'add_connection';
+      connection: CanvasAIConnectionDraft;
+    }
+  | {
+      type: 'update_connection';
+      connectionId: string;
+      patch: CanvasAIConnectionDraft;
+    }
+  | {
+      type: 'remove_connection';
+      connectionId: string;
+    }
+  | {
+      type: 'annotate';
+      message: string;
+      targetComponentId?: string;
+    };
+
+export interface CanvasAIInstructionResponse {
+  actions: CanvasAIAction[];
+  reasoning?: string;
+  summary?: string;
+  warnings?: string[];
+  provider?: string;
+  model?: string;
+  createdAt?: number;
+  rawText?: string;
 }

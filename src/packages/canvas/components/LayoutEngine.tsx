@@ -1,8 +1,8 @@
 import React, { useEffect, useCallback, useMemo } from 'react';
-import { useRenderGuard, RenderGuardPresets } from '../../../lib/performance/RenderGuard';
-import { InfiniteLoopDetector } from '../../../lib/performance/InfiniteLoopDetector';
+import { useRenderGuard, RenderGuardPresets } from '@/lib/performance/RenderGuard';
+import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { useCanvasContext } from '../contexts/CanvasContext';
-import { DesignComponent, Connection } from '../../../types';
+import type { DesignComponent, Connection } from '@/shared/contracts';
 
 export interface LayoutEngineProps {
   components: DesignComponent[];
@@ -80,11 +80,20 @@ export const LayoutEngine: React.FC<LayoutEngineProps> = ({
   );
 
   const elkEdges = useMemo<LayoutEdge[]>(() =>
-    connections.map(connection => ({
-      id: connection.id,
-      sources: [connection.sourceId],
-      targets: [connection.targetId],
-    })),
+    connections
+      .map((connection) => {
+        const source = connection.from ?? (connection as any).sourceId;
+        const target = connection.to ?? (connection as any).targetId;
+        if (!source || !target) {
+          return null;
+        }
+        return {
+          id: connection.id,
+          sources: [source],
+          targets: [target],
+        };
+      })
+      .filter((edge): edge is LayoutEdge => edge !== null),
     [connections]
   );
 

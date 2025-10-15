@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as env from '@/lib/config/environment';
 import * as aiConfig from '@/lib/services/AIConfigService';
+import { AIProvider } from '@/lib/types/AIConfig';
 import { isAIAvailable, parseAIResponse, reviewSolution } from '@/lib/api/ai';
 
 describe('AI service error handling', () => {
@@ -24,11 +25,17 @@ describe('AI service error handling', () => {
   it('isAIAvailable reflects configuration state', async () => {
     vi.spyOn(aiConfig.aiConfigService, 'loadConfig').mockResolvedValue({
       openai: { enabled: true, apiKey: 'sk-123' },
+      gemini: { enabled: false, apiKey: '' },
+      claude: { enabled: false, apiKey: '' },
+      preferredProvider: AIProvider.OPENAI,
     } as any);
     await expect(isAIAvailable()).resolves.toBe(true);
 
     vi.spyOn(aiConfig.aiConfigService, 'loadConfig').mockResolvedValue({
       openai: { enabled: false, apiKey: '' },
+      gemini: { enabled: false, apiKey: '' },
+      claude: { enabled: false, apiKey: '' },
+      preferredProvider: AIProvider.OPENAI,
     } as any);
     await expect(isAIAvailable()).resolves.toBe(false);
   });
@@ -38,6 +45,9 @@ describe('AI service error handling', () => {
     vi.spyOn(env, 'isTauriEnvironment').mockReturnValue(true);
     vi.spyOn(aiConfig.aiConfigService, 'loadConfig').mockResolvedValue({
       openai: { enabled: true, apiKey: 'sk-test' },
+      gemini: { enabled: false, apiKey: '' },
+      claude: { enabled: false, apiKey: '' },
+      preferredProvider: AIProvider.OPENAI,
     } as any);
 
     const fetchMock = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
@@ -53,6 +63,9 @@ describe('AI service error handling', () => {
     vi.spyOn(env, 'isTauriEnvironment').mockReturnValue(true);
     vi.spyOn(aiConfig.aiConfigService, 'loadConfig').mockResolvedValue({
       openai: { enabled: true, apiKey: 'sk-test' },
+      gemini: { enabled: false, apiKey: '' },
+      claude: { enabled: false, apiKey: '' },
+      preferredProvider: AIProvider.OPENAI,
     } as any);
 
     vi.spyOn(globalThis, 'fetch' as any).mockImplementation(() => new Promise(() => {}));
@@ -66,4 +79,3 @@ describe('AI service error handling', () => {
     await expect(timed).resolves.toBe('timeout');
   });
 });
-

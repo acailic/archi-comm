@@ -13,12 +13,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useAnnouncer } from "../../../shared/hooks/useAccessibility";
 import { equalityFunctions } from "../../../shared/utils/memoization";
 import { EnhancedErrorBoundary } from "../../ui/components/ErrorBoundary/EnhancedErrorBoundary";
-import { Connection, DesignComponent, InfoCard } from "../types";
+import { Connection, DesignComponent, InfoCard } from "@/shared/contracts";
+import { getCanvasPerformanceManager } from "@/lib/performance/CanvasPerformanceManager";
 import { CanvasController } from "./CanvasController";
 import { CanvasInteractionLayer } from "./CanvasInteractionLayer";
 import { EdgeLayer } from "./EdgeLayer";
 import { LayoutEngine } from "./LayoutEngine";
 import { NodeLayer } from "./NodeLayer";
+import { useVirtualizationConfig } from "../hooks/useCanvasConfig";
+
+const DEFAULT_EXTENT_PADDING = 1200;
+const DEFAULT_TRANSLATE_EXTENT: [[number, number], [number, number]] = [
+  [-8000, -8000],
+  [8000, 8000],
+];
 
 export interface ReactFlowCanvasWrapperProps {
   components: DesignComponent[];
@@ -98,11 +106,79 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
     zoom: 1,
   });
 
-  useEffect(() => {
-    if (onReactFlowInit && reactFlowInstance) {
-      onReactFlowInit(reactFlowInstance);
+  // Use advanced virtualization configuration
+  const {
+    isEnabled: virtualizationConfigEnabled,
+    nodeThreshold,
+    edgeThreshold,
+    buffer,
+    overscanPx,
+    onlyRenderVisibleElements,
+  } = useVirtualizationConfig();
+
+  // Determine if virtualization should be active based on config and content size
+  const virtualizationActive = useMemo(() => {
+    if (!virtualizationEnabled || !virtualizationConfigEnabled) {
+      return false;
     }
-  }, [onReactFlowInit, reactFlowInstance]);
+
+    // Enable virtualization if either node or edge count exceeds thresholds
+    const nodeCount = components.length;
+    const edgeCount = connections.length;
+
+    return nodeCount > nodeThreshold || edgeCount > edgeThreshold;
+  }, [
+    virtualizationEnabled,
+    virtualizationConfigEnabled,
+    components.length,
+    connections.length,
+    nodeThreshold,
+    edgeThreshold,
+  ]);
+
+  const virtualizationExtents = useMemo(() => {
+    if (!virtualizationActive) {
+      return {
+        translateExtent: DEFAULT_TRANSLATE_EXTENT,
+        nodeExtent: DEFAULT_TRANSLATE_EXTENT,
+      };
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    components.forEach((component) => {
+      const width = component.width ?? 220;
+      const height = component.height ?? 140;
+      minX = Math.min(minX, component.x);
+      minY = Math.min(minY, component.y);
+      maxX = Math.max(maxX, component.x + width);
+      maxY = Math.max(maxY, component.y + height);
+    });
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      return {
+        translateExtent: DEFAULT_TRANSLATE_EXTENT,
+        nodeExtent: DEFAULT_TRANSLATE_EXTENT,
+      };
+    }
+
+    const padding = DEFAULT_EXTENT_PADDING;
+    const translateExtent: [[number, number], [number, number]] = [
+      [minX - padding, minY - padding],
+      [maxX + padding, maxY + padding],
+    ];
+    const nodeExtent: [[number, number], [number, number]] = [
+      [minX - padding / 2, minY - padding / 2],
+      [maxX + padding / 2, maxY + padding / 2],
+    ];
+
+    return { translateExtent, nodeExtent };
+  }, [components, virtualizationActive]);
+
+  // Note: ReactFlow init is now handled via onInit prop to ensure proper timing
 
   const canvasLabel = useMemo(() => {
     const componentCount = components.length;
@@ -187,8 +263,42 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
       if (onViewportChange) {
         onViewportChange(viewportParams);
       }
+
+      try {
+        const perfManager = getCanvasPerformanceManager();
+        perfManager.recordReactFlowMetric(
+          "design-canvas",
+          "viewport-update",
+          0,
+          virtualizationActive ? 1 : 0,
+        );
+      } catch (_error) {
+        // ignore performance tracking errors
+      }
     },
-    [onViewportChange]
+    [onViewportChange, virtualizationActive]
+  );
+
+  const handleReactFlowInit = useCallback(
+    (instance: ReactFlowInstance) => {
+      // Track initialization performance
+      try {
+        const perfManager = getCanvasPerformanceManager();
+        perfManager.recordReactFlowMetric(
+          "design-canvas",
+          "init",
+          0,
+          virtualizationActive ? 1 : 0,
+        );
+      } catch (error) {
+        // Performance manager not available, skip tracking
+      }
+
+      if (onReactFlowInit) {
+        onReactFlowInit(instance);
+      }
+    },
+    [onReactFlowInit, virtualizationActive]
   );
 
   return (
@@ -200,7 +310,7 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
       selectedConnectionId={selectedConnectionId}
       selectedInfoCardId={selectedInfoCardId}
       enableAutoLayout={enableAutoLayout}
-      virtualizationEnabled={virtualizationEnabled}
+      virtualizationEnabled={virtualizationActive}
       onComponentSelect={onComponentSelect}
       onComponentDeselect={onComponentDeselect}
       onComponentDrop={onComponentDrop}
@@ -238,6 +348,18 @@ const ReactFlowCanvasInner: React.FC<ReactFlowCanvasWrapperProps> = ({
                       attributionPosition="bottom-left"
                       className="react-flow-canvas"
                       onMove={handleViewportMove}
+                      onInit={handleReactFlowInit}
+                      onlyRenderVisibleElements={virtualizationActive && onlyRenderVisibleElements}
+                      translateExtent={
+                        virtualizationActive
+                          ? virtualizationExtents.translateExtent
+                          : undefined
+                      }
+                      nodeExtent={
+                        virtualizationActive
+                          ? virtualizationExtents.nodeExtent
+                          : undefined
+                      }
                     >
                       {showBackground && (
                         <Background

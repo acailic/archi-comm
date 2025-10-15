@@ -59,6 +59,17 @@ interface GuideProps {
 
 const Guide = memo<GuideProps>(({ guide, viewport }) => {
   const isHorizontal = guide.type === "horizontal";
+  const componentCount = guide.componentIds.length;
+  const delta = guide.delta ?? null;
+  const isStrongSnap = delta !== null ? delta <= 1 : false;
+  const labelText = useMemo(() => {
+    const prefix = isHorizontal ? "H-aligned" : "V-aligned";
+    const countLabel = componentCount > 1 ? ` (${componentCount})` : "";
+    const deltaLabel =
+      delta !== null ? ` • Δ${Math.round(delta * 10) / 10}px` : "";
+    return `${prefix}${countLabel}${deltaLabel}`;
+  }, [componentCount, delta, isHorizontal]);
+
   const style = useMemo(
     () => ({
       [isHorizontal ? "top" : "left"]: `${
@@ -69,25 +80,45 @@ const Guide = memo<GuideProps>(({ guide, viewport }) => {
     [guide.position, viewport.x, viewport.y, viewport.zoom, isHorizontal],
   );
 
+  const labelStyle = useMemo(
+    () => ({
+      transform: `translate(-50%, -50%) scale(${1 / Math.max(viewport.zoom, 0.1)})`,
+    }),
+    [viewport.zoom],
+  );
+
   return (
     <div
       className={cx(
         "absolute",
-        "bg-blue-500",
         "animate-in fade-in duration-150",
         isHorizontal ? "h-px left-0 right-0" : "w-px top-0 bottom-0",
+        isStrongSnap ? "bg-blue-500" : "bg-blue-400/80",
+        "shadow-[0_0_6px_rgba(59,130,246,0.35)]",
       )}
       style={style}
+      role="presentation"
     >
-      {/* Guide label */}
       <div
         className={cx(
           "absolute px-1.5 py-0.5 rounded text-[10px] font-medium",
-          "bg-blue-500 text-white whitespace-nowrap",
+          "bg-blue-500 text-white whitespace-nowrap flex items-center gap-1",
           isHorizontal ? "left-2 -top-4" : "top-2 -left-16",
+          "backdrop-blur-sm",
         )}
+        style={labelStyle}
       >
-        {isHorizontal ? "Horizontally aligned" : "Vertically aligned"}
+        <span>{labelText}</span>
+        <span
+          className={cx(
+            "inline-flex h-2 w-2 rounded-full",
+            isStrongSnap ? "bg-emerald-300" : "bg-blue-200",
+          )}
+          aria-hidden="true"
+        />
+        <span className="sr-only">
+          {componentCount} components aligned. Offset {delta ?? 0} pixels.
+        </span>
       </div>
     </div>
   );

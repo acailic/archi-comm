@@ -54,6 +54,7 @@ import {
   type QuickAddShortcutDetail,
   dispatchAppEvent,
 } from "@/lib/events/appEvents";
+import { useCanvasPerformance } from "@canvas/hooks/useCanvasPerformance";
 
 const showCanvasToast = (type: "info" | "success", message: string) => {
   if (typeof window === "undefined") {
@@ -114,6 +115,10 @@ export const CanvasContent = React.memo(
     const [quickAddActive, setQuickAddActive] = useState(false);
     const [quickAddContext, setQuickAddContext] =
       useState<QuickAddShortcutDetail | null>(null);
+    const { recordViewportChange } = useCanvasPerformance({
+      canvasId: "design-canvas",
+      monitoringEnabled: true,
+    });
 
     // Get components from canvas store to check if canvas is empty
     const components = useCanvasStore((state) => state.components);
@@ -125,9 +130,13 @@ export const CanvasContent = React.memo(
 
     // Viewport tracking for overlays
     const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
-    const handleViewportChange = useCallback((v: Viewport) => {
-      setViewport(v);
-    }, []);
+    const handleViewportChange = useCallback(
+      (v: Viewport) => {
+        setViewport(v);
+        recordViewportChange();
+      },
+      [recordViewportChange],
+    );
 
     useEffect(() => {
       if (
@@ -842,7 +851,9 @@ export const CanvasContent = React.memo(
           return;
         }
 
-        canvasActions.setSelectedComponents(lockedComponentIds);
+        canvasActions.setSelectedComponents(lockedComponentIds, {
+          context: { allowLocked: true },
+        });
         canvasActions.setSelectionBox(null);
       };
 

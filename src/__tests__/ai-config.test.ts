@@ -91,6 +91,62 @@ describe('AIConfigService', () => {
 
       expect(loadedConfig[AIProvider.OPENAI].apiKey).toBe('sk-web123');
     });
+
+    it('encrypts every provider key before persisting', async () => {
+      mockedIsTauri.mockReturnValue(true);
+      mockedAppDataDir.mockResolvedValue('/app/data');
+      mockedJoin.mockImplementation((...parts) => Promise.resolve(parts.join('/')));
+      mockedCreateDir.mockResolvedValue(undefined);
+      mockedExists.mockResolvedValue(false);
+      mockedWriteTextFile.mockResolvedValue(undefined);
+      mockedReadTextFile.mockResolvedValue('{}');
+
+      const config = getDefaultConfig();
+      config.openai = { ...config.openai, enabled: true, apiKey: 'sk-openai-123' };
+      config.claude = {
+        ...config.claude,
+        enabled: true,
+        apiKey: 'sk-ant-api03-12345678901234567890123456789012',
+      };
+
+      await service.saveConfig(config);
+      expect(mockedWriteTextFile).toHaveBeenCalledTimes(1);
+
+      const [, payload] = mockedWriteTextFile.mock.calls[0];
+      const stored = JSON.parse(payload as string);
+
+      expect(stored.openai.apiKey).not.toEqual(config.openai.apiKey);
+      expect(stored.claude.apiKey).not.toEqual(config.claude.apiKey);
+      expect(stored.gemini.apiKey).toBe('');
+    });
+
+    it('merges defaults when loading legacy configs without provider data', async () => {
+      mockedIsTauri.mockReturnValue(true);
+      mockedAppDataDir.mockResolvedValue('/app/data');
+      mockedJoin.mockImplementation((...parts) => Promise.resolve(parts.join('/')));
+      mockedExists.mockResolvedValue(true);
+
+      const encryptedOpenAI = (service as any).encryptApiKey.call(
+        service,
+        'sk-legacy-openai'
+      );
+
+      mockedReadTextFile.mockResolvedValue(
+        JSON.stringify({
+          openai: {
+            enabled: true,
+            apiKey: encryptedOpenAI,
+          },
+        })
+      );
+
+      const loadedConfig = await service.loadConfig();
+
+      expect(loadedConfig.openai.apiKey).toBe('sk-legacy-openai');
+      expect(loadedConfig.gemini).toMatchObject({ enabled: false, apiKey: '' });
+      expect(loadedConfig.claude).toMatchObject({ enabled: false, apiKey: '' });
+      expect(loadedConfig.preferredProvider).toBeDefined();
+    });
   });
 
   describe.skip('getEnabledProviders', () => {
@@ -126,43 +182,17 @@ describe('AIConfigService', () => {
     });
   });
 
-  describe.skip('getDefaultProvider', () => {
-    it('returns configured default provider when enabled', async () => {
-      const testConfig = {
-        ...getDefaultConfig(),
-        defaultProvider: AIProvider.OPENAI,
-        [AIProvider.OPENAI]: {
-          enabled: true,
-          apiKey: 'sk-test123',
-          selectedModel: 'gpt-4',
-          settings: { temperature: 0.7, maxTokens: 2000 },
-        },
-      };
+  describe.skip('preferredProvider persistence', () => {
+    it('persists preferred provider selection', async () => {
+      const testConfig = getDefaultConfig();
+      testConfig.openai.enabled = true;
+      testConfig.preferredProvider = AIProvider.CLAUDE;
 
       mockedIsTauri.mockReturnValue(false);
       await service.saveConfig(testConfig);
 
-      const defaultProvider = await service.getDefaultProvider();
-      expect(defaultProvider).toBe(AIProvider.OPENAI);
-    });
-
-    it('falls back to first enabled provider when default is not enabled', async () => {
-      const testConfig = {
-        ...getDefaultConfig(),
-        defaultProvider: AIProvider.CLAUDE, // Not enabled
-        [AIProvider.OPENAI]: {
-          enabled: true,
-          apiKey: 'sk-test123',
-          selectedModel: 'gpt-4',
-          settings: { temperature: 0.7, maxTokens: 2000 },
-        },
-      };
-
-      mockedIsTauri.mockReturnValue(false);
-      await service.saveConfig(testConfig);
-
-      const defaultProvider = await service.getDefaultProvider();
-      expect(defaultProvider).toBe(AIProvider.OPENAI);
+      const loadedConfig = await service.loadConfig();
+      expect(loadedConfig.preferredProvider).toBe(AIProvider.CLAUDE);
     });
   });
 

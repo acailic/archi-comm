@@ -7,6 +7,7 @@ import {
   getDefaultConfig,
   validateApiKeyFormat,
   AIConfigSchema,
+  AIProvider,
 } from '../types/AIConfig';
 
 export class AIConfigService {
@@ -85,24 +86,74 @@ export class AIConfigService {
     }
   }
 
-  private encryptConfig(config: AIConfig): any {
+  private encryptProviderConfig<T extends { apiKey?: string }>(provider: T): T {
+    if (!provider) {
+      return provider;
+    }
+
+    const apiKey = typeof provider.apiKey === 'string' ? provider.apiKey : '';
     return {
-      ...config,
+      ...provider,
+      apiKey: this.encryptApiKey(apiKey),
+    };
+  }
+
+  private decryptProviderConfig<T extends { apiKey?: string } | undefined>(
+    provider: T
+  ): T {
+    if (!provider) {
+      return provider;
+    }
+
+    const apiKey =
+      typeof provider.apiKey === 'string'
+        ? this.decryptApiKey(provider.apiKey)
+        : '';
+
+    return {
+      ...provider,
+      apiKey,
+    };
+  }
+
+  private mergeWithDefaults(partial: Partial<AIConfig>): AIConfig {
+    const defaults = getDefaultConfig();
+    return {
+      preferredProvider: partial.preferredProvider ?? defaults.preferredProvider,
       openai: {
-        ...config.openai,
-        apiKey: this.encryptApiKey(config.openai.apiKey),
+        ...defaults.openai,
+        ...(partial.openai ?? {}),
+      },
+      gemini: {
+        ...defaults.gemini,
+        ...(partial.gemini ?? {}),
+      },
+      claude: {
+        ...defaults.claude,
+        ...(partial.claude ?? {}),
       },
     };
   }
 
-  private decryptConfig(encryptedConfig: any): AIConfig {
+  private encryptConfig(config: AIConfig): any {
     return {
-      ...encryptedConfig,
-      openai: {
-        ...encryptedConfig.openai,
-        apiKey: this.decryptApiKey(encryptedConfig.openai.apiKey),
-      },
+      ...config,
+      openai: this.encryptProviderConfig(config.openai),
+      gemini: this.encryptProviderConfig(config.gemini),
+      claude: this.encryptProviderConfig(config.claude),
     };
+  }
+
+  private decryptConfig(encryptedConfig: any): AIConfig {
+    const partial: Partial<AIConfig> = {
+      ...encryptedConfig,
+      openai: this.decryptProviderConfig(encryptedConfig?.openai),
+      gemini: this.decryptProviderConfig(encryptedConfig?.gemini),
+      claude: this.decryptProviderConfig(encryptedConfig?.claude),
+      preferredProvider: encryptedConfig?.preferredProvider,
+    };
+
+    return this.mergeWithDefaults(partial);
   }
 
   async loadConfig(): Promise<AIConfig> {
@@ -186,7 +237,7 @@ export class AIConfigService {
       };
     }
 
-    if (!validateApiKeyFormat(keyToTest)) {
+    if (!validateApiKeyFormat(AIProvider.OPENAI, keyToTest)) {
       return {
         success: false,
         error: 'Invalid API key format',
@@ -263,12 +314,12 @@ export class AIConfigService {
     return (
       config.openai.enabled &&
       config.openai.apiKey.trim() !== '' &&
-      validateApiKeyFormat(config.openai.apiKey)
+      validateApiKeyFormat(AIProvider.OPENAI, config.openai.apiKey)
     );
   }
 
   validateApiKey(apiKey: string): boolean {
-    return validateApiKeyFormat(apiKey);
+    return validateApiKeyFormat(AIProvider.OPENAI, apiKey);
   }
 }
 

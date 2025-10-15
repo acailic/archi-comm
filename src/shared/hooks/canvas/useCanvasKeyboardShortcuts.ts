@@ -57,6 +57,7 @@ export interface CanvasKeyboardShortcutsConfig {
   onToggleGrid?: () => void;
   onToggleMinimap?: () => void;
   onTogglePlayfulMode?: () => void;
+  onToggleTemplateLibrary?: () => void;
 
   // Other
   onSave?: () => void;
@@ -180,6 +181,11 @@ const shortcuts: KeyboardShortcut[] = [
     shift: true,
     description: "Toggle playful mode",
     action: "onTogglePlayfulMode",
+  },
+  {
+    key: "t",
+    description: "Toggle template library",
+    action: "onToggleTemplateLibrary",
   },
 
   // Other
@@ -323,6 +329,7 @@ export function getAllShortcuts(): Array<{
     else if (shortcut.action.includes("Zoom")) category = "Zoom";
     else if (shortcut.action.includes("Pan")) category = "Navigation";
     else if (shortcut.action.includes("Toggle")) category = "View Options";
+    else if (shortcut.action === "onToggleTemplateLibrary") category = "Templates";
     else if (
       ["onUndo", "onRedo", "onDelete", "onDuplicate"].includes(shortcut.action)
     )

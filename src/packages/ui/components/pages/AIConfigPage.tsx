@@ -39,6 +39,13 @@ import { Switch } from '@ui/components/ui/switch';
 import { Alert, AlertDescription } from '@ui/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@ui/components/ui/tooltip';
 import { Slider } from '@ui/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@ui/components/ui/select';
 
 
 const FormSchema = AIConfigSchema;
@@ -49,6 +56,7 @@ interface AIConfigPageProps {
 
 export function AIConfigPage({ onClose }: AIConfigPageProps) {
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showClaudeApiKey, setShowClaudeApiKey] = useState(false);
   const [temperature, setTemperature] = useState(DEFAULT_SETTINGS.temperature || 0.7);
   const [maxTokens, setMaxTokens] = useState(DEFAULT_SETTINGS.maxTokens || 1000);
 
@@ -73,6 +81,8 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
     values: config,
   });
 
+  const claudeEnabled = form.watch('claude.enabled');
+
   // Update local state when config changes
   useEffect(() => {
     setTemperature(DEFAULT_SETTINGS.temperature || 0.7);
@@ -93,6 +103,10 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
 
   const toggleApiKeyVisibility = () => {
     setShowApiKey(prev => !prev);
+  };
+
+  const toggleClaudeApiKeyVisibility = () => {
+    setShowClaudeApiKey(prev => !prev);
   };
 
   const handleResetToDefaults = async () => {
@@ -278,6 +292,46 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
           <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
             <Card>
               <CardHeader>
+                <CardTitle className='flex items-center gap-2'>
+                  <Settings className='h-5 w-5' />
+                  Provider Preference
+                </CardTitle>
+                <CardDescription>
+                  Select which AI provider ArchiComm uses for canvas automation by default.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name='preferredProvider'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Default AI Provider</FormLabel>
+                      <FormDescription>
+                        The assistant prioritises this provider when generating or updating
+                        diagrams. If the selected provider is unavailable, ArchiComm falls back to
+                        any other configured provider.
+                      </FormDescription>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className='w-full'>
+                            <SelectValue placeholder='Choose a provider' />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value='openai'>OpenAI (GPT-4 family)</SelectItem>
+                          <SelectItem value='claude'>Anthropic Claude 3</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <div className='flex items-center justify-between'>
                   <div>
                     <CardTitle className='flex items-center gap-2'>
@@ -415,6 +469,83 @@ export function AIConfigPage({ onClose }: AIConfigPageProps) {
                     </div>
                   </CardContent>
                 </Card>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className='flex items-center gap-2'>
+                  <Settings className='h-5 w-5' />
+                  Claude Configuration
+                </CardTitle>
+                <CardDescription>
+                  Configure Anthropic Claude for AI canvas automation (desktop app recommended).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className='space-y-6'>
+                <FormField
+                  control={form.control}
+                  name='claude.enabled'
+                  render={({ field }) => (
+                    <FormItem className='flex items-center justify-between'>
+                      <div className='space-y-0.5'>
+                        <FormLabel>Enable Claude</FormLabel>
+                        <FormDescription>
+                          Enable Anthropic Claude models (Claude 3) for AI-driven updates.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='claude.apiKey'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Claude API Key</FormLabel>
+                      <FormDescription>
+                        Your Anthropic API key (sk-ant-api03-...), stored encrypted on this device.
+                      </FormDescription>
+                      <div className='relative'>
+                        <FormControl>
+                          <Input
+                            type={showClaudeApiKey ? 'text' : 'password'}
+                            placeholder='Enter your Claude API key'
+                            {...field}
+                            disabled={!claudeEnabled}
+                            onChange={e => field.onChange(e)}
+                          />
+                        </FormControl>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          className='absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 p-0'
+                          onClick={toggleClaudeApiKeyVisibility}
+                        >
+                          {showClaudeApiKey ? (
+                            <EyeOff className='h-4 w-4' />
+                          ) : (
+                            <Eye className='h-4 w-4' />
+                          )}
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Alert variant='warning'>
+                  <AlertTriangle className='h-4 w-4' />
+                  <AlertDescription>
+                    Claude integration is in preview. Requests are routed through the desktop app to
+                    keep your API key private.
+                  </AlertDescription>
+                </Alert>
               </CardContent>
             </Card>
 

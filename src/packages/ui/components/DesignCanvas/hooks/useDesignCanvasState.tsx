@@ -8,6 +8,7 @@ import type { CanvasConfig } from '@/lib/import-export/types';
 import type { DesignData } from '@/shared/contracts';
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useGuardedState } from '@/lib/performance/useGuardedState';
+import { DEFAULT_VIRTUALIZATION_CONFIG } from '@/packages/canvas/utils/virtualization';
 
 interface DesignCanvasStateProps {
   initialData: DesignData;
@@ -37,7 +38,9 @@ export function useDesignCanvasState({ initialData, sessionStartTime }: DesignCa
       style: 'dots',
     },
     theme: 'light',
-    virtualizationEnabled: false,
+    virtualizationEnabled: DEFAULT_VIRTUALIZATION_CONFIG.enabled,
+    virtualizationBufferZone: DEFAULT_VIRTUALIZATION_CONFIG.bufferZone,
+    virtualizationMaxVisible: DEFAULT_VIRTUALIZATION_CONFIG.maxVisibleItems,
   }, {
     componentName: 'DesignCanvasState',
     maxUpdatesPerTick: 10,

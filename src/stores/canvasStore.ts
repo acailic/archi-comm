@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
+import { RTree, BoundingBoxImpl, SpatialItem } from "@/lib/spatial/RTree";
 import { InfiniteLoopDetector } from "@/lib/performance/InfiniteLoopDetector";
 import { deepEqual as coreDeepEqual } from "@/packages/core/utils";
 import type {
@@ -35,8 +36,42 @@ const clearAlignmentGuideTimeout = () => {
 };
 
 const resetAlignmentGuides = () => {
+  cancelAlignmentGuideRaf();
+  pendingAlignmentGuides = null;
   clearAlignmentGuideTimeout();
   useCanvasStore.setState({ alignmentGuides: [] }, false);
+};
+
+const applyAlignmentGuides = (guides: AlignmentGuide[]) => {
+  clearAlignmentGuideTimeout();
+  useCanvasStore.setState({ alignmentGuides: guides }, false);
+  if (guides.length > 0) {
+    alignmentGuideTimeoutId = setTimeout(() => {
+      resetAlignmentGuides();
+    }, 1000);
+  }
+};
+
+const scheduleAlignmentGuideUpdate = (guides: AlignmentGuide[]) => {
+  if (typeof window === "undefined") {
+    applyAlignmentGuides(guides);
+    pendingAlignmentGuides = null;
+    return;
+  }
+
+  pendingAlignmentGuides = guides;
+
+  if (alignmentGuideRafId !== null) {
+    return;
+  }
+
+  alignmentGuideRafId = window.requestAnimationFrame(() => {
+    alignmentGuideRafId = null;
+    if (pendingAlignmentGuides) {
+      applyAlignmentGuides(pendingAlignmentGuides);
+      pendingAlignmentGuides = null;
+    }
+  });
 };
 
 const typeToCategory = componentLibrary.reduce<Record<string, string>>(
@@ -46,6 +81,45 @@ const typeToCategory = componentLibrary.reduce<Record<string, string>>(
   },
   {},
 );
+
+let componentSpatialIndex: RTree<DesignComponent> | null = null;
+let componentSpatialIndexVersion = -1;
+let pendingAlignmentGuides: AlignmentGuide[] | null = null;
+let alignmentGuideRafId: number | null = null;
+
+const buildComponentSpatialIndex = (
+  components: DesignComponent[],
+): RTree<DesignComponent> => {
+  const tree = new RTree<DesignComponent>();
+  components.forEach((component) => {
+    const bounds = BoundingBoxImpl.fromComponent(component);
+    tree.insert({
+      id: component.id,
+      bounds,
+      data: component,
+      type: "component",
+    });
+  });
+  return tree;
+};
+
+const getComponentSpatialIndex = (
+  components: DesignComponent[],
+  version: number,
+): RTree<DesignComponent> => {
+  if (!componentSpatialIndex || version !== componentSpatialIndexVersion) {
+    componentSpatialIndex = buildComponentSpatialIndex(components);
+    componentSpatialIndexVersion = version;
+  }
+  return componentSpatialIndex;
+};
+
+const cancelAlignmentGuideRaf = () => {
+  if (alignmentGuideRafId !== null && typeof window !== "undefined") {
+    window.cancelAnimationFrame(alignmentGuideRafId);
+  }
+  alignmentGuideRafId = null;
+};
 
 export type CanvasMode =
   | "select"
@@ -826,6 +900,16 @@ const mutableCanvasActions = {
     );
   },
   setSelectedComponent(id: string | null, options?: ConditionalSetOptions) {
+    const allowLocked = Boolean(options?.context?.allowLocked);
+    if (id && !allowLocked) {
+      const state = useCanvasStore.getState();
+      if (
+        state.lockedComponentIds.has(id) ||
+        state.components.find((component) => component.id === id)?.locked
+      ) {
+        return;
+      }
+    }
     const current = useCanvasStore.getState().selectedComponent;
     if (
       options?.onlyIfCurrentIs !== undefined &&
@@ -1258,18 +1342,47 @@ const mutableCanvasActions = {
 
   // Multi-select actions
   setSelectedComponents(ids: string[], options?: BaseActionOptions) {
+    const state = useCanvasStore.getState();
+    const allowLocked = Boolean(options?.context?.allowLocked);
+    let filteredIds = Array.from(new Set(ids));
+
+    if (!allowLocked) {
+      const lockedIds = new Set<string>(state.lockedComponentIds);
+      state.components.forEach((component) => {
+        if (component.locked) {
+          lockedIds.add(component.id);
+        }
+      });
+      filteredIds = filteredIds.filter((id) => !lockedIds.has(id));
+    }
+
     applyUpdate(
       "setSelectedComponents",
       (draft) => {
-        draft.selectedComponentIds = ids;
-        draft.lastSelectedId = ids[ids.length - 1] || null;
+        draft.selectedComponentIds = filteredIds;
+        draft.lastSelectedId = filteredIds[filteredIds.length - 1] || null;
       },
       options,
     );
   },
 
   toggleComponentSelection(id: string, options?: BaseActionOptions) {
-    const current = useCanvasStore.getState().selectedComponentIds;
+    const state = useCanvasStore.getState();
+    const allowLocked = Boolean(options?.context?.allowLocked);
+
+    if (!allowLocked) {
+      const lockedIds = new Set<string>(state.lockedComponentIds);
+      state.components.forEach((component) => {
+        if (component.locked) {
+          lockedIds.add(component.id);
+        }
+      });
+      if (lockedIds.has(id)) {
+        return;
+      }
+    }
+
+    const current = state.selectedComponentIds;
     const newSelection = current.includes(id)
       ? current.filter((cid) => cid !== id)
       : [...current, id];
@@ -1586,7 +1699,10 @@ const mutableCanvasActions = {
       (draft) => {
         componentIds.forEach((id: string) => {
           const component = draft.components.find((c) => c.id === id);
-          if (component) component.locked = true;
+          if (component) {
+            component.locked = true;
+            draft.lockedComponentIds.add(id);
+          }
         });
       },
       options,
@@ -1599,7 +1715,10 @@ const mutableCanvasActions = {
       (draft) => {
         componentIds.forEach((id: string) => {
           const component = draft.components.find((c) => c.id === id);
-          if (component) component.locked = false;
+          if (component) {
+            component.locked = false;
+            draft.lockedComponentIds.delete(id);
+          }
         });
       },
       options,
@@ -1636,49 +1755,107 @@ const mutableCanvasActions = {
     const movingComp = state.components.find((c) => c.id === movingComponentId);
     if (!movingComp) return;
 
-    const guides: AlignmentGuide[] = [];
-    const threshold = 5; // pixels in world space
+    const width = movingComp.width ?? 220;
+    const height = movingComp.height ?? 140;
+    const movingCenterX = newX + width / 2;
+    const movingCenterY = newY + height / 2;
+    const threshold = 6;
+    const searchExtent = 5000;
 
-    // Check alignment with other components
-    state.components.forEach((comp) => {
-      if (comp.id === movingComponentId) return;
+    const spatialIndex = getComponentSpatialIndex(
+      state.components,
+      state.updateVersion,
+    );
 
-      const compCenterX = comp.x + (comp.width || 220) / 2;
-      const compCenterY = comp.y + (comp.height || 140) / 2;
-      const movingCenterX = newX + (movingComp.width || 220) / 2;
-      const movingCenterY = newY + (movingComp.height || 140) / 2;
+    const verticalBounds = new BoundingBoxImpl(
+      movingCenterX - threshold,
+      movingCenterY - searchExtent,
+      threshold * 2,
+      searchExtent * 2,
+    );
+    const horizontalBounds = new BoundingBoxImpl(
+      movingCenterX - searchExtent,
+      movingCenterY - threshold,
+      searchExtent * 2,
+      threshold * 2,
+    );
 
-      // Vertical center alignment
-      if (Math.abs(movingCenterX - compCenterX) < threshold) {
-        guides.push({
-          id: `v-${comp.id}`,
-          type: "vertical",
-          position: compCenterX,
-          componentIds: [movingComponentId, comp.id],
+    const aggregateGuides = (
+      items: SpatialItem<DesignComponent>[],
+      type: "vertical" | "horizontal",
+    ): AlignmentGuide[] => {
+      const map = new Map<
+        string,
+        { position: number; componentIds: Set<string>; delta: number }
+      >();
+
+      items.forEach((item) => {
+        const comp = item.data;
+        if (!comp || comp.id === movingComponentId) {
+          return;
+        }
+
+        const candidateWidth = comp.width ?? 220;
+        const candidateHeight = comp.height ?? 140;
+        const candidateCenterX = comp.x + candidateWidth / 2;
+        const candidateCenterY = comp.y + candidateHeight / 2;
+
+        if (type === "vertical") {
+          const delta = Math.abs(movingCenterX - candidateCenterX);
+          if (delta > threshold) return;
+          const key = `${Math.round(candidateCenterX)}`;
+          const entry = map.get(key);
+          if (entry) {
+            entry.componentIds.add(comp.id);
+            entry.delta = Math.min(entry.delta, delta);
+          } else {
+            map.set(key, {
+              position: candidateCenterX,
+              componentIds: new Set([movingComponentId, comp.id]),
+              delta,
+            });
+          }
+        } else {
+          const delta = Math.abs(movingCenterY - candidateCenterY);
+          if (delta > threshold) return;
+          const key = `${Math.round(candidateCenterY)}`;
+          const entry = map.get(key);
+          if (entry) {
+            entry.componentIds.add(comp.id);
+            entry.delta = Math.min(entry.delta, delta);
+          } else {
+            map.set(key, {
+              position: candidateCenterY,
+              componentIds: new Set([movingComponentId, comp.id]),
+              delta,
+            });
+          }
+        }
+      });
+
+      return Array.from(map.entries())
+        .filter(([, value]) => value.componentIds.size > 1)
+        .map(([key, value]) => ({
+          id: `${type}-${key}`,
+          type,
+          position: value.position,
+          componentIds: Array.from(value.componentIds),
           visible: true,
-        });
-      }
+          delta: value.delta,
+        }));
+    };
 
-      // Horizontal center alignment
-      if (Math.abs(movingCenterY - compCenterY) < threshold) {
-        guides.push({
-          id: `h-${comp.id}`,
-          type: "horizontal",
-          position: compCenterY,
-          componentIds: [movingComponentId, comp.id],
-          visible: true,
-        });
-      }
-    });
+    const guides = [
+      ...aggregateGuides(spatialIndex.query(verticalBounds), "vertical"),
+      ...aggregateGuides(spatialIndex.query(horizontalBounds), "horizontal"),
+    ];
 
-    clearAlignmentGuideTimeout();
-    useCanvasStore.setState({ alignmentGuides: guides }, false);
-
-    if (guides.length > 0) {
-      alignmentGuideTimeoutId = setTimeout(() => {
-        resetAlignmentGuides();
-      }, 1000);
+    if (guides.length === 0) {
+      resetAlignmentGuides();
+      return;
     }
+
+    scheduleAlignmentGuideUpdate(guides);
   },
 
   getDebugInfo() {

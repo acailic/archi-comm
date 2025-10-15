@@ -15,7 +15,7 @@ import {
 import { canvasActions, useCanvasStore } from "@/stores/canvasStore";
 import { DragTrailOverlay } from "./DragTrailOverlay";
 
-import type { DesignComponent } from "../../../types";
+import type { DesignComponent } from "@/shared/contracts";
 import { useCanvasContext } from "../contexts/CanvasContext";
 
 import {

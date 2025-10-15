@@ -32,6 +32,8 @@ export interface CanvasConfig {
   };
   theme?: 'light' | 'dark' | 'auto';
   virtualizationEnabled?: boolean;
+  virtualizationBufferZone?: number;
+  virtualizationMaxVisible?: number;
 }
 
 // Analytics data for tracking design creation
@@ -51,6 +53,12 @@ export interface DesignAnalytics {
       layerComplexity: number;
     };
   };
+  // World-class features
+  frameCount?: number;
+  sectionCount?: number;
+  presentationSlideCount?: number;
+  hasAIMetadata?: boolean;
+  hasRoutingConfig?: boolean;
 }
 
 // Challenge context for exported designs
@@ -247,7 +255,8 @@ export function createDesignAnalytics(
   connections: Connection[],
   infoCards: InfoCard[],
   sessionStartTime?: Date,
-  sessionEndTime?: Date
+  sessionEndTime?: Date,
+  designData?: DesignData
 ): DesignAnalytics {
   const componentTypes = Array.from(new Set(components.map(c => c.type)));
   const timeSpent = sessionStartTime && sessionEndTime
@@ -280,5 +289,11 @@ export function createDesignAnalytics(
         layerComplexity: Math.round(layerComplexity * 100) / 100,
       },
     },
+    // World-class features analytics
+    frameCount: designData?.frames?.length || 0,
+    sectionCount: designData?.sections?.length || 0,
+    presentationSlideCount: designData?.presentationSlides?.length || 0,
+    hasAIMetadata: !!designData?.aiMetadata,
+    hasRoutingConfig: !!designData?.routingConfig,
   };
 }

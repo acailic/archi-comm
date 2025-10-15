@@ -1,46 +1,74 @@
 import React, { useEffect, useMemo } from 'react';
 import { Edge, useEdgesState, Connection as ReactFlowConnection } from '@xyflow/react';
-import { Connection } from '../../../types';
-import { useRenderGuard, RenderGuardPresets } from '../../../lib/performance/RenderGuard';
-import { InfiniteLoopDetector } from '../../../lib/performance/InfiniteLoopDetector';
+import type { Connection } from '@/shared/contracts';
+import { useRenderGuard, RenderGuardPresets } from '@/lib/performance/RenderGuard';
+import { InfiniteLoopDetector } from '@/lib/performance/InfiniteLoopDetector';
 import { useCanvasContext } from '../contexts/CanvasContext';
+import { useSmartConnectors } from '../hooks/useSmartConnectors';
+import { connectionToEdge } from '../utils/canvasAdapters';
+import type { ConnectionToEdgeOptions } from '../utils/canvasAdapters';
+import type { SmartRouteResult } from '../utils/smart-routing';
 
 export interface EdgeLayerProps {
   connections: Connection[];
   children?: React.ReactNode;
 }
 
-const createReactFlowEdges = (connections: Connection[]): Edge[] => {
-  return connections.map(connection => ({
-    id: connection.id,
-    source: connection.sourceId,
-    target: connection.targetId,
-    sourceHandle: connection.sourceHandle || null,
-    targetHandle: connection.targetHandle || null,
-    type: connection.type || 'default',
-    animated: connection.animated || false,
-    style: {
-      stroke: connection.color || '#666',
-      strokeWidth: connection.width || 2,
-      ...connection.style,
-    },
-    label: connection.label,
-    labelStyle: connection.labelStyle,
-    labelShowBg: connection.labelShowBg !== false,
-    labelBgStyle: connection.labelBgStyle,
-    data: {
-      connection,
-      sourcePortId: connection.sourcePortId,
-      targetPortId: connection.targetPortId,
-      properties: connection.properties,
-    },
-    markerEnd: {
-      type: 'arrowclosed',
-      width: 20,
-      height: 20,
-      color: connection.color || '#666',
-    },
-  }));
+const connectionAdapterOptions: ConnectionToEdgeOptions = {
+  edgeType: 'custom',
+  allowCircularConnections: true,
+  ignoreMissingEndpoints: true,
+};
+
+const createReactFlowEdges = (
+  connections: Connection[],
+  smartRoutes?: Map<string, SmartRouteResult>,
+): Edge[] => {
+  return connections
+    .map((connection) => {
+      const baseEdge = connectionToEdge(connection, connectionAdapterOptions);
+      if (!baseEdge) {
+        return null;
+      }
+
+      const smartRoute = smartRoutes?.get(connection.id);
+      const augmentedConnection: Connection = smartRoute
+        ? {
+            ...connection,
+            smartPath: smartRoute.points,
+            routingMetadata: {
+              algorithm: smartRoute.algorithm,
+              updatedAt: smartRoute.generatedAt,
+              collisionsDetected: smartRoute.collisions,
+            },
+          }
+        : connection;
+
+      const edgeData = {
+        ...(baseEdge.data ?? {}),
+        connection: augmentedConnection,
+        smartPath: smartRoute?.points,
+        routingAlgorithm: smartRoute?.algorithm,
+        collisions: smartRoute?.collisions,
+        connectionStyle: (baseEdge.data as any)?.connectionStyle ?? 'curved',
+        isSelected: baseEdge.selected ?? false,
+        isStartConnection: (baseEdge.data as any)?.isStartConnection ?? false,
+      };
+
+      const edge: Edge = {
+        ...baseEdge,
+        id: connection.id,
+        type: baseEdge.type ?? 'custom',
+        source: connection.from,
+        target: connection.to,
+        sourceHandle: connection.fromHandleId ?? baseEdge.sourceHandle ?? null,
+        targetHandle: connection.toHandleId ?? baseEdge.targetHandle ?? null,
+        data: edgeData,
+      };
+
+      return edge;
+    })
+    .filter((edge): edge is Edge => edge !== null);
 };
 
 export const EdgeLayer: React.FC<EdgeLayerProps> = ({ connections, children }) => {
@@ -50,9 +78,11 @@ export const EdgeLayer: React.FC<EdgeLayerProps> = ({ connections, children }) =
   const { selectedItems } = state;
   const { connection: connectionCallbacks } = callbacks;
 
-  const reactFlowEdges = useMemo(() =>
-    createReactFlowEdges(connections),
-    [connections]
+  const smartRoutes = useSmartConnectors(connections);
+
+  const reactFlowEdges = useMemo(
+    () => createReactFlowEdges(connections, smartRoutes),
+    [connections, smartRoutes]
   );
 
   const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowEdges);
@@ -64,17 +94,24 @@ export const EdgeLayer: React.FC<EdgeLayerProps> = ({ connections, children }) =
   useEffect(() => {
     const selectedConnectionIds = new Set(selectedItems);
     setEdges(currentEdges =>
-      currentEdges.map(edge => ({
-        ...edge,
-        selected: selectedConnectionIds.has(edge.id),
-        style: {
-          ...edge.style,
-          stroke: selectedConnectionIds.has(edge.id)
-            ? '#ff6b6b'
-            : edge.data?.connection?.color || '#666',
-          strokeWidth: selectedConnectionIds.has(edge.id) ? 3 : edge.data?.connection?.width || 2,
-        },
-      }))
+      currentEdges.map(edge => {
+        const isSelected = selectedConnectionIds.has(edge.id);
+        const fallbackStroke = edge.style?.stroke ?? '#666';
+        const fallbackWidth = (edge.style as any)?.strokeWidth ?? 2;
+        return {
+          ...edge,
+          selected: isSelected,
+          style: {
+            ...edge.style,
+            stroke: isSelected ? '#ff6b6b' : fallbackStroke,
+            strokeWidth: isSelected ? 3 : fallbackWidth,
+          },
+          data: {
+            ...(edge.data ?? {}),
+            isSelected,
+          },
+        };
+      })
     );
   }, [selectedItems, setEdges]);
 
@@ -107,21 +144,26 @@ export const EdgeLayer: React.FC<EdgeLayerProps> = ({ connections, children }) =
   }, [connectionCallbacks]);
 
   const handleConnect = React.useCallback((connection: ReactFlowConnection) => {
-    if (connection.source && connection.target) {
-      const newConnection: Connection = {
-        id: `${connection.source}-${connection.target}-${Date.now()}`,
-        sourceId: connection.source,
-        targetId: connection.target,
-        sourceHandle: connection.sourceHandle || undefined,
-        targetHandle: connection.targetHandle || undefined,
-        sourcePortId: connection.sourceHandle || undefined,
-        targetPortId: connection.targetHandle || undefined,
-        type: 'default',
-        animated: false,
-        properties: {},
-      };
-      connectionCallbacks.onConnectionCreate(newConnection);
+    if (!connection.source || !connection.target) {
+      return;
     }
+
+    const newConnection: Connection = {
+      id: `${connection.source}-${connection.target}-${Date.now()}`,
+      from: connection.source,
+      to: connection.target,
+      sourceId: connection.source,
+      targetId: connection.target,
+      label: 'Connection',
+      type: 'data',
+      direction: 'end',
+      visualStyle: 'default',
+      fromHandleId: connection.sourceHandle ?? undefined,
+      toHandleId: connection.targetHandle ?? undefined,
+      fromPortId: connection.sourceHandle ?? undefined,
+      toPortId: connection.targetHandle ?? undefined,
+    };
+    connectionCallbacks.onConnectionCreate(newConnection);
   }, [connectionCallbacks]);
 
   const handleEdgesDelete = React.useCallback((edgesToDelete: Edge[]) => {

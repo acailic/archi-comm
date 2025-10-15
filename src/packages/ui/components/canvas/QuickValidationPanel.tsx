@@ -1,11 +1,11 @@
 /**
  * File: src/packages/ui/components/canvas/QuickValidationPanel.tsx
- * Purpose: Quick validation panel for on-canvas design validation and feedback
- * Why: Provides instant feedback on design quality without leaving the canvas
- * Related: DesignCanvasCore.tsx, CanvasToolbar.tsx, useDesignValidation.ts, sheet.tsx
+ * Purpose: Advanced validation panel for world-class canvas design validation and feedback
+ * Why: Provides comprehensive real-time validation with pattern detection, performance analysis, security checks, and interactive fixes
+ * Related: DesignCanvasCore.tsx, CanvasToolbar.tsx, useDesignValidation.ts, sheet.tsx, advanced-validation-engine.ts
  */
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,6 +13,15 @@ import {
   TrendingUp,
   Lightbulb,
   Target,
+  Shield,
+  Zap,
+  DollarSign,
+  Wrench,
+  Clock,
+  AlertCircle,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import type { Challenge, DesignData } from "../../../../shared/contracts";
 import type { ExtendedChallenge } from "../../../../lib/config/challenge-config";
@@ -27,6 +36,10 @@ import {
 } from "../ui/sheet";
 import { Progress } from "../ui/progress";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
+import { advancedValidationEngine } from "../../../../lib/validation/advanced-validation-engine";
+import { useRealtimeValidation } from "../../../../shared/hooks/validation/useRealtimeValidation";
 
 /**
  * Props for QuickValidationPanel component
@@ -37,6 +50,7 @@ export interface QuickValidationPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onRunFullReview?: () => void;
+  onApplyFix?: (fixData: Partial<DesignData>) => void;
 }
 
 /**
@@ -59,6 +73,7 @@ export function QuickValidationPanel({
   isOpen,
   onClose,
   onRunFullReview,
+  onApplyFix,
 }: QuickValidationPanelProps) {
   // Use design validation hook
   const { validationResult, isValidationAvailable, hasTemplate } =
@@ -289,6 +304,34 @@ export function QuickValidationPanel({
     return patterns;
   }, [designData]);
 
+  // Advanced validation results state
+  const [advancedResults, setAdvancedResults] = useState<any>(null);
+  const [isRunningAdvanced, setIsRunningAdvanced] = useState(false);
+
+  // Real-time validation
+  const realtimeValidation = useRealtimeValidation({
+    designData,
+    enabled: isOpen, // Only run when panel is open
+    debounceMs: 1500, // 1.5 second debounce
+    onValidationComplete: (results) => {
+      setAdvancedResults(results);
+    },
+  });
+
+  // Run advanced validation manually
+  const handleRunAdvancedValidation = useCallback(async () => {
+    setIsRunningAdvanced(true);
+    try {
+      const engine = advancedValidationEngine.create(designData);
+      const results = await engine.validate();
+      setAdvancedResults(results);
+    } catch (error) {
+      console.error('Advanced validation failed:', error);
+    } finally {
+      setIsRunningAdvanced(false);
+    }
+  }, [designData]);
+
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
@@ -399,6 +442,130 @@ export function QuickValidationPanel({
               </div>
             </div>
           )}
+
+          {/* Advanced validation section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Advanced Validation
+                {realtimeValidation.isValidating && (
+                  <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+                )}
+              </h3>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunAdvancedValidation}
+                  disabled={isRunningAdvanced || realtimeValidation.isValidating}
+                >
+                  {isRunningAdvanced ? "Running..." : "Run Now"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Real-time validation status */}
+            {realtimeValidation.lastValidated && (
+              <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                Last validated: {new Date(realtimeValidation.lastValidated).toLocaleTimeString()}
+              </div>
+            )}
+
+            {realtimeValidation.error && (
+              <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                Validation error: {realtimeValidation.error}
+              </div>
+            )}
+
+            {advancedResults && (
+              <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg text-sm">
+                <div className="flex flex-col sm:flex-row sm:justify-between">
+                  <div className="flex-1 min-w-0 mb-2 sm:mb-0">
+                    <p className="font-medium text-gray-900">
+                      Advanced Validation Results
+                    </p>
+                    <p className="text-gray-700">
+                      Overall Score:{" "}
+                      <span className="font-medium">
+                        {advancedResults.overallScore}%
+                      </span>
+                    </p>
+                    <p className="text-gray-700">
+                      Issues Detected:{" "}
+                      <span className="font-medium">
+                        {advancedResults.issues.length}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => {
+                        /* TODO: Implement detailed view */
+                      }}
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  {advancedResults.patterns.length > 0 && (
+                    <div className="text-xs text-gray-600">
+                      Detected Patterns:
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {advancedResults.patterns.map((pattern: any) => (
+                          <Badge key={pattern.id} variant="outline">
+                            {pattern.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {advancedResults.issues.length > 0 && (
+                    <div className="text-xs text-gray-600 mt-1">
+                      Top Issues:
+                      <ul className="list-disc list-inside space-y-1 mt-1">
+                        {advancedResults.issues.slice(0, 3).map((issue: any, index: number) => (
+                          <li key={index} className="flex items-start gap-2">
+                            <span className="text-gray-900 font-medium">
+                              {issue.severity === "critical" && "🚨"}
+                              {issue.severity === "error" && "❌"}
+                              {issue.severity === "warning" && "⚠️"}
+                              {issue.severity === "info" && "ℹ️"}
+                            </span>
+                            <div className="flex-1">
+                              <span className="text-gray-700">
+                                {issue.title}
+                              </span>
+                              {issue.fixable && onApplyFix && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="h-auto p-0 text-xs text-blue-600 hover:text-blue-800 ml-2"
+                                  onClick={() => {
+                                    if (issue.autoFix) {
+                                      const fixData = issue.autoFix();
+                                      onApplyFix(fixData);
+                                      // Re-run validation after fix
+                                      setTimeout(() => realtimeValidation.validateNow(), 100);
+                                    }
+                                  }}
+                                >
+                                  Fix
+                                </Button>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <SheetFooter className="flex-col sm:flex-col gap-2">

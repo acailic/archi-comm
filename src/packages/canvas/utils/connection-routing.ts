@@ -1,11 +1,16 @@
 /**
  * File: src/packages/canvas/utils/connection-routing.ts
- * Purpose: Smart connection routing with collision detection and path optimization
- * Why: Improves connection clarity in complex diagrams by avoiding component overlaps
+ * Purpose: Backward-compatible helpers for connection routing. For new smart
+ * routing logic see smart-routing.ts which powers the ReactFlow integration.
  * Related: src/packages/canvas/utils/connection-paths.ts, src/packages/canvas/SimpleCanvas.tsx
  */
 
-import type { DesignComponent } from '../../../shared/contracts';
+import type { Connection, DesignComponent } from '../../../shared/contracts';
+import {
+  buildSmartRoutes,
+  type SmartRouteResult,
+  type SmartRoutingOptions,
+} from './smart-routing';
 
 export interface Point {
   x: number;
@@ -181,6 +186,17 @@ export function createOrthogonalPath(
 
   return path;
 }
+
+export const getSmartRouteForConnection = (
+  connection: Connection,
+  components: DesignComponent[],
+  options?: SmartRoutingOptions,
+): SmartRouteResult | null => {
+  const routes = buildSmartRoutes([connection], components, options);
+  return routes.get(connection.id) ?? null;
+};
+
+export { buildSmartRoutes };
 
 /**
  * Smooth path with rounded corners

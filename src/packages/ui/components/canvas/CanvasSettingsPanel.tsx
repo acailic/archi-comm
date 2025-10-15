@@ -25,6 +25,7 @@ import {
   type PathStyle,
 } from '@/stores/canvasStore';
 import type { Connection } from '@/shared/contracts';
+import { useVirtualizationConfig } from '@/packages/canvas/hooks/useCanvasConfig';
 
 interface CanvasSettingsPanelProps {
   isOpen: boolean;
@@ -81,6 +82,18 @@ export function CanvasSettingsPanel({ isOpen, onClose }: CanvasSettingsPanelProp
     }),
     shallow
   );
+
+  // Use the advanced canvas configuration hook for virtualization settings
+  const {
+    virtualization,
+    updateVirtualization,
+    isEnabled,
+    nodeThreshold,
+    edgeThreshold,
+    buffer,
+    overscanPx,
+    onlyRenderVisibleElements,
+  } = useVirtualizationConfig();
 
   const metrics = useMemo(() => {
     try {
@@ -283,8 +296,115 @@ export function CanvasSettingsPanel({ isOpen, onClose }: CanvasSettingsPanelProp
           <section className='space-y-4'>
             <div className='flex items-start justify-between gap-4'>
               <div>
-                <h3 className='text-sm font-medium text-slate-900'>Performance snapshot</h3>
-                <p className='text-sm text-slate-500'>Live metrics from the canvas performance monitor.</p>
+                <h3 className='text-sm font-medium text-slate-900'>Virtualization</h3>
+                <p className='text-sm text-slate-500'>Optimize rendering performance for large diagrams.</p>
+              </div>
+            </div>
+
+            <div className='flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-3 py-2'>
+              <div>
+                <Label htmlFor='virtualization-toggle' className='text-sm font-medium text-slate-800'>Enable virtualization</Label>
+                <p className='text-xs text-slate-500'>Only render visible components and connections to improve performance.</p>
+              </div>
+              <Switch
+                id='virtualization-toggle'
+                checked={isEnabled}
+                onCheckedChange={(enabled) => updateVirtualization({ enabled })}
+                aria-label='Toggle virtualization'
+              />
+            </div>
+
+            <div className='rounded-lg border border-slate-200 px-3 py-3'>
+              <div className='flex items-center justify-between gap-4'>
+                <Label htmlFor='node-threshold-slider' className='text-sm font-medium text-slate-800'>Node threshold</Label>
+                <Badge variant='outline' className='font-mono text-xs'>{nodeThreshold}</Badge>
+              </div>
+              <Slider
+                id='node-threshold-slider'
+                value={[nodeThreshold]}
+                onValueChange={([value]) => updateVirtualization({ nodeThreshold: value })}
+                min={100}
+                max={2000}
+                step={50}
+                className='mt-4'
+                aria-label='Adjust node virtualization threshold'
+              />
+              <p className='text-xs text-slate-500 mt-2'>Enable virtualization when node count exceeds this threshold.</p>
+            </div>
+
+            <div className='rounded-lg border border-slate-200 px-3 py-3'>
+              <div className='flex items-center justify-between gap-4'>
+                <Label htmlFor='edge-threshold-slider' className='text-sm font-medium text-slate-800'>Edge threshold</Label>
+                <Badge variant='outline' className='font-mono text-xs'>{edgeThreshold}</Badge>
+              </div>
+              <Slider
+                id='edge-threshold-slider'
+                value={[edgeThreshold]}
+                onValueChange={([value]) => updateVirtualization({ edgeThreshold: value })}
+                min={200}
+                max={5000}
+                step={100}
+                className='mt-4'
+                aria-label='Adjust edge virtualization threshold'
+              />
+              <p className='text-xs text-slate-500 mt-2'>Enable virtualization when edge count exceeds this threshold.</p>
+            </div>
+
+            <div className='rounded-lg border border-slate-200 px-3 py-3'>
+              <div className='flex items-center justify-between gap-4'>
+                <Label htmlFor='buffer-slider' className='text-sm font-medium text-slate-800'>Buffer zone</Label>
+                <Badge variant='outline' className='font-mono text-xs'>{buffer}px</Badge>
+              </div>
+              <Slider
+                id='buffer-slider'
+                value={[buffer]}
+                onValueChange={([value]) => updateVirtualization({ buffer: value })}
+                min={50}
+                max={500}
+                step={25}
+                className='mt-4'
+                aria-label='Adjust virtualization buffer zone'
+              />
+              <p className='text-xs text-slate-500 mt-2'>Extra area around viewport to render for smooth scrolling.</p>
+            </div>
+
+            <div className='rounded-lg border border-slate-200 px-3 py-3'>
+              <div className='flex items-center justify-between gap-4'>
+                <Label htmlFor='overscan-slider' className='text-sm font-medium text-slate-800'>Overscan</Label>
+                <Badge variant='outline' className='font-mono text-xs'>{overscanPx}px</Badge>
+              </div>
+              <Slider
+                id='overscan-slider'
+                value={[overscanPx]}
+                onValueChange={([value]) => updateVirtualization({ overscanPx: value })}
+                min={0}
+                max={200}
+                step={10}
+                className='mt-4'
+                aria-label='Adjust virtualization overscan'
+              />
+              <p className='text-xs text-slate-500 mt-2'>Additional pixels to render beyond viewport for smoother scrolling.</p>
+            </div>
+
+            <div className='flex items-center justify-between gap-4 rounded-lg border border-slate-200 px-3 py-2'>
+              <div>
+                <Label htmlFor='visible-only-toggle' className='text-sm font-medium text-slate-800'>Render visible elements only</Label>
+                <p className='text-xs text-slate-500'>Only render elements currently visible in the viewport.</p>
+              </div>
+              <Switch
+                id='visible-only-toggle'
+                checked={onlyRenderVisibleElements}
+                onCheckedChange={(enabled) => updateVirtualization({ onlyRenderVisibleElements: enabled })}
+                aria-label='Toggle visible elements only rendering'
+              />
+            </div>
+          </section>
+
+          <section className='space-y-4'>
+            <div className='flex items-start justify-between gap-4'>
+              <div>
+                <h3 className='text-sm font-medium text-slate-900'>Performance Metrics</h3>
+                <p className='text-sm text-slate-500'>Monitor canvas performance and identify bottlenecks.</p>
               </div>
             </div>
 

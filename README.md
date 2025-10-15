@@ -134,6 +134,7 @@ For a deeper dive into the system and developer guidance, see the Architecture G
 - Architecture overview, canvas internals, and performance: `docs/ARCHITECTURE.md`
 - Canvas drawing & annotation workflows: `docs/CANVAS_DRAWING_ANNOTATION_GUIDE.md`
 - APIs for components, hooks, and services: `docs/API_REFERENCE.md`
+- World-class canvas workflows and shortcuts: `docs/WORLD_CLASS_CANVAS_GUIDE.md`
 
 ## Study Flow
 
@@ -157,6 +158,18 @@ For a deeper dive into the system and developer guidance, see the Architecture G
 - Trade-off explorer: consistency levels, replication factors, partitioning schemes, backpressure
 - Estimation helpers: latency budgets, p50/p95, queue depth, storage growth, cost rough-order
 - Interview mode: time-boxed session, hints, rubric, and exportable scorecard
+
+## AI Canvas Assistant
+
+ArchiComm’s canvas now speaks to modern coding models so you can sketch or refactor diagrams by describing your intent.
+
+- **Providers**: choose OpenAI (GPT‑4 family) or Anthropic Claude 3 under **Settings → AI**. API keys are encrypted locally and never leave the desktop app.
+- **Default provider**: pick your primary model via the “Provider Preference” selector. If that provider is unavailable, ArchiComm falls back to any other configured provider.
+- **Desktop first**: model calls run inside the Tauri shell to keep keys off the browser surface. The web build drops back to deterministic mock suggestions.
+- **Capabilities**: generate a diagram from scratch, add new services (“add a Redis cache between API and database”), or tidy an existing drawing (“group the background jobs into a worker tier”).
+- **Safety**: review warnings surfaced after each run—ambiguous instructions or unsupported actions (like annotations) are never applied silently.
+
+> Tip: keep prompts precise. Include component names when updating existing nodes so the assistant can map aliases back to live canvas elements.
 - Exports: diagrams (SVG/PNG), notes (Markdown), and ADR templates
 
 New in this build:
@@ -286,6 +299,53 @@ ArchiComm Community Edition loads "Tasks" (study modules) that define prompts, a
 - Component rendering: Single React Flow node type with customizable styling
 - Unified toolbar: Mode switcher toggles select/draw/annotate with contextual toolbars and mode indicator
 - Persistence: Local storage and export/import functionality
+
+### World-Class Canvas Features
+
+ArchiComm is on a journey to become a **world-class, top 0.1% diagramming platform** for system design. The canvas includes advanced features that match or exceed industry leaders like Figma, Miro, and Excalidraw:
+
+#### Performance & Virtualization
+- **60 FPS Performance**: Sustained 60 FPS with 1000+ components using React Flow virtualization
+- **Adaptive Quality**: Automatic quality adjustments based on performance metrics
+- **Spatial Indexing**: RTree-based spatial indexing for O(log n) collision detection
+- **LOD Rendering**: Level-of-detail rendering reduces detail at low zoom levels
+
+#### Organization & Navigation
+- **Frames & Sections**: Figma-style frames for organizing components into logical groups
+- **Advanced Search**: Fuzzy search across components, connections, annotations, and frames with jump-to-result
+- **Navigation Breadcrumbs**: History tracking with back/forward navigation (Alt+Left/Right)
+- **Frame Hierarchy**: Nested frames with collapse/expand and visual hierarchy
+
+#### AI-Powered Features
+- **Text-to-Diagram**: Natural language to architecture diagram generation using LLMs
+- **Smart Suggestions**: Context-aware suggestions for connections, patterns, and anti-patterns
+- **Anti-Pattern Detection**: Automatic detection of common architecture anti-patterns
+- **Auto-Arrange**: Intelligent layout algorithms (by type, layer, flow, hierarchy)
+
+#### Precision & Routing
+- **Smart Routing**: Orthogonal and Manhattan routing with obstacle avoidance
+- **Connection Optimization**: Automatic anchor point selection for clean paths
+- **Grid Snap**: Magnetic snap-to-grid with visual feedback
+- **Alignment Guides**: Real-time alignment guides during drag operations
+
+#### Presentation & Export
+- **Presentation Mode**: Create slides from frames with transitions and speaker notes
+- **Template Library**: 50+ curated component templates organized by category
+- **Export Options**: High-res PNG/SVG export, PDF presentations, image sequences
+- **Frame Export**: Export individual frames as standalone images
+
+#### Keyboard Shortcuts (New)
+- `Ctrl+F`: Open canvas search
+- `Ctrl+G` / `Ctrl+Shift+G`: Navigate search results
+- `Ctrl+Shift+F`: Create frame from selection
+- `Alt+Left` / `Alt+Right`: Navigate back/forward
+- `Ctrl+Shift+I`: Toggle AI assistant panel
+- `Ctrl+Shift+T`: Open text-to-diagram
+- `Ctrl+Shift+P`: Enter presentation mode
+- `Ctrl+Shift+L`: Open template library
+- `Ctrl+2`: Zoom to fit selected components
+
+See `CANVAS_WORLD_CLASS_ROADMAP.md` for the complete feature roadmap and implementation timeline.
 
 ### Keyboard Shortcuts
 

@@ -62,6 +62,7 @@ export class DesignSerializer {
           designData.infoCards || [],
           this.sessionStartTime || new Date(),
           new Date(),
+          designData
         ),
       };
 
@@ -219,6 +220,15 @@ export class DesignSerializer {
         processedDesign.infoCards?.length || 0;
       result.statistics.conflictsResolved = result.conflicts.length;
 
+      // Log world-class features
+      console.log("World-class features imported:", {
+        frames: processedDesign.frames?.length || 0,
+        sections: processedDesign.sections?.length || 0,
+        presentationSlides: processedDesign.presentationSlides?.length || 0,
+        hasAIMetadata: !!processedDesign.aiMetadata,
+        hasRoutingConfig: !!processedDesign.routingConfig,
+      });
+
       result.success = true;
 
       console.log("Design imported successfully:", result.statistics);
@@ -284,6 +294,15 @@ export class DesignSerializer {
       }
       if (!Array.isArray(data.design.connections)) {
         result.errors.push("Invalid design: connections must be an array");
+      }
+      if (data.design.frames && !Array.isArray(data.design.frames)) {
+        result.warnings.push("Invalid frames data: should be an array");
+      }
+      if (data.design.sections && !Array.isArray(data.design.sections)) {
+        result.warnings.push("Invalid sections data: should be an array");
+      }
+      if (data.design.presentationSlides && !Array.isArray(data.design.presentationSlides)) {
+        result.warnings.push("Invalid presentation slides data: should be an array");
       }
       if (!data.design.metadata) {
         result.warnings.push("Missing design metadata");
@@ -496,6 +515,12 @@ export class DesignSerializer {
       infoCards: design.infoCards || [],
       drawings: design.drawings || [],
       layers: design.layers || [],
+      // Include world-class features
+      frames: design.frames || [],
+      sections: design.sections || [],
+      presentationSlides: design.presentationSlides || [],
+      aiMetadata: design.aiMetadata,
+      routingConfig: design.routingConfig,
       metadata: {
         ...design.metadata,
         lastModified: new Date().toISOString(),

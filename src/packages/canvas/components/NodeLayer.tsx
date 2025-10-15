@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Node, useNodesState } from '@xyflow/react';
 import { canvasActions, useCanvasStore } from '@/stores/canvasStore';
-import { DesignComponent, InfoCard } from '../../../types';
+import { DesignComponent, InfoCard } from '@/shared/contracts';
 import { useRenderGuard, RenderGuardPresets } from '../../../lib/performance/RenderGuard';
 import { InfiniteLoopDetector } from '../../../lib/performance/InfiniteLoopDetector';
 import { useCanvasContext } from '../contexts/CanvasContext';
@@ -22,7 +22,7 @@ const createEnhancedNodes = (
     position: layoutPositions[component.id] || { x: component.x || 0, y: component.y || 0 },
     data: {
       component,
-      label: component.name || component.type,
+      label: component.label || component.type,
       type: component.type,
       ...component.properties,
     },
@@ -41,9 +41,9 @@ const createInfoCardNodes = (
     position: layoutPositions[infoCard.id] || { x: infoCard.x || 0, y: infoCard.y || 0 },
     data: {
       infoCard,
-      label: infoCard.title || 'Info Card',
+      label: 'Info Card',
       content: infoCard.content,
-      title: infoCard.title,
+      color: infoCard.color,
     },
     draggable: true,
     selectable: true,

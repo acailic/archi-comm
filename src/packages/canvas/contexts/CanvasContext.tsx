@@ -1,7 +1,7 @@
 import { useGuardedState } from "@/lib/performance/useGuardedState";
 import { ReactFlowInstance } from "@xyflow/react";
 import React, { createContext, ReactNode, useContext, useMemo } from "react";
-import { Connection, DesignComponent, InfoCard } from "../../../types";
+import type { Connection, DesignComponent, InfoCard } from "@/shared/contracts";
 
 export interface LayoutPositions {
   [nodeId: string]: { x: number; y: number };

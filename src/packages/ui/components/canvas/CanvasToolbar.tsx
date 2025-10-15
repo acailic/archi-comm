@@ -57,6 +57,9 @@ import {
   QuickAddShortcutDetail,
   dispatchAppEvent,
 } from "@/lib/events/appEvents";
+import { shortcutBus } from "@/lib/events/shortcutBus";
+import { ComponentTemplateLibrary } from "./ComponentTemplateLibrary";
+import { useCanvasKeyboardShortcuts } from "@/shared/hooks/canvas/useCanvasKeyboardShortcuts";
 
 /**
  * Quick add toolbar support:
@@ -127,6 +130,36 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
   const [quickAddActive, setQuickAddActive] = useState(false);
   const [showQuickAddHint, setShowQuickAddHint] = useState(false);
   const [showShortcutsHint, setShowShortcutsHint] = useState(false);
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
+
+  const toggleTemplateLibrary = useCallback(() => {
+    setShowTemplateLibrary((prev) => !prev);
+  }, []);
+
+  const openTemplateLibrary = useCallback(() => {
+    setShowTemplateLibrary(true);
+  }, []);
+
+  const closeTemplateLibrary = useCallback(() => {
+    setShowTemplateLibrary(false);
+  }, []);
+
+  // Keyboard shortcuts
+  useCanvasKeyboardShortcuts({
+    enabled: true,
+    onToggleTemplateLibrary: toggleTemplateLibrary,
+  });
+
+  useEffect(() => {
+    const unsubscribeTemplateLibrary = shortcutBus.on(
+      "shortcut:template-library",
+      toggleTemplateLibrary,
+    );
+
+    return () => {
+      unsubscribeTemplateLibrary();
+    };
+  }, [toggleTemplateLibrary]);
 
   const markQuickAddUsed = useCallback(() => {
     setShowQuickAddHint(false);
@@ -388,6 +421,17 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
             }
           />
         )}
+        {isDesignCanvas && (
+          <ToolbarButton
+            icon={Layers}
+            label="Templates (T)"
+            active={showTemplateLibrary}
+            onClick={openTemplateLibrary}
+            tooltip="Browse architecture templates - Press T to open"
+            variant="primary"
+            shortcutBadge="T"
+          />
+        )}
         <ToolbarButton
           icon={Link2}
           label="Quick Connect (Q)"
@@ -645,6 +689,12 @@ const CanvasToolbarComponent: React.FC<CanvasToolbarProps> = ({
           <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-600 rotate-45" />
         </div>
       )}
+
+      {/* Template Library Modal */}
+      <ComponentTemplateLibrary
+        isOpen={showTemplateLibrary}
+        onClose={closeTemplateLibrary}
+      />
     </div>
   );
 };
