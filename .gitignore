@@ -250,6 +250,8 @@ config.json
 *.p12
 *.pfx
 auth.json
+.tauri-updater-keys/
+.gitleaks-report.json
 
 # Database
 *.db

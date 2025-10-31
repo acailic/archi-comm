@@ -1,0 +1,72 @@
+# Gitleaks configuration for ArchiComm
+# This file defines patterns for detecting secrets in the codebase
+
+title = "ArchiComm Gitleaks Configuration"
+
+[extend]
+# useDefault = true  # Uncomment to extend default gitleaks rules
+
+[allowlist]
+description = "Allowlist for test patterns and non-sensitive matches"
+
+# Allowlist file patterns - these files are allowed to contain test secrets
+paths = [
+  '''src/__tests__/.*''',
+  '''e2e/.*''',
+  '''.*\.test\.ts$''',
+  '''.*\.spec\.ts$''',
+]
+
+# Allowlist regex patterns - these patterns are considered safe
+regexes = [
+  # Test API keys
+  '''sk-test-[a-zA-Z0-9-]+''',
+  '''sk-proj-test-[a-zA-Z0-9-]+''',
+  # Demo email addresses
+  '''test@example\.com''',
+  '''demo@example\.com''',
+  '''\+test@''',
+  '''@techcorp\.com''',
+  '''@startup\.com''',
+  # Student demo IDs
+  '''cs301-student-\d+''',
+  # System design test patterns
+  '''SYSDESIGN-WEEK\d+''',
+]
+
+# Custom rules for ArchiComm-specific patterns
+[[rules]]
+id = "archicomm-api-key"
+description = "Detects ArchiComm API keys"
+regex = '''archicomm[_-]?(api)?[_-]?key[_-]?[:=]\s*['"]?([a-zA-Z0-9_-]{32,})['"]?'''
+tags = ["api-key", "archicomm"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{48}'''
+tags = ["api-key", "openai"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic Claude API Key"
+regex = '''sk-ant-api\d{2}-[a-zA-Z0-9_-]{95}'''
+tags = ["api-key", "anthropic"]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)api[_-]?key[_-]?[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?'''
+tags = ["api-key", "generic"]
+
+[[rules]]
+id = "bearer-token"
+description = "Bearer Token"
+regex = '''Bearer\s+[a-zA-Z0-9_-]{20,}'''
+tags = ["token", "bearer"]
+
+[[rules]]
+id = "private-key"
+description = "Private Key"
+regex = '''-----BEGIN\s+(RSA\s+)?PRIVATE KEY-----'''
+tags = ["key", "private"]

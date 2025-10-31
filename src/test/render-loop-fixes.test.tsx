@@ -3,7 +3,6 @@
  * This tests the improvements made to useDesignCanvasPerformance and UpdateDepthMonitor
  */
 
-import { renderHook } from '@testing-library/react';
 import { UpdateDepthMonitor } from '@/lib/performance/UpdateDepthMonitor';
 
 describe('Render Loop Prevention Fixes', () => {

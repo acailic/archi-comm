@@ -9,6 +9,10 @@ import { CanvasController } from '../../packages/canvas/components/CanvasControl
 import { RenderLoopDiagnostics } from '../../lib/debug/RenderLoopDiagnostics';
 import { InfiniteLoopDetector } from '../../lib/performance/InfiniteLoopDetector';
 import type { DesignComponent, Connection, InfoCard } from '@shared/contracts';
+import {
+  createTestComponent,
+  createTestConnection,
+} from '../canvas/test-helpers';
 
 // Mock ReactFlow to avoid complex rendering setup
 vi.mock('reactflow', () => ({
@@ -39,39 +43,30 @@ vi.mock('reactflow', () => ({
 
 describe('Canvas Layers Integration Tests', () => {
   const mockComponents: DesignComponent[] = [
-    {
-      id: 'comp1',
-      type: 'service',
-      name: 'User Service',
+    createTestComponent('comp1', 'microservice', {
+      label: 'User Service',
       x: 100,
       y: 100,
       properties: {},
-    },
-    {
-      id: 'comp2',
-      type: 'database',
-      name: 'User DB',
+    }),
+    createTestComponent('comp2', 'database', {
+      label: 'User DB',
       x: 300,
       y: 200,
       properties: {},
-    },
+    }),
   ];
 
   const mockConnections: Connection[] = [
-    {
-      id: 'conn1',
-      sourceId: 'comp1',
-      targetId: 'comp2',
-      type: 'api',
+    createTestConnection('conn1', 'comp1', 'comp2', 'data', {
       label: 'Queries',
       properties: {},
-    },
+    }),
   ];
 
   const mockInfoCards: InfoCard[] = [
     {
       id: 'info1',
-      title: 'Note',
       content: 'Important note',
       x: 50,
       y: 50,
@@ -167,16 +162,14 @@ describe('Canvas Layers Integration Tests', () => {
       );
 
       // Update components
-      const updatedComponents = [
+      const updatedComponents: DesignComponent[] = [
         ...mockComponents,
-        {
-          id: 'comp3',
-          type: 'api',
-          name: 'API Gateway',
+        createTestComponent('comp3', 'api-gateway', {
+          label: 'API Gateway',
           x: 200,
           y: 150,
           properties: {},
-        },
+        }),
       ];
 
       rerender(
@@ -326,14 +319,14 @@ describe('Canvas Layers Integration Tests', () => {
     });
 
     it('handles virtualization layer efficiently', async () => {
-      const manyComponents = Array.from({ length: 100 }, (_, i) => ({
-        id: `comp${i}`,
-        type: 'service',
-        name: `Service ${i}`,
-        x: (i % 10) * 150,
-        y: Math.floor(i / 10) * 100,
-        properties: {},
-      }));
+      const manyComponents: DesignComponent[] = Array.from({ length: 100 }, (_, i) =>
+        createTestComponent(`comp${i}`, 'microservice', {
+          label: `Service ${i}`,
+          x: (i % 10) * 150,
+          y: Math.floor(i / 10) * 100,
+          properties: {},
+        }),
+      );
 
       render(
         <DndProvider backend={HTML5Backend}>
@@ -576,16 +569,14 @@ describe('Canvas Layers Integration Tests', () => {
       });
 
       // Update components and verify state sync
-      const updatedComponents = [
+      const updatedComponents: DesignComponent[] = [
         ...mockComponents,
-        {
-          id: 'comp3',
-          type: 'service',
-          name: 'New Service',
+        createTestComponent('comp3', 'microservice', {
+          label: 'New Service',
           x: 400,
           y: 300,
           properties: {},
-        },
+        }),
       ];
 
       rerender(

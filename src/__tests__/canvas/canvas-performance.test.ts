@@ -1,6 +1,6 @@
 import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { act } from '@testing-library/react';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useCanvasStore, canvasActions } from '../../stores/canvasStore';
 import { resetTestStores } from '../../test/react-testing-utils';
 import {
   generateComponents,
@@ -8,7 +8,7 @@ import {
   measureTime,
   expectWithinBudget,
 } from './test-helpers';
-import type { DesignComponent, Connection } from '../../shared/contracts';
+import type { DesignComponent } from '../../shared/contracts';
 
 const PERFORMANCE_BUDGETS = {
   components_100: 50,
@@ -36,7 +36,7 @@ describe('Canvas Performance Benchmarks', () => {
       const components = generateComponents(count);
       const duration = measureTime(() => {
         act(() => {
-          useCanvasStore.getState().setComponents(components);
+          canvasActions.setComponents(components);
         });
       });
 
@@ -54,12 +54,12 @@ describe('Canvas Performance Benchmarks', () => {
     test.each(updateCases)('should update $count components within budget', ({ count, budget }) => {
       const components = generateComponents(count);
       act(() => {
-        useCanvasStore.getState().setComponents(components);
+        canvasActions.setComponents(components);
       });
 
       const duration = measureTime(() => {
         act(() => {
-          useCanvasStore.getState().updateComponents((current: DesignComponent[]) =>
+          canvasActions.updateComponents((current: DesignComponent[]) =>
             current.map((component, index) =>
               index === 0 ? { ...component, x: component.x + 10 } : component,
             ),
@@ -77,12 +77,12 @@ describe('Canvas Performance Benchmarks', () => {
       const components = generateComponents(200);
       const connections = generateConnections(components, 200);
       act(() => {
-        useCanvasStore.getState().setComponents(components);
+        canvasActions.setComponents(components);
       });
 
       const duration = measureTime(() => {
         act(() => {
-          useCanvasStore.getState().setConnections(connections);
+          canvasActions.setConnections(connections);
         });
       });
 
@@ -95,7 +95,7 @@ describe('Canvas Performance Benchmarks', () => {
     it('should read store slices within budget', () => {
       const components = generateComponents(150);
       act(() => {
-        useCanvasStore.getState().setComponents(components);
+        canvasActions.setComponents(components);
       });
 
       const duration = measureTime(() => {

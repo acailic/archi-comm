@@ -3,9 +3,9 @@
 // Tests store initialization, actions, undo/redo, rate limiting, and conditional updates
 // RELEVANT FILES: src/stores/canvasStore.ts, src/test/react-testing-utils.tsx, src/lib/performance/InfiniteLoopDetector.ts
 
-import { describe, it, test, expect, beforeEach, vi } from 'vitest';
+import { describe, it, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act } from '@testing-library/react';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useCanvasStore, canvasActions } from '../../stores/canvasStore';
 import { resetTestStores } from '../../test/react-testing-utils';
 import {
   createTestComponent,
@@ -69,7 +69,7 @@ describe('Canvas Store', () => {
       const initialVersion = useCanvasStore.getState().updateVersion;
 
       act(() => {
-        useCanvasStore.getState().setComponents(components);
+        canvasActions.setComponents(components);
       });
 
       const snapshot = getStoreSnapshot();
@@ -82,13 +82,13 @@ describe('Canvas Store', () => {
       const components = [createTestComponent('comp-1', 'server')];
 
       act(() => {
-        useCanvasStore.getState().setComponents(components);
+        canvasActions.setComponents(components);
       });
 
       const { updateVersion, lastUpdatedAt } = getStoreSnapshot();
 
       act(() => {
-        useCanvasStore.getState().setComponents([...components]);
+        canvasActions.setComponents([...components]);
       });
 
       const snapshot = getStoreSnapshot();
@@ -100,7 +100,7 @@ describe('Canvas Store', () => {
       setupCanvasStore([createTestComponent('comp-1', 'server')]);
 
       act(() => {
-        useCanvasStore.getState().updateComponents((current: DesignComponent[]) => [
+        canvasActions.updateComponents((current: DesignComponent[]) => [
           ...current,
           createTestComponent('comp-2', 'database', { x: 200, y: 200 }),
         ]);
@@ -115,7 +115,7 @@ describe('Canvas Store', () => {
       setupCanvasStore([createTestComponent('comp-1', 'server')]);
 
       act(() => {
-        useCanvasStore.getState().updateComponents((current: DesignComponent[]) =>
+        canvasActions.updateComponents((current: DesignComponent[]) =>
           current.map((component: DesignComponent) =>
             component.id === 'comp-1' ? { ...component, x: 300 } : component,
           ),
@@ -132,7 +132,7 @@ describe('Canvas Store', () => {
       ]);
 
       act(() => {
-        useCanvasStore.getState().updateComponents((current: DesignComponent[]) =>
+        canvasActions.updateComponents((current: DesignComponent[]) =>
           current.filter((component: DesignComponent) => component.id !== 'comp-1'),
         );
       });
@@ -148,7 +148,7 @@ describe('Canvas Store', () => {
       const connections = [createTestConnection('conn-1', 'comp-1', 'comp-2')];
 
       act(() => {
-        useCanvasStore.getState().setConnections(connections);
+        canvasActions.setConnections(connections);
       });
 
       expect(getStoreSnapshot().connections).toEqual(connections);
@@ -158,13 +158,13 @@ describe('Canvas Store', () => {
       const connections = [createTestConnection('conn-1', 'comp-1', 'comp-2')];
 
       act(() => {
-        useCanvasStore.getState().setConnections(connections);
+        canvasActions.setConnections(connections);
       });
 
       const { updateVersion } = getStoreSnapshot();
 
       act(() => {
-        useCanvasStore.getState().setConnections([...connections]);
+        canvasActions.setConnections([...connections]);
       });
 
       expect(getStoreSnapshot().updateVersion).toBe(updateVersion);
@@ -174,7 +174,7 @@ describe('Canvas Store', () => {
       setupCanvasStore([], [createTestConnection('conn-1', 'comp-1', 'comp-2')]);
 
       act(() => {
-        useCanvasStore.getState().updateConnections((current: Connection[]) => [
+        canvasActions.updateConnections((current: Connection[]) => [
           ...current,
           createTestConnection('conn-2', 'comp-2', 'comp-3', 'control'),
         ]);
@@ -187,7 +187,7 @@ describe('Canvas Store', () => {
       setupCanvasStore([], [createTestConnection('conn-1', 'comp-1', 'comp-2')]);
 
       act(() => {
-        useCanvasStore.getState().updateConnections((current: Connection[]) =>
+        canvasActions.updateConnections((current: Connection[]) =>
           current.map((connection: Connection) =>
             connection.id === 'conn-1' ? { ...connection, type: 'async' } : connection,
           ),
@@ -207,7 +207,7 @@ describe('Canvas Store', () => {
       );
 
       act(() => {
-        useCanvasStore.getState().updateConnections((current: Connection[]) =>
+        canvasActions.updateConnections((current: Connection[]) =>
           current.filter((connection: Connection) => connection.id !== 'conn-1'),
         );
       });
@@ -221,7 +221,7 @@ describe('Canvas Store', () => {
   describe('Canvas Mode Actions', () => {
     it('should switch to quick-connect mode', () => {
       act(() => {
-        useCanvasStore.getState().setCanvasMode('quick-connect');
+        canvasActions.setCanvasMode('quick-connect');
       });
 
       expect(useCanvasStore.getState().canvasMode).toBe('quick-connect');
@@ -229,13 +229,13 @@ describe('Canvas Store', () => {
 
     it('should switch from quick-connect to select and clear source', () => {
       act(() => {
-        useCanvasStore.getState().setCanvasMode('quick-connect');
-        useCanvasStore.getState().setQuickConnectSource('comp-1');
-        useCanvasStore.getState().setQuickConnectPreview({ x: 100, y: 100 });
+        canvasActions.setCanvasMode('quick-connect');
+        canvasActions.setQuickConnectSource('comp-1');
+        canvasActions.setQuickConnectPreview({ x: 100, y: 100 });
       });
 
       act(() => {
-        useCanvasStore.getState().setCanvasMode('select');
+        canvasActions.setCanvasMode('select');
       });
 
       expect(useCanvasStore.getState().canvasMode).toBe('select');
@@ -245,7 +245,7 @@ describe('Canvas Store', () => {
 
     it('should switch to pan mode', () => {
       act(() => {
-        useCanvasStore.getState().setCanvasMode('pan');
+        canvasActions.setCanvasMode('pan');
       });
 
       expect(useCanvasStore.getState().canvasMode).toBe('pan');
@@ -253,7 +253,7 @@ describe('Canvas Store', () => {
 
     it('should switch to annotation mode', () => {
       act(() => {
-        useCanvasStore.getState().setCanvasMode('annotation');
+        canvasActions.setCanvasMode('annotation');
       });
 
       expect(useCanvasStore.getState().canvasMode).toBe('annotation');
@@ -261,13 +261,13 @@ describe('Canvas Store', () => {
 
     it('should not trigger update when setting same mode', () => {
       act(() => {
-        useCanvasStore.getState().setCanvasMode('select');
+        canvasActions.setCanvasMode('select');
       });
 
       const initialVersion = useCanvasStore.getState().updateVersion;
 
       act(() => {
-        useCanvasStore.getState().setCanvasMode('select');
+        canvasActions.setCanvasMode('select');
       });
 
       expect(useCanvasStore.getState().updateVersion).toBe(initialVersion);
@@ -275,7 +275,7 @@ describe('Canvas Store', () => {
 
     it('should set quick connect source', () => {
       act(() => {
-        useCanvasStore.getState().setQuickConnectSource('comp-1');
+        canvasActions.setQuickConnectSource('comp-1');
       });
 
       expect(useCanvasStore.getState().quickConnectSource).toBe('comp-1');
@@ -283,8 +283,8 @@ describe('Canvas Store', () => {
 
     it('should clear quick connect source', () => {
       act(() => {
-        useCanvasStore.getState().setQuickConnectSource('comp-1');
-        useCanvasStore.getState().setQuickConnectSource(null);
+        canvasActions.setQuickConnectSource('comp-1');
+        canvasActions.setQuickConnectSource(null);
       });
 
       expect(useCanvasStore.getState().quickConnectSource).toBeNull();
@@ -292,7 +292,7 @@ describe('Canvas Store', () => {
 
     it('should set quick connect preview position', () => {
       act(() => {
-        useCanvasStore.getState().setQuickConnectPreview({ x: 250, y: 150 });
+        canvasActions.setQuickConnectPreview({ x: 250, y: 150 });
       });
 
       expect(useCanvasStore.getState().quickConnectPreview).toEqual({ x: 250, y: 150 });
@@ -303,17 +303,17 @@ describe('Canvas Store', () => {
     const toggleScenarios = [
       {
         name: 'grid',
-        toggle: () => useCanvasStore.getState().toggleGrid(),
+        toggle: () => canvasActions.toggleGrid(),
         selector: (state: CanvasStoreState) => state.gridEnabled,
       },
       {
         name: 'snap to grid',
-        toggle: () => useCanvasStore.getState().toggleSnapToGrid(),
+        toggle: () => canvasActions.toggleSnapToGrid(),
         selector: (state: CanvasStoreState) => state.snapToGrid,
       },
       {
         name: 'minimap',
-        toggle: () => useCanvasStore.getState().toggleMinimap(),
+        toggle: () => canvasActions.toggleMinimap(),
         selector: (state: CanvasStoreState) => state.showMinimap,
       },
     ] as const;
@@ -330,7 +330,7 @@ describe('Canvas Store', () => {
 
     it('should set grid spacing with valid values', () => {
       act(() => {
-        useCanvasStore.getState().setGridSpacing(50);
+        canvasActions.setGridSpacing(50);
       });
 
       expect(useCanvasStore.getState().gridSpacing).toBe(50);
@@ -338,7 +338,7 @@ describe('Canvas Store', () => {
 
     it('should clamp grid spacing to minimum', () => {
       act(() => {
-        useCanvasStore.getState().setGridSpacing(5);
+        canvasActions.setGridSpacing(5);
       });
 
       expect(useCanvasStore.getState().gridSpacing).toBe(10);
@@ -346,7 +346,7 @@ describe('Canvas Store', () => {
 
     it('should clamp grid spacing to maximum', () => {
       act(() => {
-        useCanvasStore.getState().setGridSpacing(150);
+        canvasActions.setGridSpacing(150);
       });
 
       expect(useCanvasStore.getState().gridSpacing).toBe(100);
@@ -354,13 +354,13 @@ describe('Canvas Store', () => {
 
     it('should not trigger update when setting same grid spacing', () => {
       act(() => {
-        useCanvasStore.getState().setGridSpacing(20);
+        canvasActions.setGridSpacing(20);
       });
 
       const { updateVersion } = getStoreSnapshot();
 
       act(() => {
-        useCanvasStore.getState().setGridSpacing(20);
+        canvasActions.setGridSpacing(20);
       });
 
       expect(getStoreSnapshot().updateVersion).toBe(updateVersion);
@@ -372,7 +372,7 @@ describe('Canvas Store', () => {
       const initial = useCanvasStore.getState().animationsEnabled;
 
       act(() => {
-        useCanvasStore.getState().toggleAnimations();
+        canvasActions.toggleAnimations();
       });
 
       expect(useCanvasStore.getState().animationsEnabled).toBe(!initial);
@@ -380,7 +380,7 @@ describe('Canvas Store', () => {
 
     it('should set animation speed with valid values', () => {
       act(() => {
-        useCanvasStore.getState().setAnimationSpeed(2.0);
+        canvasActions.setAnimationSpeed(2.0);
       });
 
       expect(useCanvasStore.getState().animationSpeed).toBe(2.0);
@@ -388,7 +388,7 @@ describe('Canvas Store', () => {
 
     it('should clamp animation speed to minimum', () => {
       act(() => {
-        useCanvasStore.getState().setAnimationSpeed(0.1);
+        canvasActions.setAnimationSpeed(0.1);
       });
 
       expect(useCanvasStore.getState().animationSpeed).toBe(0.5);
@@ -396,7 +396,7 @@ describe('Canvas Store', () => {
 
     it('should clamp animation speed to maximum', () => {
       act(() => {
-        useCanvasStore.getState().setAnimationSpeed(5.0);
+        canvasActions.setAnimationSpeed(5.0);
       });
 
       expect(useCanvasStore.getState().animationSpeed).toBe(2.0);
@@ -404,39 +404,117 @@ describe('Canvas Store', () => {
 
     it('should not trigger update when setting same animation speed', () => {
       act(() => {
-        useCanvasStore.getState().setAnimationSpeed(1.0);
+        canvasActions.setAnimationSpeed(1.0);
       });
 
       const initialVersion = useCanvasStore.getState().updateVersion;
 
       act(() => {
-        useCanvasStore.getState().setAnimationSpeed(1.0);
+        canvasActions.setAnimationSpeed(1.0);
       });
 
       expect(useCanvasStore.getState().updateVersion).toBe(initialVersion);
+    });
+
+    describe('Transient animation state', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('clears droppedComponentId after animation duration', () => {
+        act(() => {
+          canvasActions.setDroppedComponent('comp-42');
+        });
+
+        expect(useCanvasStore.getState().droppedComponentId).toBe('comp-42');
+
+        act(() => {
+          vi.advanceTimersByTime(599);
+        });
+        expect(useCanvasStore.getState().droppedComponentId).toBe('comp-42');
+
+        act(() => {
+          vi.advanceTimersByTime(1);
+        });
+        expect(useCanvasStore.getState().droppedComponentId).toBeNull();
+      });
+
+      it('clears snappingComponentId after animation duration', () => {
+        act(() => {
+          canvasActions.setSnappingComponent('comp-99');
+        });
+
+        expect(useCanvasStore.getState().snappingComponentId).toBe('comp-99');
+
+        act(() => {
+          vi.advanceTimersByTime(299);
+        });
+        expect(useCanvasStore.getState().snappingComponentId).toBe('comp-99');
+
+        act(() => {
+          vi.advanceTimersByTime(1);
+        });
+        expect(useCanvasStore.getState().snappingComponentId).toBeNull();
+      });
+
+      it('manages flowing connection ids without duplicates', () => {
+        act(() => {
+          canvasActions.addFlowingConnection('conn-1');
+          canvasActions.addFlowingConnection('conn-1');
+          canvasActions.addFlowingConnection('conn-2');
+        });
+
+        expect(useCanvasStore.getState().flowingConnectionIds).toEqual(['conn-1', 'conn-2']);
+
+        act(() => {
+          canvasActions.removeFlowingConnection('conn-1');
+        });
+
+        expect(useCanvasStore.getState().flowingConnectionIds).toEqual(['conn-2']);
+      });
+
+      it('tracks dragged component id', () => {
+        expect(useCanvasStore.getState().draggedComponentId).toBeNull();
+
+        act(() => {
+          canvasActions.setDraggedComponent('drag-me');
+        });
+
+        expect(useCanvasStore.getState().draggedComponentId).toBe('drag-me');
+
+        act(() => {
+          canvasActions.setDraggedComponent(null);
+        });
+
+        expect(useCanvasStore.getState().draggedComponentId).toBeNull();
+      });
     });
   });
 
   describe('Connection Preference Actions', () => {
     it('should set default connection type to data', () => {
       act(() => {
-        useCanvasStore.getState().setDefaultConnectionType('data');
+        canvasActions.setDefaultConnectionType('data');
       });
 
       expect(useCanvasStore.getState().defaultConnectionType).toBe('data');
     });
 
-    it('should set default connection type to api', () => {
+    it('should set default connection type to control', () => {
       act(() => {
-        useCanvasStore.getState().setDefaultConnectionType('api');
+        canvasActions.setDefaultConnectionType('control');
       });
 
-      expect(useCanvasStore.getState().defaultConnectionType).toBe('api');
+      expect(useCanvasStore.getState().defaultConnectionType).toBe('control');
     });
 
     it('should set default connection type to async', () => {
       act(() => {
-        useCanvasStore.getState().setDefaultConnectionType('async');
+        canvasActions.setDefaultConnectionType('async');
       });
 
       expect(useCanvasStore.getState().defaultConnectionType).toBe('async');
@@ -444,7 +522,7 @@ describe('Canvas Store', () => {
 
     it('should set default path style to straight', () => {
       act(() => {
-        useCanvasStore.getState().setDefaultPathStyle('straight');
+        canvasActions.setDefaultPathStyle('straight');
       });
 
       expect(useCanvasStore.getState().defaultPathStyle).toBe('straight');
@@ -452,7 +530,7 @@ describe('Canvas Store', () => {
 
     it('should set default path style to curved', () => {
       act(() => {
-        useCanvasStore.getState().setDefaultPathStyle('curved');
+        canvasActions.setDefaultPathStyle('curved');
       });
 
       expect(useCanvasStore.getState().defaultPathStyle).toBe('curved');
@@ -460,7 +538,7 @@ describe('Canvas Store', () => {
 
     it('should set default path style to stepped', () => {
       act(() => {
-        useCanvasStore.getState().setDefaultPathStyle('stepped');
+        canvasActions.setDefaultPathStyle('stepped');
       });
 
       expect(useCanvasStore.getState().defaultPathStyle).toBe('stepped');
@@ -470,7 +548,7 @@ describe('Canvas Store', () => {
       const initial = useCanvasStore.getState().smartRouting;
 
       act(() => {
-        useCanvasStore.getState().toggleSmartRouting();
+        canvasActions.toggleSmartRouting();
       });
 
       expect(useCanvasStore.getState().smartRouting).toBe(!initial);
@@ -480,7 +558,7 @@ describe('Canvas Store', () => {
       const initial = useCanvasStore.getState().bundleConnections;
 
       act(() => {
-        useCanvasStore.getState().toggleConnectionBundling();
+        canvasActions.toggleConnectionBundling();
       });
 
       expect(useCanvasStore.getState().bundleConnections).toBe(!initial);
@@ -490,7 +568,7 @@ describe('Canvas Store', () => {
   describe('Onboarding Actions', () => {
     it('should mark tour as completed', () => {
       act(() => {
-        useCanvasStore.getState().markTourCompleted();
+        canvasActions.markTourCompleted();
       });
 
       expect(useCanvasStore.getState().tourCompleted).toBe(true);
@@ -498,7 +576,7 @@ describe('Canvas Store', () => {
 
     it('should dismiss tip and add to dismissed list', () => {
       act(() => {
-        useCanvasStore.getState().dismissTip('tip-1');
+        canvasActions.dismissTip('tip-1');
       });
 
       expect(useCanvasStore.getState().dismissedTips).toContain('tip-1');
@@ -506,8 +584,8 @@ describe('Canvas Store', () => {
 
     it('should not duplicate dismissed tips', () => {
       act(() => {
-        useCanvasStore.getState().dismissTip('tip-1');
-        useCanvasStore.getState().dismissTip('tip-1');
+        canvasActions.dismissTip('tip-1');
+        canvasActions.dismissTip('tip-1');
       });
 
       const dismissedTips = useCanvasStore.getState().dismissedTips;
@@ -523,7 +601,7 @@ describe('Canvas Store', () => {
       );
 
       act(() => {
-        useCanvasStore.getState().resetCanvas();
+        canvasActions.resetCanvas();
       });
 
       const state = useCanvasStore.getState();
@@ -536,7 +614,7 @@ describe('Canvas Store', () => {
       const initialVersion = useCanvasStore.getState().updateVersion;
 
       act(() => {
-        useCanvasStore.getState().resetCanvas();
+        canvasActions.resetCanvas();
       });
 
       expect(useCanvasStore.getState().updateVersion).toBeGreaterThan(initialVersion);
@@ -549,7 +627,7 @@ describe('Canvas Store', () => {
       const initialTimestamp = useCanvasStore.getState().lastUpdatedAt;
 
       act(() => {
-        useCanvasStore.getState().setComponents(
+        canvasActions.setComponents(
           [createTestComponent('comp-1', 'server')],
           { silent: true }
         );
@@ -562,7 +640,7 @@ describe('Canvas Store', () => {
       const initialVersion = useCanvasStore.getState().updateVersion;
 
       act(() => {
-        useCanvasStore.getState().setComponents(
+        canvasActions.setComponents(
           [createTestComponent('comp-1', 'server')],
           { silent: true }
         );

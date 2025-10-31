@@ -23,6 +23,7 @@ import { useOptimizedSelector } from "../../../../shared/hooks/useOptimizedSelec
 import {
   useCanvasDrawings,
   useCanvasStore,
+  useCanvasAnnotations,
   useDrawingColor,
   useDrawingSettings,
   useDrawingSize,
@@ -52,7 +53,6 @@ import {
   type ConnectionTemplate,
 } from "../../../canvas/config/connection-templates";
 import { useQuickConnect } from "../../../canvas/hooks/useQuickConnect";
-import { SimpleCanvas } from "../../../canvas/SimpleCanvas";
 import { AnnotationSidebar } from "../canvas/AnnotationSidebar";
 import { AnnotationToolbar } from "../canvas/AnnotationToolbar";
 import { CanvasContextualHelp } from "../canvas/CanvasContextualHelp";
@@ -75,6 +75,10 @@ import { CanvasOverlays } from "./components/CanvasOverlays";
 import { DesignCanvasLayout } from "./components/DesignCanvasLayout";
 import { DesignCanvasHeader } from "./DesignCanvasHeader";
 import { shortcutBus } from "@/lib/events/shortcutBus";
+import { AnnotationLayer } from "@/packages/canvas/components/AnnotationLayer";
+import { CanvasAnnotationOverlay } from "../overlays/CanvasAnnotationOverlay";
+import { pointerEventToFlowPosition } from "@/lib/canvas/drawing-utils";
+import type { ReactFlowInstance } from "@xyflow/react";
 import {
   APP_EVENT,
   type AppEventPayloads,
@@ -104,6 +108,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   >(undefined);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const highlightTimeoutRef = useRef<number | null>(null);
+  const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   type CanvasEventName =
     | typeof APP_EVENT.CANVAS_ZOOM_IN
@@ -159,9 +164,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   }, [challenge.title]);
 
   // Annotation state
-  const [annotations, setAnnotations] = useState<Annotation[]>(
-    initialData.annotations ?? [],
-  );
+  const annotations = useCanvasAnnotations();
   const [selectedAnnotationTool, setSelectedAnnotationTool] = useState<
     Annotation["type"] | null
   >(null);
@@ -335,9 +338,9 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
 
   const handleAnnotationsImported = useCallback(
     (importedAnnotations: Annotation[]) => {
-      setAnnotations(importedAnnotations);
+      canvasActions.setAnnotations(importedAnnotations);
     },
-    [],
+    [canvasActions],
   );
 
   const {
@@ -476,6 +479,26 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
     handleBgColorChange,
     handleNodeBgChange,
   } = callbacks;
+
+  const handleReactFlowInit = useCallback(
+    (instance: ReactFlowInstance | null) => {
+      reactFlowInstanceRef.current = instance;
+      registerReactFlowInstance(instance);
+    },
+    [registerReactFlowInstance],
+  );
+
+  const projectPointerToFlow = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const instance = reactFlowInstanceRef.current;
+      if (!instance) {
+        return null;
+      }
+      const [flowX, flowY] = pointerEventToFlowPosition(event, instance);
+      return { x: flowX, y: flowY };
+    },
+    [],
+  );
 
   // Keyboard navigation and shortcuts
   useCanvasKeyboardNavigation({
@@ -671,28 +694,20 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
   const handleAnnotationToolSelect = useCallback(
     (tool: Annotation["type"] | null) => {
       setSelectedAnnotationTool(tool);
+      canvasActions.setCanvasMode(tool ? "annotation" : "select");
     },
-    [],
+    [canvasActions],
   );
 
   const handleAnnotationCreate = useCallback(
-    (x: number, y: number, type: Annotation["type"]) => {
-      const newAnnotation: Annotation = {
-        id: `annotation-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type,
-        content: "",
-        x,
-        y,
-        width: 200,
-        height: 100,
-        timestamp: Date.now(),
-      };
-      setAnnotations((prev) => [...prev, newAnnotation]);
-      setSelectedAnnotationId(newAnnotation.id);
+    (annotation: Annotation) => {
+      canvasActions.addAnnotation(annotation);
+      setSelectedAnnotationId(annotation.id);
       setSelectedAnnotationTool(null);
+      canvasActions.setCanvasMode("select");
       markDesignModified();
     },
-    [markDesignModified],
+    [canvasActions, markDesignModified],
   );
 
   const handleAnnotationSelect = useCallback((id: string | null) => {
@@ -701,23 +716,21 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
 
   const handleAnnotationDelete = useCallback(
     (id: string) => {
-      setAnnotations((prev) => prev.filter((a) => a.id !== id));
       if (selectedAnnotationId === id) {
         setSelectedAnnotationId(null);
       }
+      canvasActions.deleteAnnotation(id);
       markDesignModified();
     },
-    [selectedAnnotationId, markDesignModified],
+    [canvasActions, selectedAnnotationId, markDesignModified],
   );
 
   const handleAnnotationUpdate = useCallback(
-    (id: string, updates: Partial<Annotation>) => {
-      setAnnotations((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, ...updates } : a)),
-      );
+    (annotation: Annotation) => {
+      canvasActions.updateAnnotation(annotation);
       markDesignModified();
     },
-    [markDesignModified],
+    [canvasActions, markDesignModified],
   );
 
   const handleAnnotationFocus = useCallback(
@@ -935,43 +948,66 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
               />
             </div>
 
-            <ReactFlowCanvasWrapper
-              components={components}
-              connections={connections}
-              infoCards={infoCards}
-              selectedComponentId={selectedComponentId}
-              onViewportChange={setCurrentViewport}
-              onComponentSelect={handleComponentSelect}
-              onComponentDeselect={() => handleComponentSelect(null)}
-              onComponentDrop={handleComponentDrop}
-              onComponentPositionChange={handleComponentMove}
-              onComponentDelete={handleDeleteComponent}
-              onConnectionCreate={(connection) => {
-                // In quick-connect mode, connections are created via the hook
-                if (
-                  quickConnect.isQuickConnectMode &&
-                  quickConnect.quickConnectSource
-                ) {
-                  quickConnect.completeQuickConnect(connection.to);
-                } else {
-                  handleCompleteConnection(connection.from, connection.to);
-                }
-              }}
-              onConnectionDelete={handleConnectionDelete}
-              onConnectionSelect={() => {}}
-              onReactFlowInit={registerReactFlowInstance}
-            />
+            <div className="relative h-full w-full">
+              <ReactFlowCanvasWrapper
+                components={components}
+                connections={connections}
+                infoCards={infoCards}
+                selectedComponentId={selectedComponentId}
+                onViewportChange={setCurrentViewport}
+                onComponentSelect={handleComponentSelect}
+                onComponentDeselect={() => handleComponentSelect(null)}
+                onComponentDrop={handleComponentDrop}
+                onComponentPositionChange={handleComponentMove}
+                onComponentDelete={handleDeleteComponent}
+                onConnectionCreate={(connection) => {
+                  if (
+                    quickConnect.isQuickConnectMode &&
+                    quickConnect.quickConnectSource
+                  ) {
+                    quickConnect.completeQuickConnect(connection.to);
+                  } else {
+                    handleCompleteConnection(connection.from, connection.to);
+                  }
+                }}
+                onConnectionDelete={handleConnectionDelete}
+                onConnectionSelect={() => {}}
+                onReactFlowInit={handleReactFlowInit}
+              />
 
-            {/* Quick Connect Overlay */}
-            {quickConnect.isQuickConnectMode &&
-              quickConnect.quickConnectSource && (
-                <QuickConnectOverlay
-                  sourceNodeId={quickConnect.quickConnectSource}
-                  previewPosition={quickConnect.quickConnectPreview}
-                  isValidTarget={true}
-                  onCancel={quickConnect.cancelQuickConnect}
-                />
-              )}
+              <AnnotationLayer
+                annotations={annotations}
+                viewport={currentViewport}
+                selectedAnnotationId={selectedAnnotationId}
+                highlightedAnnotationId={highlightedAnnotationId}
+                onSelect={(id) => {
+                  handleAnnotationSelect(id);
+                  if (!showAnnotationSidebar) {
+                    setShowAnnotationSidebar(true);
+                  }
+                }}
+              />
+
+              <CanvasAnnotationOverlay
+                annotations={annotations}
+                selectedTool={selectedAnnotationTool}
+                isActive={selectedAnnotationTool !== null}
+                viewportZoom={currentViewport.zoom ?? 1}
+                projectPointer={projectPointerToFlow}
+                onAnnotationCreate={handleAnnotationCreate}
+                onAnnotationSelect={(id) => handleAnnotationSelect(id)}
+              />
+
+              {quickConnect.isQuickConnectMode &&
+                quickConnect.quickConnectSource && (
+                  <QuickConnectOverlay
+                    sourceNodeId={quickConnect.quickConnectSource}
+                    previewPosition={quickConnect.quickConnectPreview}
+                    isValidTarget={true}
+                    onCancel={quickConnect.cancelQuickConnect}
+                  />
+                )}
+            </div>
           </div>
         }
         propertiesPanel={
@@ -1148,6 +1184,7 @@ const DesignCanvasComponent: React.FC<DesignCanvasProps> = ({
           <AnnotationToolbar
             selectedTool={selectedAnnotationTool}
             onToolSelect={handleAnnotationToolSelect}
+            annotationCount={annotations.length}
           />
         }
         annotationSidebar={

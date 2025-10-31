@@ -2,7 +2,7 @@ import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { renderWithAppProviders, resetTestStores } from '../../test/react-testing-utils';
 import { CanvasToolbar } from '../../packages/ui/components/canvas/CanvasToolbar';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { canvasActions, useCanvasStore } from '../../stores/canvasStore';
 import { expectButtonActive, expectButtonInactive, expectButtonAccessible } from './test-helpers';
 
 type CanvasStoreState = ReturnType<typeof useCanvasStore.getState>;
@@ -46,7 +46,7 @@ describe('CanvasToolbar', () => {
     });
 
     test.each(modeScenarios)('should show active state when mode is %s', ({ mode, label }) => {
-      useCanvasStore.getState().setCanvasMode(mode);
+      canvasActions.setCanvasMode(mode);
       renderWithAppProviders(<CanvasToolbar />);
 
       const button = screen.getByRole('button', { name: label });
@@ -54,8 +54,8 @@ describe('CanvasToolbar', () => {
     });
 
     it('should clear quick connect state when switching away from quick-connect', () => {
-      useCanvasStore.getState().setCanvasMode('quick-connect');
-      useCanvasStore.getState().setQuickConnectSource('comp-1');
+      canvasActions.setCanvasMode('quick-connect');
+      canvasActions.setQuickConnectSource('comp-1');
 
       renderWithAppProviders(<CanvasToolbar />);
       const selectButton = screen.getByRole('button', { name: /select/i });
@@ -67,9 +67,8 @@ describe('CanvasToolbar', () => {
 
   describe('Drawing Mode Toggle', () => {
     it('re-activates drawing with a single click after switching modes', () => {
-      const store = useCanvasStore.getState();
-      store.setDrawingTool('pen');
-      store.setCanvasMode('select');
+      canvasActions.setDrawingTool('pen');
+      canvasActions.setCanvasMode('select');
 
       renderWithAppProviders(<CanvasToolbar />);
 
@@ -81,9 +80,8 @@ describe('CanvasToolbar', () => {
     });
 
     it('restores the last used drawing tool when re-entering draw mode', () => {
-      const store = useCanvasStore.getState();
-      store.setDrawingTool('highlighter');
-      store.setCanvasMode('select');
+      canvasActions.setDrawingTool('highlighter');
+      canvasActions.setCanvasMode('select');
 
       renderWithAppProviders(<CanvasToolbar />);
 
@@ -95,8 +93,7 @@ describe('CanvasToolbar', () => {
     });
 
     it('exits draw mode when already active', () => {
-      const store = useCanvasStore.getState();
-      store.setDrawingTool('pen');
+      canvasActions.setDrawingTool('pen');
 
       renderWithAppProviders(<CanvasToolbar />);
 
@@ -120,21 +117,21 @@ describe('CanvasToolbar', () => {
         name: 'grid',
         label: /grid/i,
         aria: 'Grid',
-        toggle: () => useCanvasStore.getState().toggleGrid(),
+      toggle: () => canvasActions.toggleGrid(),
         selector: (state) => state.gridEnabled,
       },
       {
         name: 'snap',
         label: /snap/i,
         aria: 'Snap',
-        toggle: () => useCanvasStore.getState().toggleSnapToGrid(),
+      toggle: () => canvasActions.toggleSnapToGrid(),
         selector: (state) => state.snapToGrid,
       },
       {
         name: 'minimap',
         label: /minimap/i,
         aria: 'Minimap',
-        toggle: () => useCanvasStore.getState().toggleMinimap(),
+      toggle: () => canvasActions.toggleMinimap(),
         selector: (state) => state.showMinimap,
       },
     ];
@@ -185,14 +182,14 @@ describe('CanvasToolbar', () => {
 
     it('should show correct visual state based on store value', () => {
       if (!useCanvasStore.getState().animationsEnabled) {
-        useCanvasStore.getState().toggleAnimations();
+        canvasActions.toggleAnimations();
       }
 
       renderWithAppProviders(<CanvasToolbar />);
 
       expectButtonActive(screen.getByRole('button', { name: /animations/i }));
 
-      useCanvasStore.getState().toggleAnimations();
+      canvasActions.toggleAnimations();
       renderWithAppProviders(<CanvasToolbar />);
 
       expectButtonInactive(screen.getByRole('button', { name: /animations/i }));

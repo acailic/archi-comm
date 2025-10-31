@@ -38,9 +38,20 @@ function generateKeys() {
       throw new Error('Failed to extract keys from output');
     }
 
-    // Save keys to files
-    fs.writeFileSync(path.join(KEYS_DIR, 'public.key'), publicKey);
-    fs.writeFileSync(path.join(KEYS_DIR, 'private.key'), privateKey);
+    // Save keys to files with restrictive permissions (Unix-like systems)
+    const privateKeyPath = path.join(KEYS_DIR, 'private.key');
+    const publicKeyPath = path.join(KEYS_DIR, 'public.key');
+
+    fs.writeFileSync(publicKeyPath, publicKey);
+    fs.writeFileSync(privateKeyPath, privateKey);
+
+    // Set restrictive permissions on private key (600 = owner read/write only)
+    // This only works on Unix-like systems; Windows has different permission model
+    try {
+      fs.chmodSync(privateKeyPath, 0o600);
+    } catch (error) {
+      console.warn('⚠️ Could not set restrictive permissions on private key file (may not be supported on this OS)');
+    }
 
     console.log('\n✅ Keys generated successfully!\n');
 
@@ -55,11 +66,15 @@ function generateKeys() {
     console.log('   - Go to your repository settings');
     console.log('   - Navigate to Secrets and variables > Actions');
     console.log('   - Create a new secret named TAURI_PRIVATE_KEY');
-    console.log(`   - Set the value to: ${privateKey}`);
+    console.log(`   - Read the private key from: ${privateKeyPath}`);
+    console.log('   - IMPORTANT: Never print or share the private key in console logs or files');
     console.log('\n⚠️ Security Reminders:');
+    console.log('- Private key is saved to:', privateKeyPath);
     console.log('- Keep your private key secure and never commit it to version control');
-    console.log('- Backup your keys securely');
+    console.log('- The .tauri-updater-keys/ directory is gitignored by default');
+    console.log('- Backup your keys securely (encrypted backup recommended)');
     console.log('- Consider using different keys for development and production');
+    console.log('- Rotate keys periodically for enhanced security');
 
   } catch (error) {
     console.error('\n❌ Error generating keys:', error.message);

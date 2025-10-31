@@ -3,7 +3,7 @@
 ## Overview
 Implementation of complete annotation system for ArchiComm canvas, enabling users to add notes, comments, highlights, labels, and arrows to their architecture diagrams.
 
-## ✅ Completed (4 tasks)
+## ✅ Completed (7 tasks)
 
 ### 1. Extend Annotation Interface ✅
 **File**: `src/shared/contracts/index.ts`
@@ -46,68 +46,43 @@ Implementation of complete annotation system for ArchiComm canvas, enabling user
 - Selector functions
 - Integration with existing canvas data management
 
-## 📝 Remaining Work (10 tasks)
+### 5. Canvas Store Actions Implementation ✅
+**File**: `src/stores/canvasStore.ts`
+- Added full annotation CRUD helpers in `mutableCanvasActions`
+- Exposed selectors (`useCanvasAnnotations`) and ensured `updateCanvasData`/`resetCanvas` cover annotations
+- Persistence helpers updated via `useDesignCanvasImportExport`
+
+### 6. Annotation Toolbar UI ✅
+**File**: `src/packages/ui/components/canvas/AnnotationToolbar.tsx`
+- Floating toolbar wired into `DesignCanvasCore`
+- Keyboard shortcut hints & clear selection support
+- Badge now reflects live annotation count from the store
+
+### 7. Canvas Annotation Overlay & Layer ✅
+**Files**:
+  - `src/packages/ui/components/overlays/CanvasAnnotationOverlay.tsx`
+  - `src/packages/canvas/components/AnnotationLayer.tsx`
+- Overlay translates pointer events to flow coordinates via React Flow instance
+- Supports placing comments/notes/labels/highlights/arrows with tool previews
+- AnnotationLayer renders persisted annotations with selection/highlight styling and arrow SVGs
+
+## 📝 Remaining Work (6 tasks)
 
 ### High Priority
 
-#### 1. Complete Canvas Store Actions
-**File**: `src/stores/canvasStore.ts`
-**Status**: Interface/state done, actions needed
-**Effort**: 30 minutes
-
-Follow `ANNOTATION_CANVAS_STORE_ACTIONS.md` to add:
-- Annotation CRUD actions to `mutableCanvasActions`
-- Export actions in `canvasActions`
-- Add selectors (`useCanvasAnnotations`, `useAnnotationsByType`, etc.)
-- Update `updateCanvasData` to handle annotations
-- Update `resetCanvas` to clear annotations
-- Update `useNormalizedCanvasData` to include annotations
-- Update persistence configuration
-
-#### 2. AnnotationToolbar Component
-**File**: `src/packages/ui/components/canvas/AnnotationToolbar.tsx` (NEW)
-**Status**: Not started
+#### 1. AnnotationSidebar Enhancements
+**File**: `src/packages/ui/components/canvas/AnnotationSidebar.tsx`
+**Status**: MVP done, polish pending
 **Effort**: 2 hours
 
-Create toolbar for selecting annotation types:
-- Floating toolbar with preset buttons
-- Color picker for each preset type
-- Close button and keyboard shortcuts (ESC, 1-5)
-- Position in top-right area of canvas
-- Show visual preview of each preset
-- Import from annotation-presets
-
-#### 3. CanvasAnnotationOverlay Component
-**File**: `src/packages/ui/components/overlays/CanvasAnnotationOverlay.tsx` (NEW)
-**Status**: Not started
-**Effort**: 3 hours
-
-Create drawing overlay:
-- Handle mouse down/move/up for drawing
-- Two interaction modes:
-  - Click-to-place (note, comment, label)
-  - Drag-to-draw (highlight, arrow)
-- Show preview while drawing
-- Coordinate conversion (screen to canvas)
-- Integration with ReactFlow instance
-- Only active when `canvasMode === 'annotation'`
+- Add filters (type, resolved, author)
+- Improve context menu actions (duplicate, copy link)
+- Persist sidebar open/closed state per challenge
+- Hook up multi-select bulk actions (resolve/delete/export)
 
 ### Medium Priority
 
-#### 4. AnnotationSidebar Component
-**File**: `src/packages/ui/components/canvas/AnnotationSidebar.tsx` (NEW)
-**Status**: Not started
-**Effort**: 2 hours
-
-Create annotation management sidebar:
-- List all annotations with search/filter
-- Type filter dropdown
-- Annotation item actions (edit, delete, toggle visibility)
-- Empty state messaging
-- Keyboard navigation (arrow keys, ENTER, DELETE)
-- Collapsible with smooth animations
-
-#### 5. AnnotationEditDialog Component
+#### 2. AnnotationEditDialog Component
 **File**: `src/packages/ui/components/modals/AnnotationEditDialog.tsx` (NEW)
 **Status**: Not started
 **Effort**: 3 hours
@@ -121,26 +96,9 @@ Create edit dialog:
 - Keyboard shortcuts (Ctrl+S, ESC, Ctrl+B, Ctrl+I)
 - Use TipTap editor for rich text
 
-#### 6. AnnotationLayer Rendering
-**File**: `src/packages/canvas/components/AnnotationLayer.tsx` (NEW)
-**Status**: Not started
-**Effort**: 4 hours
-
-Create annotation rendering layer:
-- Render each annotation type appropriately:
-  - Note/sticky note: colored rectangle with content
-  - Comment: speech bubble
-  - Highlight: semi-transparent area with dashed border
-  - Label: small text label
-  - Arrow: SVG line with arrowhead
-- Apply viewport transformations
-- Handle click/double-click events
-- Show selection indicators
-- Performance optimizations (memo, virtualization)
-
 ### Lower Priority
 
-#### 7. CanvasInteractionLayer Extension
+#### 3. CanvasInteractionLayer Extension
 **File**: `src/packages/canvas/components/CanvasInteractionLayer.tsx`
 **Status**: Not started
 **Effort**: 1 hour
@@ -153,7 +111,7 @@ Extend interaction layer:
 - Prevent default interactions in annotation mode
 - Add annotation mode indicator
 
-#### 8. CanvasContent Integration
+#### 4. CanvasContent Integration
 **File**: `src/packages/ui/components/DesignCanvas/components/CanvasContent.tsx`
 **Status**: Not started
 **Effort**: 2 hours
@@ -168,7 +126,7 @@ Integrate all annotation components:
 - Implement callbacks for annotation interactions
 - Proper Z-index layering
 
-#### 9. Import/Export Updates
+#### 5. Import/Export Updates
 **File**: `src/packages/ui/components/DesignCanvas/hooks/useDesignCanvasImportExport.ts`
 **Status**: Not started
 **Effort**: 30 minutes
@@ -179,7 +137,7 @@ Update import/export:
 - Validate annotation data structure
 - Handle legacy designs without annotations
 
-#### 10. Component Exports
+#### 6. Component Exports
 **Files**:
 - `src/packages/ui/components/canvas/index.ts`
 - `src/packages/ui/components/index.ts`

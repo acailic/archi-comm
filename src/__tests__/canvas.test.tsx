@@ -17,7 +17,6 @@ import {
   toReactFlowNodes,
   updateReactFlowEdge,
   updateReactFlowNode,
-  type ArchiCommEdge,
   type ArchiCommNode,
 } from '../packages/canvas/utils/rf-adapters';
 import type { Connection, DesignComponent } from '@shared/contracts';
@@ -571,20 +570,17 @@ describe('React Flow Adapter Functions', () => {
 
   describe('fromEdgeChanges', () => {
     it('handles add changes', () => {
-      const newEdge: ArchiCommEdge = {
+      const newConnection: Connection = {
         id: 'conn3',
-        source: 'comp1',
-        target: 'comp2',
-        type: 'step',
-        data: {
-          label: 'Control Flow',
-          type: 'control',
-          protocol: 'TCP',
-          direction: 'end',
-        },
-        deletable: true,
-        selectable: true,
+        from: 'comp1',
+        to: 'comp2',
+        label: 'Control Flow',
+        type: 'control',
+        protocol: 'TCP',
+        direction: 'end',
       };
+
+      const [newEdge] = toReactFlowEdges([newConnection]);
 
       const changes: EdgeChange[] = [
         {
@@ -605,6 +601,7 @@ describe('React Flow Adapter Functions', () => {
         type: 'control',
         protocol: 'TCP',
         direction: 'end',
+        visualStyle: undefined,
       });
     });
 

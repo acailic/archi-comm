@@ -1983,6 +1983,8 @@ export type CanvasActions = typeof mutableCanvasActions;
 // Export canvasActions for direct imports
 export const canvasActions = mutableCanvasActions;
 
+export type CanvasState = CanvasStoreState;
+
 export const useCanvasComponents = (): DesignComponent[] =>
   useCanvasStore((state) => state.components);
 export const useCanvasConnections = () =>

@@ -23,7 +23,7 @@ import {
 import * as drawingUtils from "../../lib/canvas/drawing-utils";
 import { DrawingOverlay } from "../../packages/ui/components/canvas/DrawingOverlay";
 import { DrawingToolbar } from "../../packages/ui/components/canvas/DrawingToolbar";
-import type { DrawingSettings, DrawingStroke } from "../../shared/contracts";
+import type { DrawingSettings, DrawingStroke, StrokePoint } from "../../shared/contracts";
 
 // Mock React Flow
 vi.mock("@xyflow/react", () => ({
@@ -35,7 +35,7 @@ vi.mock("@xyflow/react", () => ({
 
 // Mock perfect-freehand
 vi.mock("perfect-freehand", () => ({
-  getStroke: vi.fn((points: number[][], options?: any) => {
+  getStroke: vi.fn((points: number[][], _options?: any) => {
     // Simple mock that returns a rectangle around the points
     if (!points.length) return [];
     const minX = Math.min(...points.map((p) => p[0]));
@@ -52,13 +52,15 @@ vi.mock("perfect-freehand", () => ({
 }));
 
 // Test data
+const baseStrokePoints: StrokePoint[] = [
+  [10, 10],
+  [20, 20],
+  [30, 15],
+];
+
 const mockStroke: DrawingStroke = {
   id: "test-stroke-1",
-  points: [
-    [10, 10],
-    [20, 20],
-    [30, 15],
-  ],
+  points: baseStrokePoints,
   color: "#000000",
   size: 4,
   timestamp: Date.now(),
@@ -79,7 +81,7 @@ const mockSettings: DrawingSettings = {
 describe("Drawing Utilities", () => {
   describe("getStrokeOutline", () => {
     it("should return stroke outline points", () => {
-      const points = [
+      const points: StrokePoint[] = [
         [10, 10],
         [20, 20],
         [30, 15],
@@ -119,7 +121,7 @@ describe("Drawing Utilities", () => {
 
   describe("pointsToStroke", () => {
     it("should create a DrawingStroke object", () => {
-      const points = [
+      const points: StrokePoint[] = [
         [10, 10],
         [20, 20],
       ];
@@ -137,7 +139,7 @@ describe("Drawing Utilities", () => {
     });
 
     it("should generate unique IDs", () => {
-      const points = [
+      const points: StrokePoint[] = [
         [10, 10],
         [20, 20],
       ];

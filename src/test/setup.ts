@@ -16,13 +16,16 @@ interface WindowDef {
   url: string;
 }
 
+type TauriMock = ReturnType<typeof createTauriMocks>;
+type TauriMetadata = {
+  __windows: WindowDef[];
+  __currentWindow: WindowDef;
+};
+
 declare global {
   interface Window {
-    __TAURI__: any;
-    __TAURI_METADATA__: {
-      __windows: WindowDef[];
-      __currentWindow: WindowDef;
-    };
+    __TAURI__: TauriMock;
+    __TAURI_METADATA__: TauriMetadata;
     // For error testing
     __testErrors: any[];
     triggerTestError: (...args: any[]) => void;
@@ -106,16 +109,17 @@ class MockDataTransferItemList {
     return this.items.length;
   }
   add(data: string | File, type?: string): DataTransferItem | null {
-    const item: DataTransferItem = {
+    const item = {
       kind: data instanceof File ? 'file' : 'string',
       type: type || (data instanceof File ? data.type : 'text/plain'),
       getAsFile: () => (data instanceof File ? data : null),
-      getAsString: (callback: (data: string) => void) => {
+      getAsString: (callback: (value: string) => void) => {
         if (typeof data === 'string') {
           callback(data);
         }
       },
-    };
+      webkitGetAsEntry: () => undefined,
+    } as unknown as DataTransferItem;
     this.items.push(item);
     return item;
   }
@@ -154,9 +158,11 @@ class MockDragEvent extends Event {
 const extendedLocalStorage = new ExtendedMockStorage();
 const extendedSessionStorage = new ExtendedMockStorage();
 
+const tauriMetadata: TauriMetadata = { __windows: [], __currentWindow: { label: '', title: '', url: '' } };
+
 const mockWindow = {
   __TAURI__: tauriMocks,
-  __TAURI_METADATA__: { __windows: [], __currentWindow: { label: '', title: '', url: '' } },
+  __TAURI_METADATA__: tauriMetadata,
   ResizeObserver: class {
     observe() {}
     unobserve() {}

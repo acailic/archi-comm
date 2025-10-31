@@ -1,6 +1,30 @@
 import { aiConfigService } from './AIConfigService';
 import { isTauri } from '@/lib/platform/tauri';
 import { AIProvider } from '@/lib/types/AIConfig';
+
+/**
+ * Sanitize error objects to remove sensitive information like API keys
+ * This prevents accidental leakage of credentials in logs or error messages
+ */
+function sanitizeError(err: unknown): Error {
+  if (!(err instanceof Error)) {
+    return new Error('An unknown error occurred');
+  }
+
+  // Create a sanitized copy of the error
+  const sanitized = new Error(err.message);
+  sanitized.name = err.name;
+  sanitized.stack = err.stack;
+
+  // Remove sensitive patterns from error message
+  sanitized.message = err.message
+    .replace(/Bearer\s+[A-Za-z0-9_-]+/gi, 'Bearer [REDACTED]')
+    .replace(/sk-[A-Za-z0-9_-]+/gi, 'sk-[REDACTED]')
+    .replace(/x-api-key[:\s]+[A-Za-z0-9_-]+/gi, 'x-api-key: [REDACTED]')
+    .replace(/Authorization[:\s]+[A-Za-z0-9_\s-]+/gi, 'Authorization: [REDACTED]');
+
+  return sanitized;
+}
 import type {
   AIAssistantResponse,
   TextToDiagramOptions,
@@ -105,7 +129,8 @@ class OpenAICanvasAdapter implements CanvasAIProviderAdapter {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`OpenAI request failed (${response.status}): ${errorText}`);
+      const error = new Error(`OpenAI request failed (${response.status}): ${errorText}`);
+      throw sanitizeError(error);
     }
 
     const data = await response.json();
@@ -139,7 +164,8 @@ class ClaudeCanvasAdapter implements CanvasAIProviderAdapter {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Claude request failed (${response.status}): ${errorText}`);
+      const error = new Error(`Claude request failed (${response.status}): ${errorText}`);
+      throw sanitizeError(error);
     }
 
     const data = await response.json();
@@ -803,11 +829,12 @@ export class CanvasAIService {
       const parsed = this.normalizeResponse(raw);
       return this.createAssistantResponseFromActions(parsed, request.prompt);
     } catch (error) {
+      const sanitized = sanitizeError(error);
+      console.error('AI diagram generation failed:', sanitized);
       const mock = generateMockDiagram(request.prompt);
       return {
         success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to generate diagram from AI provider',
+        message: sanitized.message || 'Failed to generate diagram from AI provider',
         suggestions: [
           {
             components: mock.components,
@@ -857,8 +884,9 @@ export class CanvasAIService {
       }
       return parsed;
     } catch (error) {
-      const warning =
-        error instanceof Error ? error.message : 'AI provider request failed unexpectedly.';
+      const sanitized = sanitizeError(error);
+      console.error('AI instruction execution failed:', sanitized);
+      const warning = sanitized.message || 'AI provider request failed unexpectedly.';
       const mock = mockInstructionResponse(request.prompt);
       mock.warnings = [...(mock.warnings ?? []), warning];
       return mock;

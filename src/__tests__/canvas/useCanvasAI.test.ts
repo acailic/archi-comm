@@ -70,9 +70,13 @@ describe('useCanvasAI', () => {
     expect(mockedCanvasAIService.executeInstruction).toHaveBeenCalledTimes(1);
     expect(instruction).not.toBeNull();
 
-    let applyResult;
+    if (!instruction) {
+      throw new Error('Instruction should be available after runInstruction resolves');
+    }
+
+    let applyResult!: ReturnType<typeof result.current.applyInstruction>;
     act(() => {
-      applyResult = result.current.applyInstruction(instruction);
+      applyResult = result.current.applyInstruction(instruction as CanvasAIInstructionResponse);
     });
 
     expect(applyResult.success).toBe(true);

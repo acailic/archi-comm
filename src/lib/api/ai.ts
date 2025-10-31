@@ -3,6 +3,30 @@ import { aiConfigService } from '@/lib/services/AIConfigService';
 import { DEFAULT_SETTINGS } from '../types/AIConfig';
 import { isTauri } from '@/lib/platform/tauri';
 
+/**
+ * Sanitize error objects to remove sensitive information like API keys
+ * This prevents accidental leakage of credentials in logs or error messages
+ */
+function sanitizeError(err: unknown): Error {
+  if (!(err instanceof Error)) {
+    return new Error('An unknown error occurred');
+  }
+
+  // Create a sanitized copy of the error
+  const sanitized = new Error(err.message);
+  sanitized.name = err.name;
+  sanitized.stack = err.stack;
+
+  // Remove sensitive patterns from error message
+  sanitized.message = err.message
+    .replace(/Bearer\s+[A-Za-z0-9_-]+/gi, 'Bearer [REDACTED]')
+    .replace(/sk-[A-Za-z0-9_-]+/gi, 'sk-[REDACTED]')
+    .replace(/x-api-key[:\s]+[A-Za-z0-9_-]+/gi, 'x-api-key: [REDACTED]')
+    .replace(/Authorization[:\s]+[A-Za-z0-9_\s-]+/gi, 'Authorization: [REDACTED]');
+
+  return sanitized;
+}
+
 // AI API Response interface for different providers
 interface AIResponse {
   content: string;
@@ -88,7 +112,8 @@ export function parseAIResponse(content: string): ReviewResp {
       return ReviewRespSchema.parse(parsed);
     }
   } catch (error) {
-    console.warn('Failed to parse AI response as JSON:', error);
+    const sanitized = sanitizeError(error);
+    console.warn('Failed to parse AI response as JSON:', sanitized);
   }
 
   // Fallback: create review from plain text

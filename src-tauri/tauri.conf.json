@@ -19,26 +19,60 @@
         "open": true
       },
       "path": {
-        "all": true
+        "all": false,
+        "resolve": true,
+        "normalize": true,
+        "join": true,
+        "dirname": true,
+        "basename": true,
+        "isAbsolute": true
       },
       "fs": {
-        "all": true,
-        "scope": ["$APPDATA", "$APPDATA/*", "$RESOURCE", "$RESOURCE/*", "$TEMP", "$TEMP/*"]
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "createDir": true,
+        "removeDir": false,
+        "copyFile": false,
+        "removeFile": false,
+        "renameFile": false,
+        "exists": true,
+        "scope": [
+          "$APPDATA/archicomm",
+          "$APPDATA/archicomm/**",
+          "$RESOURCE",
+          "$RESOURCE/**",
+          "$TEMP/archicomm",
+          "$TEMP/archicomm/**"
+        ]
       },
       "dialog": {
-        "all": true
+        "all": false,
+        "open": true,
+        "save": true,
+        "message": true,
+        "ask": true,
+        "confirm": true
       },
       "notification": {
         "all": true
       },
       "clipboard": {
-        "all": true
+        "all": false,
+        "writeText": true,
+        "readText": true
       },
       "globalShortcut": {
-        "all": true
+        "all": false
       },
       "os": {
-        "all": true
+        "all": false,
+        "platform": true,
+        "version": true,
+        "type": true,
+        "arch": true,
+        "tempdir": true
       },
       "window": {
         "all": false,

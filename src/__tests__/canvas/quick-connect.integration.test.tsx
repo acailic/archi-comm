@@ -1,7 +1,7 @@
 import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useQuickConnect } from '../../packages/canvas/hooks/useQuickConnect';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { canvasActions, useCanvasStore } from '../../stores/canvasStore';
 import { resetTestStores } from '../../test/react-testing-utils';
 import {
   createTestComponent,
@@ -99,7 +99,7 @@ describe('Quick Connect Integration', () => {
       setupCanvasStore(getComponents(), []);
 
       act(() => {
-        useCanvasStore.getState().setDefaultConnectionType(type);
+        canvasActions.setDefaultConnectionType(type);
       });
 
       const { result } = renderQuickConnect();
@@ -189,8 +189,8 @@ describe('Quick Connect Integration', () => {
       const { result } = renderHook(() => useQuickConnect());
 
       act(() => {
-        useCanvasStore.getState().setCanvasMode('quick-connect');
-        useCanvasStore.getState().setQuickConnectSource('comp-2');
+        canvasActions.setCanvasMode('quick-connect');
+        canvasActions.setQuickConnectSource('comp-2');
       });
 
       expect(result.current.isQuickConnectMode).toBe(true);

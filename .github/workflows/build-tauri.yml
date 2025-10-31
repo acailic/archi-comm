@@ -24,6 +24,73 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Verify Required Secrets (macOS)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          echo "Verifying required secrets for macOS build..."
+          MISSING_SECRETS=()
+
+          [[ -z "${{ secrets.APPLE_CERTIFICATE }}" ]] && MISSING_SECRETS+=("APPLE_CERTIFICATE")
+          [[ -z "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ]] && MISSING_SECRETS+=("APPLE_CERTIFICATE_PASSWORD")
+          [[ -z "${{ secrets.APPLE_SIGNING_IDENTITY }}" ]] && MISSING_SECRETS+=("APPLE_SIGNING_IDENTITY")
+          [[ -z "${{ secrets.APPLE_ID }}" ]] && MISSING_SECRETS+=("APPLE_ID")
+          [[ -z "${{ secrets.APPLE_TEAM_ID }}" ]] && MISSING_SECRETS+=("APPLE_TEAM_ID")
+          [[ -z "${{ secrets.APPLE_PASSWORD }}" ]] && MISSING_SECRETS+=("APPLE_PASSWORD")
+          [[ -z "${{ secrets.APPLE_PROVIDER_SHORT_NAME }}" ]] && MISSING_SECRETS+=("APPLE_PROVIDER_SHORT_NAME")
+          [[ -z "${{ secrets.TAURI_PRIVATE_KEY }}" ]] && MISSING_SECRETS+=("TAURI_PRIVATE_KEY")
+
+          if [[ ${#MISSING_SECRETS[@]} -gt 0 ]]; then
+            echo "Error: The following required secrets are not configured:"
+            printf '  - %s\n' "${MISSING_SECRETS[@]}"
+            echo ""
+            echo "Please configure these secrets in your GitHub repository settings."
+            echo "See docs/SECURITY.md for more information."
+            exit 1
+          fi
+          echo "All required secrets are configured."
+
+      - name: Verify Required Secrets (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          echo "Verifying required secrets for Windows build..."
+          MISSING_SECRETS=()
+
+          [[ -z "${{ secrets.WINDOWS_CERTIFICATE }}" ]] && MISSING_SECRETS+=("WINDOWS_CERTIFICATE")
+          [[ -z "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" ]] && MISSING_SECRETS+=("WINDOWS_CERTIFICATE_PASSWORD")
+          [[ -z "${{ secrets.WINDOWS_CERTIFICATE_THUMBPRINT }}" ]] && MISSING_SECRETS+=("WINDOWS_CERTIFICATE_THUMBPRINT")
+          [[ -z "${{ secrets.TAURI_PRIVATE_KEY }}" ]] && MISSING_SECRETS+=("TAURI_PRIVATE_KEY")
+
+          if [[ ${#MISSING_SECRETS[@]} -gt 0 ]]; then
+            echo "Error: The following required secrets are not configured:"
+            printf '  - %s\n' "${MISSING_SECRETS[@]}"
+            echo ""
+            echo "Please configure these secrets in your GitHub repository settings."
+            echo "See docs/SECURITY.md for more information."
+            exit 1
+          fi
+          echo "All required secrets are configured."
+
+      - name: Verify Required Secrets (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        shell: bash
+        run: |
+          echo "Verifying required secrets for Linux build..."
+          MISSING_SECRETS=()
+
+          [[ -z "${{ secrets.TAURI_PRIVATE_KEY }}" ]] && MISSING_SECRETS+=("TAURI_PRIVATE_KEY")
+
+          if [[ ${#MISSING_SECRETS[@]} -gt 0 ]]; then
+            echo "Error: The following required secrets are not configured:"
+            printf '  - %s\n' "${MISSING_SECRETS[@]}"
+            echo ""
+            echo "Please configure these secrets in your GitHub repository settings."
+            echo "See docs/SECURITY.md for more information."
+            exit 1
+          fi
+          echo "All required secrets are configured."
+
       - name: Install dependencies (Ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |

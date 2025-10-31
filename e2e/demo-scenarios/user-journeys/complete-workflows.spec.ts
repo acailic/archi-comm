@@ -256,6 +256,9 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.locator('[data-testid="login-button"]').click();
     await page.waitForTimeout(1000);
 
+    // DEMO CREDENTIALS ONLY - These are test/demo credentials used for E2E demonstration
+    // purposes only. They are NOT real user credentials and should NOT be reused elsewhere.
+    // Pattern: demo email addresses for test scenarios
     await page.locator('[data-testid="email-input"]').fill('sarah.chen@techcorp.com');
     await page.locator('[data-testid="password-input"]').fill('professional123');
     await page.locator('[data-testid="login-submit"]').click();
@@ -340,6 +343,7 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.waitForTimeout(1000);
 
     await page.locator('[data-testid="invite-reviewers"]').click();
+    // DEMO EMAIL ADDRESSES - These are fictional email addresses for E2E test scenarios
     await page.locator('[data-testid="reviewer-email"]').fill('john.doe@techcorp.com');
     await page.locator('[data-testid="add-reviewer"]').click();
     await page.locator('[data-testid="reviewer-email"]').fill('lisa.wang@techcorp.com');
@@ -685,6 +689,7 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.waitForTimeout(1000);
 
     await page.locator('[data-testid="share-with-team"]').click();
+    // DEMO EMAIL ADDRESSES - Fictional team member emails for E2E testing
     await page.locator('[data-testid="team-member-email"]').fill('dev1@startup.com');
     await page.locator('[data-testid="add-team-member"]').click();
     await page.locator('[data-testid="team-member-email"]').fill('dev2@startup.com');
@@ -759,6 +764,8 @@ test.describe('Complete User Journey Demonstrations', () => {
     await page.locator('[data-testid="student-mode"]').click();
     await page.waitForTimeout(1000);
 
+    // DEMO CREDENTIALS ONLY - These are test/demo student IDs used for E2E demonstration
+    // purposes only. They are NOT real student credentials and are safe for public test scenarios.
     await page.locator('[data-testid="student-id"]').fill('cs301-student-042');
     await page.locator('[data-testid="assignment-code"]').fill('SYSDESIGN-WEEK8');
     await page.locator('[data-testid="enter-classroom"]').click();

@@ -1,6 +1,6 @@
 import { vi, expect, type MockInstance } from 'vitest';
 import { act } from '@testing-library/react';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useCanvasStore, canvasActions } from '../../stores/canvasStore';
 import { resetTestStores } from '../../test/react-testing-utils';
 import type { DesignComponent, Connection, ConnectionType } from '../../shared/contracts';
 
@@ -158,10 +158,8 @@ export function setupCanvasStore(
   resetTestStores();
 
   act(() => {
-    useCanvasStore.setState({
-      components,
-      connections,
-    });
+    canvasActions.setComponents(components, { silent: true });
+    canvasActions.setConnections(connections, { silent: true });
   });
 }
 
