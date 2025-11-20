@@ -15,7 +15,7 @@ build/
 # Vite cache and build artifacts
 .vite/
 .vite-cache/
-vite.config.ts.timestamp-*
+vite.config.*.timestamp-*
 
 # macOS artifacts
 .DS_Store

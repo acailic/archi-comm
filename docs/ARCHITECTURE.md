@@ -40,7 +40,7 @@ src-tauri/              # Rust shell for the Tauri Desktop build
 | `audio` | Simple audio recording with MediaRecorder API. | `SimpleAudioManager`, recording state management |
 | `services` | Service façades for persistence, Tauri integration, and fallbacks. | `audio/AudioService`, `storage`, `tauri` |
 
-Packages expose a “barrel” file (`index.ts`) that defines the public surface area. Consumers import through the alias defined in `config/tsconfig.json` and `config/vite.config.ts`:
+Packages expose a “barrel” file (`index.ts`) that defines the public surface area. Consumers import through the alias defined in `config/tsconfig.json` and `config/vite.config.mjs`:
 
 ```
 import { DesignCanvas } from '@ui/components/DesignCanvas';
@@ -87,7 +87,7 @@ Domain-specific stores now live under `src/stores`. For example `src/stores/canv
 
 All tool configuration lives in `config/`:
 
-- `config/vite.config.ts` resolves package aliases and points Vite to the repo root/public directory.
+- `config/vite.config.mjs` resolves package aliases and points Vite to the repo root/public directory.
 - `config/eslint.config.js` and `config/.prettierrc` ensure linting and formatting runs against the new structure.
 - `config/playwright.config.ts` resolves paths relative to the project root so E2E tests work after the move.
 - `config/tsconfig.json` exposes the new path aliases and redraws include/exclude paths from the config directory.

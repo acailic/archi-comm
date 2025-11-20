@@ -12,7 +12,15 @@ import renderOptimization from '../eslint-rules/react-render-optimization.js';
 export default [
   js.configs.recommended,
   {
-    ignores: ['tools/scripts/*.js', 'tools/scripts/*.mjs', 'config/vite.config.ts', 'config/eslint.config.js', 'eslint-rules/*.js'],
+    ignores: [
+      'tools/scripts/*.js',
+      'tools/scripts/*.mjs',
+      'config/vite.config.mjs',
+      'config/vite.config.ts',
+      'config/eslint.config.js',
+      'eslint-rules/*.js',
+      'commitlint.config.cjs',
+    ],
   },
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -24,7 +32,7 @@ export default [
         ecmaFeatures: {
           jsx: true,
         },
-        project: ['./config/tsconfig.json'],
+        project: ['./config/tsconfig.eslint.json'],
         tsconfigRootDir: process.cwd(),
       },
       globals: {
@@ -79,7 +87,7 @@ export default [
     },
     plugins: {
       '@typescript-eslint': typescript,
-      'import': importPlugin,
+      import: importPlugin,
       'unused-imports': unusedImports,
       'render-optimization': renderOptimization,
       'react-perf': reactPerf,
@@ -96,7 +104,7 @@ export default [
     },
     rules: {
       // Basic rules
-      'no-console': ['warn', { 'allow': ['warn', 'error'] }],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-debugger': 'error',
       'eol-last': ['error', 'always'],
       'no-unused-vars': 'off',
@@ -124,28 +132,31 @@ export default [
       // Import/Export rules
       'import/no-unresolved': 'error',
       'import/no-duplicates': 'warn',
-      'import/order': ['warn', {
-        'groups': ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-        'pathGroups': [
-          { 'pattern': '@/**', 'group': 'internal', 'position': 'before' },
-          { 'pattern': '@shared/**', 'group': 'internal', 'position': 'before' },
-          { 'pattern': '@lib/**', 'group': 'internal', 'position': 'before' },
-          { 'pattern': '@packages/**', 'group': 'internal', 'position': 'before' },
-          { 'pattern': '@stores/**', 'group': 'internal', 'position': 'before' }
-        ],
-        'pathGroupsExcludedImportTypes': ['builtin'],
-        'newlines-between': 'always',
-        'alphabetize': { 'order': 'asc', 'caseInsensitive': true }
-      }],
-      'import/newline-after-import': ['warn', { 'count': 1 }],
+      'import/order': [
+        'warn',
+        {
+          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+          pathGroups: [
+            { pattern: '@/**', group: 'internal', position: 'before' },
+            { pattern: '@shared/**', group: 'internal', position: 'before' },
+            { pattern: '@lib/**', group: 'internal', position: 'before' },
+            { pattern: '@packages/**', group: 'internal', position: 'before' },
+            { pattern: '@stores/**', group: 'internal', position: 'before' },
+          ],
+          pathGroupsExcludedImportTypes: ['builtin'],
+          'newlines-between': 'always',
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
+      ],
+      'import/newline-after-import': ['warn', { count: 1 }],
 
       // Unused imports rules
       'unused-imports/no-unused-imports': 'warn',
       'unused-imports/no-unused-vars': [
         'warn',
         {
-          'varsIgnorePattern': '^_',
-          'argsIgnorePattern': '^_',
+          varsIgnorePattern: '^_',
+          argsIgnorePattern: '^_',
         },
       ],
 
@@ -176,7 +187,7 @@ export default [
       },
     },
     plugins: {
-      'react': react,
+      react: react,
       'react-hooks': reactHooks,
       'react-perf': reactPerf,
       'jsx-a11y': jsxA11y,
@@ -196,8 +207,8 @@ export default [
       'react/no-deprecated': 'warn',
       'react/no-unknown-property': 'error',
       'react/self-closing-comp': 'warn',
-      'react/jsx-no-leaked-render': ['error', { 'validStrategies': ['ternary', 'coerce'] }],
-      'react/jsx-no-useless-fragment': ['warn', { 'allowExpressions': true }],
+      'react/jsx-no-leaked-render': ['error', { validStrategies: ['ternary', 'coerce'] }],
+      'react/jsx-no-useless-fragment': ['warn', { allowExpressions: true }],
       'react/hook-use-state': 'warn',
       'react/jsx-no-constructed-context-values': 'warn',
       'react/no-array-index-key': 'warn',
@@ -221,7 +232,20 @@ export default [
     },
   },
   {
-    files: ['**/*.test.{ts,tsx}', '**/e2e/**/*', '**/__tests__/**/*'],
+    files: ['**/*.test.{ts,tsx}', '**/e2e/**/*', '**/__tests__/**/*', 'src/test/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        vi: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+      },
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       'no-console': 'off',
@@ -253,7 +277,7 @@ export default [
       'build/',
       'src-tauri/',
       'node_modules/',
-      'config/vite.config.ts',
+      'config/vite.config.mjs',
       'config/playwright.config.ts',
       'config/eslint.config.js',
       'e2e/**/*',

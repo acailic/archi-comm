@@ -2,12 +2,13 @@
 // tools/cli/test-runner.js
 // Enhanced test runner integrating with acceptance criteria
 // Runs tests by criterion, task, or coverage gaps
-// RELEVANT FILES: src/lib/task-system/test-traceability.ts, config/vite.config.ts, config/playwright.config.ts
+// RELEVANT FILES: src/lib/task-system/test-traceability.ts, config/vite.config.mjs, config/playwright.config.ts
 
-const { Command } = require("commander");
-const chalk = require("chalk");
-const ora = require("ora");
 const { spawn } = require("child_process");
+
+const chalk = require("chalk");
+const { Command } = require("commander");
+const ora = require("ora");
 
 const program = new Command();
 

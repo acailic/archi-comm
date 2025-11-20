@@ -1,4 +1,4 @@
-// /commitlint.config.js
+// /commitlint.config.cjs
 // Commitlint configuration for enforcing conventional commits
 // See: https://commitlint.js.org
 

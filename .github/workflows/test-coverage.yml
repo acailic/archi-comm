@@ -1,7 +1,7 @@
 # .github/workflows/test-coverage.yml
 # Test coverage workflow with enforcement
 # Ensures test coverage is maintained and visible in PRs
-# RELEVANT FILES: config/vite.config.ts, config/coverage.config.json, package.json
+# RELEVANT FILES: config/vite.config.mjs, config/coverage.config.json, package.json
 
 name: Test Coverage
 

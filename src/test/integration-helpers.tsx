@@ -3,14 +3,24 @@
 // Provides reusable test utilities that bridge unit and E2E testing with React Testing Library
 // RELEVANT FILES: src/test/setup.ts, e2e/utils/test-helpers.ts, src/components/AppContainer.tsx, src/features/canvas/hooks/useNodePresenter.ts
 
-import React, { ReactElement } from 'react';
-import { render, RenderResult, screen, fireEvent, waitFor } from '@testing-library/react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import userEvent from '@testing-library/user-event';
-import { ServiceProvider } from '@/lib/di/ServiceProvider';
-import { createContainer, createToken } from '@/lib/di/Container';
-import { TooltipProvider } from '@ui/components/ui/tooltip';
+import {
+  render,
+  RenderResult,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import React, { ReactElement } from "react";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+
+import { createContainer, createToken } from "@/lib/di/Container";
+import { ServiceProvider } from "@/lib/di/ServiceProvider";
+import { LoggerProvider } from "@/lib/logging/LoggerProvider";
+import { RecoveryProvider } from "@/lib/recovery/RecoveryContext";
+
+import { AccessibilityProvider } from "@ui/components/accessibility/AccessibilityProvider";
 
 // Types for test data structures
 export interface TestComponent {
@@ -37,13 +47,19 @@ export interface TestDesignData {
 }
 
 export interface TestErrorScenario {
-  type: 'network' | 'validation' | 'system' | 'storage';
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  type: "network" | "validation" | "system" | "storage";
+  severity: "low" | "medium" | "high" | "critical";
   recoverable: boolean;
 }
 
 export interface TestWorkflowPhase {
-  phase: 'welcome' | 'challenge-selection' | 'design' | 'audio' | 'review' | 'complete';
+  phase:
+    | "welcome"
+    | "challenge-selection"
+    | "design"
+    | "audio"
+    | "review"
+    | "complete";
   data?: any;
 }
 
@@ -59,31 +75,30 @@ interface RenderWithProvidersOptions {
  */
 export function renderWithProviders(
   ui: ReactElement,
-  options: RenderWithProvidersOptions = {}
+  options: RenderWithProvidersOptions = {},
 ): RenderResult {
-  const {
-    mockServices = {},
-    errorBoundary = true
-  } = options;
+  const { mockServices = {}, errorBoundary = true } = options;
 
   // Create test container for DI services
   const testContainer = MockHelpers.createTestContainer(mockServices);
 
   const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
     const providers = (
-      <DndProvider backend={HTML5Backend}>
-        <ServiceProvider container={testContainer as any}>
-          {children}
-        </ServiceProvider>
-      </DndProvider>
+      <LoggerProvider scope="test">
+        <RecoveryProvider>
+          <AccessibilityProvider>
+            <DndProvider backend={HTML5Backend}>
+              <ServiceProvider container={testContainer as any}>
+                {children}
+              </ServiceProvider>
+            </DndProvider>
+          </AccessibilityProvider>
+        </RecoveryProvider>
+      </LoggerProvider>
     );
 
     if (errorBoundary) {
-      return (
-        <TestErrorBoundary>
-          {providers}
-        </TestErrorBoundary>
-      );
+      return <TestErrorBoundary>{providers}</TestErrorBoundary>;
     }
 
     return providers;
@@ -140,19 +155,24 @@ export class CanvasTestHelpers {
   static async addComponent(
     type: string,
     position: { x: number; y: number },
-    label?: string
+    label?: string,
   ): Promise<TestComponent> {
     // Canvas (React Flow) root
-    const canvas = (screen.queryByTestId('reactflow-canvas') || screen.queryByTestId('canvas') || document.querySelector('.react-flow')) as HTMLElement | null;
-    if (!canvas) throw new Error('Canvas not found: reactflow-canvas');
+    const canvas = (screen.queryByTestId("reactflow-canvas") ||
+      screen.queryByTestId("canvas") ||
+      document.querySelector(".react-flow")) as HTMLElement | null;
+    if (!canvas) throw new Error("Canvas not found: reactflow-canvas");
 
     // Palette item for the given type
     const paletteItem = screen.queryByTestId(`palette-item-${type}`);
-    if (!paletteItem) throw new Error(`Palette item not found for type: ${type}`);
+    if (!paletteItem)
+      throw new Error(`Palette item not found for type: ${type}`);
 
     // Collect existing node ids before drop
     const beforeIds = new Set(
-      Array.from(document.querySelectorAll('.react-flow__node')).map(el => (el as HTMLElement).dataset.id || '')
+      Array.from(document.querySelectorAll(".react-flow__node")).map(
+        (el) => (el as HTMLElement).dataset.id || "",
+      ),
     );
 
     // Perform drag-and-drop using Testing Library userEvent
@@ -160,22 +180,28 @@ export class CanvasTestHelpers {
     await userEvent.dragAndDrop(paletteItem, canvas);
 
     // Wait for a new node to appear
-    let newId = '';
+    let newId = "";
     await waitFor(() => {
-      const after = Array.from(document.querySelectorAll('.react-flow__node')) as HTMLElement[];
-      const afterIds = after.map(n => n.dataset.id || '').filter(Boolean);
-      const diff = afterIds.filter(id => !beforeIds.has(id));
-      if (diff.length === 0) throw new Error('No new node created');
+      const after = Array.from(
+        document.querySelectorAll(".react-flow__node"),
+      ) as HTMLElement[];
+      const afterIds = after.map((n) => n.dataset.id || "").filter(Boolean);
+      const diff = afterIds.filter((id) => !beforeIds.has(id));
+      if (diff.length === 0) throw new Error("No new node created");
       newId = diff[0];
     });
 
     // Optionally set label via PropertiesPanel if provided
     if (label) {
       // select the node
-      const node = document.querySelector(`[data-id="${newId}"]`) as HTMLElement | null;
+      const node = document.querySelector(
+        `[data-id="${newId}"]`,
+      ) as HTMLElement | null;
       if (node) {
         await userEvent.click(node);
-        const labelInput = screen.queryByPlaceholderText('Enter component label...');
+        const labelInput = screen.queryByPlaceholderText(
+          "Enter component label...",
+        );
         if (labelInput) {
           await userEvent.clear(labelInput);
           await userEvent.type(labelInput, label);
@@ -195,7 +221,9 @@ export class CanvasTestHelpers {
    * Selects a component on the canvas
    */
   static async selectComponent(id: string): Promise<void> {
-    const component = document.querySelector(`[data-id="${id}"]`) as HTMLElement | null;
+    const component = document.querySelector(
+      `[data-id="${id}"]`,
+    ) as HTMLElement | null;
     if (!component) throw new Error(`Component not found: ${id}`);
     await userEvent.click(component);
   }
@@ -203,15 +231,26 @@ export class CanvasTestHelpers {
   /**
    * Creates a connection between two components
    */
-  static async createConnection(fromId: string, toId: string): Promise<TestConnection> {
+  static async createConnection(
+    fromId: string,
+    toId: string,
+  ): Promise<TestConnection> {
     // React Flow renders handles as .react-flow__handle with data-handlepos attr
-    const fromNode = document.querySelector(`[data-id="${fromId}"]`) as HTMLElement | null;
-    const toNode = document.querySelector(`[data-id="${toId}"]`) as HTMLElement | null;
-    if (!fromNode || !toNode) throw new Error('from/to nodes not found');
+    const fromNode = document.querySelector(
+      `[data-id="${fromId}"]`,
+    ) as HTMLElement | null;
+    const toNode = document.querySelector(
+      `[data-id="${toId}"]`,
+    ) as HTMLElement | null;
+    if (!fromNode || !toNode) throw new Error("from/to nodes not found");
 
-    const fromHandle = fromNode.querySelector('.react-flow__handle[data-handlepos="bottom"]') as HTMLElement | null;
-    const toHandle = toNode.querySelector('.react-flow__handle[data-handlepos="top"]') as HTMLElement | null;
-    if (!fromHandle || !toHandle) throw new Error('from/to handles not found');
+    const fromHandle = fromNode.querySelector(
+      '.react-flow__handle[data-handlepos="bottom"]',
+    ) as HTMLElement | null;
+    const toHandle = toNode.querySelector(
+      '.react-flow__handle[data-handlepos="top"]',
+    ) as HTMLElement | null;
+    if (!fromHandle || !toHandle) throw new Error("from/to handles not found");
 
     // Start connection drag and finish on target handle
     fireEvent.mouseDown(fromHandle, { buttons: 1 });
@@ -230,11 +269,19 @@ export class CanvasTestHelpers {
   /**
    * Moves a component to a new position
    */
-  static async moveComponent(id: string, newPosition: { x: number; y: number }): Promise<void> {
-    const component = document.querySelector(`[data-id="${id}"]`) as HTMLElement | null;
+  static async moveComponent(
+    id: string,
+    newPosition: { x: number; y: number },
+  ): Promise<void> {
+    const component = document.querySelector(
+      `[data-id="${id}"]`,
+    ) as HTMLElement | null;
     if (!component) throw new Error(`Component not found: ${id}`);
     fireEvent.mouseDown(component, { buttons: 1 });
-    fireEvent.mouseMove(component, { clientX: newPosition.x, clientY: newPosition.y });
+    fireEvent.mouseMove(component, {
+      clientX: newPosition.x,
+      clientY: newPosition.y,
+    });
     fireEvent.mouseUp(component);
   }
 
@@ -244,7 +291,7 @@ export class CanvasTestHelpers {
   static async deleteComponent(id: string): Promise<void> {
     await this.selectComponent(id);
     // Use PropertiesPanel delete button for reliable deletion
-    const deleteBtn = screen.getByRole('button', { name: /delete component/i });
+    const deleteBtn = screen.getByRole("button", { name: /delete component/i });
     await userEvent.click(deleteBtn);
     await waitFor(() => {
       const node = document.querySelector(`[data-id="${id}"]`);
@@ -256,17 +303,19 @@ export class CanvasTestHelpers {
    * Gets the current number of components on the canvas
    */
   static getComponentCount(): number {
-    return document.querySelectorAll('.react-flow__node').length;
+    return document.querySelectorAll(".react-flow__node").length;
   }
 
   /**
    * Gets the current number of connections on the canvas
    */
   static getConnectionCount(): number {
-    const edgesByTestId = document.querySelectorAll('[data-testid^="rf__edge-"]');
+    const edgesByTestId = document.querySelectorAll(
+      '[data-testid^="rf__edge-"]',
+    );
     if (edgesByTestId.length > 0) return edgesByTestId.length;
     // Fallback selector
-    return document.querySelectorAll('.react-flow__edge').length;
+    return document.querySelectorAll(".react-flow__edge").length;
   }
 
   /**
@@ -279,18 +328,18 @@ export class CanvasTestHelpers {
     // @ts-expect-error override for testing
     URL.createObjectURL = (blob: Blob) => {
       capturedBlob = blob;
-      return 'blob:test-url';
+      return "blob:test-url";
     };
 
     try {
       // Click the export button by probing toolbar buttons until export is triggered
-      const buttons = screen.getAllByRole('button');
+      const buttons = screen.getAllByRole("button");
       for (const btn of buttons) {
         await userEvent.click(btn);
         if (capturedBlob) break;
       }
 
-      if (!capturedBlob) throw new Error('Export was not triggered');
+      if (!capturedBlob) throw new Error("Export was not triggered");
       const jsonText = await capturedBlob.text();
       const parsed = JSON.parse(jsonText);
 
@@ -300,17 +349,17 @@ export class CanvasTestHelpers {
           id: c.id,
           type: c.type,
           position: { x: c.x, y: c.y },
-          label: c.label || ''
+          label: c.label || "",
         })),
         connections: (parsed.connections || []).map((e: any) => ({
           id: e.id,
           fromId: e.from,
-          toId: e.to
+          toId: e.to,
         })),
         metadata: {
           timestamp: Date.now(),
-          version: '1.0.0'
-        }
+          version: "1.0.0",
+        },
       };
     } finally {
       URL.createObjectURL = originalCreate;
@@ -329,31 +378,33 @@ export class WorkflowTestHelpers {
     const challengeCard = screen.getByTestId(`challenge-${challengeId}`);
     await userEvent.click(challengeCard);
 
-    const startButton = screen.getByTestId('start-challenge-button');
+    const startButton = screen.getByTestId("start-challenge-button");
     await userEvent.click(startButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('design-canvas')).toBeInTheDocument();
+      expect(screen.getByTestId("design-canvas")).toBeInTheDocument();
     });
   }
 
   /**
    * Completes the design phase with specified components
    */
-  static async completeDesignPhase(components: Array<{ type: string; label?: string }>): Promise<void> {
+  static async completeDesignPhase(
+    components: Array<{ type: string; label?: string }>,
+  ): Promise<void> {
     for (const comp of components) {
       await CanvasTestHelpers.addComponent(
         comp.type,
         { x: Math.random() * 400, y: Math.random() * 300 },
-        comp.label
+        comp.label,
       );
     }
 
-    const continueButton = screen.getByTestId('continue-to-recording');
+    const continueButton = screen.getByTestId("continue-to-recording");
     await userEvent.click(continueButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('audio-recording')).toBeInTheDocument();
+      expect(screen.getByTestId("audio-recording")).toBeInTheDocument();
     });
   }
 
@@ -361,26 +412,26 @@ export class WorkflowTestHelpers {
    * Completes the audio recording phase
    */
   static async completeAudioPhase(transcript?: string): Promise<void> {
-    const startRecordingButton = screen.getByTestId('start-recording');
+    const startRecordingButton = screen.getByTestId("start-recording");
     await userEvent.click(startRecordingButton);
 
     // Simulate recording process
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    const stopRecordingButton = screen.getByTestId('stop-recording');
+    const stopRecordingButton = screen.getByTestId("stop-recording");
     await userEvent.click(stopRecordingButton);
 
     if (transcript) {
-      const transcriptArea = screen.getByTestId('transcript-area');
+      const transcriptArea = screen.getByTestId("transcript-area");
       await userEvent.clear(transcriptArea);
       await userEvent.type(transcriptArea, transcript);
     }
 
-    const continueButton = screen.getByTestId('continue-to-review');
+    const continueButton = screen.getByTestId("continue-to-review");
     await userEvent.click(continueButton);
 
     await waitFor(() => {
-      expect(screen.getByTestId('review-screen')).toBeInTheDocument();
+      expect(screen.getByTestId("review-screen")).toBeInTheDocument();
     });
   }
 
@@ -389,19 +440,21 @@ export class WorkflowTestHelpers {
    */
   static async navigateToReview(): Promise<void> {
     await waitFor(() => {
-      expect(screen.getByTestId('review-screen')).toBeInTheDocument();
+      expect(screen.getByTestId("review-screen")).toBeInTheDocument();
     });
   }
 
   /**
    * Triggers error recovery scenarios for testing
    */
-  static async triggerErrorRecovery(errorType: TestErrorScenario['type']): Promise<void> {
+  static async triggerErrorRecovery(
+    errorType: TestErrorScenario["type"],
+  ): Promise<void> {
     // Use global test error trigger
     (globalThis as any).triggerTestError(errorType);
 
     await waitFor(() => {
-      expect(screen.getByTestId('recovery-overlay')).toBeInTheDocument();
+      expect(screen.getByTestId("recovery-overlay")).toBeInTheDocument();
     });
   }
 }
@@ -434,12 +487,12 @@ export class MockHelpers {
         mockStorage.data.clear();
       }),
       simulateFailure: vi.fn(() => {
-        throw new Error('Storage quota exceeded');
-      })
+        throw new Error("Storage quota exceeded");
+      }),
     };
 
-    Object.defineProperty(global, 'localStorage', { value: mockStorage });
-    Object.defineProperty(global, 'sessionStorage', { value: mockStorage });
+    Object.defineProperty(global, "localStorage", { value: mockStorage });
+    Object.defineProperty(global, "sessionStorage", { value: mockStorage });
   }
 
   /**
@@ -463,11 +516,11 @@ export class MockHelpers {
       memory: {
         usedJSHeapSize: 1000000,
         totalJSHeapSize: 5000000,
-        jsHeapSizeLimit: 10000000
+        jsHeapSizeLimit: 10000000,
       },
       advanceTime: (ms: number) => {
         currentTime += ms;
-      }
+      },
     };
   }
 
@@ -477,6 +530,8 @@ export class MockHelpers {
   static createTestContainer(mockServices: Record<string, any> = {}): any {
     // Adapt DI container for tests and register provided mocks by token name
     const container = createContainer();
+    const originalGetRegisteredServices =
+      container.getRegisteredServices.bind(container);
     Object.entries(mockServices).forEach(([name, instance]) => {
       const token = createToken<any>(name);
       container.register(token, () => instance, { singleton: true });
@@ -485,7 +540,7 @@ export class MockHelpers {
     });
     // Provide minimum API used by ServiceProvider in tests
     return Object.assign(container, {
-      getRegisteredServices: () => container.getRegisteredServices(),
+      getRegisteredServices: () => originalGetRegisteredServices(),
       dispose: vi.fn(),
     });
   }
@@ -503,7 +558,7 @@ export class AssertionHelpers {
       expect(screen.getByText(label)).toBeInTheDocument();
       return;
     }
-    const anyNode = document.querySelector('.react-flow__node');
+    const anyNode = document.querySelector(".react-flow__node");
     expect(anyNode).toBeInTheDocument();
   }
 
@@ -520,22 +575,22 @@ export class AssertionHelpers {
   /**
    * Asserts the current workflow phase
    */
-  static expectWorkflowPhase(phase: TestWorkflowPhase['phase']): void {
+  static expectWorkflowPhase(phase: TestWorkflowPhase["phase"]): void {
     switch (phase) {
-      case 'welcome':
-        expect(screen.getByTestId('welcome-screen')).toBeInTheDocument();
+      case "welcome":
+        expect(screen.getByTestId("welcome-screen")).toBeInTheDocument();
         break;
-      case 'challenge-selection':
-        expect(screen.getByTestId('challenge-selection')).toBeInTheDocument();
+      case "challenge-selection":
+        expect(screen.getByTestId("challenge-selection")).toBeInTheDocument();
         break;
-      case 'design':
-        expect(screen.getByTestId('design-canvas')).toBeInTheDocument();
+      case "design":
+        expect(screen.getByTestId("design-canvas")).toBeInTheDocument();
         break;
-      case 'audio':
-        expect(screen.getByTestId('audio-recording')).toBeInTheDocument();
+      case "audio":
+        expect(screen.getByTestId("audio-recording")).toBeInTheDocument();
         break;
-      case 'review':
-        expect(screen.getByTestId('review-screen')).toBeInTheDocument();
+      case "review":
+        expect(screen.getByTestId("review-screen")).toBeInTheDocument();
         break;
       default:
         throw new Error(`Unknown workflow phase: ${phase}`);
@@ -545,12 +600,15 @@ export class AssertionHelpers {
   /**
    * Asserts export data structure and content
    */
-  static expectExportData(data: TestDesignData, expectedStructure: Partial<TestDesignData>): void {
+  static expectExportData(
+    data: TestDesignData,
+    expectedStructure: Partial<TestDesignData>,
+  ): void {
     expect(data).toMatchObject(expectedStructure);
     expect(Array.isArray(data.components)).toBe(true);
     expect(Array.isArray(data.connections)).toBe(true);
-    expect(data.metadata).toHaveProperty('timestamp');
-    expect(data.metadata).toHaveProperty('version');
+    expect(data.metadata).toHaveProperty("timestamp");
+    expect(data.metadata).toHaveProperty("version");
   }
 
   /**
@@ -558,11 +616,11 @@ export class AssertionHelpers {
    */
   static expectRecoveryOverlay(visible: boolean): void {
     if (visible) {
-      expect(screen.getByTestId('recovery-overlay')).toBeInTheDocument();
-      expect(screen.getByTestId('recovery-message')).toBeInTheDocument();
-      expect(screen.getByTestId('recovery-actions')).toBeInTheDocument();
+      expect(screen.getByTestId("recovery-overlay")).toBeInTheDocument();
+      expect(screen.getByTestId("recovery-message")).toBeInTheDocument();
+      expect(screen.getByTestId("recovery-actions")).toBeInTheDocument();
     } else {
-      expect(screen.queryByTestId('recovery-overlay')).not.toBeInTheDocument();
+      expect(screen.queryByTestId("recovery-overlay")).not.toBeInTheDocument();
     }
   }
 }
@@ -578,7 +636,7 @@ export function setupIntegrationTests(): void {
 
   // Setup global error tracking
   (globalThis as any).__testErrors = [];
-  (globalThis as any).triggerTestError = (type: TestErrorScenario['type']) => {
+  (globalThis as any).triggerTestError = (type: TestErrorScenario["type"]) => {
     const error = new Error(`Test error: ${type}`);
     error.name = `Test${type.charAt(0).toUpperCase() + type.slice(1)}Error`;
     throw error;

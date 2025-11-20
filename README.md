@@ -81,12 +81,12 @@ Upgrade anytime with `brew upgrade archicomm`. Prefer to build from source? Repl
 
 Every tagged build ships to [GitHub Releases](https://github.com/acailic/archi-comm/releases) with SHA256 checksums.
 
-| Platform | Artifact | How to install |
-| --- | --- | --- |
-| macOS (Intel/Apple Silicon) | `ArchiComm-macOS.dmg` | Double-click the DMG and drag ArchiComm to Applications. |
-| Windows 10/11 | `ArchiComm-Setup-x64.exe` | Run the signed installer and follow the wizard. |
-| Linux (AppImage) | `ArchiComm-x86_64.AppImage` | `chmod +x ArchiComm-x86_64.AppImage && ./ArchiComm-x86_64.AppImage` |
-| Linux (Debian/Ubuntu) | `archicomm_x.y.z_amd64.deb` | `sudo dpkg -i archicomm_x.y.z_amd64.deb` |
+| Platform                    | Artifact                    | How to install                                                      |
+| --------------------------- | --------------------------- | ------------------------------------------------------------------- |
+| macOS (Intel/Apple Silicon) | `ArchiComm-macOS.dmg`       | Double-click the DMG and drag ArchiComm to Applications.            |
+| Windows 10/11               | `ArchiComm-Setup-x64.exe`   | Run the signed installer and follow the wizard.                     |
+| Linux (AppImage)            | `ArchiComm-x86_64.AppImage` | `chmod +x ArchiComm-x86_64.AppImage && ./ArchiComm-x86_64.AppImage` |
+| Linux (Debian/Ubuntu)       | `archicomm_x.y.z_amd64.deb` | `sudo dpkg -i archicomm_x.y.z_amd64.deb`                            |
 
 Download from the latest release manually or via curl:
 
@@ -115,7 +115,7 @@ Build binaries: `npm run build` (creates signed Tauri bundles for your OS).
 
 ### Package Manager
 
-We standardize on npm for dependency management. Commit updates to `package-lock.json` and avoid adding alternative lockfiles (`yarn.lock`, `pnpm-lock.yaml`). Vite's canonical configuration lives at `config/vite.config.ts`; update that file when changing dev server or build behavior.
+We standardize on npm for dependency management. Commit updates to `package-lock.json` and avoid adding alternative lockfiles (`yarn.lock`, `pnpm-lock.yaml`). Vite's canonical configuration lives at `config/vite.config.mjs`; update that file when changing dev server or build behavior.
 
 ### Auto-Updates
 
@@ -170,6 +170,7 @@ ArchiComm’s canvas now speaks to modern coding models so you can sketch or ref
 - **Safety**: review warnings surfaced after each run—ambiguous instructions or unsupported actions (like annotations) are never applied silently.
 
 > Tip: keep prompts precise. Include component names when updating existing nodes so the assistant can map aliases back to live canvas elements.
+
 - Exports: diagrams (SVG/PNG), notes (Markdown), and ADR templates
 
 New in this build:
@@ -305,36 +306,42 @@ ArchiComm Community Edition loads "Tasks" (study modules) that define prompts, a
 ArchiComm is on a journey to become a **world-class, top 0.1% diagramming platform** for system design. The canvas includes advanced features that match or exceed industry leaders like Figma, Miro, and Excalidraw:
 
 #### Performance & Virtualization
+
 - **60 FPS Performance**: Sustained 60 FPS with 1000+ components using React Flow virtualization
 - **Adaptive Quality**: Automatic quality adjustments based on performance metrics
 - **Spatial Indexing**: RTree-based spatial indexing for O(log n) collision detection
 - **LOD Rendering**: Level-of-detail rendering reduces detail at low zoom levels
 
 #### Organization & Navigation
+
 - **Frames & Sections**: Figma-style frames for organizing components into logical groups
 - **Advanced Search**: Fuzzy search across components, connections, annotations, and frames with jump-to-result
 - **Navigation Breadcrumbs**: History tracking with back/forward navigation (Alt+Left/Right)
 - **Frame Hierarchy**: Nested frames with collapse/expand and visual hierarchy
 
 #### AI-Powered Features
+
 - **Text-to-Diagram**: Natural language to architecture diagram generation using LLMs
 - **Smart Suggestions**: Context-aware suggestions for connections, patterns, and anti-patterns
 - **Anti-Pattern Detection**: Automatic detection of common architecture anti-patterns
 - **Auto-Arrange**: Intelligent layout algorithms (by type, layer, flow, hierarchy)
 
 #### Precision & Routing
+
 - **Smart Routing**: Orthogonal and Manhattan routing with obstacle avoidance
 - **Connection Optimization**: Automatic anchor point selection for clean paths
 - **Grid Snap**: Magnetic snap-to-grid with visual feedback
 - **Alignment Guides**: Real-time alignment guides during drag operations
 
 #### Presentation & Export
+
 - **Presentation Mode**: Create slides from frames with transitions and speaker notes
 - **Template Library**: 50+ curated component templates organized by category
 - **Export Options**: High-res PNG/SVG export, PDF presentations, image sequences
 - **Frame Export**: Export individual frames as standalone images
 
 #### Keyboard Shortcuts (New)
+
 - `Ctrl+F`: Open canvas search
 - `Ctrl+G` / `Ctrl+Shift+G`: Navigate search results
 - `Ctrl+Shift+F`: Create frame from selection
@@ -569,6 +576,7 @@ Useful scripts:
 For complete tooling documentation, see `docs/TOOLING.md`.
 
 ---
+
 ## Contributing
 
 We welcome improvements to modules, patterns, checklists, and study flows for the Community Edition.
@@ -604,14 +612,16 @@ ArchiComm Pro unlocks advanced features for professional users, including automa
 ### Drawing Issues
 
 **Can't draw on the canvas?**
+
 - Press `D` or click **Draw** in the unified toolbar to enter drawing mode.
 - Pick a pen, highlighter, or eraser in the floating toolbar beneath the header.
-- Confirm the mode indicator badge shows *Drawing Mode* and the cursor preview circle is visible.
+- Confirm the mode indicator badge shows _Drawing Mode_ and the cursor preview circle is visible.
 - If strokes still do not appear, press `V` then `D` to reset the mode and ensure you are dragging on the canvas (not over other panels).
 
 ### Annotation Issues
 
 **Annotations not placing?**
+
 - Press `A` or click **Annotate**, then choose a comment, note, label, arrow, or highlight tool.
 - Look for the hover halo that appears when the cursor is ready to place an annotation.
 - Ensure no side panels or overlays are covering the canvas—toggle layer visibility if necessary.

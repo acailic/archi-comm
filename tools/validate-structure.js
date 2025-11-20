@@ -3,47 +3,47 @@
  * Validates repository structure to ensure configuration, tooling,
  * and source packages follow the expected organization.
  */
-import fs from 'fs';
-import path from 'path';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..');
+const projectRoot = path.resolve(__dirname, "..");
 
 const requiredDirectories = [
-  'config',
-  'tools/scripts',
-  'docs',
-  'src/packages/core',
-  'src/packages/ui',
-  'src/packages/canvas',
-  'src/packages/audio',
-  'src/packages/services'
+  "config",
+  "tools/scripts",
+  "docs",
+  "src/packages/core",
+  "src/packages/ui",
+  "src/packages/canvas",
+  "src/packages/audio",
+  "src/packages/services",
 ];
 
 const legacyConfigFiles = [
-  '.prettierrc',
-  '.releaserc.json',
-  'eslint.config.js',
-  'playwright.config.ts',
-  'tsconfig.json',
-  'vite.config.ts',
-  'src/vite.config.ts',
-  'sonar-project.properties'
+  ".prettierrc",
+  ".releaserc.json",
+  "eslint.config.js",
+  "playwright.config.ts",
+  "tsconfig.json",
+  "vite.config.mjs",
+  "src/vite.config.ts",
+  "sonar-project.properties",
 ];
 
 const forbiddenDevelopmentArtifacts = [
-  'TODO.md',
-  'CLAUDE.md',
-  'ideas',
-  'dev-notes',
-  'brainstorming',
-  'scratch',
-  'temp-notes',
-  'draft-notes',
-  'scripts'
+  "TODO.md",
+  "CLAUDE.md",
+  "ideas",
+  "dev-notes",
+  "brainstorming",
+  "scratch",
+  "temp-notes",
+  "draft-notes",
+  "scripts",
 ];
 
 const deprecatedImportSegments = [
@@ -54,7 +54,7 @@ const deprecatedImportSegments = [
   "src/components/",
   "src/services/",
   "src/features/canvas",
-  "src/lib/audio"
+  "src/lib/audio",
 ];
 
 const errors = [];
@@ -81,17 +81,22 @@ function ensureDevelopmentArtifactsNotTracked() {
   forbiddenDevelopmentArtifacts.forEach((name) => {
     const target = path.join(projectRoot, name);
     if (fs.existsSync(target)) {
-      errors.push(`Development artifact should not exist at repository root: ${name}`);
+      errors.push(
+        `Development artifact should not exist at repository root: ${name}`,
+      );
     }
   });
 
   try {
-    const trackedArtifacts = execSync('git ls-files -- TODO.md CLAUDE.md ideas dev-notes brainstorming scratch', {
-      cwd: projectRoot,
-      stdio: ['ignore', 'pipe', 'ignore']
-    })
+    const trackedArtifacts = execSync(
+      "git ls-files -- TODO.md CLAUDE.md ideas dev-notes brainstorming scratch",
+      {
+        cwd: projectRoot,
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    )
       .toString()
-      .split('\n')
+      .split("\n")
       .filter(Boolean);
     if (trackedArtifacts.length > 0) {
       trackedArtifacts
@@ -121,7 +126,17 @@ function walkFiles(startDir, matcher) {
     for (const entry of entries) {
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        if (['node_modules', '.git', 'docs', 'dist', 'distribution', 'tools', '.husky'].includes(entry.name)) {
+        if (
+          [
+            "node_modules",
+            ".git",
+            "docs",
+            "dist",
+            "distribution",
+            "tools",
+            ".husky",
+          ].includes(entry.name)
+        ) {
           continue;
         }
         stack.push(fullPath);
@@ -135,26 +150,28 @@ function walkFiles(startDir, matcher) {
 }
 
 function ensureImportsUsePackages() {
-  const sourceDir = path.join(projectRoot, 'src');
+  const sourceDir = path.join(projectRoot, "src");
   if (!fs.existsSync(sourceDir)) {
-    errors.push('Missing src directory');
+    errors.push("Missing src directory");
     return;
   }
 
   const files = walkFiles(sourceDir, (filePath) => {
     const ext = path.extname(filePath);
-    return ['.ts', '.tsx', '.js', '.jsx'].includes(ext);
+    return [".ts", ".tsx", ".js", ".jsx"].includes(ext);
   });
 
   files.forEach((filePath) => {
-    const rawContent = fs.readFileSync(filePath, 'utf8');
+    const rawContent = fs.readFileSync(filePath, "utf8");
     const content = rawContent
-      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
-      .replace(/\/\/.*$/gm, ''); // Remove line comments
+      .replace(/\/\*[\s\S]*?\*\//g, "") // Remove block comments
+      .replace(/\/\/.*$/gm, ""); // Remove line comments
 
     deprecatedImportSegments.forEach((segment) => {
       if (content.includes(segment)) {
-        errors.push(`Deprecated import segment \"${segment}\" found in ${path.relative(projectRoot, filePath)}`);
+        errors.push(
+          `Deprecated import segment "${segment}" found in ${path.relative(projectRoot, filePath)}`,
+        );
       }
     });
   });
@@ -167,12 +184,14 @@ function run() {
   ensureImportsUsePackages();
 
   if (errors.length > 0) {
-    console.error('\nRepository structure validation failed:\n');
+    console.error("\nRepository structure validation failed:\n");
     errors.forEach((message) => console.error(` - ${message}`));
-    console.error('\nPlease align the repository with the expected structure before committing.');
+    console.error(
+      "\nPlease align the repository with the expected structure before committing.",
+    );
     process.exit(1);
   } else {
-    console.log('Repository structure looks good.');
+    console.log("Repository structure looks good.");
   }
 }
 

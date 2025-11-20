@@ -97,7 +97,7 @@ Documented Tauri vs Electron decision:
 #### 7. Update Test Coverage Thresholds (15 minutes)
 **Status**: ✅ Complete
 **Date**: 2025-09-30
-**Files**: `config/vite.config.ts`
+**Files**: `config/vite.config.mjs`
 
 Updated coverage requirements:
 - Lines: 70% → 80%

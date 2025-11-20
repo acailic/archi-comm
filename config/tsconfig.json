@@ -1,12 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": [
-      "ES2020",
-      "DOM",
-      "DOM.Iterable",
-      "WebWorker"
-    ],
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "WebWorker"],
     "types": ["vite/client", "vitest/globals"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
@@ -31,69 +26,40 @@
     "exactOptionalPropertyTypes": false,
     "baseUrl": "../",
     "paths": {
-      "@/*": [
-        "src/*"
-      ],
-      "@packages/*": [
-        "src/packages/*"
-      ],
-      "@stores/*": [
-        "src/stores/*"
-      ],
-      "@core": [
-        "src/packages/core/index.ts"
-      ],
-      "@core/*": [
-        "src/packages/core/*"
-      ],
-      "@ui": [
-        "src/packages/ui/index.ts"
-      ],
-      "@ui/*": [
-        "src/packages/ui/*"
-      ],
-      "@canvas": [
-        "src/packages/canvas/index.ts"
-      ],
-      "@canvas/*": [
-        "src/packages/canvas/*"
-      ],
-      "@audio": [
-        "src/packages/audio/index.ts"
-      ],
-      "@audio/*": [
-        "src/packages/audio/*"
-      ],
-      "@services": [
-        "src/packages/services/index.ts"
-      ],
-      "@services/*": [
-        "src/packages/services/*"
-      ],
-      "@lib/*": [
-        "src/lib/*"
-      ],
-      "@shared/*": [
-        "src/shared/*"
-      ],
-      "@hooks/*": [
-        "src/shared/hooks/*"
-      ],
-      "@test/*": [
-        "src/test/*"
-      ]
+      "@/*": ["src/*"],
+      "@packages/*": ["src/packages/*"],
+      "@stores/*": ["src/stores/*"],
+      "@core": ["src/packages/core/index.ts"],
+      "@core/*": ["src/packages/core/*"],
+      "@ui": ["src/packages/ui/index.ts"],
+      "@ui/*": ["src/packages/ui/*"],
+      "@canvas": ["src/packages/canvas/index.ts"],
+      "@canvas/*": ["src/packages/canvas/*"],
+      "@audio": ["src/packages/audio/index.ts"],
+      "@audio/*": ["src/packages/audio/*"],
+      "@services": ["src/packages/services/index.ts"],
+      "@services/*": ["src/packages/services/*"],
+      "@lib/*": ["src/lib/*"],
+      "@shared/*": ["src/shared/*"],
+      "@hooks/*": ["src/shared/hooks/*"],
+      "@test/*": ["src/test/*"]
     }
   },
   "include": [
     "../src/**/*",
     "../src/types/**/*",
-    "../test/**/*"
+    "../test/**/*",
+    "../__tests__/**/*",
+    "../config/**/*.ts",
+    "../config/**/*.mts"
   ],
   "exclude": [
     "../node_modules",
     "../dist",
     "../src-tauri",
     "../test-results",
-    "../coverage"
+    "../coverage",
+    "../config/vite.config.ts",
+    "../config/playwright.config.ts"
   ]
 }

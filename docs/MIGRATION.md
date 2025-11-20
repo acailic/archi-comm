@@ -23,7 +23,7 @@ All tooling configuration moved under `config/` and the Vite/TypeScript aliases 
 4. Replace service imports: `@/services...` → `@services...`.
 5. Pull shared helpers from `@core` (`@core/types`, `@core/utils`).
 
-The new path aliases are defined in `config/tsconfig.json` and `config/vite.config.ts`.
+The new path aliases are defined in `config/tsconfig.json` and `config/vite.config.mjs`.
 
 ## Verifying the Move
 

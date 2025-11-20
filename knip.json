@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
     "src/main.tsx",
-    "config/vite.config.ts",
+    "config/vite.config.mjs",
     "config/playwright.config.ts"
   ],
   "project": ["src/**/*.{ts,tsx}", "config/**/*.{ts,js}", "e2e/**/*.{ts,tsx}"],
@@ -23,10 +23,10 @@
   "ignoreDependencies": ["@tauri-apps/cli", "husky", "lint-staged"],
   "ignoreExportsUsedInFile": true,
   "vite": {
-    "config": ["config/vite.config.ts"]
+    "config": ["config/vite.config.mjs"]
   },
   "vitest": {
-    "config": ["config/vite.config.ts"]
+    "config": ["config/vite.config.mjs"]
   },
   "playwright": {
     "config": ["config/playwright.config.ts"]

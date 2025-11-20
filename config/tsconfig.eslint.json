@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true
+  },
+  "include": [
+    "../src/**/*",
+    "../src/types/**/*",
+    "../test/**/*",
+    "../__tests__/**/*",
+    "../config/**/*",
+    "../*.config.js",
+    "../commitlint.config.cjs",
+    "../tools/**/*.js",
+    "../tools/**/*.ts"
+  ],
+  "exclude": [
+    "../node_modules",
+    "../dist",
+    "../src-tauri",
+    "../test-results",
+    "../coverage",
+    "../config/vite.config.ts"
+  ]
+}

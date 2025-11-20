@@ -4,7 +4,7 @@
 
 - `src/`: React + TypeScript app (`main.tsx`, `App.tsx`), feature code in `components/`, `hooks/`, `services/`, `lib/`, and styles in `styles/`/`index.css`. Additional docs in `src/guidelines/`.
 - `src-tauri/`: Tauri (Rust) backend (`src/main.rs`, `tauri.conf.json`, `icons/`, `target/`). Tauri commands are exposed with `#[tauri::command]` (e.g., `create_project`, `save_diagram`).
-- Root: `index.html`, `vite.config.ts`, `package.json`, `README.md`, built web assets in `dist/`.
+- Root: `index.html`, `vite.config.mjs`, `package.json`, `README.md`, built web assets in `dist/`.
 
 ## Build, Test, and Development
 

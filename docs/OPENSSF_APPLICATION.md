@@ -75,7 +75,7 @@ Apply at: https://bestpractices.coreinfrastructure.org/
 ### High Priority
 
 1. **Increase test coverage to 80%+**
-   - Status: In progress (thresholds updated in vite.config.ts)
+   - Status: In progress (thresholds updated in vite.config.mjs)
    - Action: Write tests for uncovered code paths
    - Files: See coverage report at `coverage/index.html`
 

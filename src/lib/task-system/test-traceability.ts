@@ -1,7 +1,7 @@
 // src/lib/task-system/test-traceability.ts
 // Test traceability system linking acceptance criteria to test execution
 // Tracks test results and generates traceability reports
-// RELEVANT FILES: src/lib/task-system/acceptance-criteria-manager.ts, src/packages/services/storage.ts, config/vite.config.ts
+// RELEVANT FILES: src/lib/task-system/acceptance-criteria-manager.ts, src/packages/services/storage.ts, config/vite.config.mjs
 
 import { acceptanceCriteriaManager } from "./acceptance-criteria-manager";
 import type { AcceptanceCriterion } from "./schemas/acceptance-criteria";

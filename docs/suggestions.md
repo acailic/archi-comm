@@ -22,7 +22,7 @@ fuse.js or match-sorter: Add fuzzy ranking to your Command Palette. Slot into th
 nanoid: Collision‑resistant IDs instead of Date.now()/Math.random(). Use in src/lib/utils.ts:20 and places generating IDs like src/components/DesignCanvas.tsx:64.
 Build & Dev
 
-vite-plugin-svgr: Import SVGs as React components (props, styling) instead of URL modules. Add to vite.config.ts and replace \*.svg usages where helpful.
+vite-plugin-svgr: Import SVGs as React components (props, styling) instead of URL modules. Add to vite.config.mjs and replace \*.svg usages where helpful.
 why-did-you-render: Dev‑only tool to spot avoidable re‑renders in complex canvases. Initialize in src/main.tsx:172 for development builds.
 Testing & Quality
 
